@@ -1,0 +1,810 @@
+ == Frequently Asked Questions (FAQ) ==
+ 
+ * How do I change the Multi channel ordering?
+ - When in idle mode (not edit/play etc), press ALT+1/2/3/4 to increase
+   the according multi slot. CTRL+M enables multi.
+   Multi
+   
+ * Alt+F5/ALT+F5 (copy/paste) doesn't work!
+ - Windows: you need to make sure those keybinding are disabled in
+   'GeForce Experience' if you have that software installed.
+ - OS X/mac OS/Linux: You need to remove or re-bind ALT+F4/ALT+F5 to other keys
+   in your OS settings.
+ 
+ * Is there a way to make the window bigger?
+ - Set VIDEOSCALE to 2X, 3x or 4X in protracker.ini.
+
+ * Is there a way to run the program in fullscreen mode?
+ - Press F11.
+
+ * How do I change the stereo separation (panning)?
+ - Adjust the STEREOSEPARATION setting in protracker.ini. It's a percentage
+   value ranging from 0 to 100. 0 being mono and 100 being 100% separated like
+   the audio output from an Amiga.
+   Pressing SHIFT+F12 will toggle between STEREOSEPARATION and 100% (hard pan).
+
+ * Can this ProTracker clone load PT.Config files?
+ - Yes. Put one in the same directory as the executable program, and it will
+   load the first one it can find (PT.Config-00..99).
+   It will override some of the settings from protracker.ini.
+
+ * Will there ever be MIDI support?
+ - No, sorry. Try a modern module tracker instead, or ProTracker on the Amiga.
+ 
+ * Is there a quick way to save my module?
+ - Press CTRL+S. This hotkey is "split mode" in Amiga ProTracker, which is not
+   included in this PT clone.
+   
+ * Can I revert a sample after I edited it?
+ - Press CTRL+Z while the sampler screen is open.
+
+ * [insert random question]
+ - Try to send an email to olav.sorensen@live.no or visit #protracker at IRCnet.
+
+ == Some misc. info ==
+
+ WARNING: Note B-3 (or pitches getting near; pitch slides, vibrato or arpeggio)
+ may not play correctly on a real Amiga. It might crackle/pop because of a
+ DMA underrun. Take extra care when doing high pitches!
+
+ == Missing things that will NOT be added in the future ==
+  
+  * Split keys (kinda pointless without MIDI). ctrl+s is now used for MOD saving
+  * MIDI support
+  * Setup screen
+  
+ == Some ProTracker keybindings are used by other things in OS X! ==
+ 
+  - In OS X, go to System Preferences -> Keyboard -> Keyboard Shortcuts and
+    disable keybindings that could interrupt with any PT keybindings.
+ 
+ == Non-ProTracker additions ==
+ 
+ * Toggle channels by right clicking on the scopes
+    
+ * MOD2WAV button for rendering the current song to a .WAV file.
+   Read more about this function in the MAINSCREEN chapter.
+ 
+ * PAT2SMP button for rendering the current pattern (from current row)
+   to the current sample slot. Read more about this function in the
+   MAINSCREEN chapter.
+ 
+ * Sample draw tool
+   Use right mouse button to edit sample data in the sampler like in FT2
+   (hold SHIFT key to stop drawing in the y axis, for making steady lines)
+   
+ * Sample "restore" keybinding (ctrl+z when sampler screen is open)
+   When a sample is loaded its attributes and datas are copied to a temp buffer.
+   If you press ctrl+z, the current sample's data+attributes will be restored.
+   Now you don't need to reload a sample when you make a change you regret!
+   
+ * WAV sample loader.
+   Supports: 8-bit, 16-bit, 24-bit, 32-bit and 32-bit/64-bit floating point
+   The WAV samples are mixed to mono and quantized to 8-bit.
+   It also attempts to load the "SMPL" chunk to get loop points and
+   volume from sampler WAVs and Open ModPlug Tracker and the like.
+   
+ * AIFF sample loader.
+   Supports: 8-bit, 16-bit, 24-bit and 32-bit
+   The AIFF samples are mixed to mono and quantized to 8-bit.
+   
+ * PAGE UP/DOWN and HOME/END works in POS-ED, DISK OP. and the pattern editor
+   (and HOME/END works while editing strings)
+   
+ * Low-pass and high-pass filters in the sampler editor
+ 
+ * Some more stuff added to make life easier, like mouse wheel support.
+
+ Now follows the main parts of this help file.
+ 
+
+               MAINSCREEN
+               ----------
+ ## PLAY ##
+ Will play the song from the current song position. The pointer turns yellow,
+ just to show you what's going on. If you hold right mouse button while
+ clicking, it will play from the current row. Useful for checking if parts
+ of the pattern sounds right, instead of playing from the beginning all
+ the time.
+
+ ## PATTERN ##
+ Will play the current pattern which is shown at the bottom of the screen.
+ The pointer turns yellow here as well. If you hold right mouse button while
+ clicking, it will play from the current row. Useful for checking if parts
+ of the pattern sounds right, instead of playing from the beginning all
+ the time.
+
+ ## EDIT ##
+ Will put you in edit mode. The pointer turns blue, and you can enter notes
+ and numbers from the keyboard. Use the arrow keys to move up/down and
+ left/right in the pattern. Entering a note or a number will cause the
+ pattern to jump one or more slots down, dependant on the EDITSKIP setting.
+
+ ## RECORD ##
+ Will put you in edit mode, but also play the current pattern or song.
+ You can select this in the Edit Options menu. While the pattern or
+ song is playing, you can type in notes and numbers from the keyboard,
+ and they will appear in the pattern as it scrolls. The notes and numbers
+ will also be quantized to the nearest row, so that keeping a steady rhythm
+ is no problem (if you're good with realtime beats). The pointer will turn
+ blue here as well as in the the normal edit mode.
+
+ ## STOP ##
+ Will stop playing of songs and patterns, recording, and will turn edit
+ mode off. Can also be used to stop all looping samples when you're jamming.
+
+ ## CLEAR ##
+ Will first ask you what you want to clear. You can clear either all,
+ song or samples.
+
+ ## EDIT OP. ##
+ Will exchange the spectrum analyzer or quadrascope with the edit menu(s).
+ Pressing more than one time will browse through the edit op. screens.
+ Click the "chord" button on screen 3 to get to the fourth screen.
+
+ ## DISK OP. ##
+ Will go to the load/save dialog.
+ While in the DISK OP., you can press shift+character to jump
+ to the first filename entry starting with that character.
+
+ ## MOD2WAV ##
+ Renders the current song to a 16-bit 44.1kHz stereo WAV file.
+ Amiga panning mode, channel solo/mute, BLEP and the HP/LP filters are
+ included in the rendering. What you hear in the tracker is what you get.
+
+ ## PAT2SMP ##
+ Renders the current pattern (from current row) to the current sample slot.
+ This tool is handy for making drum loops.
+ 
+ - Quality mode: -
+ HI: 28836Hz - Play the new sample at note A-3 (finetune +5)
+ LO: 22168Hz - Play the new sample at note F-3 (finetune +1)
+  
+ HI has the highest possible quality, but can only fit 2.27 seconds of audio.
+ LO is worse in quality, but can fit slightly more at 2.95 seconds.
+ 
+ You should use this feature in sequences to fit as much rows as you need.
+ F.ex. start from row 0 to row 23, then make another sample from row 24 to 47,
+ then 48 to 63. This should only give you an idea of how to use it, as you might
+ need to do it differently depending on the song BPM, HI/LO and rows needed.
+ If the BPM is high, you could possibly fit a whole pattern in HI mode in just
+ two samples.
+
+ The solo/mute buttons are functional and handled in the PAT2SMP mixing.
+
+ ## POS ED. ##
+ This is the position editor screen found in ProTracker 2.2 or later.
+ You can give patterns a name for organizing, but they are not saved
+ in the module.
+
+ ## SAMPLER ##
+ Will go to the sampler screen.
+
+ The small gadgets labeled
+
+ ## 1, 2, 3 and 4 ##
+ Represents the audio channels of your Ami.. I mean, non-Amiga computer.
+ When lit, that channel is on. When not lit, the channel is muted and and
+ the notes in that channel will not be played.
+ If you hold the right mouse button while clicking, the channel will be solo'd.
+
+ You can also use ctrl-a to toggle an audio channel, and ctrl-q to unmute all
+ channels. ctrl+shift-a will solo the current channel.
+
+ ## Tempo ##
+ The tempo gadget on the status bar is for setting the CIA speed, if CIA
+ timing is used. The gadget will be updated every time you set the speed
+ using the F command (if CIA that is). To toggle between VBLANK/CIA,
+ press ctrl+F12. This flag is not stored in the MOD file, so be careful.
+ CIA is the standard mode, use it all the time unless you know what
+ you're doing.
+
+
+
+                DISK OP.
+                --------
+
+ ## Path ##
+ The paths for modules and samples. It can be up to ~260 characters
+ long, depending on the OS. Click on it to edit the path. Right click
+ while editing to zero out all the text - handy for changing the drive.
+
+ ## Pack ## (NOT YET IMPLEMENTED)
+ When on, ProTracker will powerpack modules/samples before saving.
+
+ ## Load module ##
+ Will set the DISK OP. to LOAD MODULE mode. It will only list loadable
+ files (MOD/STK/M15/PP extensions).
+
+ ## Save module ##
+ Will save the module to the current disk op. path. The filename will be
+ <songname>.mod or mod.<songname> dependant on a protracker.ini setting.
+
+ ## Load sample ##
+ Will set the DISK OP. to LOAD SAMPLE mode. It will list all files in a dir.
+
+ ## Save Sample ##
+ Will save the current sample as WAV, IFF or RAW. Select this in the "SAVE"
+ gadget to the left. Sample loop points are stored to IFF files.
+
+
+
+                SAMPLER
+                -------
+ The new sampler/sample editor was included simply because we thought 
+ the one in Noisetracker 2.0 was terrible, and we needed graphing of
+ samples and proper loop editing. 
+
+ It's very fast, much faster than Audiomaster, and the editing is
+ much simpler. 
+
+ We also included a resampling option which we hope you'll find useful.
+
+ Editing
+ -------
+ When editing a sample, use the mouse to set the cursor line and to mark
+ ranges.
+
+ ## Waveform ##
+ Will play the full sample with loops.
+
+ ## Display ##
+ Will play the part of the sample being shown on screen.
+
+ ## Range ##
+ Will play the marked range.
+
+ ## Stop ##
+ Will stop all playing of samples.
+
+ ## Show range ##
+ Will magnify the current range and display it.
+
+ ## Show all ##
+ Will display the whole sample.
+
+ ## Beg ##
+ Will put the cursor line at the beginning of the sample.
+ Holding SHIFT while clicking will extend the marking to the beginning.
+ 
+ ## End ##
+ Will put the cursor line at the end of the sample.
+ Holding SHIFT while clicking will extend the marking to the end.
+
+ ## Center ##
+ Will put the cursor line at the center of the sample.
+ Holding SHIFT while clicking will extend the marking to the center.
+
+ ## Zoom out ##
+ Will show double the range you are displaying.
+
+ ## Range all ##
+ Will range the part of the sample being displayed on screen.
+
+ ## Cut ## (or ctrl+X)
+ Will cut the part of the sample that's marked.
+
+ ## Copy ## (or ctrl+C)
+ Will copy the marked range to the copy buffer.
+
+ ## Paste ## (or ctrl+V)
+ Will paste the copy buffer into the current sample.
+ 
+ ## Volume ""
+ Will take you to the volume tool box.
+ 
+ ## Tunetone ##
+ Will create a tuned sinus sound, which you can tune your samples after.
+ 
+ ## Fix DC ##
+ Will remove any eventual DC offset in the sample, which will make it centered.
+ This function might not always work as intended, especially not on basic
+ waveforms.
+ 
+ ## Filters ##
+ Will take you to the filters tool box.
+
+ ## Offs (offset) ##
+ This displays what 9xx command value to use to play the sample from where you're
+ pointing at in the sample data. This will display no value if the position is
+ equal to zero, since 900 means "use last 9xx value".
+
+ ## Resample ##
+ Here's a step-by-step explanation:
+
+ 1. Turn on the tuning tone.
+ 2. Use the keyboard to find what note it is. Use finetune if needed.
+ 3. Enter the note in the "Note:" box to the right. 
+ 4. Press resample!
+
+ ## Note ##
+ This is what note to resample to.
+
+ ## Disp (display) ##
+ This is the length of the part of the sample being shown on screen.
+
+ ## Loop on/off ##
+ This is for turning sample loops on/off without having to fiddle with the
+ repeat and replen gadgets.
+ 
+ ## Exit ##
+ Exits the sampler screen. 
+
+
+ The volume tool box
+ --------------
+ Set the "from" and "to" volume percentages by using the sliders,
+ or just type in any number you please (from 0 to 200) in the
+ percentage boxes to the right.
+
+ ## Normalize ##
+ Will find the highest volume settings possible (without clipping).
+
+ ## Cancel ##
+ Will exit the volume box.
+
+ ## \ ##
+ Will set the percentages 100%-0%
+
+ ## / ##
+ Will set the percentages 0%-100%
+
+ ## - ##
+ Will set the percentages 100%-100%
+
+ ## Ramp ##
+ Will ramp (calculate) the volume!
+
+
+ The filters tool box
+ --------------
+ This tool box lets you low-pass or high-pass a sample.
+ Cool for vocals and drumloops, or for any filtering needs.
+ Keep in mind that this is a crude filter, the base frequency
+ is manually set to 16574Hz, so the cutoff values really depend
+ on the base frequency of the sample.
+ This means that for example a 100Hz low-pass is 100Hz only if
+ the base frequency of the sample is 16574Hz.
+ Just test your way to the audible cutoff you want, and press
+ UNDO if you didn't like it.
+
+ ## Undo ##
+ Restores the sample data to the previous state. Used for when you
+ didn't like the new filtered value. Use CTRL+Z to completely
+ restore the sample to the state of when it was loaded.
+
+ ## Exit ##
+ Will exit the volume box.
+
+ ## Low-Pass ##
+ Will low-pass the sample with the given cutoff frequency.
+
+ ## Low-Pass Frequency ##
+ Click on this to manually set a cutoff or use the up/down gadgets.
+
+ ## High-Pass ##
+ Will high-pass the sample with the given cutoff frequency.
+
+ ## High-Pass Frequency ##
+ Click on this to manually set a cutoff or use the up/down gadgets
+ 
+ ## Normalize Sample ##
+ Will normalize the sample after it has been filtered, before
+ quantizing it to 8-bit. This will prevent clipping and also result
+ in higher quality if the filtered result was low on amplitude.
+
+
+                EDIT OP.
+                --------
+
+ The edit op. screens were just a handy way for us to implement all the new
+ functions we had thought of. There are four screens, and you can browse 
+ through them by pressing the edit op.  gadget more than once, or select one
+ by clicking on the numbers 1-3. Screen four is accessed by clicking the "chord"
+ button in edit op. screen 3.
+               
+ To exit edit op., click on the gadget labeled "E" or press ESC.
+
+ 
+ Edit op. Screen 1:
+
+ ## Transposing ##
+
+ What is transposing ?
+
+ Transposing lets you shift the pitch of the notes up or down. 
+ E.g. Change a C-3 to a C#3.
+
+ In comparison to other trackers, ProTracker lets you transpose in just
+ about every way you can imagine. You can transpose either the current
+ sample or all the samples in a channel or pattern.
+
+ To the right of the title bar is a small box with the letter "S" or "A".
+
+ S - Only the current sample will be transposed. 
+ A - All the samples from $00-$1F will be transposed.
+
+ To toggle between the two, click on the edit op. title bar.
+ 
+ If the config entry "TransDel" is enabled, all the notes transposed out of
+ range (C-1 to B-3) will be deleted. If not, they will not be transposed.
+
+
+
+ Edit op. screen 2: (Record)
+
+ ## Record ## 
+ Patt - Record current pattern only. 
+ Song - When recording, PT will move through the patterns in the
+        song, just like normal play.
+
+ ## Quantize ##
+ Will move the notes you record to every n'th row. Entering 00 will 
+ turn off the quantizing, and the notes you play will always be 
+ inserted at the row you are at. Entering 01 will quantize
+ the notes the the nearest row according to the speed. i.e. if you 
+ play a note after the first half has been played, it will be quantized
+ to the row below. Entering a value like 8 will quantize to every 8th
+ row, and so on. Got that? 
+
+ ## Metro (metronome) ##
+ The first number is the speed of the metronome, and the second is the 
+ channel to play it on. The sample used for metronomes is always sample
+ 31/$1F. Load your own favourite metronome sample.
+ To turn off the metronome, just set the speed or channel to 00. 
+
+ ## Multi ##
+ When on, PT will jump to another channel after you play a note on the
+ keyboard. This makes it possible to play two or more notes at the same
+ time.
+
+
+
+ Edit Op. screen 2: (samples)
+
+ To the right of the title bar is a small box with the letter "T", "P"
+ or "S".
+
+ T - Copy & Exchange apply to current track (channel) only.
+ P - Copy & Exchange will affect the the whole pattern.
+ S - Copy & Exchange will apply to the real samples in memory.
+
+ To toggle between the two, click on the edit op. title bar.
+
+ ## Delete ##
+ Will delete all notes with the current sample in current channel or whole
+ pattern.
+
+ ## Kill ##
+ Will kill the current sample. That is, remove it from memory and reset
+ all sample settings.
+
+ ## EXCHGE (exchange) ##
+ Will exchange the sample number shown in the "from" gadget with the sample
+ number in the "to" gadget and vice versa. "T" or "P" selects track (channel) or
+ pattern. "S" exchanges the samples.
+
+ ## MOVE ##
+ Will move the sample number shown in the "from" gadget to the sample
+ number in the "to" gadget.
+
+
+
+ Edit Op. screen 3: (Sample Editor)
+
+ To the right of the title bar is a small box with the letter "H" or "C".
+
+ H - Will halve the volume on many sample altering effects to avoid clipping.
+ C - Will not halve the volume. The sample may be clipped.
+ 
+ To toggle between the two, click on the edit op. title bar.
+
+ ## Mix ## 
+ Will mix one sample with another. PT asks you which two samples to be
+ mixed, and where to put the result.
+
+ Holding the right button and pressing mix will mix the current sample with
+ itself. You can offset the sample by setting a position in the "pos" gadget.
+ If you set "mod" to a non-zero value, the sample will also be modulated. 
+
+ ## Echo ##
+ Will create a echo effect on the current sample. Use "pos" to set the 
+ delay time of the echo. If you want more room to echo in, just turn up
+ the length of the sample.
+
+ ## Boost (treble increase) ##
+ Will turn up the treble of the sample. Use this on hi-hats and snares!
+
+ ## Filter (treble decrease) ##
+ Will Delta-filter the sample (treble decrease). Use this on noisy basses.
+
+ ## X-Fade (crossfade) ##
+ Will crossfade the sample (mix with itself, backwards). Handy for looping
+ samples that are hard to loop.
+
+ ## Backwd (backwards) ##
+ Will turn the sample backwards.
+
+ ## Upsamp (upsample) ##
+ Will remove every second byte of the sample, halving the length and 
+ shifting the pitch one octave up.
+
+ ## Dnsamp (downsample) ##
+ Will double every byte of the sample, doubling the length, and shifting
+ the pitch one octave down. If you downsample samples longer than $7FFE, 
+ you will lose the end of them. 
+
+ ## POS ##
+ This is just an offset in the sample, used for a lot of things.
+
+ ## MOD (modulate) ##
+ This is used for modulation. Press "MOD" to modulate the current sample.
+
+ ## CB (Cut Beginning) ##
+ Will chop the number of bytes set in the "pos" gadget off the beginning of
+ the sample.
+
+ ## Chord ##
+ Will take you to the Sample Chord Editor screen.
+ 
+ ## FU (Fade Up) ##
+ Will fade the volume from 0 to 100%. Use "Pos" to select where in the
+ sample to fade up to.
+
+ ## FD (Fade Down) ##
+ Will fade the volume from 100 to 0%. Use "Pos" to select where in the
+ sample to fade down from.
+
+ ## VOL ##
+ With this you can change the "real" volume of the sample. Just set a
+ percentage and press "VOL".
+
+ Edit Op.3 is now intended to be used with the new sample editor. If a 
+ range is marked, some of the functions apply to the range only. If there's
+ no range marked, the functions will affect the whole sample. You may also
+ set "POS" by clicking on the sample and setting the cursor line.
+
+
+
+ Edit Op. screen 4: (Sample Chord Editor)
+ 
+ ## Chord ##
+ Will make the chord, using the current sample and the notes chosen, and
+ the chord will be put in the current sample or a free sample slot, depending
+ on your choice (see below).
+
+ ## Reset ##
+ Will reset the notes and the length.
+
+ ## Undo ##
+ Will undo the last change (apart from multiple arrow up/down).
+ 
+ ## Length ##
+ Will set the length to the maximum value, depending on the length of
+ the original sample and the notes you chose. This will of course set
+ the ':' after the 4 length digits (see below).
+ Holding the right mouse button will set the length to the minimum depending
+ on the notes chosen. '.' will be shown after the 4 digits. Mixing with the
+ minimum length will make the sample as long as the shortest sample of the
+ four resampled notes.
+ Looped samples will always be 65534 in length so that it's easier for you
+ to find good sample loop points.
+
+ ## Major ##
+ Will set a major chord, depending on the basenote.
+
+ ## Minor ##
+ Will set a minor chord, depending on the basenote.
+
+ ## Sus-4 ##
+ Will set a suspended fourth chord, depending on the basenote.
+
+ ## Major7 ##
+ Will set a major seventh chord, depending on the basenote.
+
+ ## Minor7 ##
+ Will set a minor seventh chord, depending on the basenote.
+
+ ## Major6 ##
+ Will set a major sixth chord, depending on the basenote.
+
+ ## Minor6 ##
+ Will set a minor sixth chord, depending on the basenote.
+
+ ## 4 notegadgets ##
+ The upper one is the basenote. If you press a gadget, PT will wait for you
+ to press a note. Holding the right mouse button will reset the note.
+
+ ## 4 Up/Down gadgets ##
+ Will add/sub 1 halfnote from the current note. Holding right mouse button will
+ add/sub 1 octave. You can reset the note by adding past B-3.
+
+ ## The 4 rightmost gadgets ##
+ Works just like the edit op gadgets.
+ 1,2,3 takes you to the corresponding edit screen, and E exits.
+
+ ## The status line ##
+ Pressing the upper line will toggle between New or Old sample: If N, then
+ PT will search for a free sample to put the result in. If O, then PT will
+ put the result in the current sample, overwriting it.
+
+ Note #1
+ -------
+ PT puts a '!' last in the sample name to show you that this is a chord
+ sample. The '!' is for you to see where the destination sample has gone,
+ it has nothing to do with the program. You can take the '!' away and
+ rename the sample to ...-major, ...-minor etc for instance.
+
+ Note #2
+ -------
+ The chosen option on the status line in edit op. 3, H(alve) or C(lip)
+ will NOT affect the chord mixing. The mixing is done in 16-bit, then
+ normalized and quantized to 8-bit using rounding.
+
+             GENERAL INFO.
+             -------------
+ Making Music
+ ------------
+ Any piece of music written with ProTracker is built up from patterns.
+ Each pattern is built up from four channels, one for each of the Amiga's
+ audio channels.
+
+ A pattern is 64 lines long. The middle line is always the one you edit.
+ If you need shorter patterns, use the pattern break (Dxx) effect command.
+
+ A channel is built up like this:
+
+     32  C-3 01 C20
+     /   \_/ |/ \_/
+    /    /   |    \
+  Row Note Sample Effect/Command
+
+ The C-3 is the note being played at row 32. 01 is the sample number,
+ and the three last digits are the effect command, in this case, set
+ volume to $20 (C-Command, 20-Value).
+
+ ProTracker holds a table with info about the sequence in which the patterns
+ will be played. With the "Pos" gadget you determine your position in the table.
+ With "Pattern" you define what pattern to play at that position.
+ "Length" defines the total size of the table. The full sequence of patterns
+ is the song. A song is built up from up to 100 different patterns, each
+ being played at up to 128 different positions.
+
+ The small gadgets labeled "I" and "D" are Insert and Delete. With those you
+ can insert or delete a position from your song. The length of your song
+ will be adjusted automatically. Remember that the length of your song
+ must always be one more than the last position, since the first position
+ is 0.
+
+ Holding down the right mouse button when pressing the Pos, Pattern and Length
+ gadgets will speed them up a bit.
+
+
+ Finetune
+ --------
+ This is a goodie. Tune your untuned samples to match the others.
+ Holding right mouse button while clicking will set finetune to zero.
+
+     0 436.4 hz    -1 432.1 hz
+     1 439.0 hz    -2 429.6 hz
+     2 441.6 hz    -3 426.3 hz
+     3 445.1 hz    -4 423.1 hz
+     4 447.8 hz    -5 419.9 hz
+     5 451.5 hz    -6 416.7 hz
+     6 455.2 hz    -7 414.4 hz
+     7 457.0 hz    -8 412.0 hz
+
+
+ Sample 
+ ------
+ Clicking on the sample up/down gadgets will flicker through the
+ samples. You can use up to 31 (hex $1F) samples in a song.
+
+ Sample zero function
+ --------------------
+ Pressing both mouse buttons at the same time will set the sample number
+ to 'zero'. You can then record/edit the pattern with sample 0 to prevent
+ ProTracker from setting the volume each time you play a new note.
+
+ Length
+ ------
+ The Length gadgets are simply used for setting the length of the sample.
+ A sample can be up to 64k, 65534/$fffe long.
+
+ Volume
+ ------
+ Use this to set the volume the current sample will be played at.
+
+ Repeat (loop start)
+ ------
+ Here you set the start of the sample loop.
+
+ Replen (loop length)
+ ------
+ Here you set the length of the sample loop.
+
+ Pressing both the left and right button on the sample gadgets will
+ speed them up a bit.
+
+ The Pattern Number Gadget
+ -------------------------
+ To the middle left of the screen is a box with a number in it. The number
+ is the current pattern number.
+
+ The "Are you sure?" dialog
+ --------------------------
+ In addition to the gadgets, you can use "Y" or Return for Yes,
+ and "N" or ESC for No. Clicking the right mouse button also acts as No.
+
+ The Clear dialog
+ ----------------
+ In addition to the gadgets you can use "A" for All, "O" for Song, "S" for
+ samples and "C" or ESC for Cancel. Clicking the right mouse button acts
+ as Cancel.
+
+ The Load (sample) gadget
+ ------------------------
+ This gadget will set DISK OP. "load sample" mode and enter the DISK OP.
+
+ The text input routine
+ ----------------------
+ Now this is really simple. Clicking on a text line will enable you to edit
+ it. Some text lines are longer than they seem, so use the arrow keys to
+ scroll back and forth in the text. You can also use HOME/END on your keyb.
+ The text input mode is just like an ordinary text editor. You can use
+ backspace, delete, space, numeric pad keys and such.
+ Pressing Return will exit text edit mode and save the changes.
+ Pressing the right mouse button will clear the text line and exit the editing.
+ Use ESC to just exit.
+
+
+ Tips 'n tricks
+ --------------
+ When inserting, pasting or join-pasting, hold down shift to keep the
+ cursor from jumping to the end of the block. e.g. shift+ctrl+p
+
+ Holding shift while pressing ctrl+k (kill to end of channel) will kill to
+ start of channel instead.
+
+ Use ESC or right mouse button to exit from a lot of things.
+
+
+ Effect tips
+ -----------
+ You can set the volume without playing a note. e.g. ---01000
+ This will set the volume for sample 1 without trigging the note.
+
+ Or try trigging the sample and sliding
+ the volume down. e.g. C-301A08
+                       ---01A08
+                       ---01A08
+ This will create a strange arpeggiato effect, like on "Cream of the earth"
+ by Romeo Knight / RSI.
+ 
+ Entering a new sample number without a note will swap to the new sample
+ after the previous one was done playing. This is useful for creating
+ a sweeping effect on chiptune styled songs, and so on.
+
+
+ Mouse Pointer Colors
+ --------------------
+
+ Gray      - Nothing is happening.
+ Yellow    - Playing song / pattern.
+ Green     - Disk action.
+ Blue      - Edit / record.
+ Magenta   - Waiting for something (text, number or something else).
+ Red       - Something went wrong.
+
+
+ Drumpad
+ -------
+ ProTracker features a drumpad as in Noisetracker 2.0 and 2.1.
+ Use '\' instead of period '.' to toggle modes. One or
+ more dots will appear to the right of the TUNE/TIMING display.
+
+ No dots: Normal keypad.
+   1 dot: Drumpad.
+  2 dots: Drumpad - Edit/Rec possible.
+
+ Use alt+keypadkey to set note.

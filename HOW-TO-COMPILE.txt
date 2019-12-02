@@ -1,0 +1,42 @@
+---- Guide on how to compile the PT2 clone for Windows/macOS/Linux ---
+
+LINUX NOTE: This code is NOT big-endian compatible! The clone might also
+            behave slightly wrong if bitshift-right on signed numbers is
+            compiled into using logical shift (LSR/SHR) instead of arithmetic
+            shift (ASR/SAR). Most CPUs have ASR/SAR instructions.
+
+
+Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
+
+
+== COMPILING ON LINUX (little-endian only!) ==
+ 1. Install the following packages:
+    Ubuntu/Debian and similar: build-essential libsdl2-dev
+    Fedora: gcc gcc-c++ alsa-lib-devel SDL2-devel
+    Others: www.google.com (you want gcc, g++ (or c++), alsa dev and SDL2 dev)
+ 2. Compile the PT2 clone:     (folder: "pt2-clone")
+    chmod +x make-linux.sh     (only needed once)
+    ./make-linux.sh
+ 3. Move pt2-clone/release/other/protracker.ini to ~/.protracker/
+
+
+== COMPILING ON WINDOWS 7 SP1 OR NEWER ==
+ 1. Download Visual Studio Community 2019 (it's free)
+ 2. Start the installer and select the "Desktop development with C++" package
+ 3. Install and wait for it to finish...
+ 4. Open "pt2-clone\vs2019_project\pt2-clone.sln"
+ 5. If you're missing the Windows 10 SDK, then you need to change the Windows
+    SDK version used in the project settings for both debug and release x86/x64.
+ 6. Compile (make sure it's in Release mode. Also note x86/x64)
+
+
+== COMPILING ON MAC OS X 10.6 OR NEWER ==
+ 1. Download and install the "Command Line Tools" XCode package (google it)
+ 2. Download the SDL 2.0.10 framework here:
+    https://www.libsdl.org/release/SDL2-2.0.10.dmg
+ 3. Inside the package, copy SDL2.framework to /Library/Frameworks/
+ 4. Compile the PT2 clone:      (folder: "pt2-clone")
+    chmod +x make-macos.sh      (only needed once)
+   ./make-macos.sh
+ 5. If you have more than one user in your OS, move
+    pt2-clone/release/macos/protracker.ini to ~/.protracker/

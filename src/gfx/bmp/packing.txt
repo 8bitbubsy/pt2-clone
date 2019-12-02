@@ -1,0 +1,34 @@
+If you want to add/modify graphical datas in my PT clone, you need to
+ run the BMPs through a packer (my packer is supplied - bmp2pth.c/bmp2pth.exe).
+
+Every bitmap (the packed ones) has four colors.
+
+Translation scheme (32-bit RGB to 2-bit palette look-up):
+ 0x00000000 (palette[0]) -> 0
+ 0x00BBBBBB (palette[1]) -> 1
+ 0x00888888 (palette[2]) -> 2
+ 0x00555555 (palette[3]) -> 3
+ (other RGB values = invalid, modify palette[] in pt_palette.c for other colors)
+
+Then each pixel is bit-packed like this (8-bit binary value):
+ xx000000 = pixel 1
+ 00xx0000 = pixel 2
+ 0000xx00 = pixel 3
+ 000000xx = pixel 4
+ (f.ex. 01001011)
+
+The data is then RLE encoded using the compactor found in ptcompacter.s
+ in the PT1.3 source code, except that the "Lowest" (compactor code)
+ variable should contain 204 (0xCC) instead of 181 (0xB5).
+
+WARNING:
+ Due to the nature of the RLE packer, one 8-bit value is used as an ID to tell
+ the RLE unpack routine that RLE data follows. This value is 0xCC (11001100b).
+ When translated to 32-bit RGB, this is:
+  0x00555555, 0x00000000, 0x00555555, 0x00000000
+ (palette[3], palette[0], palette[3], palette[0])
+
+ This means that if these four values are repeated anywhere in the BMP files,
+ you will mess up the RLE scheme.
+
+EOF

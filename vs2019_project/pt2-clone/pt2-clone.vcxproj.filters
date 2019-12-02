@@ -1,0 +1,152 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="gfx">
+      <UniqueIdentifier>{f7b38265-f2ea-42ed-b3ac-34f72cedbbe1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers">
+      <UniqueIdentifier>{d92546b9-e457-49e3-83c0-5826b29679ee}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\pt2_audio.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_blep.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_config.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_diskop.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_edit.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_header.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_helpers.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_keyboard.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_modloader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_mouse.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_palette.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_patternviewer.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sampleloader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sampler.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_scopes.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_tables.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_textout.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_unicode.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_visuals.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\pt2_audio.c" />
+    <ClCompile Include="..\..\src\pt2_blep.c" />
+    <ClCompile Include="..\..\src\pt2_config.c" />
+    <ClCompile Include="..\..\src\pt2_diskop.c" />
+    <ClCompile Include="..\..\src\pt2_edit.c" />
+    <ClCompile Include="..\..\src\pt2_helpers.c" />
+    <ClCompile Include="..\..\src\pt2_keyboard.c" />
+    <ClCompile Include="..\..\src\pt2_main.c" />
+    <ClCompile Include="..\..\src\pt2_modloader.c" />
+    <ClCompile Include="..\..\src\pt2_modplayer.c" />
+    <ClCompile Include="..\..\src\pt2_mouse.c" />
+    <ClCompile Include="..\..\src\pt2_palette.c" />
+    <ClCompile Include="..\..\src\pt2_patternviewer.c" />
+    <ClCompile Include="..\..\src\pt2_sampleloader.c" />
+    <ClCompile Include="..\..\src\pt2_sampler.c" />
+    <ClCompile Include="..\..\src\pt2_scopes.c" />
+    <ClCompile Include="..\..\src\pt2_tables.c" />
+    <ClCompile Include="..\..\src\pt2_textout.c" />
+    <ClCompile Include="..\..\src\pt2_unicode.c" />
+    <ClCompile Include="..\..\src\pt2_visuals.c" />
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_arrow.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_clear.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_diskop.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_editop.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_font.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_icon.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_loop_pins.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_mod2wav.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_mute_buttons.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_pat2smp_dialog.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_patcursor.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_pointer.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_posed.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_sampler.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_spectrum.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_tracker.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\gfx\pt2_gfx_yes_no_dialog.c">
+      <Filter>gfx</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\src\pt2-clone.rc" />
+  </ItemGroup>
+</Project>

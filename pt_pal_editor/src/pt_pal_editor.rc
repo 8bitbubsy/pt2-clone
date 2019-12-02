@@ -1,0 +1,33 @@
+#include <winver.h>
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     0,1,0,0
+PRODUCTVERSION  0,1,0,0
+FILETYPE        VFT_APP
+
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileDescription",  "Palette editor for ProTracker 2.3D clone"
+            VALUE "ProductName",      "Palette editor for ProTracker 2.3D clone"
+            VALUE "ProductVersion",   "1.0"
+#ifdef _WIN64
+            VALUE "InternalName",     "pt_pal_editor-win64"
+            VALUE "OriginalFilename", "pt_pal_editor-win64.exe"
+#else
+            VALUE "InternalName",     "pt_pal_editor-win32"
+            VALUE "OriginalFilename", "pt_pal_editor-win32.exe"
+#endif
+            VALUE "LegalCopyright",   "Copyright © Olav ""8bitbubsy"" Sørensen"
+        END
+    END
+
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0409, 1200
+    END
+END
+
+IDI_MAIN_ICON ICON "gfx\\ptclone_pal_editor.ico"

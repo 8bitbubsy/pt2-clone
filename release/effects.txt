@@ -1,0 +1,412 @@
+             EFFECT COMMANDS
+             ---------------
+
+ Effect commands on ProTracker should
+ be compatible with all other trackers.
+
+ 0 - None/Arpeggio          8 - * NOT USED *
+ 1 - Pitch Slide Up         9 - Sample Offset
+ 2 - Pitch Slide Down       A - Volume Slide
+ 3 - Tone Portamento        B - Position Jump
+ 4 - Vibrato                C - Set Volume
+ 5 - Tone Porta + VolSlide  D - Pattern Break
+ 6 - Vibrato + VolSlide     E - Misc. Cmds
+ 7 - Tremolo                F - Set Speed
+
+              E - COMMANDS
+              ------------
+
+ The E command has been altered to contain more commands than one.
+
+ E0- LED Filter On/Off      E8- * NOT USED *
+ E1- Fine Pitch Slide Up    E9- Note Retrig
+ E2- Fine Pitch Slide Down  EA- Fine Volume Slide Up
+ E3- Glissando Control      EB- Fine Volume Slide Down
+ E4- Set Vibrato Waveform   EC- Note Cut
+ E5- Set Finetune           ED- Note Delay
+ E6- Pattern Loop           EE- Pattern Delay
+ E7- Set Tremolo Waveform   EF- Invert Loop
+
+
+
+ Cmd 0. Arpeggio [Range:$0-$F/$0-$F]
+ -----------------------------------
+ Usage: $0 + 1st halfnote add
+           + 2nd halfnote add
+
+ Arpeggio is used to simulate chords. This is done by rapidly changing the
+ pitch between 3 (or 2) different notes. It sounds very noisy and grainy on
+ most samples, but okay on monotone ones.
+
+ Example: C-300047  C-major chord: (C+E+G  or C+4+7 halfnotes)
+          C-300037  C-minor chord: (C+D#+G or C+3+7 halfnotes)
+
+
+
+ Cmd 1. Pitch Slide Up [Speed:$00-$FF]
+ -------------------------------------
+ Usage: $1 + slide speed
+
+ This will simply slide the sample pitch up. You can NOT slide
+ higher than B-3! (Period 113)
+
+ Example: C-300103  1 is the command, 3 is the slide speed.
+
+ NOTE: The pitch slide will be called as many times as the speed of the song.
+ This means that you'll sometimes have trouble sliding accurately. If you
+ change the speed without changing the slide rates, it will sound bad...
+
+
+
+ Cmd 2. Pitch Slide Down [Speed:$00-FF]
+ --------------------------------------
+ Usage: $2 + slide speed
+
+ Just like command 1, except that this one slides the pitch down instead.
+ (adds to the period).
+
+ You can NOT slide lower than C-1! (period 856)
+
+ Example: C-300203  2 is the command, 3 is the slide speed.
+
+
+
+ Cmd 3. Tone Portamento [Speed:$00-$FF]
+ --------------------------------------
+ Usage: Dest-note + $3 + slidespeed
+
+ This command will automatically slide from the old note to the new.
+ You don't have to worry about which direction to slide, you need only set
+ the slide speed. To keep on sliding, just select the command $3 + 00.
+
+ Example: A-200000  First play a note.
+          C-300305  C-3 is the note to slide to, 3 the command,
+                    and 5 the speed.
+
+
+
+ Cmd 4. Vibrato [Rate:$0-$F,Depth:$0-$F]
+ ---------------------------------------
+ Usage: $4 + vibratorate + vibratodepth
+ 
+ Vibrato will vibrate the sample pitch with a waveform (FM synthesis).
+
+ Example: C-300481  4 is the command, 8 is the speed of the vibrato,
+                    and 1 is the depth of the vibrato.
+
+ To keep on vibrating, just select the command $4 + 00. To change the
+ vibrato, you can alter the rate, depth or both. Use command E4- to
+ change the vibrato waveform.
+
+
+
+ Cmd 5. Tone Portamento + Volume Slide [Speed:$0-$F/$0-$F]
+ ---------------------------------------------------------
+ Usage: $5 + upspeed + downspeed
+ 
+ This command will continue the current tone portamento and slide the volume
+ at the same time. Compatible with Noisetracker 2.0.
+
+ Example: C-300503  3 is the speed to turn the volume down.
+          C-300540  4 is the speed to slide it up.
+
+
+
+ Cmd 6. Vibrato + Volume Slide [Speed:$0-$F/$0-$F]
+ -------------------------------------------------
+ Usage: $6 + upspeed + downspeed
+
+ This command will continue the current vibrato and slide the volume at the
+ same time. Compatible with Noisetracker 2.0.
+
+ Example: C-300605  5 is the speed to turn the volume down.
+          C-300640  4 is the speed to slide it up.
+
+
+
+ Cmd 7. Tremolo [Rate:$0-$F,Depth:$0-$F]
+ ---------------------------------------
+ Usage: $7 + tremolorate + tremolodepth
+
+ Tremolo will vibrate the volume with a waveform (AM synthesis).
+
+ Example: C-300794  7 is the command, 9 is the speed of the tremolo,
+                    and 4 is the depth of the tremolo.
+
+ To keep on tremolo'ing, just select the command $7 + 00. To change the
+ tremolo, you can alter the rate, depth or both. Use command E7- to
+ change the tremolo waveform.
+
+
+
+ Cmd 9. Set Sample Offset [Offs:$00-$FF]
+ ---------------------------------------
+ Usage: $9 + sample offset
+
+ This command will play from a chosen position in the sample, and not from
+ the beginning. The two numbers equal the two first numbers in the length
+ of the sample. Handy for speech samples.
+ Due to a bug in the ProTracker replayer, attempting to use this command on
+ samples longer than 65534/$FFFF will result in no sound.
+
+ Example: C-300923  Play sample from offset $2300.
+
+
+
+ Cmd A. Volume Slide [Speed:$0-$F/$0-$F]
+ ---------------------------------------
+ Usage: $A + upspeed + downspeed
+
+ Example: C-300A05  5 is the speed to turn the volume down.
+          C-300A40  4 is the speed to slide it up.
+
+ NOTE: The slide will be called as many times as the speed of the song.
+ The slower the song, the more the volume will be changed on each note.
+
+
+
+ Cmd B. Position Jump [Pos:$00-$7F]
+ ----------------------------------
+ Usage: $B + position to continue at
+
+ Example: C-300B01  B is the command, 1 is the position to
+                    restart the song at.
+
+ This command will also perform a pattern break (see 2 pages below).
+
+ You can use this command instead of restart as on Noisetracker, but you 
+ must enter the position in hex!
+
+
+
+ Cmd C. Set Volume [Volume:$00-$40]
+ ----------------------------------
+ Usage: $C + new volume
+
+ Well, this old familiar command will set the current volume to your own
+ selected. The highest volume is $40. All volumes are represented in hex.
+ (programmers do it in hex, you know!)
+
+ Example: C-300C10  C is the command, 10 is the volume (16 decimal).
+
+
+
+ Cmd D. Pattern Break [Row:00-63, decimal]
+ -----------------------------------------
+ Usage: $D + row
+
+ This command just jumps to the next song position, and continues play
+ from the row you specify.
+
+ Example: C-300D00  Jump to the next song position and continue play
+                    from row 00.
+      Or: C-300D32  Jump to the next song position and continue play
+                    from row 32 instead.
+
+
+
+ Cmd E0. Set LED Filter [Range:$0-$F]
+ ------------------------------------
+ Usage: $E0 + value (0 = on, anything else = off)
+
+ This command jerks around with the stupid LED filter.
+ No one should ever use it.
+
+ Example: C-300E01  turns LED filter off
+          C-300E00  turns LED filter on
+
+
+
+ Cmd E1. Fine Pitch Slide Up [Range:$0-$F]
+ -----------------------------------------
+ Usage: $E1 + value
+
+ This command works just like the normal portamento up, except that
+ it only slides up once. It does not continue sliding during the length
+ of the note.
+
+ Example: C-300E11  Slide up 1 at the beginning of the note.
+
+ (great for creating chorus effects)
+
+
+
+ Cmd E2. Fine Pitch Slide Down [Range:$0-$F]
+ -------------------------------------------
+ Usage: $E2 + value
+
+ This command works just like the normal portamento down, except that
+ it only slides down once. It does not continue sliding during the length
+ of the note.
+
+ Example: C-300E26  Slide up 6 at the beginning of the note.
+
+
+
+ Cmd E3. Glissando Control [Range:$0-$1]
+ ---------------------------------------
+ Usage: $E3 + glissando control
+
+ Glissando must be used with the tone portamento command. When glissando is
+ activated, tone portamento will slide a halfnote at a time, instead of a
+ straight slide.
+
+ Example: C-300E31  Turn Glissando on.
+          C-300E30  Turn Glissando off.
+
+
+
+ Cmd E4. Set Vibrato Waveform [Range:$0-$3]
+ ------------------------------------------
+ Usage: $E4 + vibrato waveform
+
+ Example: C-300E40  Set sine (default)
+               E44  Don't retrig WF
+          C-300E41  Set Ramp Down
+               E45  Don't retrig WF
+          C-300E42  Set Squarewave
+               E46  Don't retrig WF
+
+
+
+ Cmd E5. Set Finetune [Range:$0-$F]
+ ----------------------------------
+ Usage: $E5 + finetune value
+
+ Example: C-300E51  Set finetune to 1.
+
+ Use these tables to figure out the finetune value.
+
+ Finetune: +7 +6 +5 +4 +3 +2 +1  0
+    Value:  7  6  5  4  3  2  1  0
+
+ Finetune: -1 -2 -3 -4 -5 -6 -7 -8
+    Value:  F  E  D  C  B  A  9  8
+
+
+
+ Cmd E6. Pattern Loop [Loops:$0-$F]
+ ----------------------------------
+ Usage: $E6 + number of loops
+
+ This command will loop a part of a pattern.
+
+ Example: C-300E60  Set loop start.
+          C-300E63  Jump to loop 3 times before playing on.
+
+
+
+ Cmd E7. Set Tremolo Waveform [Range:$0-$3]
+ ------------------------------------------
+ Usage: $E7 + tremolo waveform
+
+ Example: C-300E70  Set sine (default)
+               E74  Don't retrig WF
+          C-300E71  Set Ramp Down
+               E75  Don't retrig WF
+          C-300E72  Set Squarewave
+               E76  Don't retrig WF
+
+
+
+ Cmd E9. Note Retrig [Value:$0-$F]
+ ---------------------------------
+ Usage: $E9 + tick to retrig note at
+
+ This command will retrig the same note before playing the next. Where to
+ retrig depends on the speed of the song. If you retrig with 1 in speed 6
+ that note will be trigged 6 times in one note slot. Retrig on hi-hats!
+
+ Example: C-300F06  Set speed to 6.
+          C-300E93  Retrig at tick 3 out of 6.
+
+
+
+ Cmd EA. Fine Volume Slide Up [Range:$0-$F]
+ ------------------------------------------
+ Usage: $EA + value
+
+ This command works just like the normal volume slide up, except that
+ it only slides up once. It does not continue sliding during the length
+ of the note.
+
+ Example: C-300EA3  Slide volume up 1 at the beginning of the note.
+
+
+
+ Cmd EB. Fine Volume Slide Down [Range:$0-$F]
+ --------------------------------------------
+ Usage: $EB + value
+
+ This command works just like the normal volume slide down, except that
+ it only slides down once. It does not continue sliding during the length
+ of the note.
+
+ Example: C-300EB6  Slide volume down 6 at the beginning of the note.
+
+
+
+ Cmd EC. Note Cut [Value:$0-$F]
+ ------------------------------
+ Usage: $EC + tick to cut note at
+
+ This command will cut the note at the selected tick, creating
+ extremely short notes.
+
+ Example: C-300F06  Set speed to 6.
+          C-300EC3  Cut at tick 3 out of 6.
+
+ Note that the note is not really cut, the volume is just turned down.
+
+
+
+ Cmd ED. Note Delay [Value:$0-$F]
+ --------------------------------
+ Usage: $ED + ticks to delay note
+
+ This command will delay the note to the selected tick.
+
+ Example: C-300F06  Set speed to 6.
+          C-300ED3  Play note at tick 3 out of 6.
+
+ You can play the same note on two channels, delay one, and get a
+ nice flanger effect.
+
+
+
+ Cmd EE. Pattern Delay [Notes:$0-$F]
+ -----------------------------------
+ Usage: $EE + notes to delay pattern
+
+ This command will delay the pattern the selected numbers of notes.
+
+ Example: C-300EE8  Delay pattern 8 notes before playing on.
+
+ All other effects are still active when the pattern is being delayed.
+
+
+
+ Cmd EF. Invert Loop [Speed:$0-$F]
+ ---------------------------------
+ Usage: $EF + Invertspeed
+
+ This command will need a short loop ($10,20,40,80 etc. bytes) to work.
+ It will invert the loop byte by byte.
+
+ Example: C-300EF8 Set invspeed to 8.
+
+ To turn off the inverting, set invspeed to 0, or press ctrl + Z.
+
+
+
+ Cmd F. Set Speed [Speed:$00-$FF]
+ --------------------------------
+ Usage: $F + speed
+
+ This command will set the speed of the song (ticks per row).
+
+Vblank: Range 01-FF - Normal timing  
+
+   CIA: Range 01-1F - Set vblank speeds with CIA timing.
+   CIA: Range 20-FF - Set BPM speeds, range 32-255.
+  Both: Range 00    - STOP song.

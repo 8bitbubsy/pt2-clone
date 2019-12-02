@@ -1,0 +1,194 @@
+   KEYBINDINGS
+   -----------
+   
+ WARNING: Keybindings are hardcoded to the US keyboard layout.
+          But pattern notes are the same regardless of layout.
+
+ Remember to always use the left shift and alt, as the right ones
+ are used for other things.
+
+ == Where's the Amiga key? ==
+   PC keyboard:
+      Left Amiga key = left Windows key
+     Right Amiga key = right Alt Gr key
+ 
+   Mac keyboard:
+      Left Amiga key = left Command key
+     Right Amiga key = right Command key
+ ----------------------------
+  
+ == New keybindings not present in original PT: ==
+   alt+F11     - Toggle between real/fake VU-Meters
+   F11         - Toggle fullscreen
+   F12         - Toggle Amiga model (for low-pass filter)
+   shift+F12   - Toggle Amiga panning (100% stereo separation)
+   ctrl+F12    - Toggle CIA/VBLANK timing for tempo/speed effect (Fxx)
+   alt+1/2/3/4 - Increase Multi ordering (when in idle, not play/edit/rec.)
+ -------------------------------------------------
+ 
+ High note keys:  2 3   5 6 7   9 0   =
+                 Q W E R T Y U I O P [ ]
+                   
+ Low note keys:    S D   G H J   L ;
+                  Z X C V B N M , . /
+
+ F1 - Choose low octave (from C-1 to G-3)
+ F2 - Choose high octave (from C-2 to B-3)
+
+ shift+F3 - Cut channel to buffer
+ shift+F4 - Copy channel to buffer
+ shift+F5 - Paste channel buffer to channel
+
+  alt+F3 - Cut whole pattern to buffer
+  alt+F4 - Copy whole pattern to buffer
+  alt+F5 - Paste pattern buffer to pattern
+ 
+ ctrl+F3 - Cut commands to buffer
+ ctrl+F4 - Copy commands to buffer
+ ctrl+F5 - Paste command buffer to channel
+
+ F6 - Go to row 0
+ F7 - Go to row 16
+ F8 - Go to row 32
+ F9 - Go to row 48
+ F10- Go to row 63
+
+ shift+F6-F10 - Store current row on selected F-key
+   alt+F6-F10 - Play pattern from the stored row
+  ctrl+F6-F10 - Record from the stored row
+
+ esc - Exit DiskOp/EditOp/Sampler etc...
+
+ shift+return    - Insert blank note at current row and move
+                   the others down. Notes beyond row 63 will be lost!
+ shift+backspace - Delete note above current row and move
+                   the others up. You can NOT do this if you're
+                   at row 0!
+
+ alt+return    - As above, but with all 4 channels
+ alt+backspace - As above, but with all 4 channels
+
+ ctrl+return    - Push commands one down
+ ctrl+backspace - Drag commands one up
+
+ ctrl+0-9 - Select how many rows ProTracker will jump down each time
+            you insert a note (this is only for edit mode)
+
+   alt+cursor right - Pattern number up
+   alt+cursor left  - Pattern number down
+ shift+cursor right - song position up
+ shift+cursor left  - song position down
+
+ space - Toggle between Stop/Edit-mode
+
+      alt gr (right alt) - Play Song
+ right ctrl (cmd on Mac) - Play Pattern
+             right shift - Record
+        
+ caps lock - Toggle Keyrepeat on/off (will use the OS settings for repeat/delay)
+
+      del - Delete note under cursor
+  alt+del - Delete command only 
+ shft+del - Delete note and command
+
+ On Numeric pad:
+    "."/del - Kill Sample
+          0 - Select Sample $0
+    1st row - Select Sample $1-$4
+    2nd row - Select Sample $5-$8
+    3rd row - Select Sample $9-$c
+    4th row - Select Sample $d-$f
+ Just enter - Toggle sample offset +$10
+
+ Holding enter + the other keys, will select sample $11-$1F
+
+ Left Amiga key plus keys below - Transposing like in Edit Op.
+
+   Sample/Channel      Sample/Pattern
+   ----------------------------------
+   1 - Note Up         2 - Note Up
+   Q - Note Down       W - Note Down
+   A - Octave Up       S - Octave Up
+   Z - Octave Down     X - Octave Down
+
+   All/Channel        All/Pattern
+   ------------------------------
+   3 - Note Up         4 - Note Up
+   E - Note Down       R - Note Down
+   D - Octave Up       F - Octave Up
+   C - Octave Down     V - Octave Down
+
+       tab - Move cursor to next channel
+ shift+tab - Move cursor to prev channel
+
+ ctrl+a - Toggle channel on/off
+ ctrl+b - Mark block
+ ctrl+c - Copy block to buffer (if sampler is open; copy data)
+ ctrl+d - Delete block, drag notes up
+ ctrl+e - Expand notes in channel
+ ctrl+f - Toggle LED filter on/off
+ ctrl+g - Boost treble on all samples
+ ctrl+h - Transpose block up
+ ctrl+i - Insert block, push notes down
+ ctrl+j - Join-paste block
+ ctrl+k - Kill notes to end of channel
+ ctrl+l - Transpose block down
+ ctrl+m - Toggle multikeys
+ ctrl+n - Re-mark last block
+ ctrl+o - Shrink notes in channel
+ ctrl+p - Paste block
+ ctrl+q - Unmute all channels
+ ctrl+r - Restore F6-F10 positions
+ ctrl+s - Save module (this is 'toggle split mode' in original PT)
+ ctrl+t - Swap channels
+ ctrl+u - Undo last pattern edit change
+ ctrl+v - Decrease treble on all samples (if sampler is open; paste data)
+ ctrl+w - Polyphonize block
+ ctrl+x - Cut block to buffer (if sampler is open; cut data)
+ ctrl+y - Backwards block
+ ctrl+z - Restore Effects (if sampler is open; restore sample data+attributes)
+
+ shift+0-9 - Store current command on selected key
+   alt+0-9 - Insert command in current channel
+
+   alt+"\" - Copy command above cursor to current row.
+   alt+"=" - Copy command above cursor to current row
+             and add one to the value.
+   alt+"-" - Copy command above cursor to current row
+             and subract one from the value.
+
+  alt+b - Treble increase current sample
+  alt+c - Toggle channel 3
+  alt+d - Toggle Disk Op. screen
+  alt+e - Toggle Edit Op. + screens
+  alt+f - Treble decrease current sample
+  alt+g - Toggle record mode (PT clone or PT2.3E only)
+  alt+i - Auto insert effect on/off
+  alt+k - Delete current sample/channel
+  alt+m - Toggle metronome on/off (hold SHIFT to set metronome channel)
+  alt+p - Toggle Pos Ed. screen
+  alt+q - Quit ProTracker
+  alt+r - Resample current sample
+  alt+s - Toggle sampler screen
+  alt+t - Toggle tuning tone
+  alt+v - Toggle channel 4
+  alt+x - Toggle channel 2
+  alt+y - Save all samples
+  alt+z - Toggle channel 1
+
+  F3 - Cut   (and/or ctrl+x in sampler screen)
+  F4 - Copy  (and/or ctrl+c in sampler screen)
+  F5 - Paste (and/or ctrl+v in sampler screen)
+
+    return - Step one note forward
+ backspace - Step one note backward
+ 
+ "'" - Decrease auto insert slot (if auto insert effect is enabled)
+ "\" - Increase auto insert slot (if auto insert effect is enabled)
+         (hold SHIFT to increase/decrease auto insert even more) 
+
+             "\" - Toggle keypad mode (if auto insert is disabled)
+      alt+keypad - Tune drumpad
+ ctrl+left/right - Sample up/down
+ 
+ shift+key - Jump to file entry (only when DISK OP. is shown)  
