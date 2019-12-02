@@ -64,8 +64,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LibraryPath>../../../vs2019_project/pt-clone/sdl/lib;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
-    <IncludePath>../../../vs2019_project/pt-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
+    <LibraryPath>../../../vs2019_project/pt2-clone/sdl/lib;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>../../../vs2019_project/pt2-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
     <OutDir>..\..\release\win32\</OutDir>
     <LinkIncremental>false</LinkIncremental>
     <TargetName>pt_pal_editor-win32</TargetName>
@@ -73,19 +73,19 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>pt_pal_editor-win64</TargetName>
-    <LibraryPath>../../../vs2019_project/pt-clone/sdl/lib64;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
-    <IncludePath>../../../vs2019_project/pt-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
+    <LibraryPath>../../../vs2019_project/pt2-clone/sdl/lib64;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>../../../vs2019_project/pt2-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
     <IntDir>$(Configuration)\</IntDir>
     <OutDir>..\..\release\win64\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>../../../vs2019_project/pt-clone/sdl/lib;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
-    <IncludePath>../../../vs2019_project/pt-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
+    <LibraryPath>../../../vs2019_project/pt2-clone/sdl/lib;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>../../../vs2019_project/pt2-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
     <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LibraryPath>../../../vs2019_project/pt-clone/sdl/lib64;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
-    <IncludePath>../../../vs2019_project/pt-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
+    <LibraryPath>../../../vs2019_project/pt2-clone/sdl/lib64;$(VCInstallDir)lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>../../../vs2019_project/pt2-clone/sdl/include;$(VCInstallDir)include;$(IncludePath)</IncludePath>
     <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
