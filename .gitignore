@@ -12,3 +12,4 @@ pt_pal_editor/vs2019_project/.vs/pt_pal_editor/v16/.suo
 pt_pal_editor/vs2019_project/pt_pal_editor/Release/pt_pal_editor.vcxproj.FileListAbsolute.txt
 vs2019_project/.vs/pt2-clone/v16/.suo
 *.cache
+*.ipch

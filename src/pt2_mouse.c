@@ -4027,8 +4027,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 					memset((int8_t *)editor.spectrumVolumes, 0, sizeof (editor.spectrumVolumes));
 			}
 
-			     if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE) renderQuadrascopeBg();
-			else if (editor.ui.visualizerMode == VISUAL_SPECTRUM) renderSpectrumAnalyzerBg();
+			if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE)
+				renderQuadrascopeBg();
+			else if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
+				renderSpectrumAnalyzerBg();
 		}
 		break;
 
