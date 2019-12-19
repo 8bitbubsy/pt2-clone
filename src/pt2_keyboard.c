@@ -3670,7 +3670,7 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 
 				handleAskNo();
 
-				pointerSetMode(POINTER_MODE_READ_DIR, NO_CARRY);
+				pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 				setStatusMessage("RENDERING MOD...", NO_CARRY);
 			}
 		}
@@ -3921,7 +3921,7 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 				editor.errorMsgBlock = true;
 				editor.errorMsgCounter = 0;
 
-				pointerErrorMode();
+				setErrPointer();
 			}
 			break;
 

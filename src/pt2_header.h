@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include "pt2_unicode.h"
 
-#define PROG_VER_STR "1.00"
+#define PROG_VER_STR "1.01"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -399,7 +399,7 @@ struct editor_t
 		uint8_t numLen, numBits;
 
 		// render/update flags
-		bool refreshMousePointer, updateStatusText, updatePatternData;
+		bool updateStatusText, updatePatternData;
 		bool updateSongName, updateMod2WavDialog, mod2WavFinished;
 
 		// edit op. #2
@@ -438,7 +438,8 @@ struct editor_t
 		uint16_t *numPtr16, tmpDisp16, *dstOffset, dstPos, textLength, editTextPos;
 		uint16_t dstOffsetEnd, lastSampleOffset;
 		int32_t askTempData, renderX, renderY, renderW, renderH, displayW, displayH;
-		uint32_t xScaleMul, yScaleMul;
+		uint32_t xScale, yScale;
+		double dMouseXMul, dMouseYMul;
 		SDL_PixelFormat *pixelFormat;
 #ifdef _WIN32
 		HWND hWnd;

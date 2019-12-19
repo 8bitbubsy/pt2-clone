@@ -153,13 +153,10 @@ void exitGetTextLine(bool updateValue)
 				modEntry->head.moduleTitle[i] = (char)tolower(modEntry->head.moduleTitle[i]);
 		}
 
-		if (editor.ui.editObject != PTB_DO_DATAPATH) // special case for disk op. right mouse button
-		{
-			pointerSetPreviousMode();
+		pointerSetPreviousMode();
 
-			if (!editor.mixFlag)
-				updateWindowTitle(MOD_IS_MODIFIED);
-		}
+		if (!editor.mixFlag)
+			updateWindowTitle(MOD_IS_MODIFIED);
 	}
 	else
 	{

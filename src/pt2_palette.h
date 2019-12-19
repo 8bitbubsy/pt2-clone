@@ -24,19 +24,5 @@ enum
 	// -----------------------------
 	PAL_COLORKEY = 14,
 	// -----------------------------
-	PALETTE_NUM,
-	// -----------------------------
-
-	POINTER_MODE_IDLE = 0,
-	POINTER_MODE_EDIT = 1,
-	POINTER_MODE_PLAY = 2,
-	POINTER_MODE_MSG1 = 3,
-	POINTER_MODE_LOAD = 4,
-	POINTER_MODE_RECORD = 5,
-	POINTER_MODE_READ_DIR = 6
+	PALETTE_NUM
 };
-
-void setMsgPointer(void);
-void pointerErrorMode(void);
-void pointerSetMode(int8_t pointerMode, bool carry);
-void pointerSetPreviousMode(void);

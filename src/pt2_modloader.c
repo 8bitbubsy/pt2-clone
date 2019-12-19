@@ -16,7 +16,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "pt2_palette.h"
+#include "pt2_mouse.h"
 #include "pt2_header.h"
 #include "pt2_sampler.h"
 #include "pt2_textout.h"
@@ -26,7 +26,7 @@
 #include "pt2_unicode.h"
 #include "pt2_modloader.h"
 #include "pt2_sampleloader.h"
-
+#
 typedef struct mem_t
 {
 	bool _eof;
@@ -1161,7 +1161,7 @@ void loadModFromArg(char *arg)
 		editor.errorMsgCounter = 0;
 
 		// status/error message is set in the mod loader
-		pointerErrorMode();
+		setErrPointer();
 	}
 
 	free(filenameU);
@@ -1205,8 +1205,6 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 
 	// don't allow drag n' drop if the tracker is busy
 	if (editor.ui.pointerMode == POINTER_MODE_MSG1 ||
-		editor.ui.pointerMode == POINTER_MODE_LOAD ||
-		editor.ui.pointerMode == POINTER_MODE_READ_DIR ||
 		editor.diskop.isFilling || editor.isWAVRendering ||
 		editor.ui.samplerFiltersBoxShown || editor.ui.samplerVolBoxShown)
 	{
@@ -1328,7 +1326,7 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			editor.errorMsgActive = true;
 			editor.errorMsgBlock = true;
 			editor.errorMsgCounter = 0;
-			pointerErrorMode(); // status/error message is set in the mod loader
+			setErrPointer(); // status/error message is set in the mod loader
 		}
 	}
 	else

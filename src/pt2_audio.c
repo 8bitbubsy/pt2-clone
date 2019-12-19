@@ -1070,7 +1070,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 
 	editor.blockMarkFlag = false;
 
-	pointerSetMode(POINTER_MODE_READ_DIR, NO_CARRY);
+	pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 	setStatusMessage("RENDERING MOD...", NO_CARRY);
 
 	editor.ui.disableVisualizer = true;

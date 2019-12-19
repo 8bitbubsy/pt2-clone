@@ -25,7 +25,9 @@
 #include "pt2_keyboard.h"
 
 /* TODO: Move irrelevant routines outta here! Disgusting design!
-** Keep in mind that this was programmed in my early programming days... */
+ * Keep in mind that this was programmed in my early programming days... */
+
+SDL_Cursor *cursors[NUM_CURSORS];
 
 extern SDL_Renderer *renderer;
 extern SDL_Window *window;
@@ -74,15 +76,164 @@ static bool handleGUIButtons(int32_t button);
 static void handleRepeatedGUIButtons(void);
 static void handleRepeatedSamplerFilterButtons(void);
 
+static void pointerSetColor(uint8_t cursorColorIndex)
+{
+	assert(cursorColorIndex <= 5);
+
+	palette[PAL_MOUSE_1] = cursorColors[cursorColorIndex][0];
+	palette[PAL_MOUSE_2] = cursorColors[cursorColorIndex][1];
+	palette[PAL_MOUSE_3] = cursorColors[cursorColorIndex][2];
+
+	if (ptConfig.hwMouse)
+		setSystemCursor(cursors[cursorColorIndex]);
+}
+
+void pointerSetMode(uint8_t pointerMode, bool carry)
+{
+	assert(pointerMode <= 5);
+
+	editor.ui.pointerMode = pointerMode;
+	if (carry)
+		editor.ui.previousPointerMode = editor.ui.pointerMode;
+
+	switch (pointerMode)
+	{
+		case POINTER_MODE_IDLE:   pointerSetColor(POINTER_GRAY);   break;
+		case POINTER_MODE_PLAY:   pointerSetColor(POINTER_YELLOW); break;
+		case POINTER_MODE_EDIT:   pointerSetColor(POINTER_BLUE);   break;
+		case POINTER_MODE_RECORD: pointerSetColor(POINTER_BLUE);   break;
+		case POINTER_MODE_MSG1:   pointerSetColor(POINTER_PURPLE); break;
+		case POINTER_MODE_MSG2:   pointerSetColor(POINTER_GREEN);  break;
+		default: break;
+	}
+}
+
+void pointerSetPreviousMode(void)
+{
+	if (editor.ui.editTextFlag || editor.ui.askScreenShown || editor.ui.clearScreenShown)
+		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
+	else
+		pointerSetMode(editor.ui.previousPointerMode, NO_CARRY);
+}
+
+void setMsgPointer(void)
+{
+	pointerSetMode(POINTER_MODE_MSG2, false);
+}
+
+void setErrPointer(void)
+{
+	pointerSetColor(POINTER_RED);
+}
+
+bool setSystemCursor(SDL_Cursor *cursor)
+{
+	if (cursor == NULL)
+	{
+		SDL_SetCursor(SDL_GetDefaultCursor());
+		return false;
+	}
+
+	SDL_SetCursor(cursor);
+	return true;
+}
+
+void freeMouseCursors(void)
+{
+	SDL_SetCursor(SDL_GetDefaultCursor());
+	for (uint32_t i = 0; i < NUM_CURSORS; i++)
+	{
+		if (cursors[i] != NULL)
+		{
+			SDL_FreeCursor(cursors[i]);
+			cursors[i] = NULL;
+		}
+	}
+}
+
+bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse pointer shape
+{
+	freeMouseCursors();
+
+	uint8_t scaling = editor.ui.yScale;
+	for (uint32_t i = 0; i < NUM_CURSORS; i++)
+	{
+		SDL_Surface *surface = SDL_CreateRGBSurface(0, POINTER_W*scaling, POINTER_H*scaling, 32, 0, 0, 0, 0);
+		if (surface == NULL)
+		{
+			freeMouseCursors();
+			ptConfig.hwMouse = false; // enable software mouse
+			return false;
+		}
+
+		uint32_t color1 = cursorColors[i][0];
+		uint32_t color2 = cursorColors[i][1];
+		uint32_t color3 = cursorColors[i][2];
+		uint32_t colorkey = 0x12345678;
+
+		color1   = SDL_MapRGB(surface->format, R24(color1),   G24(color1),   B24(color1));
+		color2   = SDL_MapRGB(surface->format, R24(color2),   G24(color2),   B24(color2));
+		color3   = SDL_MapRGB(surface->format, R24(color3),   G24(color3),   B24(color3));
+		colorkey = SDL_MapRGB(surface->format, R24(colorkey), G24(colorkey), B24(colorkey));
+
+		SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE);
+		SDL_SetColorKey(surface, SDL_TRUE, colorkey);
+		SDL_SetSurfaceRLE(surface, SDL_TRUE);
+
+		const uint8_t *srcPixels8 = mousePointerBMP;
+		SDL_LockSurface(surface);
+
+		uint32_t *dstPixels32 = (uint32_t *)surface->pixels;
+		for (int32_t k = 0; k < surface->w*surface->h; k++) // fill surface with colorkey pixels
+			dstPixels32[k] = colorkey;
+
+		// blit upscaled cursor to surface
+		for (uint32_t y = 0; y < POINTER_H; y++)
+		{
+			uint32_t *outX = &dstPixels32[(y * scaling) * surface->w];
+			for (uint32_t yScale = 0; yScale < scaling; yScale++)
+			{
+				for (uint32_t x = 0; x < POINTER_W; x++)
+				{
+					uint8_t srcPix = srcPixels8[(y * POINTER_W) + x];
+					if (srcPix != PAL_COLORKEY)
+					{
+						uint32_t pixel = colorkey; // make compiler happy
+						     if (srcPix == PAL_MOUSE_1) pixel = color1;
+						else if (srcPix == PAL_MOUSE_2) pixel = color2;
+						else if (srcPix == PAL_MOUSE_3) pixel = color3;
+
+						for (uint32_t xScale = 0; xScale < scaling; xScale++)
+							outX[xScale] = pixel;
+					}
+
+					outX += scaling;
+				}
+			}
+		}
+
+		SDL_UnlockSurface(surface);
+
+		cursors[i] = SDL_CreateColorCursor(surface, 0, 0);
+		if (cursors[i] == NULL)
+		{
+			SDL_FreeSurface(surface);
+			freeMouseCursors();
+			ptConfig.hwMouse = false; // enable software mouse
+			return false;
+		}
+
+		SDL_FreeSurface(surface);
+	}
+
+	pointerSetPreviousMode(); // this sets the appropriate the hardware cursor
+	return true;
+}
+
 void updateMouseScaling(void)
 {
-	double dScaleX, dScaleY;
-
-	dScaleX = editor.ui.renderW / (double)SCREEN_W;
-	dScaleY = editor.ui.renderH / (double)SCREEN_H;
-
-	editor.ui.xScaleMul = (dScaleX == 0.0) ? 65536 : (uint32_t)round(65536.0 / dScaleX);
-	editor.ui.yScaleMul = (dScaleY == 0.0) ? 65536 : (uint32_t)round(65536.0 / dScaleY);
+	if (editor.ui.renderW > 0) editor.ui.dMouseXMul = (double)SCREEN_W / editor.ui.renderW;
+	if (editor.ui.renderH > 0) editor.ui.dMouseYMul = (double)SCREEN_H / editor.ui.renderH;
 }
 
 void readMouseXY(void)
@@ -103,7 +254,7 @@ void readMouseXY(void)
 	SDL_GetMouseState(&mx, &my);
 
 	/* in centered fullscreen mode, trap the mouse inside the framed image
-	** and subtract the coords to match the OS mouse position (fixes touch from touchscreens) */
+	 * and subtract the coords to match the OS mouse position (fixes touch from touchscreens) */
 	if (editor.fullscreen && !ptConfig.fullScreenStretch)
 	{
 		if (mx < editor.ui.renderX)
@@ -135,9 +286,9 @@ void readMouseXY(void)
 	if (mx < 0) mx = 0;
 	if (my < 0) my = 0;
 
-	// multiply coords by video scaling factors
-	mx = (((uint32_t)mx * editor.ui.xScaleMul) + (1 << 15)) >> 16;
-	my = (((uint32_t)my * editor.ui.yScaleMul) + (1 << 15)) >> 16;
+	// multiply coords by video scaling factors (do not round)
+	mx = (uint32_t)(mx * editor.ui.dMouseXMul);
+	my = (uint32_t)(my * editor.ui.dMouseYMul);
 
 	if (mx >= SCREEN_W) mx = SCREEN_W - 1;
 	if (my >= SCREEN_H) my = SCREEN_H - 1;
@@ -147,12 +298,12 @@ void readMouseXY(void)
 
 	if (ptConfig.hwMouse)
 	{
-		// hardware mouse (OS)
+		// hardware mouse
 		hideSprite(SPRITE_MOUSE_POINTER);
 	}
 	else
 	{
-		// software mouse (PT mouse)
+		// software mouse
 		setSpritePos(SPRITE_MOUSE_POINTER, input.mouse.x, input.mouse.y);
 	}
 }
@@ -1980,7 +2131,7 @@ bool handleRightMouseButton(void)
 		editor.errorMsgBlock = true;
 		editor.errorMsgCounter = 0;
 
-		pointerErrorMode();
+		setErrPointer();
 		removeClearScreen();
 		return true;
 	}
@@ -2119,7 +2270,7 @@ bool handleLeftMouseButton(void)
 				editor.ui.answerYes = false;
 				handleAskNo();
 
-				pointerSetMode(POINTER_MODE_READ_DIR, NO_CARRY);
+				pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 				setStatusMessage("RENDERING MOD...", NO_CARRY);
 			}
 		}
@@ -4314,7 +4465,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			editor.errorMsgActive = true;
 			editor.errorMsgBlock = true;
 			editor.errorMsgCounter = 0;
-			pointerErrorMode();
+			setErrPointer();
 		}
 		break;
 

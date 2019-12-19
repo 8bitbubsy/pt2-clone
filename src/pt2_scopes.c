@@ -141,11 +141,11 @@ static void updateRealVuMeters(void)
 		tmpScope = *sc;
 		didSwapData = se->didSwapData;
 
-		samplesToScan = tmpScope.delta >> 16; // XXX: Is this correct? It appears to do what it should, visually.
+		samplesToScan = tmpScope.delta >> 16;
 		if (samplesToScan <= 0)
 			continue;
 
-		if (samplesToScan > 512) // if delta (period) was overflown, don't waste cycles on reading a ton of samples
+		if (samplesToScan > 512) // don't waste cycles on reading a ton of samples
 			samplesToScan = 512;
 
 		volume = modEntry->channels[i].n_volume;

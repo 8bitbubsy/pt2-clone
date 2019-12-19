@@ -11,6 +11,16 @@ uint32_t *muteButtonsBMP   = NULL, *posEdBMP           = NULL, *samplerFiltersBM
 uint32_t *samplerScreenBMP = NULL, *pat2SmpDialogBMP   = NULL, *trackerFrameBMP    = NULL;
 uint32_t *yesNoDialogBMP   = NULL;
 
+const uint32_t cursorColors[6][3] =
+{
+	{ 0x444444, 0x777777, 0xAAAAAA }, // gray
+	{ 0x444400, 0x777700, 0xAAAA00 }, // yellow
+	{ 0x000066, 0x004499, 0x0055BB }, // blue
+	{ 0x440044, 0x770077, 0xAA00AA }, // purple
+	{ 0x004400, 0x007700, 0x00AA00 }, // green
+	{ 0x770000, 0x990000, 0xCC0000 }  // red
+};
+
 int8_t pNoteTable[32] = // for drumpad
 {
 	24, 24, 24, 24, 24, 24, 24, 24, 24, 24,

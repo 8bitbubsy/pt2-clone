@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <SDL2/SDL.h>
 
 // taken from the ptplay project and modified
 enum ptbuttons
@@ -231,6 +233,38 @@ typedef struct guiButton_t
 {
 	int32_t x1, y1, x2, y2, b;
 } guiButton_t;
+
+enum
+{
+	POINTER_W = 16,
+	POINTER_H = 16,
+
+	POINTER_MODE_IDLE = 0,
+	POINTER_MODE_EDIT = 1,
+	POINTER_MODE_PLAY = 2,
+	POINTER_MODE_MSG1 = 3,
+	POINTER_MODE_RECORD = 4,
+	POINTER_MODE_MSG2 = 5,
+
+	POINTER_GRAY = 0,
+	POINTER_YELLOW = 1,
+	POINTER_BLUE = 2,
+	POINTER_PURPLE = 3,
+	POINTER_GREEN = 4,
+	POINTER_RED = 5
+};
+
+#define NUM_CURSORS 6
+
+extern SDL_Cursor *cursors[NUM_CURSORS];
+
+void setMsgPointer(void);
+void setErrPointer(void);
+void pointerSetMode(uint8_t pointerMode, bool carry);
+void pointerSetPreviousMode(void);
+bool setSystemCursor(SDL_Cursor *cursor);
+void freeMouseCursors(void);
+bool createMouseCursors(void);
 
 void readMouseXY(void);
 void updateMouseScaling(void);

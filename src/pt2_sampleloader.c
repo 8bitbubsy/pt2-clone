@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include "pt2_header.h"
 #include "pt2_textout.h"
-#include "pt2_palette.h"
+#include "pt2_mouse.h"
 #include "pt2_sampler.h"
 #include "pt2_audio.h"
 #include "pt2_sampleloader.h"

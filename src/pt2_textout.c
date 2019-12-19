@@ -639,5 +639,5 @@ void displayErrorMsg(const char *msg)
 	if (*msg != '\0')
 		setStatusMessage(msg, NO_CARRY);
 
-	pointerErrorMode();
+	setErrPointer();
 }

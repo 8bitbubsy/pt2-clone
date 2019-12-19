@@ -5,6 +5,7 @@
 #include "pt2_mouse.h"
 
 // TABLES
+extern const uint32_t cursorColors[6][3];
 extern const char noteNames1[36][4];
 extern const char noteNames2[36][4];
 extern const uint8_t vibratoTable[32];

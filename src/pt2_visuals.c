@@ -1709,7 +1709,7 @@ void handleAskNo(void)
 			editor.errorMsgActive = true;
 			editor.errorMsgBlock = true;
 			editor.errorMsgCounter = 0;
-			pointerErrorMode();
+			setErrPointer();
 		}
 		break;
 	}
@@ -1771,7 +1771,7 @@ void handleAskYes(void)
 			modEntry->currRow = modEntry->row;
 
 			editor.blockMarkFlag = false;
-			pointerSetMode(POINTER_MODE_READ_DIR, NO_CARRY);
+			pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 			setStatusMessage("RENDERING...", NO_CARRY);
 			modSetTempo(modEntry->currBPM);
 			editor.pat2SmpPos = 0;
@@ -2754,6 +2754,11 @@ void updateRenderSizeVars(void)
 		editor.ui.renderX = 0;
 		editor.ui.renderY = 0;
 	}
+
+	// for mouse cursor creation
+	editor.ui.xScale = (uint32_t)round(editor.ui.renderW / (double)SCREEN_W);
+	editor.ui.yScale = (uint32_t)round(editor.ui.renderH / (double)SCREEN_H);
+	createMouseCursors();
 }
 
 void toggleFullScreen(void)

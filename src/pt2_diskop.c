@@ -333,7 +333,7 @@ void handleEntryJumping(char jumpToChar) // SHIFT+character
 	editor.errorMsgBlock = true;
 	editor.errorMsgCounter = 0;
 
-	pointerErrorMode();
+	setErrPointer();
 }
 
 bool diskOpEntryIsEmpty(int32_t fileIndex)
@@ -644,9 +644,6 @@ static bool diskOpFillBuffer(void)
 
 	freeDiskOpEntryMem();
 
-	if (!editor.errorMsgActive)
-		pointerSetMode(POINTER_MODE_READ_DIR, NO_CARRY);
-
 	// fill disk op. buffer (type, size, path, file name, date changed)
 
 	// read first file
@@ -701,12 +698,6 @@ static bool diskOpFillBuffer(void)
 			editor.diskop.numEntries = 1;
 		else
 			statusOutOfMemory();
-	}
-
-	if (!editor.errorMsgActive)
-	{
-		pointerSetPreviousMode();
-		diskOpShowSelectText();
 	}
 
 	return true;
@@ -949,7 +940,7 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 					editor.errorMsgCounter = 0;
 
 					// status/error message is set in the mod loader
-					pointerErrorMode();
+					setErrPointer();
 				}
 			}
 			else if (editor.diskop.mode == DISKOP_MODE_SMP)
