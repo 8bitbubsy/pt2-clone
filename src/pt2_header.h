@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include "pt2_unicode.h"
 
-#define PROG_VER_STR "1.01"
+#define PROG_VER_STR "1.02"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'

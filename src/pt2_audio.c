@@ -276,7 +276,7 @@ void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 		{
 			s = &modEntry->samples[editor.currSample];
 			paulaSetData(i, ch->n_start + s->loopStart);
-			paulaSetLength(i, s->loopLength);
+			paulaSetLength(i, s->loopLength / 2);
 		}
 	}
 }
@@ -349,7 +349,7 @@ void paulaStartDMA(uint8_t ch)
 
 	length = v->newLength;
 	if (length < 2)
-		length = 2;
+		length = 2; // for safety
 
 	v->dPhase = 0.0;
 	v->pos = 0;
@@ -397,15 +397,15 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 
 	if (period == 0)
 	{
-		v->dDelta = 0.0;
+		v->dDelta = 0.0; // confirmed behavior on real Amiga
 		setScopeDelta(ch, 0);
 		return;
 	}
 
-	// confirmed behavior on real Amiga
 	if (period < 113)
-		period = 113;
+		period = 113; // confirmed behavior on real Amiga
 
+	// if the new period was the same as the previous period, use cached deltas
 	if (period == oldPeriod)
 	{
 		v->dDelta = oldVoiceDelta;
@@ -415,6 +415,7 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 	{
 		oldPeriod = period;
 
+		// if we are rendering pattern to sample (PAT2SMP), use different frequencies
 		if (editor.isSMPRendering)
 			dPeriodToDeltaDiv = editor.pat2SmpHQ ? (PAULA_PAL_CLK / 28836.0) : (PAULA_PAL_CLK / 22168.0);
 		else
@@ -424,9 +425,8 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 		oldVoiceDelta = v->dDelta;
 
 		// set scope rate
-
 #if SCOPE_HZ != 64
-#error Scope Hz is not 64 (2^n), change rate calc. to use doubles+round in pt_scope.c
+#error Scope Hz is not 64 (2^n), change rate calc. to use doubles+round in pt2_scope.c
 #endif
 		oldScopeDelta = (PAULA_PAL_CLK * (65536UL / SCOPE_HZ)) / period;
 		setScopeDelta(ch, oldScopeDelta);
@@ -439,20 +439,25 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 
 void paulaSetVolume(uint8_t ch, uint16_t vol)
 {
-	vol &= 127;
+	vol &= 127; // confirmed behavior on real Amiga
+
 	if (vol > 64)
-		vol = 64;
+		vol = 64; // confirmed behavior on real Amiga
 
 	paula[ch].dVolume = vol * (1.0 / 64.0);
 }
 
-// our Paula simulation takes sample lengths in bytes instead of words
-void paulaSetLength(uint8_t ch, uint32_t len)
+void paulaSetLength(uint8_t ch, uint16_t len)
 {
-	if (len < 2)
-		len = 2; // needed safety for mixer and scopes
+	if (len == 0)
+	{
+		len = 65535;
+		/* confirmed behavior on real Amiga (also needed for safety)
+		 * And yes, we have room for this, it will never overflow! */
+	}
 
-	scopeExt[ch].newLength = paula[ch].newLength = len;
+	// our mixer works with bytes, not words. Multiply by two
+	scopeExt[ch].newLength = paula[ch].newLength = len * 2;
 }
 
 void paulaSetData(uint8_t ch, const int8_t *src)

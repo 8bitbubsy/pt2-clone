@@ -634,16 +634,16 @@ static void sampleOffset(moduleChannel_t *ch)
 	if ((ch->n_cmd & 0xFF) > 0)
 		ch->n_sampleoffset = ch->n_cmd & 0xFF;
 
-	newOffset = ch->n_sampleoffset << 8;
+	newOffset = ch->n_sampleoffset << 7;
 
-	if (newOffset < ch->n_length)
+	if ((int16_t)newOffset < (int16_t)ch->n_length)
 	{
 		ch->n_length -= newOffset;
-		ch->n_start += newOffset;
+		ch->n_start += newOffset*2;
 	}
 	else
 	{
-		ch->n_length = 2;
+		ch->n_length = 1;
 	}
 }
 
@@ -782,8 +782,8 @@ static void setPeriod(moduleChannel_t *ch)
 		if (ch->n_start == NULL)
 		{
 			ch->n_loopstart = NULL;
-			paulaSetLength(ch->n_chanindex, 2);
-			ch->n_replen = 2;
+			paulaSetLength(ch->n_chanindex, 1);
+			ch->n_replen = 1;
 		}
 
 		paulaSetPeriod(ch->n_chanindex, ch->n_period);
@@ -830,7 +830,7 @@ static void playVoice(moduleChannel_t *ch)
 	ch->n_note = note.period;
 	ch->n_cmd = (note.command << 8) | note.param;
 
-	if ((note.sample >= 1) && (note.sample <= 31)) // SAFETY BUG FIX: don't handle sample-numbers >31
+	if (note.sample >= 1 && note.sample <= 31) // SAFETY BUG FIX: don't handle sample-numbers >31
 	{
 		ch->n_samplenum = note.sample - 1;
 		s = &modEntry->samples[ch->n_samplenum];
@@ -838,14 +838,14 @@ static void playVoice(moduleChannel_t *ch)
 		ch->n_start = &modEntry->sampleData[s->offset];
 		ch->n_finetune = s->fineTune;
 		ch->n_volume = s->volume;
-		ch->n_length = s->length;
-		ch->n_replen = s->loopLength;
+		ch->n_length = s->length / 2;
+		ch->n_replen = s->loopLength / 2;
 
 		if (s->loopStart > 0)
 		{
 			ch->n_loopstart = ch->n_start + s->loopStart;
 			ch->n_wavestart = ch->n_loopstart;
-			ch->n_length = s->loopStart + ch->n_replen;
+			ch->n_length = (s->loopStart / 2) + ch->n_replen;
 		}
 		else
 		{

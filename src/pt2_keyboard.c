@@ -489,11 +489,8 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (input.keyb.leftAltPressed)
 			{
-				if (handleSpecialKeys(scancode))
-				{
-					if (editor.currMode != MODE_RECORD)
-						modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 63);
-				}
+				if (handleSpecialKeys(scancode) && editor.currMode != MODE_RECORD)
+					modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 0x3F);
 			}
 			else
 			{
@@ -591,7 +588,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else
 			{
 				editor.ui.askScreenShown = true;
-				editor.ui.askScreenType  = ASK_QUIT;
+				editor.ui.askScreenType = ASK_QUIT;
 
 				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 				setStatusMessage("REALLY QUIT ?", NO_CARRY);
@@ -638,9 +635,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			{
 				if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 				{
-					     if (modEntry->currRow == 63) modSetPos(DONT_SET_ORDER, modEntry->currRow - 15);
-					else if (modEntry->currRow == 15) modSetPos(DONT_SET_ORDER, 0); // 15-16 would turn into -1, which is "DON'T SET ROW" flag
-					else modSetPos(DONT_SET_ORDER, modEntry->currRow - 16);
+					if (modEntry->currRow == 63)
+						modSetPos(DONT_SET_ORDER, modEntry->currRow - 15);
+					else if (modEntry->currRow == 15)
+						modSetPos(DONT_SET_ORDER, 0); // 15-16 would turn into -1, which is "DON'T SET ROW" flag
+					else
+						modSetPos(DONT_SET_ORDER, modEntry->currRow - 16);
 				}
 			}
 
@@ -668,7 +668,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			{
 				if (editor.diskop.numEntries > DISKOP_LINES)
 				{
-					editor.diskop.scrollOffset += DISKOP_LINES - 1;
+					editor.diskop.scrollOffset += DISKOP_LINES-1;
 					if (editor.diskop.scrollOffset > editor.diskop.numEntries-DISKOP_LINES)
 						editor.diskop.scrollOffset = editor.diskop.numEntries-DISKOP_LINES;
 
@@ -1040,7 +1040,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					for (i = 0; i < MOD_ROWS; i++)
 					{
 						noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
-
 						noteDst->command = noteSrc->command;
 						noteDst->param = noteSrc->param;
 
@@ -1888,8 +1887,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (editor.diskop.numEntries > DISKOP_LINES)
 				{
 					editor.diskop.scrollOffset++;
-
-					if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up even on keyb UP/DOWN
+					if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
 						editor.diskop.scrollOffset += 3;
 
 					if (editor.diskop.scrollOffset > editor.diskop.numEntries-DISKOP_LINES)
@@ -1939,8 +1937,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (editor.ui.diskOpScreenShown)
 			{
 				editor.diskop.scrollOffset--;
-
-				if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up even on keyb UP/DOWN
+				if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
 					editor.diskop.scrollOffset -= 3;
 
 				if (editor.diskop.scrollOffset < 0)
@@ -2128,7 +2125,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else if (input.keyb.leftAltPressed)
 			{
 				s = &modEntry->samples[editor.currSample];
-
 				if (s->length == 0)
 				{
 					displayErrorMsg("SAMPLE IS EMPTY");
@@ -2167,7 +2163,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					return;
 				}
 
-				editor.blockMarkFlag   = false;
+				editor.blockMarkFlag = false;
 				editor.blockBufferFlag = true;
 
 				for (i = 0; i < MOD_ROWS; i++)
@@ -2224,7 +2220,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 						{
 							pointerSetPreviousMode();
 							setPrevStatusMessage();
-
 							displayMainScreen();
 						}
 						else
@@ -2495,7 +2490,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				for (i = 0; i < MOD_ROWS; i++)
 				{
 					noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
-
 					if (noteSrc->sample == editor.currSample+1)
 					{
 						noteSrc->period = 0;
@@ -2519,7 +2513,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					while (i >= 0)
 					{
 						noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
-
 						noteDst->period = 0;
 						noteDst->sample = 0;
 						noteDst->command = 0;
@@ -2534,7 +2527,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					while (i < MOD_ROWS)
 					{
 						noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
-
 						noteDst->period = 0;
 						noteDst->sample = 0;
 						noteDst->command = 0;
@@ -2869,7 +2861,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else if (input.keyb.leftCtrlPressed)
 			{
 				// Polyphonize Block
-
 				if (!editor.blockBufferFlag)
 				{
 					displayErrorMsg("BUFFER IS EMPTY !");
@@ -2884,7 +2875,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				while (true)
 				{
 					noteDst = &patt[(j * AMIGA_VOICES) + editor.cursor.channel];
-
 					if (editor.blockBuffer[i].period == 0 && editor.blockBuffer[i].sample == 0)
 					{
 						noteDst->command = editor.blockBuffer[i].command;
@@ -2961,7 +2951,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				for (i = editor.buffFromPos; i <= editor.buffToPos; i++)
 				{
 					noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
-
 					noteDst->period = 0;
 					noteDst->sample = 0;
 					noteDst->command = 0;
@@ -3069,7 +3058,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					for (i = 0; i < AMIGA_VOICES; i++)
 					{
 						ch = &modEntry->channels[i];
-
 						ch->n_wavecontrol = 0;
 						ch->n_glissfunk = 0;
 						ch->n_finetune = 0;
@@ -3101,7 +3089,7 @@ void movePatCurPrevCh(void)
 {
 	int8_t pos = ((editor.cursor.pos + 5) / 6) - 1;
 
-	editor.cursor.pos  = (pos < 0) ? (3 * 6) : (pos * 6);
+	editor.cursor.pos = (pos < 0) ? (3 * 6) : (pos * 6);
 	editor.cursor.mode = CURSOR_NOTE;
 
 	     if (editor.cursor.pos <  6) editor.cursor.channel = 0;
@@ -3170,7 +3158,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		return;
 	}
 
-	switch (scancode) // only some buttons repeat
+	switch (scancode) // only some buttons have repeat
 	{
 		case SDL_SCANCODE_PAGEUP:
 		{
@@ -3189,21 +3177,21 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				{
 					if (editor.ui.diskOpScreenShown)
 					{
-						editor.diskop.scrollOffset -= DISKOP_LINES - 1;
+						editor.diskop.scrollOffset -= DISKOP_LINES-1;
 						if (editor.diskop.scrollOffset < 0)
 							editor.diskop.scrollOffset = 0;
 
 						editor.ui.updateDiskOpFileList = true;
 					}
 				}
-				else
+				else if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 				{
-					if ((editor.currMode == MODE_IDLE) || (editor.currMode == MODE_EDIT))
-					{
-						     if (modEntry->currRow == 63) modSetPos(DONT_SET_ORDER, modEntry->currRow - 15);
-						else if (modEntry->currRow == 15) modSetPos(DONT_SET_ORDER, 0); // 15-16 would turn into -1, which is "DON'T SET ROW" flag
-						else modSetPos(DONT_SET_ORDER, modEntry->currRow - 16);
-					}
+					if (modEntry->currRow == 63)
+						modSetPos(DONT_SET_ORDER, modEntry->currRow - 15);
+					else if (modEntry->currRow == 15)
+						modSetPos(DONT_SET_ORDER, 0); // 15-16 would turn into -1, which is "DON'T SET ROW" flag
+					else
+						modSetPos(DONT_SET_ORDER, modEntry->currRow - 16);
 				}
 			}
 		}
@@ -3226,17 +3214,16 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				{
 					if (editor.diskop.numEntries > DISKOP_LINES)
 					{
-						editor.diskop.scrollOffset += DISKOP_LINES - 1;
+						editor.diskop.scrollOffset += DISKOP_LINES-1;
 						if (editor.diskop.scrollOffset > editor.diskop.numEntries-DISKOP_LINES)
 							editor.diskop.scrollOffset = editor.diskop.numEntries-DISKOP_LINES;
 
 						editor.ui.updateDiskOpFileList = true;
 					}
 				}
-				else
+				else if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 				{
-					if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
-						modSetPos(DONT_SET_ORDER, modEntry->currRow + 16);
+					modSetPos(DONT_SET_ORDER, modEntry->currRow + 16);
 				}
 			}
 		}
@@ -3351,7 +3338,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					input.keyb.repeatCounter = 0;
 
 					editor.diskop.scrollOffset--;
-					if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up even on keyb UP/DOWN
+					if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
 						editor.diskop.scrollOffset -= 3;
 
 					if (editor.diskop.scrollOffset < 0)
@@ -3377,9 +3364,10 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
 				{
 					repeatNum = 6;
-
-					     if (input.keyb.leftAltPressed) repeatNum = 1;
-					else if (input.keyb.shiftPressed)repeatNum = 3;
+					if (input.keyb.leftAltPressed)
+						repeatNum = 1;
+					else if (input.keyb.shiftPressed)
+						repeatNum = 3;
 
 					if (input.keyb.repeatCounter >= repeatNum)
 					{
@@ -3402,8 +3390,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (editor.diskop.numEntries > DISKOP_LINES)
 					{
 						editor.diskop.scrollOffset++;
-
-						if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up even on keyb UP/DOWN
+						if (input.mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
 							editor.diskop.scrollOffset += 3;
 
 						if (editor.diskop.scrollOffset > editor.diskop.numEntries-DISKOP_LINES)
@@ -3431,12 +3418,13 @@ void handleKeyRepeat(SDL_Scancode scancode)
 			}
 			else if (!editor.ui.samplerScreenShown)
 			{
-				if ((editor.currMode != MODE_PLAY) && (editor.currMode != MODE_RECORD))
+				if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
 				{
 					repeatNum = 6;
-
-					     if (input.keyb.leftAltPressed) repeatNum = 1;
-					else if (input.keyb.shiftPressed) repeatNum = 3;
+					if (input.keyb.leftAltPressed)
+						repeatNum = 1;
+					else if (input.keyb.shiftPressed)
+						repeatNum = 3;
 
 					if (input.keyb.repeatCounter >= repeatNum)
 					{
@@ -3531,8 +3519,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			return false;
 		}
 
-		     if (scancode == SDL_SCANCODE_F1) editor.keyOctave = OCTAVE_LOW;
-		else if (scancode == SDL_SCANCODE_F2) editor.keyOctave = OCTAVE_HIGH;
+		if (scancode == SDL_SCANCODE_F1)
+			editor.keyOctave = OCTAVE_LOW;
+		else if (scancode == SDL_SCANCODE_F2)
+			editor.keyOctave = OCTAVE_HIGH;
 
 		rawKey = keyToNote(scancode);
 		if (rawKey >= 0)
@@ -3579,8 +3569,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			return false;
 		}
 
-		     if (scancode == SDL_SCANCODE_F1) editor.keyOctave = OCTAVE_LOW;
-		else if (scancode == SDL_SCANCODE_F2) editor.keyOctave = OCTAVE_HIGH;
+		if (scancode == SDL_SCANCODE_F1)
+			editor.keyOctave = OCTAVE_LOW;
+		else if (scancode == SDL_SCANCODE_F2)
+			editor.keyOctave = OCTAVE_HIGH;
 
 		rawKey = keyToNote(scancode);
 		if (rawKey >= 0)
@@ -3606,8 +3598,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			return false;
 		}
 
-		     if (scancode == SDL_SCANCODE_F1) editor.keyOctave = OCTAVE_LOW;
-		else if (scancode == SDL_SCANCODE_F2) editor.keyOctave = OCTAVE_HIGH;
+		if (scancode == SDL_SCANCODE_F1)
+			editor.keyOctave = OCTAVE_LOW;
+		else if (scancode == SDL_SCANCODE_F2)
+			editor.keyOctave = OCTAVE_HIGH;
 
 		rawKey = keyToNote(scancode);
 		if (rawKey >= 0)
@@ -3798,7 +3792,6 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 					editor.ui.askScreenShown = false;
 					editor.ui.answerNo = false;
 					editor.ui.answerYes = true;
-
 					editor.pat2SmpHQ = false;
 					handleAskYes();
 					// pointer/status is updated by the 'yes handler'
@@ -3967,32 +3960,29 @@ void handleTextEditInputChar(char textChar)
 
 				textMarkerMoveRight();
 			}
-			else
+			else if ((textChar >= '0' && textChar <= '9') || (textChar >= 'A' && textChar <= 'F'))
 			{
-				if ((textChar >= '0' && textChar <= '9') || (textChar >= 'A' && textChar <= 'F'))
+				if (editor.ui.dstPos == 14) // hack for sample mix text
 				{
-					if (editor.ui.dstPos == 14) // hack for sample mix text
-					{
-						*editor.ui.editPos = textChar;
-					}
-					else
-					{
-						*editor.ui.editPos++ = textChar;
-						textMarkerMoveRight();
+					*editor.ui.editPos = textChar;
+				}
+				else
+				{
+					*editor.ui.editPos++ = textChar;
+					textMarkerMoveRight();
 
-						if (editor.ui.dstPos == 9) // hack for sample mix text
-						{
-							for (i = 0; i < 4; i++)
-							{
-								editor.ui.editPos++;
-								textMarkerMoveRight();
-							}
-						}
-						else if (editor.ui.dstPos == 6) // hack for sample mix text
+					if (editor.ui.dstPos == 9) // hack for sample mix text
+					{
+						for (i = 0; i < 4; i++)
 						{
 							editor.ui.editPos++;
 							textMarkerMoveRight();
 						}
+					}
+					else if (editor.ui.dstPos == 6) // hack for sample mix text
+					{
+						editor.ui.editPos++;
+						textMarkerMoveRight();
 					}
 				}
 			}
@@ -4049,8 +4039,10 @@ void handleTextEditInputChar(char textChar)
 		{
 			if ((textChar >= '0' && textChar <= '9') || (textChar >= 'A' && textChar <= 'F'))
 			{
-				     if (textChar <= '9') textChar -= '0';
-				else if (textChar <= 'F') textChar -= ('A' - 10);
+				if (textChar <= '9')
+					textChar -= '0';
+				else if (textChar <= 'F')
+					textChar -= 'A'-10;
 
 				if (editor.ui.numBits == 16)
 				{
@@ -4127,7 +4119,6 @@ bool handleTextEditMode(SDL_Scancode scancode)
 			if (editor.ui.editTextFlag)
 			{
 				textCharPrevious();
-
 				if (!input.keyb.repeatKey)
 					input.keyb.delayCounter = 0;
 
@@ -4147,7 +4138,6 @@ bool handleTextEditMode(SDL_Scancode scancode)
 			if (editor.ui.editTextFlag)
 			{
 				textCharNext();
-
 				if (!input.keyb.repeatKey)
 					input.keyb.delayCounter = 0;
 
@@ -4184,7 +4174,7 @@ bool handleTextEditMode(SDL_Scancode scancode)
 					input.keyb.delayCounter = 0;
 
 				input.keyb.repeatKey = true;
-				input.keyb.delayKey  = false;
+				input.keyb.delayKey = false;
 
 				updateTextObject(editor.ui.editObject);
 			}
@@ -4209,7 +4199,7 @@ bool handleTextEditMode(SDL_Scancode scancode)
 						*readTmp++ = readTmpNext;
 					}
 
-					// hack to prevent cloning last character if the song/sample name has one character too much
+					// kludge to prevent cloning last character if the song/sample name has one character too much
 					if (editor.ui.editObject == PTB_SONGNAME || editor.ui.editObject == PTB_SAMPLENAME)
 						*editor.ui.textEndPtr = '\0';
 

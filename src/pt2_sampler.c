@@ -32,10 +32,10 @@ static int32_t samOffsetScaled;
 
 static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
 {
-	  0,  25,  49,  71,  91, 106, 118, 126,
-	127, 126, 118, 106,  91,  71,  49,  25,
-	  0, -25, -49, -71, -91,-106,-118,-126,
-   -127,-126,-118,-106, -91, -71, -49, -25
+	   0,  25,  49,  71,  91, 106, 118, 126,
+	 127, 126, 118, 106,  91,  71,  49,  25,
+	   0, -25, -49, -71, -91,-106,-118,-126,
+	-127,-126,-118,-106, -91, -71, -49, -25
 };
 
 extern uint32_t *pixelBuffer; // pt_main.c
@@ -253,7 +253,7 @@ static void getSampleDataPeak(int8_t *smpPtr, int32_t numBytes, int16_t *outMin,
 {
 	int8_t smp, smpMin, smpMax;
 
-	smpMin =  127;
+	smpMin = 127;
 	smpMax = -128;
 
 	for (int32_t i = 0; i < numBytes; i++)
@@ -400,55 +400,55 @@ void invertRange(void)
 
 void displaySample(void)
 {
-	if (editor.ui.samplerScreenShown)
-	{
-		renderSampleData();
-		if (editor.markStartOfs != -1)
-			invertRange();
+	if (!editor.ui.samplerScreenShown)
+		return;
 
-		editor.ui.update9xxPos = true;
-	}
+	renderSampleData();
+	if (editor.markStartOfs != -1)
+		invertRange();
+
+	editor.ui.update9xxPos = true;
 }
 
 void redrawSample(void)
 {
 	moduleSample_t *s;
 
-	if (editor.ui.samplerScreenShown)
+	if (!editor.ui.samplerScreenShown)
+		return;
+
+	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
-		assert(editor.currSample >= 0 && editor.currSample <= 30);
-		if (editor.currSample >= 0 && editor.currSample <= 30)
+		editor.markStartOfs = -1;
+
+		editor.sampler.samOffset = 0;
+		updateSamOffset();
+
+		s = &modEntry->samples[editor.currSample];
+		if (s->length > 0)
 		{
-			editor.markStartOfs = -1;
-
-			editor.sampler.samOffset = 0;
-			updateSamOffset();
-
-			s = &modEntry->samples[editor.currSample];
-			if (s->length > 0)
-			{
-				editor.sampler.samStart = &modEntry->sampleData[s->offset];
-				editor.sampler.samDisplay = s->length;
-				editor.sampler.samLength = s->length;
-			}
-			else
-			{
-				// "blank sample" template
-				editor.sampler.samStart = editor.sampler.blankSample;
-				editor.sampler.samLength = SAMPLE_AREA_WIDTH;
-				editor.sampler.samDisplay = SAMPLE_AREA_WIDTH;
-			}
-
-			renderSampleData();
-			updateSamplePos();
-
-			editor.ui.update9xxPos = true;
-			editor.ui.lastSampleOffset = 0x900;
-
-			// for quadrascope
-			editor.sampler.samDrawStart = s->offset;
-			editor.sampler.samDrawEnd = s->offset + s->length;
+			editor.sampler.samStart = &modEntry->sampleData[s->offset];
+			editor.sampler.samDisplay = s->length;
+			editor.sampler.samLength = s->length;
 		}
+		else
+		{
+			// "blank sample" template
+			editor.sampler.samStart = editor.sampler.blankSample;
+			editor.sampler.samLength = SAMPLE_AREA_WIDTH;
+			editor.sampler.samDisplay = SAMPLE_AREA_WIDTH;
+		}
+
+		renderSampleData();
+		updateSamplePos();
+
+		editor.ui.update9xxPos = true;
+		editor.ui.lastSampleOffset = 0x900;
+
+		// for quadrascope
+		editor.sampler.samDrawStart = s->offset;
+		editor.sampler.samDrawEnd = s->offset + s->length;
 	}
 }
 
@@ -702,8 +702,10 @@ void redoSampleData(int8_t sample)
 	// this routine can be called while the sampler toolboxes are open, so redraw them
 	if (editor.ui.samplerScreenShown)
 	{
-		     if (editor.ui.samplerVolBoxShown) renderSamplerVolBox();
-		else if (editor.ui.samplerFiltersBoxShown) renderSamplerFiltersBox();
+		if (editor.ui.samplerVolBoxShown)
+			renderSamplerVolBox();
+		else if (editor.ui.samplerFiltersBoxShown)
+			renderSamplerFiltersBox();
 	}
 }
 
@@ -828,7 +830,7 @@ void samplerRemoveDcOffset(void)
 }
 
 #define INTRP_QUADRATIC_TAPS 3
-#define INTRP8_QUADRATIC(s1, s2, s3, f) /* output: -32768..32767 */ \
+#define INTRP8_QUADRATIC(s1, s2, s3, f) /* output: -32768..32767 (+ spline overshoot) */ \
 { \
 	int32_t s4, frac = (f) >> 1; \
 	\
@@ -1042,7 +1044,7 @@ void mixChordSample(void)
 			mixData[j] += samples[0];
 
 			v->posFrac += v->delta;
-			if (v->posFrac >= 65536)
+			if (v->posFrac > 0xFFFF)
 			{
 				v->pos += v->posFrac >> 16;
 				v->posFrac &= 0xFFFF;
@@ -1173,7 +1175,7 @@ void samplerResample(void)
 
 		if (loopStart+loopLength > s->length)
 		{
-			s->loopStart= 0;
+			s->loopStart = 0;
 			s->loopLength = 2;
 		}
 		else
@@ -1230,9 +1232,7 @@ void doMix(void)
 	smpFrom2 = hexToInteger2(&editor.mixText[7]);
 	smpTo = hexToInteger2(&editor.mixText[13]);
 
-	if (smpFrom1 == 0 || smpFrom1 > 0x1F ||
-	    smpFrom2 == 0 || smpFrom2 > 0x1F ||
-	    smpTo    == 0 || smpTo    > 0x1F)
+	if (smpFrom1 == 0 || smpFrom1 > 0x1F || smpFrom2 == 0 || smpFrom2 > 0x1F || smpTo == 0 || smpTo > 0x1F)
 	{
 		displayErrorMsg("NOT RANGE 01-1F !");
 		return;
@@ -1401,7 +1401,7 @@ void filterSample(int8_t sample, bool ignoreMark)
 
 	for (i = from; i < to; i++)
 	{
-		tmp16 = (smpDat[i + 0] + smpDat[i + 1]) >> 1;
+		tmp16 = (smpDat[i+0] + smpDat[i+1]) >> 1;
 		CLAMP8(tmp16);
 		smpDat[i] = (int8_t)tmp16;
 	}
@@ -1425,10 +1425,12 @@ void toggleTuningTone(void)
 		if (editor.tuningNote > 35)
 			editor.tuningNote = 35;
 
+		modEntry->channels[editor.tuningChan].n_volume = 64; // we need this for the scopes
+
 		paulaSetPeriod(editor.tuningChan, periodTable[editor.tuningNote]);
 		paulaSetVolume(editor.tuningChan, 64);
 		paulaSetData(editor.tuningChan, tuneToneData);
-		paulaSetLength(editor.tuningChan, sizeof (tuneToneData));
+		paulaSetLength(editor.tuningChan, sizeof (tuneToneData) / 2);
 		paulaStartDMA(editor.tuningChan);
 
 		// force loop flag on for scopes
@@ -1490,13 +1492,15 @@ void sampleMarkerToCenter(void)
 	}
 	else
 	{
-		middlePos = editor.sampler.samOffset + (int32_t)round(editor.sampler.samDisplay / 2.0);
+		middlePos = editor.sampler.samOffset + (int32_t)((editor.sampler.samDisplay / 2.0) + 0.5);
 
 		invertRange();
-		if (input.keyb.shiftPressed && (editor.markStartOfs != -1))
+		if (input.keyb.shiftPressed && editor.markStartOfs != -1)
 		{
-			     if (editor.markStartOfs < middlePos) editor.markEndOfs = middlePos;
-			else if (editor.markEndOfs > middlePos) editor.markStartOfs = middlePos;
+			if (editor.markStartOfs < middlePos)
+				editor.markEndOfs = middlePos;
+			else if (editor.markEndOfs > middlePos)
+				editor.markStartOfs = middlePos;
 		}
 		else
 		{
@@ -1717,7 +1721,7 @@ void samplerSamDelete(uint8_t cut)
 			val32 = (s->loopStart - (markEnd - markStart)) & 0xFFFFFFFE;
 			if (val32 < 0)
 			{
-				s->loopStart  = 0;
+				s->loopStart = 0;
 				s->loopLength = 2;
 			}
 			else
@@ -1781,7 +1785,6 @@ void samplerSamPaste(void)
 	}
 
 	s = &modEntry->samples[editor.currSample];
-
 	if (s->length > 0 && editor.markStartOfs == -1)
 	{
 		displayErrorMsg("SET CURSOR POS");
@@ -1887,33 +1890,39 @@ void samplerSamPaste(void)
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
 
-void samplerPlayWaveform(void)
+static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, bool playWaveformFlag)
 {
-	uint8_t chn;
-	int16_t tempPeriod;
 	moduleChannel_t *ch;
 	moduleSample_t *s;
-
-	chn = editor.cursor.channel;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 	assert(chn < AMIGA_VOICES);
 	assert(editor.currPlayNote <= 35);
 
-	s  = &modEntry->samples[editor.currSample];
+	s = &modEntry->samples[editor.currSample];
 	ch = &modEntry->channels[chn];
 
-	tempPeriod = periodTable[(37 * (s->fineTune & 0xF)) + editor.currPlayNote];
 	ch->n_samplenum = editor.currSample;
 	ch->n_volume = s->volume;
-	ch->n_period = tempPeriod;
-	ch->n_start = &modEntry->sampleData[s->offset];
-	ch->n_length = (s->loopStart > 0) ? (s->loopStart + s->loopLength) : s->length; // yes, this is correct. Do not touch
-	ch->n_loopstart = &modEntry->sampleData[s->offset + s->loopStart];
-	ch->n_replen = s->loopLength;
+	ch->n_period = periodTable[(37 * (s->fineTune & 0xF)) + editor.currPlayNote];
+	
+	if (playWaveformFlag)
+	{
+		ch->n_start = &modEntry->sampleData[s->offset];
+		ch->n_length = (s->loopStart > 0) ? (uint32_t)(s->loopStart + s->loopLength) / 2 : s->length / 2;
+		ch->n_loopstart = &modEntry->sampleData[s->offset + s->loopStart];
+		ch->n_replen = s->loopLength / 2;
+	}
+	else
+	{
+		ch->n_start = &modEntry->sampleData[s->offset + startOffset];
+		ch->n_length = (endOffset - startOffset) / 2;
+		ch->n_loopstart = &modEntry->sampleData[s->offset];
+		ch->n_replen = 1;
+	}
 
-	if (ch->n_length < 2)
-		ch->n_length = 2;
+	if (ch->n_length == 0)
+		ch->n_length = 1;
 
 	paulaSetVolume(chn, ch->n_volume);
 	paulaSetPeriod(chn, ch->n_period);
@@ -1926,64 +1935,35 @@ void samplerPlayWaveform(void)
 		paulaStopDMA(chn);
 
 	// these take effect after the current DMA cycle is done
-	paulaSetData(chn, ch->n_loopstart);
-	paulaSetLength(chn, ch->n_replen);
+	if (playWaveformFlag)
+	{
+		paulaSetData(chn, ch->n_loopstart);
+		paulaSetLength(chn, ch->n_replen);
+	}
+	else
+	{
+		paulaSetData(chn, NULL);
+		paulaSetLength(chn, 1);
+	}
 
 	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
+}
+
+void samplerPlayWaveform(void)
+{
+	playCurrSample(editor.cursor.channel, 0, 0, true);
 }
 
 void samplerPlayDisplay(void)
 {
-	uint8_t chn;
-	int16_t tempPeriod;
-	moduleChannel_t *ch;
-	moduleSample_t *s;
+	int32_t start = editor.sampler.samOffset;
+	int32_t end = editor.sampler.samOffset + editor.sampler.samDisplay;
 
-	chn = editor.cursor.channel;
-
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	assert(chn < AMIGA_VOICES);
-	assert(editor.currPlayNote <= 35);
-
-	s  = &modEntry->samples[editor.currSample];
-	ch = &modEntry->channels[chn];
-
-	tempPeriod = periodTable[(37 * (s->fineTune & 0xF)) + editor.currPlayNote];
-	ch->n_samplenum = editor.currSample;
-	ch->n_period = tempPeriod;
-	ch->n_volume = s->volume;
-	ch->n_start = &modEntry->sampleData[s->offset + editor.sampler.samOffset];
-	ch->n_length = editor.sampler.samDisplay;
-	ch->n_loopstart = &modEntry->sampleData[s->offset];
-	ch->n_replen = 2;
-
-	if (ch->n_length < 2)
-		ch->n_length = 2;
-
-	paulaSetVolume(chn, ch->n_volume);
-	paulaSetPeriod(chn, ch->n_period);
-	paulaSetData(chn, ch->n_start);
-	paulaSetLength(chn, ch->n_length);
-
-	if (!editor.muted[chn])
-		paulaStartDMA(chn);
-	else
-		paulaStopDMA(chn);
-
-	// these take effect after the current DMA cycle is done
-	paulaSetData(chn, NULL);
-	paulaSetLength(chn, 1);
-
-	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
+	playCurrSample(editor.cursor.channel, start, end, false);
 }
 
 void samplerPlayRange(void)
 {
-	uint8_t chn;
-	int16_t tempPeriod;
-	moduleChannel_t *ch;
-	moduleSample_t *s;
-
 	if (editor.markStartOfs == -1)
 	{
 		displayErrorMsg("NO RANGE SELECTED");
@@ -1996,42 +1976,7 @@ void samplerPlayRange(void)
 		return;
 	}
 
-	chn = editor.cursor.channel;
-
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	assert(chn < AMIGA_VOICES);
-	assert(editor.currPlayNote <= 35);
-
-	s = &modEntry->samples[editor.currSample];
-	ch = &modEntry->channels[chn];
-
-	tempPeriod = periodTable[(37 * (s->fineTune & 0xF)) + editor.currPlayNote];
-	ch->n_samplenum = editor.currSample;
-	ch->n_period = tempPeriod;
-	ch->n_volume = s->volume;
-	ch->n_start = &modEntry->sampleData[s->offset + editor.markStartOfs];
-	ch->n_length = editor.markEndOfs - editor.markStartOfs;
-	ch->n_loopstart = &modEntry->sampleData[s->offset];
-	ch->n_replen = 2;
-
-	if (ch->n_length < 2)
-		ch->n_length = 2;
-
-	paulaSetVolume(chn, ch->n_volume);
-	paulaSetPeriod(chn, ch->n_period);
-	paulaSetData(chn, ch->n_start);
-	paulaSetLength(chn, ch->n_length);
-
-	if (!editor.muted[chn])
-		paulaStartDMA(chn);
-	else
-		paulaStopDMA(chn);
-
-	// these take effect after the current DMA cycle is done
-	paulaSetData(chn, NULL);
-	paulaSetLength(chn, 1);
-
-	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
+	playCurrSample(editor.cursor.channel, editor.markStartOfs, editor.markEndOfs, false);
 }
 
 void setLoopSprites(void)

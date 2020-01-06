@@ -1230,7 +1230,7 @@ void renderAboutScreen(void)
 
 	sprintf(verString, "v%s", PROG_VER_STR);
 	verStringX = 260 + (63 - ((uint32_t)strlen(verString) * (FONT_CHAR_W - 1))) / 2;
-	textOutTight(pixelBuffer, verStringX, 75, verString, palette[PAL_GENBKG2]);
+	textOutTight(pixelBuffer, verStringX, 67, verString, palette[PAL_GENBKG2]);
 }
 
 void renderEditOpMode(void)

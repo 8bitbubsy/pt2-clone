@@ -199,6 +199,7 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 					if (srcPix != PAL_COLORKEY)
 					{
 						uint32_t pixel = colorkey; // make compiler happy
+
 						     if (srcPix == PAL_MOUSE_1) pixel = color1;
 						else if (srcPix == PAL_MOUSE_2) pixel = color2;
 						else if (srcPix == PAL_MOUSE_3) pixel = color3;
@@ -348,7 +349,6 @@ void mouseButtonUpHandler(uint8_t mouseButton)
 			case PTB_PATTERND:
 			{
 				editor.ui.updateSongSize = true;
-
 				if (editor.ui.posEdScreenShown)
 					editor.ui.updatePosEd = true;
 			}
@@ -410,7 +410,7 @@ void handleGUIButtonRepeat(void)
 		return;
 	}
 
-	if (input.mouse.lastGUIButton != checkGUIButtons()) // XXX: This can potentially do a ton of iterations, bad design!
+	if (input.mouse.lastGUIButton != checkGUIButtons()) // FIXME: This can potentially do a ton of iterations, bad design!
 	{
 		// only repeat the button that was first clicked (e.g. if you hold and move mouse to another button)
 		input.mouse.repeatCounter = 0;
@@ -539,8 +539,8 @@ void edPosUpButton(bool fast)
 	{
 		if (fast)
 		{
-			if (editor.samplePos <= 0xFFFF-544)
-				editor.samplePos += 544; // 50Hz/60Hz scaled value
+			if (editor.samplePos <= 0xFFFF-64)
+				editor.samplePos += 64;
 			else
 				editor.samplePos = 0xFFFF;
 		}
@@ -556,8 +556,8 @@ void edPosUpButton(bool fast)
 	{
 		if (fast)
 		{
-			if (editor.samplePos <= 0xFFFF-37)
-				editor.samplePos += 37; // 50Hz/60Hz scaled value
+			if (editor.samplePos <= 0xFFFF-64)
+				editor.samplePos += 64;
 			else
 				editor.samplePos = 0xFFFF;
 		}
@@ -582,8 +582,8 @@ void edPosDownButton(bool fast)
 	{
 		if (fast)
 		{
-			if (editor.samplePos > 544)
-				editor.samplePos -= 544; // 50Hz/60Hz scaled value
+			if (editor.samplePos > 64)
+				editor.samplePos -= 64;
 			else
 				editor.samplePos = 0;
 		}
@@ -599,8 +599,8 @@ void edPosDownButton(bool fast)
 	{
 		if (fast)
 		{
-			if (editor.samplePos > 37)
-				editor.samplePos -= 37; // 50Hz/60Hz scaled value
+			if (editor.samplePos > 64)
+				editor.samplePos -= 64;
 			else
 				editor.samplePos = 0;
 		}
@@ -652,6 +652,8 @@ void edVolUpButton(void)
 	{
 		if (editor.sampleVol <= 999-10)
 			editor.sampleVol += 10;
+		else
+			editor.sampleVol = 999;
 	}
 	else
 	{
@@ -668,6 +670,8 @@ void edVolDownButton(void)
 	{
 		if (editor.sampleVol >= 10)
 			editor.sampleVol -= 10;
+		else
+			editor.sampleVol = 0;
 	}
 	else
 	{
@@ -704,9 +708,9 @@ void sampleDownButton(void)
 
 void sampleFineTuneUpButton(void)
 {
-	int8_t finetune = modEntry->samples[editor.currSample].fineTune & 0x0F;
+	int8_t finetune = modEntry->samples[editor.currSample].fineTune & 0xF;
 	if (finetune != 7)
-		modEntry->samples[editor.currSample].fineTune = (finetune + 1) & 0x0F;
+		modEntry->samples[editor.currSample].fineTune = (finetune + 1) & 0xF;
 
 	if (input.mouse.rightButtonPressed)
 		modEntry->samples[editor.currSample].fineTune = 0;
@@ -717,9 +721,9 @@ void sampleFineTuneUpButton(void)
 
 void sampleFineTuneDownButton(void)
 {
-	int8_t finetune = modEntry->samples[editor.currSample].fineTune & 0x0F;
+	int8_t finetune = modEntry->samples[editor.currSample].fineTune & 0xF;
 	if (finetune != 8)
-		modEntry->samples[editor.currSample].fineTune = (finetune - 1) & 0x0F;
+		modEntry->samples[editor.currSample].fineTune = (finetune - 1) & 0xF;
 
 	if (input.mouse.rightButtonPressed)
 		modEntry->samples[editor.currSample].fineTune = 0;
@@ -1284,7 +1288,6 @@ void handleSamplerVolumeBox(void)
 			return;
 		}
 
-
 		if (input.mouse.x >= 174 && input.mouse.x <= 207)
 		{
 			// FROM NUM
@@ -1437,7 +1440,7 @@ void handleSamplerVolumeBox(void)
 				sampleData = &modEntry->sampleData[s->offset];
 				if (editor.markStartOfs != -1)
 				{
-					sampleData  += editor.markStartOfs;
+					sampleData += editor.markStartOfs;
 					sampleLength = editor.markEndOfs - editor.markStartOfs;
 				}
 				else
@@ -1445,19 +1448,24 @@ void handleSamplerVolumeBox(void)
 					sampleLength = s->length;
 				}
 
-				sampleIndex = 0;
-				while (sampleIndex < sampleLength)
+				if (sampleLength > 0)
 				{
-					dSmp = (sampleIndex * editor.vol2) / (double)sampleLength;
-					dSmp += ((sampleLength - sampleIndex) * editor.vol1) / (double)sampleLength;
-					dSmp *= (double)(*sampleData);
-					dSmp /= 100.0;
+					double dSampleLengthMul = 1.0 / sampleLength;
 
-					smp32 = (int32_t)dSmp;
-					CLAMP8(smp32);
+					sampleIndex = 0;
+					while (sampleIndex < sampleLength)
+					{
+						dSmp = (sampleIndex * editor.vol2) * dSampleLengthMul;
+						dSmp += ((sampleLength - sampleIndex) * editor.vol1) * dSampleLengthMul;
+						dSmp *= *sampleData;
+						dSmp *= (1.0 / 100.0);
 
-					*sampleData++ = (int8_t)smp32;
-					sampleIndex++;
+						smp32 = (int32_t)dSmp;
+						CLAMP8(smp32);
+
+						*sampleData++ = (int8_t)smp32;
+						sampleIndex++;
+					}
 				}
 
 				fixSampleBeep(s);
@@ -1861,11 +1869,8 @@ void handleSamplerFiltersBox(void)
 
 static bool withinButtonRect(const guiButton_t *b)
 {
-	if (input.mouse.x >= b->x1 && input.mouse.x <= b->x2 &&
-	    input.mouse.y >= b->y1 && input.mouse.y <= b->y2)
-	{
+	if (input.mouse.x >= b->x1 && input.mouse.x <= b->x2 && input.mouse.y >= b->y1 && input.mouse.y <= b->y2)
 		return true;
-	}
 
 	return false;
 }
@@ -1961,7 +1966,7 @@ void handleTextEditing(uint8_t mouseButton)
 			tmp16 = input.mouse.y - editor.ui.lineCurY;
 			if (tmp16 <= 2 && tmp16 >= -9)
 			{
-				tmp16 = ((input.mouse.x - editor.ui.lineCurX) + 4) >> 3;
+				tmp16 = (uint16_t)((input.mouse.x - editor.ui.lineCurX) + 4) >> 3;
 				while (tmp16 != 0) // 0 = pos we want
 				{
 					if (tmp16 > 0)
@@ -2019,8 +2024,10 @@ void handleTextEditing(uint8_t mouseButton)
 				}
 				else
 				{
-					     if (editor.ui.editObject == PTB_SONGNAME) editor.ui.updateSongName = true;
-					else if (editor.ui.editObject == PTB_SAMPLENAME) editor.ui.updateCurrSampleName = true;
+					if (editor.ui.editObject == PTB_SONGNAME)
+						editor.ui.updateSongName = true;
+					else if (editor.ui.editObject == PTB_SAMPLENAME)
+						editor.ui.updateCurrSampleName = true;
 
 					exitGetTextLine(EDIT_TEXT_UPDATE);
 				}
@@ -2045,25 +2052,18 @@ void mouseWheelUpHandler(void)
 				editor.ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (editor.ui.posEdScreenShown)
+		else if (editor.ui.posEdScreenShown && modEntry->currOrder > 0)
 		{
-			if (modEntry->currOrder > 0)
-				modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+			modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
 		}
 	}
-	else
+	else if (editor.ui.samplerScreenShown)
 	{
-		// lower part of screen
-		if (editor.ui.samplerScreenShown)
-		{
-			samplerZoomInMouseWheel();
-		}
-		else
-		{
-			// pattern data
-			if (!editor.songPlaying && modEntry->currRow > 0)
-				modSetPos(DONT_SET_ORDER, modEntry->currRow - 1);
-		}
+		samplerZoomInMouseWheel(); // lower part of screen
+	}
+	else if (!editor.songPlaying && modEntry->currRow > 0)
+	{
+		modSetPos(DONT_SET_ORDER, modEntry->currRow - 1); // pattern data
 	}
 }
 
@@ -2075,7 +2075,6 @@ void mouseWheelDownHandler(void)
 	if (input.mouse.y < 121)
 	{
 		// upper part of screen
-
 		if (editor.ui.diskOpScreenShown)
 		{
 			if (editor.diskop.numEntries > DISKOP_LINES && editor.diskop.scrollOffset < editor.diskop.numEntries-DISKOP_LINES)
@@ -2084,25 +2083,18 @@ void mouseWheelDownHandler(void)
 				editor.ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (editor.ui.posEdScreenShown)
+		else if (editor.ui.posEdScreenShown && modEntry->currOrder < modEntry->head.orderCount-1)
 		{
-			if (modEntry->currOrder < (modEntry->head.orderCount - 1))
-				modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
+			modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
 		}
 	}
-	else
+	else if (editor.ui.samplerScreenShown)
 	{
-		// lower part of screen
-		if (editor.ui.samplerScreenShown)
-		{
-			samplerZoomOutMouseWheel();
-		}
-		else
-		{
-			// pattern data
-			if (!editor.songPlaying && modEntry->currRow < MOD_ROWS)
-				modSetPos(DONT_SET_ORDER, modEntry->currRow + 1);
-		}
+		samplerZoomOutMouseWheel(); // lower part of screen
+	}
+	else if (!editor.songPlaying && modEntry->currRow < MOD_ROWS)
+	{
+		modSetPos(DONT_SET_ORDER, modEntry->currRow + 1); // pattern data
 	}
 }
 
@@ -2228,7 +2220,7 @@ bool handleLeftMouseButton(void)
 				{
 					// YES button
 					editor.ui.askScreenShown = false;
-					editor.ui.answerNo  = false;
+					editor.ui.answerNo = false;
 					editor.ui.answerYes = true;
 					handleAskYes();
 				}
@@ -2236,7 +2228,7 @@ bool handleLeftMouseButton(void)
 				{
 					// NO button
 					editor.ui.askScreenShown = false;
-					editor.ui.answerNo  = true;
+					editor.ui.answerNo = true;
 					editor.ui.answerYes = false;
 					handleAskNo();
 				}
@@ -2308,8 +2300,8 @@ void updateMouseCounters(void)
 			editor.errorMsgCounter = 0;
 
 			// don't reset status text/mouse color during certain modes
-			if (!editor.ui.askScreenShown      && !editor.ui.clearScreenShown    &&
-				!editor.ui.pat2SmpDialogShown  && !editor.ui.changingChordNote   &&
+			if (!editor.ui.askScreenShown && !editor.ui.clearScreenShown &&
+				!editor.ui.pat2SmpDialogShown && !editor.ui.changingChordNote &&
 				!editor.ui.changingDrumPadNote && !editor.ui.changingSmpResample &&
 				!editor.swapChannelFlag)
 			{
@@ -2318,7 +2310,7 @@ void updateMouseCounters(void)
 			}
 
 			editor.errorMsgActive = false;
-			editor.errorMsgBlock  = false;
+			editor.errorMsgBlock = false;
 
 			diskOpShowSelectText();
 		}
@@ -2328,8 +2320,7 @@ void updateMouseCounters(void)
 static bool handleGUIButtons(int32_t button) // are you prepared to enter the jungle?
 {
 	char pat2SmpText[24];
-	int8_t *ptr8_1, *ptr8_2, *ptr8_3, *ptr8_4;
-	int8_t tmpSmp, modTmp, modDat;
+	int8_t *ptr8_1, *ptr8_2, *ptr8_3, *ptr8_4, tmpSmp, modTmp, modDat;
 	uint8_t i;
 	int16_t tmp16;
 	int32_t smp32, j, modPos, oldVal, tmp32;
@@ -2978,10 +2969,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
+			double dSamplePosMul = 1.0 / editor.samplePos;
+
 			ptr8_1 = &modEntry->sampleData[s->offset];
 			for (j = 0; j < editor.samplePos; j++)
 			{
-				dSmp = ((*ptr8_1) * j) / (double)editor.samplePos;
+				dSmp = ((*ptr8_1) * j) * dSamplePosMul;
 				smp32 = (int32_t)dSmp;
 				CLAMP8(smp32);
 				*ptr8_1++ = (int8_t)smp32;
@@ -3005,21 +2998,22 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			if (editor.samplePos >= (s->length - 1))
+			if (editor.samplePos >= s->length-1)
 			{
 				displayErrorMsg("INVALID POS !");
 				break;
 			}
 
+			tmp32 = (s->length - 1) - editor.samplePos;
+			if (tmp32 == 0)
+				tmp32 = 1;
+
+			double dSampleMul = 1.0 / tmp32;
+
 			ptr8_1 = &modEntry->sampleData[s->offset+s->length-1];
 			for (j = editor.samplePos; j < s->length; j++)
 			{
-				dSmp = (*ptr8_1) * (j - editor.samplePos);
-
-				tmp32 = (s->length - 1) - editor.samplePos;
-				if (tmp32 > 0)
-					dSmp /= (double)tmp32;
-
+				dSmp = ((*ptr8_1) * (j - editor.samplePos)) * dSampleMul;
 				smp32 = (int32_t)dSmp;
 				CLAMP8(smp32);
 				*ptr8_1-- = (int8_t)smp32;
@@ -3098,11 +3092,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.sampleVol != 100)
 			{
 				ptr8_1 = &modEntry->sampleData[modEntry->samples[editor.currSample].offset];
+				double dSampleMul = editor.sampleVol / 100.0;
+
 				for (j = 0; j < s->length; j++)
 				{
-					tmp16 = (int16_t)roundf(((*ptr8_1) * editor.sampleVol) / 100.0f);
+					tmp16 = (int16_t)(ptr8_1[j] * dSampleMul);
 					CLAMP8(tmp16);
-					*ptr8_1++ = (int8_t)tmp16;
+					ptr8_1[j] = (int8_t)tmp16;
 				}
 
 				fixSampleBeep(s);
@@ -3457,15 +3453,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_ABOUT:
 		{
 			editor.ui.aboutScreenShown ^= 1;
+
 			if (editor.ui.aboutScreenShown)
-			{
 				renderAboutScreen();
-			}
-			else
-			{
-				     if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE) renderQuadrascopeBg();
-				else if (editor.ui.visualizerMode == VISUAL_SPECTRUM) renderSpectrumAnalyzerBg();
-			}
+			else if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE)
+				renderQuadrascopeBg();
+			else if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
+				renderSpectrumAnalyzerBg();
 		}
 		break;
 
@@ -3794,16 +3788,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_EDITOP:
 		{
 			if (editor.ui.editOpScreen == 3) // chord screen
-			{
 				editor.ui.editOpScreen = 0;
-			}
+			else if (editor.ui.editOpScreenShown)
+				editor.ui.editOpScreen = (editor.ui.editOpScreen + 1) % 3;
 			else
-			{
-				if (editor.ui.editOpScreenShown)
-					editor.ui.editOpScreen = (editor.ui.editOpScreen + 1) % 3;
-				else
-					editor.ui.editOpScreenShown = true;
-			}
+				editor.ui.editOpScreenShown = true;
 
 			renderEditOpScreen();
 		}
@@ -4499,7 +4488,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_FTUNEU:
 		{
-			if ((modEntry->samples[editor.currSample].fineTune & 0x0F) != 7)
+			if ((modEntry->samples[editor.currSample].fineTune & 0xF) != 7)
 			{
 				sampleFineTuneUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4509,7 +4498,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_FTUNED:
 		{
-			if ((modEntry->samples[editor.currSample].fineTune & 0x0F) != 8)
+			if ((modEntry->samples[editor.currSample].fineTune & 0xF) != 8)
 			{
 				sampleFineTuneDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);

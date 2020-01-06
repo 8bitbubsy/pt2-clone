@@ -691,7 +691,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 		if (handleSpecialKeys(scancode))
 		{
 			if (editor.currMode != MODE_RECORD)
-				modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 63);
+				modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 0x3F);
 
 			return;
 		}
@@ -830,11 +830,11 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 				if (input.keyb.shiftPressed || input.keyb.leftAltPressed)
 				{
 					note->command = 0;
-					note->param   = 0;
+					note->param = 0;
 				}
 
 				if (editor.currMode != MODE_RECORD)
-					modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 63);
+					modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 0x3F);
 
 				updateWindowTitle(MOD_IS_MODIFIED);
 			}
@@ -854,51 +854,51 @@ bool handleSpecialKeys(SDL_Scancode scancode)
 {
 	note_t *patt, *note, *prevNote;
 
-	if (input.keyb.leftAltPressed)
+	if (!input.keyb.leftAltPressed)
+		return false;
+
+	patt = modEntry->patterns[modEntry->currPattern];
+	note = &patt[(modEntry->currRow * AMIGA_VOICES) + editor.cursor.channel];
+	prevNote = &patt[(((modEntry->currRow - 1) & 0x3F) * AMIGA_VOICES) + editor.cursor.channel];
+
+	if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)
 	{
-		patt = modEntry->patterns[modEntry->currPattern];
-		note = &patt[(modEntry->currRow * AMIGA_VOICES) + editor.cursor.channel];
-		prevNote = &patt[(((modEntry->currRow - 1) & 0x3F) * AMIGA_VOICES) + editor.cursor.channel];
+		// insert stored effect (buffer[0..8])
+		note->command = editor.effectMacros[scancode - SDL_SCANCODE_1] >> 8;
+		note->param = editor.effectMacros[scancode - SDL_SCANCODE_1] & 0xFF;
 
-		if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)
-		{
-			// insert stored effect (buffer[0..8])
-			note->command = editor.effectMacros[scancode - SDL_SCANCODE_1] >> 8;
-			note->param = editor.effectMacros[scancode - SDL_SCANCODE_1] & 0xFF;
+		updateWindowTitle(MOD_IS_MODIFIED);
+		return true;
+	}
 
-			updateWindowTitle(MOD_IS_MODIFIED);
-			return true;
-		}
+	// copy command+effect from above into current command+effect
+	if (scancode == SDL_SCANCODE_BACKSLASH)
+	{
+		note->command = prevNote->command;
+		note->param = prevNote->param;
 
-		// copy command+effect from above into current command+effect
-		if (scancode == SDL_SCANCODE_BACKSLASH)
-		{
-			note->command = prevNote->command;
-			note->param   = prevNote->param;
+		updateWindowTitle(MOD_IS_MODIFIED);
+		return true;
+	}
 
-			updateWindowTitle(MOD_IS_MODIFIED);
-			return true;
-		}
+	// copy command+(effect + 1) from above into current command+effect
+	if (scancode == SDL_SCANCODE_EQUALS)
+	{
+		note->command = prevNote->command;
+		note->param = prevNote->param + 1; // wraps 0x00..0xFF
 
-		// copy command+(effect + 1) from above into current command+effect
-		if (scancode == SDL_SCANCODE_EQUALS)
-		{
-			note->command = prevNote->command;
-			note->param = prevNote->param + 1; // wraps 0x00..0xFF
+		updateWindowTitle(MOD_IS_MODIFIED);
+		return true;
+	}
 
-			updateWindowTitle(MOD_IS_MODIFIED);
-			return true;
-		}
+	// copy command+(effect - 1) from above into current command+effect
+	if (scancode == SDL_SCANCODE_MINUS)
+	{
+		note->command = prevNote->command;
+		note->param = prevNote->param - 1; // wraps 0x00..0xFF
 
-		// copy command+(effect - 1) from above into current command+effect
-		if (scancode == SDL_SCANCODE_MINUS)
-		{
-			note->command = prevNote->command;
-			note->param = prevNote->param - 1; // wraps 0x00..0xFF
-
-			updateWindowTitle(MOD_IS_MODIFIED);
-			return true;
-		}
+		updateWindowTitle(MOD_IS_MODIFIED);
+		return true;
 	}
 
 	return false;
@@ -939,12 +939,12 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			chn->n_volume = s->volume;
 			chn->n_period = tempPeriod;
 			chn->n_start = &modEntry->sampleData[s->offset];
-			chn->n_length = (s->loopStart > 0) ? (s->loopStart + s->loopLength) : s->length;
+			chn->n_length = (s->loopStart > 0) ? (uint32_t)(s->loopStart + s->loopLength) / 2 : s->length / 2;
 			chn->n_loopstart = &modEntry->sampleData[s->offset + s->loopStart];
-			chn->n_replen = s->loopLength;
+			chn->n_replen = s->loopLength / 2;
 
-			if (chn->n_length < 2)
-				chn->n_length = 2;
+			if (chn->n_length == 0)
+				chn->n_length = 1;
 
 			paulaSetVolume(ch, chn->n_volume);
 			paulaSetPeriod(ch, chn->n_period);
@@ -995,7 +995,7 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 	{
 		// delete note and sample if illegal note (= -2, -1 = ignore) key was entered
 
-		if (normalMode || (!normalMode && editor.pNoteFlag == 2))
+		if (normalMode || editor.pNoteFlag == 2)
 		{
 			if (!editor.ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
 			{

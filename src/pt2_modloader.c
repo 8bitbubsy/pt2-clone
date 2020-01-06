@@ -687,7 +687,7 @@ module_t *modLoad(UNICHAR *fileName)
 	for (i = 0; i < MOD_SAMPLES; i++)
 		newModule->samples[i].offset = MAX_SAMPLE_LEN * i;
 
-	newModule->sampleData = (int8_t *)calloc(MOD_SAMPLES + 1, MAX_SAMPLE_LEN); // +1 sample slot for overflow safety (scopes etc)
+	newModule->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN); // +2 sample slots for overflow safety (Paula and scopes)
 	if (newModule->sampleData == NULL)
 	{
 		statusOutOfMemory();
@@ -1359,7 +1359,7 @@ module_t *createNewMod(void)
 			goto oom;
 	}
 
-	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 1, MAX_SAMPLE_LEN); // +1 sample slot for overflow safety (scopes etc)
+	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN); // +2 sample slots for overflow safety (Paula and scopes)
 	if (newMod->sampleData == NULL)
 		goto oom;
 

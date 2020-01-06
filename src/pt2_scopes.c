@@ -150,7 +150,7 @@ static void updateRealVuMeters(void)
 
 		volume = modEntry->channels[i].n_volume;
 
-		if (se->active && tmpScope.data != NULL && volume != 0 && !editor.muted[i] && tmpScope.length > 0)
+		if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)
 		{
 			smpPeak = 0;
 			readPos = tmpScope.pos;
@@ -229,7 +229,7 @@ void drawScopes(void)
 			volume = -modEntry->channels[i].n_volume; // 0..64 -> -64..0
 
 			// render scope
-			if (se->active && tmpScope.data != NULL && volume != 0 && !editor.muted[i] && tmpScope.length > 0)
+			if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)
 			{
 				// scope is active
 
