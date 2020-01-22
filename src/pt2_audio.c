@@ -1023,10 +1023,10 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	wavHeader.numChannels = 2;
 	wavHeader.sampleRate = audio.audioFreq;
 	wavHeader.bitsPerSample = 16;
-	wavHeader.byteRate = wavHeader.sampleRate * wavHeader.numChannels * wavHeader.bitsPerSample / 8;
-	wavHeader.blockAlign = wavHeader.numChannels * wavHeader.bitsPerSample / 8;
+	wavHeader.byteRate = wavHeader.sampleRate * wavHeader.numChannels * (wavHeader.bitsPerSample / 8);
+	wavHeader.blockAlign = wavHeader.numChannels * (wavHeader.bitsPerSample / 8);
 	wavHeader.subchunk2ID = 0x61746164; // "data"
-	wavHeader.subchunk2Size = totalSampleCounter * 4; // 16-bit stereo = * 4
+	wavHeader.subchunk2Size = totalSampleCounter * (wavHeader.bitsPerSample / 8);
 
 	fwrite(&wavHeader, sizeof (wavHeader_t), 1, fOut);
 	fclose(fOut);

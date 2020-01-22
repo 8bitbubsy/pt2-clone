@@ -2142,7 +2142,8 @@ bool handleRightMouseButton(void)
 	if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE && input.mouse.y >= 55 && input.mouse.y <= 87)
 	{
 		if (!editor.ui.posEdScreenShown && !editor.ui.editOpScreenShown && !editor.ui.diskOpScreenShown &&
-			!editor.ui.aboutScreenShown && !editor.ui.samplerVolBoxShown && !editor.ui.samplerFiltersBoxShown)
+			!editor.ui.aboutScreenShown && !editor.ui.samplerVolBoxShown &&
+			!editor.ui.samplerFiltersBoxShown && !editor.isWAVRendering)
 		{
 			     if (input.mouse.x > 127 && input.mouse.x <= 167) editor.muted[0] ^= 1;
 			else if (input.mouse.x > 175 && input.mouse.x <= 215) editor.muted[1] ^= 1;
