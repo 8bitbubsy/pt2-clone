@@ -63,7 +63,7 @@ void doStopIt(void)
 	moduleChannel_t *c;
 	uint8_t i;
 
-	resetOldPeriods();
+	resetCachedMixerPeriod();
 
 	pattDelTime = 0;
 	pattDelTime2 = 0;
@@ -1447,10 +1447,10 @@ void modFree(void)
 			free(modEntry->patterns[i]);
 	}
 
-	if (modEntry->sampleData != NULL)
+	if (modEntry->sampleDataUnaligned != NULL)
 	{
 		clearPaulaAndScopes();
-		free(modEntry->sampleData);
+		free(modEntry->sampleDataUnaligned);
 	}
 
 	free(modEntry);

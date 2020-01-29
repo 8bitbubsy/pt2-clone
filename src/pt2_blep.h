@@ -32,4 +32,5 @@ typedef struct blep_t
 } blep_t;
 
 void blepAdd(blep_t *b, double dOffset, double dAmplitude);
+void blepVolAdd(blep_t *b, double dAmplitude);
 double blepRun(blep_t *b);

@@ -11,7 +11,7 @@ typedef struct lossyIntegrator_t
 	double dBuffer[2], b0, b1;
 } lossyIntegrator_t;
 
-void resetOldPeriods(void);
+void resetCachedMixerPeriod(void);
 void resetDitherSeed(void);
 void calcCoeffLossyIntegrator(double dSr, double dHz, lossyIntegrator_t *filter);
 void lossyIntegrator(lossyIntegrator_t *filter, double *dIn, double *dOut);

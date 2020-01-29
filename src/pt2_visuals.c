@@ -106,7 +106,7 @@ void setupPerfFreq(void)
 	if (dFrac > (double)UINT32_MAX)
 		dFrac = (double)UINT32_MAX;
 
-	editor.vblankTimeLenFrac = (uint32_t)round(dFrac);
+	editor.vblankTimeLenFrac = (uint32_t)(dFrac + 0.5);
 }
 
 void setupWaitVBL(void)
@@ -131,7 +131,7 @@ void waitVBL(void)
 		diff32 = (uint32_t)(timeNext64 - time64);
 
 		// convert to microseconds and round to integer
-		time32 = (uint32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
+		time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
 
 		// delay until we have reached next tick
 		if (time32 > 0)
@@ -140,9 +140,8 @@ void waitVBL(void)
 
 	// update next tick time
 	timeNext64 += editor.vblankTimeLen;
-
 	timeNext64Frac += editor.vblankTimeLenFrac;
-	if (timeNext64Frac >= (1ULL << 32))
+	if (timeNext64Frac > 0xFFFFFFFF)
 	{
 		timeNext64Frac &= 0xFFFFFFFF;
 		timeNext64++;

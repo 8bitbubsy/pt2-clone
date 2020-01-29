@@ -369,7 +369,7 @@ module_t *modLoad(UNICHAR *fileName)
 	{
 		s = &newModule->samples[i];
 
-		if (mightBeSTK && i > 14)
+		if (mightBeSTK && i >= 15)
 		{
 			s->loopLength = 2;
 		}
@@ -409,6 +409,9 @@ module_t *modLoad(UNICHAR *fileName)
 			loopStart = ((mgetc(mod) << 8) | mgetc(mod)) * 2;
 			loopLength = ((mgetc(mod) << 8) | mgetc(mod)) * 2;
 
+			if (loopLength < 2)
+				loopLength = 2; // fixes empty samples in .MODs saved from FT2
+
 			if (loopStart > MAX_SAMPLE_LEN || loopStart+loopLength > MAX_SAMPLE_LEN)
 			{
 				s->loopStart = 0;
@@ -422,9 +425,6 @@ module_t *modLoad(UNICHAR *fileName)
 
 			if (mightBeSTK)
 				s->loopStart /= 2;
-
-			if (s->loopLength < 2)
-				s->loopLength = 2;
 
 			// fix for poorly converted STK->PTMOD modules.
 			if (!mightBeSTK && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
@@ -448,12 +448,12 @@ module_t *modLoad(UNICHAR *fileName)
 			}
 
 			// some modules are broken like this, adjust sample length if possible (this is ok if we have room)
-			if (s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
+			if (s->length > 0 && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
 			{
 				loopOverflowVal = (s->loopStart+s->loopLength) - s->length;
 				if (s->length+loopOverflowVal <= MAX_SAMPLE_LEN)
 				{
-					s->length += loopOverflowVal; // this is safe, we're calloc()'ing 65535*(31+1) bytes
+					s->length += loopOverflowVal; // this is safe, we're calloc()'ing 65535*(31+2) bytes
 				}
 				else
 				{
@@ -465,9 +465,9 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 
 	// STK 2.5 had loopStart in words, not bytes. Convert if late version STK.
-	for (i = 0; i < 15; i++)
+	if (mightBeSTK && lateSTKVerFlag)
 	{
-		if (mightBeSTK && lateSTKVerFlag)
+		for (i = 0; i < 15; i++)
 		{
 			s = &newModule->samples[i];
 			if (s->loopStart > 2)
@@ -684,15 +684,19 @@ module_t *modLoad(UNICHAR *fileName)
 		}
 	}
 
+	// set static sample data pointers (sample data = one huge buffer internally)
 	for (i = 0; i < MOD_SAMPLES; i++)
 		newModule->samples[i].offset = MAX_SAMPLE_LEN * i;
 
-	newModule->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN); // +2 sample slots for overflow safety (Paula and scopes)
-	if (newModule->sampleData == NULL)
+	// +2 sample slots for overflow safety (Paula and scopes)
+	newModule->sampleDataUnaligned = (int8_t *)CALLOC_PAD((MOD_SAMPLES + 2) * MAX_SAMPLE_LEN, 256);
+	if (newModule->sampleDataUnaligned == NULL)
 	{
 		statusOutOfMemory();
 		goto modLoadError;
 	}
+
+	newModule->sampleData = (int8_t *)ALIGN_PTR(newModule->sampleDataUnaligned, 256);
 
 	// load sample data
 	numSamples = (newModule->head.format == FORMAT_STK) ? 15 : 31;
@@ -1359,9 +1363,12 @@ module_t *createNewMod(void)
 			goto oom;
 	}
 
-	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN); // +2 sample slots for overflow safety (Paula and scopes)
-	if (newMod->sampleData == NULL)
+	// +2 sample slots for overflow safety (Paula and scopes)
+	newMod->sampleDataUnaligned = (int8_t *)CALLOC_PAD((MOD_SAMPLES + 2) * MAX_SAMPLE_LEN, 256);
+	if (newMod->sampleDataUnaligned == NULL)
 		goto oom;
+
+	newMod->sampleData = (int8_t *)ALIGN_PTR(newMod->sampleDataUnaligned, 256);
 
 	newMod->head.orderCount = 1;
 	newMod->head.patternCount = 1;

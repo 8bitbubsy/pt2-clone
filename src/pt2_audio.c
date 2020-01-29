@@ -51,7 +51,7 @@ typedef struct voice_t
 	volatile bool active;
 	const int8_t *data, *newData;
 	int32_t length, newLength, pos;
-	double dVolume, dDelta, dPhase, dLastDelta, dLastPhase, dPanL, dPanR;
+	double dVolume, dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase, dPanL, dPanR;
 } paulaVoice_t;
 
 static volatile int8_t filterFlags;
@@ -61,7 +61,7 @@ static bool amigaPanFlag, wavRenderingDone;
 static uint16_t ch1Pan, ch2Pan, ch3Pan, ch4Pan, oldPeriod;
 static int32_t sampleCounter, maxSamplesToMix, randSeed = INITIAL_DITHER_SEED;
 static uint32_t oldScopeDelta;
-static double *dMixBufferL, *dMixBufferR, oldVoiceDelta;
+static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
 static lossyIntegrator_t filterLo, filterHi;
 static ledFilterCoeff_t filterLEDC;
@@ -128,7 +128,7 @@ static void calcCoeffLED(double dSr, double dHz, ledFilterCoeff_t *filter)
 
 #ifndef NO_FILTER_FINETUNING
 	/* 8bitbubsy: makes the filter curve sound (and look) much closer to the real deal.
-	** This has been tested against both an A500 and A1200. */
+	** This has been tested against both an A500 and A1200 (real units). */
 	dFb *= 0.62;
 #endif
 
@@ -183,7 +183,7 @@ void lossyIntegrator(lossyIntegrator_t *filter, double *dIn, double *dOut)
 	**
 	** This implementation has a less smooth cutoff curve compared to the old one, so it's
 	** maybe not the best. However, I stick to this one because it has a higher gain
-	** at the end of the curve (closer to Amiga 500). It also sounds much closer when
+	** at the end of the curve (closer to real tested Amiga 500). It also sounds much closer when
 	** comparing whitenoise on an A500. */
 
 	// left channel low-pass
@@ -383,7 +383,7 @@ void paulaStartDMA(uint8_t ch)
 	*sc = s; // update it
 }
 
-void resetOldPeriods(void)
+void resetCachedMixerPeriod(void)
 {
 	oldPeriod = 0;
 }
@@ -398,6 +398,7 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 	if (period == 0)
 	{
 		v->dDelta = 0.0; // confirmed behavior on real Amiga
+		v->dDeltaMul = 1.0; // for BLEP synthesis
 		setScopeDelta(ch, 0);
 		return;
 	}
@@ -408,11 +409,17 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 	// if the new period was the same as the previous period, use cached deltas
 	if (period == oldPeriod)
 	{
-		v->dDelta = oldVoiceDelta;
+		v->dDelta = dOldVoiceDelta;
+		v->dDeltaMul = dOldVoiceDeltaMul; // for BLEP synthesis
 		setScopeDelta(ch, oldScopeDelta);
 	}
 	else 
 	{
+		// this period is not cached, calculate mixer/scope deltas
+
+#if SCOPE_HZ != 64
+#error Scope Hz is not 64 (2^n), change rate calc. to use doubles+round in pt2_scope.c
+#endif
 		oldPeriod = period;
 
 		// if we are rendering pattern to sample (PAT2SMP), use different frequencies
@@ -422,19 +429,23 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 			dPeriodToDeltaDiv = audio.dPeriodToDeltaDiv;
 
 		v->dDelta = dPeriodToDeltaDiv / period;
-		oldVoiceDelta = v->dDelta;
+		v->dDeltaMul = 1.0 / v->dDelta; // for BLEP synthesis
 
-		// set scope rate
-#if SCOPE_HZ != 64
-#error Scope Hz is not 64 (2^n), change rate calc. to use doubles+round in pt2_scope.c
-#endif
+		// cache these
+		dOldVoiceDelta = v->dDelta;
+		dOldVoiceDeltaMul = v->dDeltaMul; // for BLEP synthesis
 		oldScopeDelta = (PAULA_PAL_CLK * (65536UL / SCOPE_HZ)) / period;
+
 		setScopeDelta(ch, oldScopeDelta);
 	}
 
 	// for BLEP synthesis
+
 	if (v->dLastDelta == 0.0)
 		v->dLastDelta = v->dDelta;
+
+	if (v->dLastDeltaMul == 0.0)
+		v->dLastDeltaMul = v->dDeltaMul;
 }
 
 void paulaSetVolume(uint8_t ch, uint16_t vol)
@@ -453,7 +464,8 @@ void paulaSetLength(uint8_t ch, uint16_t len)
 	{
 		len = 65535;
 		/* confirmed behavior on real Amiga (also needed for safety)
-		 * And yes, we have room for this, it will never overflow! */
+		** And yes, we have room for this, it will never overflow!
+		*/
 	}
 
 	// our mixer works with bytes, not words. Multiply by two
@@ -515,10 +527,13 @@ void mixChannels(int32_t numSamples)
 	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
 		v = &paula[i];
+		if (!v->active)
+			continue;
+
 		bSmp = &blep[i];
 		bVol = &blepVol[i];
 
-		for (int32_t j = 0; v->active && j < numSamples; j++)
+		for (int32_t j = 0; j < numSamples; j++)
 		{
 			dataPtr = v->data;
 			if (dataPtr == NULL)
@@ -534,14 +549,18 @@ void mixChannels(int32_t numSamples)
 
 			if (dTempSample != bSmp->dLastValue)
 			{
-				if (v->dLastDelta > 0.0 && v->dLastDelta > v->dLastPhase)
-					blepAdd(bSmp, v->dLastPhase / v->dLastDelta, bSmp->dLastValue - dTempSample);
+				if (v->dLastDelta > v->dLastPhase)
+				{
+					// div->mul trick: v->dLastDeltaMul is 1.0 / v->dLastDelta
+					blepAdd(bSmp, v->dLastPhase * v->dLastDeltaMul, bSmp->dLastValue - dTempSample);
+				}
+
 				bSmp->dLastValue = dTempSample;
 			}
 
 			if (dTempVolume != bVol->dLastValue)
 			{
-				blepAdd(bVol, 0.0, bVol->dLastValue - dTempVolume);
+				blepVolAdd(bVol, bVol->dLastValue - dTempVolume);
 				bVol->dLastValue = dTempVolume;
 			}
 
@@ -554,18 +573,21 @@ void mixChannels(int32_t numSamples)
 			dMixBufferR[j] += dTempSample * v->dPanR;
 
 			v->dPhase += v->dDelta;
-			while (v->dPhase >= 1.0) // PAT2SMP needs multi-step, so use while() here
+
+			// PAT2SMP needs multi-step, so use while() here (will be only one iteration in normal mixing mode)
+			while (v->dPhase >= 1.0)
 			{
 				v->dPhase -= 1.0;
 
 				v->dLastPhase = v->dPhase;
 				v->dLastDelta = v->dDelta;
+				v->dLastDeltaMul = v->dDeltaMul;
 
 				if (++v->pos >= v->length)
 				{
 					v->pos = 0;
 
-					// re-fetch Paula register values now
+					// re-fetch new Paula register values now
 					v->length = v->newLength;
 					v->data = v->newData;
 				}
@@ -731,7 +753,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 		if (samplesTodo > 0)
 		{
 			outputAudio(out, samplesTodo);
-			out += (samplesTodo << 1);
+			out += (uint32_t)samplesTodo * 2;
 
 			sampleBlock -= samplesTodo;
 			sampleCounter -= samplesTodo;
@@ -863,15 +885,19 @@ bool setupAudio(void)
 
 	maxSamplesToMix = (int32_t)ceil((have.freq * 2.5) / 32.0);
 
-	dMixBufferL = (double *)calloc(maxSamplesToMix, sizeof (double));
-	dMixBufferR = (double *)calloc(maxSamplesToMix, sizeof (double));
+	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
+	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
+
 	editor.mod2WavBuffer = (int16_t *)malloc(sizeof (int16_t) * maxSamplesToMix);
 
-	if (dMixBufferL == NULL || dMixBufferR == NULL || editor.mod2WavBuffer == NULL)
+	if (dMixBufferLUnaligned == NULL || dMixBufferRUnaligned == NULL || editor.mod2WavBuffer == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
+
+	dMixBufferL = (double *)ALIGN_PTR(dMixBufferLUnaligned, 256);
+	dMixBufferR = (double *)ALIGN_PTR(dMixBufferRUnaligned, 256);
 
 	audio.audioBufferSize = have.samples;
 	ptConfig.soundFrequency = have.freq;
@@ -903,16 +929,16 @@ void audioClose(void)
 		dev = 0;
 	}
 
-	if (dMixBufferL != NULL)
+	if (dMixBufferLUnaligned != NULL)
 	{
-		free(dMixBufferL);
-		dMixBufferL = NULL;
+		free(dMixBufferLUnaligned);
+		dMixBufferLUnaligned = NULL;
 	}
 
-	if (dMixBufferR != NULL)
+	if (dMixBufferRUnaligned != NULL)
 	{
-		free(dMixBufferR);
-		dMixBufferR = NULL;
+		free(dMixBufferRUnaligned);
+		dMixBufferRUnaligned = NULL;
 	}
 
 	if (editor.mod2WavBuffer != NULL)
@@ -964,12 +990,12 @@ uint32_t getAudioFrame(int16_t *outStream)
 			samplesToMix = maxSamplesToMix;
 
 		outputAudio(outStream, samplesToMix);
-		outStream += (samplesToMix << 1);
+		outStream += (uint32_t)samplesToMix * 2;
 
 		smpCounter -= samplesToMix;
 	}
 
-	return samplesPerTick << 1; // * 2 for stereo
+	return (uint32_t)samplesPerTick * 2; // * 2 for stereo
 }
 
 static int32_t SDLCALL mod2WavThreadFunc(void *ptr)

@@ -54,6 +54,30 @@ void blepAdd(blep_t *b, double dOffset, double dAmplitude)
 	b->samplesLeft = BLEP_NS;
 }
 
+/* 8bitbubsy: simplified, faster version of blepAdd for blep'ing voice volume.
+** Result is identical! (confirmed with binary comparison)
+*/
+void blepVolAdd(blep_t *b, double dAmplitude)
+{
+	int8_t n;
+	int32_t i;
+	const double *dBlepSrc;
+
+	dBlepSrc = (const double *)dBlepData + BLEP_OS;
+
+	i = b->index;
+
+	n = BLEP_NS;
+	while (n--)
+	{
+		b->dBuffer[i] += dAmplitude * (*dBlepSrc);
+		i = (i + 1) & BLEP_RNS;
+		dBlepSrc += BLEP_SP;
+	}
+
+	b->samplesLeft = BLEP_NS;
+}
+
 double blepRun(blep_t *b)
 {
 	double fBlepOutput;

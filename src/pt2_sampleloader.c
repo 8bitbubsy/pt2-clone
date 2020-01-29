@@ -847,7 +847,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 	if (sampleVolume > 65536)
 		sampleVolume = 65536;
 
-	sampleVolume = (uint32_t)round(sampleVolume / 1024.0);
+	sampleVolume = (int32_t)round(sampleVolume / 1024.0);
 	if (sampleVolume > 64)
 		sampleVolume = 64;
 

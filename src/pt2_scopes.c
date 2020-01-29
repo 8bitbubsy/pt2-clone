@@ -355,7 +355,7 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 			diff32 = (uint32_t)(timeNext64 - time64);
 
 			// convert to microseconds and round to integer
-			time32 = (uint32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
+			time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
 
 			// delay until we have reached next tick
 			if (time32 > 0)
@@ -364,9 +364,8 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 		// update next tick time
 		timeNext64 += scopeTimeLen;
-
 		timeNext64Frac += scopeTimeLenFrac;
-		if (timeNext64Frac >= (1ULL << 32))
+		if (timeNext64Frac > 0xFFFFFFFF)
 		{
 			timeNext64Frac &= 0xFFFFFFFF;
 			timeNext64++;
@@ -390,7 +389,7 @@ bool initScopes(void)
 	dFrac *= UINT32_MAX + 1.0;
 	if (dFrac > (double)UINT32_MAX)
 		dFrac = (double)UINT32_MAX;
-	scopeTimeLenFrac = (uint32_t)round(dFrac);
+	scopeTimeLenFrac = (uint32_t)(dFrac + 0.5);
 
 	scopeThread = SDL_CreateThread(scopeThreadFunc, NULL, NULL);
 	if (scopeThread == NULL)

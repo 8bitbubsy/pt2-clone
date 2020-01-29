@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include "pt2_unicode.h"
 
-#define PROG_VER_STR "1.03"
+#define PROG_VER_STR "1.04"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -278,7 +278,7 @@ typedef struct moduleChannel_t
 
 typedef struct module_t
 {
-	int8_t *sampleData, currRow, modified, row;
+	int8_t *sampleData, *sampleDataUnaligned, currRow, modified, row;
 	uint8_t currSpeed, moduleLoaded;
 	uint16_t currOrder, currPattern, currBPM;
 	uint32_t rowsCounter, rowsInTotal;

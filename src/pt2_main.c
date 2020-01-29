@@ -113,10 +113,6 @@ int main(int argc, char *argv[])
 	cpu.hasSSE = SDL_HasSSE();
 	cpu.hasSSE2 = SDL_HasSSE2();
 
-#ifdef _WIN32
-	setupWin32Usleep();
-#endif
-
 	// set up crash handler
 #ifndef _DEBUG
 #ifdef _WIN32
@@ -158,6 +154,21 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef _WIN32
+	if (!cpu.hasSSE)
+	{
+		showErrorMsgBox("Your computer's processor doesn't have the SSE instruction set\n" \
+		                "which is needed for this program to run. Sorry!");
+		return 0;
+	}
+
+	if (!cpu.hasSSE2)
+	{
+		showErrorMsgBox("Your computer's processor doesn't have the SSE2 instruction set\n" \
+		                "which is needed for this program to run. Sorry!");
+		return 0;
+	}
+
+	setupWin32Usleep();
 	disableWasapi(); // disable problematic WASAPI SDL2 audio driver on Windows (causes clicks/pops sometimes...)
 #endif
 

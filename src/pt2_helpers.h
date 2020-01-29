@@ -11,6 +11,10 @@
 // fast 16-bit -> 8-bit clamp
 #define CLAMP8(i) if ((int8_t)(i) != i) i = 0x7F ^ (i >> 15)
 
+#define ALIGN_PTR(p, x) (((uintptr_t)(p) + ((x)-1)) & ~((x)-1))
+#define MALLOC_PAD(size, pad) (malloc((size) + (pad)))
+#define CALLOC_PAD(size, pad) (calloc((size) + (pad), 1))
+
 #define SWAP16(value) \
 ( \
 	(((uint16_t)((value) & 0x00FF)) << 8) | \

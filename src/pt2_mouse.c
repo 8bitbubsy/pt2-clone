@@ -288,8 +288,8 @@ void readMouseXY(void)
 	if (my < 0) my = 0;
 
 	// multiply coords by video scaling factors (do not round)
-	mx = (uint32_t)(mx * editor.ui.dMouseXMul);
-	my = (uint32_t)(my * editor.ui.dMouseYMul);
+	mx = (int32_t)(mx * editor.ui.dMouseXMul);
+	my = (int32_t)(my * editor.ui.dMouseYMul);
 
 	if (mx >= SCREEN_W) mx = SCREEN_W - 1;
 	if (my >= SCREEN_H) my = SCREEN_H - 1;
