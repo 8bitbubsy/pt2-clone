@@ -12,4 +12,4 @@ Linux users will unfortunately have to compile the program manually.
 Please read HOW-TO-COMPILE.txt file in the repository.
 
 PS: The source code is quite hackish and hardcoded. \
-My first priority is _accuracy_, not flexibility and clean code.
+My first priority is to make an _accurate_ 1:1 clone, and not to make flexible and easily modifiable code.
