@@ -459,11 +459,8 @@ module_t *modLoad(UNICHAR *fileName)
 			s->loopLength = (uint16_t)loopLength;
 		}
 
-		/* Ultimate SoundTracker before version 2.5 had loopStart in bytes, not words
-		** XXX: This has to be verified... It's possible that it was before that,
-		** and that this breaks some modules.
-		*/
-		if (mightBeSTK && !lateSTKVerFlag)
+		// in The Ultimate SoundTracker, sample loop start is in bytes, not words
+		if (mightBeSTK)
 			s->loopStart /= 2;
 
 		// fix for poorly converted STK (< v2.5) -> PT/NT modules (FIXME: Worth keeping or not?)
