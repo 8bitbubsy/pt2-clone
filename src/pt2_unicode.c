@@ -17,7 +17,7 @@ uint32_t unicharToAnsi(char *dstBuffer, const UNICHAR *inputString, uint32_t max
 #ifdef _WIN32
 		if (ch >= 256)
 #else
-		if ((signed)ch < 0)
+		if ((uint8_t)ch > 127)
 #endif
 		{
 			*dstBuffer++ = '?';

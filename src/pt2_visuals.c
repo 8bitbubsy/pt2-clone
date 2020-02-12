@@ -101,11 +101,7 @@ void setupPerfFreq(void)
 	editor.vblankTimeLen = (uint32_t)dInt;
 
 	// fractional part scaled to 0..2^32-1
-
-	dFrac *= UINT32_MAX + 1.0;
-	if (dFrac > (double)UINT32_MAX)
-		dFrac = (double)UINT32_MAX;
-
+	dFrac *= UINT32_MAX;
 	editor.vblankTimeLenFrac = (uint32_t)(dFrac + 0.5);
 }
 
@@ -546,27 +542,26 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		textOutBg(pixelBuffer, 264, 123, "      ", palette[PAL_GENBKG], palette[PAL_GENBKG]);
 
 		// calculate module length
-		modEntry->head.totalSampleSize = 0;
+		uint32_t totalSampleDataSize = 0;
 		for (i = 0; i < MOD_SAMPLES; i++)
-			modEntry->head.totalSampleSize += modEntry->samples[i].length;
+			totalSampleDataSize += modEntry->samples[i].length;
 
-		modEntry->head.patternCount = 0;
+		uint32_t totalPatterns = 0;
 		for (i = 0; i < MOD_ORDERS; i++)
 		{
-			if (modEntry->head.order[i] > modEntry->head.patternCount)
-				modEntry->head.patternCount = modEntry->head.order[i];
+			if (modEntry->head.order[i] > totalPatterns)
+				totalPatterns = modEntry->head.order[i];
 		}
 
-		modEntry->head.moduleSize = 2108 + modEntry->head.totalSampleSize + (modEntry->head.patternCount * 1024);
-
-		if (modEntry->head.moduleSize > 999999)
+		uint32_t moduleSize = 2108 + (totalPatterns * 1024) + totalSampleDataSize;
+		if (moduleSize > 999999)
 		{
 			charOut(pixelBuffer, 304, 123, 'K', palette[PAL_GENTXT]);
-			printFourDecimals(pixelBuffer, 272, 123, modEntry->head.moduleSize / 1000, palette[PAL_GENTXT]);
+			printFourDecimals(pixelBuffer, 272, 123, moduleSize / 1000, palette[PAL_GENTXT]);
 		}
 		else
 		{
-			printSixDecimals(pixelBuffer, 264, 123, modEntry->head.moduleSize, palette[PAL_GENTXT]);
+			printSixDecimals(pixelBuffer, 264, 123, moduleSize, palette[PAL_GENTXT]);
 		}
 	}
 
@@ -2755,8 +2750,8 @@ void updateRenderSizeVars(void)
 	}
 
 	// for mouse cursor creation
-	editor.ui.xScale = (uint32_t)round(editor.ui.renderW / (double)SCREEN_W);
-	editor.ui.yScale = (uint32_t)round(editor.ui.renderH / (double)SCREEN_H);
+	editor.ui.xScale = (int32_t)((editor.ui.renderW / (double)SCREEN_W) + 0.5);
+	editor.ui.yScale = (int32_t)((editor.ui.renderH / (double)SCREEN_H) + 0.5);
 	createMouseCursors();
 }
 

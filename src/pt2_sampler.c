@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h> // roundf()
 #include "pt2_header.h"
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
@@ -2101,19 +2100,19 @@ static void samplerZoomOut(int32_t step, int16_t x)
 
 void samplerZoomInMouseWheel(void)
 {
-	int32_t step = (int32_t)round(editor.sampler.samDisplay / 10.0);
+	int32_t step = (int32_t)((editor.sampler.samDisplay / 10.0f) + 0.5f);
 	samplerZoomIn(step, input.mouse.x);
 }
 
 void samplerZoomOutMouseWheel(void)
 {
-	int32_t step = (int32_t)round(editor.sampler.samDisplay / 10.0);
+	int32_t step = (int32_t)((editor.sampler.samDisplay / 10.0f) + 0.5f);
 	samplerZoomOut(step, input.mouse.x);
 }
 
 void samplerZoomOut2x(void)
 {
-	int32_t step= (int32_t)round(editor.sampler.samDisplay / 2.0);
+	int32_t step = (int32_t)((editor.sampler.samDisplay / 2.0f) + 0.5f);
 	samplerZoomOut(step, SCREEN_W / 2);
 }
 
@@ -2281,7 +2280,7 @@ void samplerBarPressed(bool mouseButtonHeld)
 		if (tmp32 < 0)
 			tmp32 = 0;
 
-		tmp32 = (int32_t)round((tmp32 * editor.sampler.samLength) / 311.0);
+		tmp32 = (int32_t)(((tmp32 * editor.sampler.samLength) / 311.0) + 0.5);
 		if (tmp32+editor.sampler.samDisplay <= editor.sampler.samLength)
 		{
 			if (tmp32 == editor.sampler.samOffset)

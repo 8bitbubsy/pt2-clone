@@ -32,7 +32,7 @@ typedef struct mem_t
 	bool _eof;
 	uint8_t *_ptr, *_base;
 	uint32_t _cnt, _bufsiz;
-} mem_t;
+} MEMFILE;
 
 static bool oldAutoPlay;
 static char oldFullPath[(PATH_MAX * 2) + 2];
@@ -41,11 +41,12 @@ static module_t *tempMod;
 
 extern SDL_Window *window;
 
-static mem_t *mopen(const uint8_t *src, uint32_t length);
-static void mclose(mem_t **buf);
-static int32_t mgetc(mem_t *buf);
-static size_t mread(void *buffer, size_t size, size_t count, mem_t *buf);
-static void mseek(mem_t *buf, int32_t offset, int32_t whence);
+static MEMFILE *mopen(const uint8_t *src, uint32_t length);
+static void mclose(MEMFILE **buf);
+static int32_t mgetc(MEMFILE *buf);
+static size_t mread(void *buffer, size_t size, size_t count, MEMFILE *buf);
+static void mseek(MEMFILE *buf, int32_t offset, int32_t whence);
+static void mrewind(MEMFILE *buf);
 static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint32_t srcLen, uint32_t dstLen, uint8_t skipBits);
 
 void showSongUnsavedAskBox(int8_t askScreenType)
@@ -167,23 +168,35 @@ bool modSave(char *fileName)
 	return true;
 }
 
-static int8_t checkModType(const char *buf)
-{
-	     if (!strncmp(buf, "M.K.", 4)) return FORMAT_MK;   // ProTracker v1.x, handled as ProTracker v2.x
-	else if (!strncmp(buf, "M!K!", 4)) return FORMAT_MK2;  // ProTracker v2.x (if >64 patterns)
-	else if (!strncmp(buf, "FLT4", 4)) return FORMAT_FLT4; // StarTrekker (4ch), handled as ProTracker v2.x
-	else if (!strncmp(buf, "1CHN", 4)) return FORMAT_1CHN; // handled as 4ch
-	else if (!strncmp(buf, "2CHN", 4)) return FORMAT_2CHN; // FastTracker II, handled as 4ch
-	else if (!strncmp(buf, "3CHN", 4)) return FORMAT_3CHN; // handled as 4ch
-	else if (!strncmp(buf, "4CHN", 4)) return FORMAT_4CHN; // rare type, not sure what tracker it comes from
-	else if (!strncmp(buf, "N.T.", 4)) return FORMAT_MK;   // NoiseTracker 1.0, handled as ProTracker v2.x
-	else if (!strncmp(buf, "M&K!", 4)) return FORMAT_FEST; // Special NoiseTracker format (used in music disks?)
-	else if (!strncmp(buf, "FEST", 4)) return FORMAT_FEST; // Special NoiseTracker format (used in music disks?)
-	else if (!strncmp(buf, "NSMS", 4)) return FORMAT_MK;   // OpenMPT Load_mod.cpp: "kingdomofpleasure.mod by bee hunter"
-	else if (!strncmp(buf, "LARD", 4)) return FORMAT_MK;   // OpenMPT Load_mod.cpp: "judgement_day_gvine.mod by 4-mat"
-	else if (!strncmp(buf, "PATT", 4)) return FORMAT_MK;   // OpenMPT Load_mod.cpp: "ProTracker 3.6"
+#define IS_ID(s, b) !strncmp(s, b, 4)
 
-	return FORMAT_UNKNOWN; // may be The Ultimate SoundTracker, 15 samples
+static uint8_t getModType(uint8_t *numChannels, const char *id)
+{
+	*numChannels = 4;
+
+	if (IS_ID("M.K.", id) || IS_ID("M!K!", id) || IS_ID("NSMS", id) || IS_ID("LARD", id) || IS_ID("PATT", id))
+	{
+		return FORMAT_MK; // ProTracker (or compatible)
+	}
+	else if (IS_ID("FLT4", id))
+	{
+		return FORMAT_FLT; // Startrekker (4 channels)
+	}
+	else if (IS_ID("N.T.", id))
+	{
+		return FORMAT_NT; // NoiseTracker
+	}
+	else if (IS_ID("M&K!", id) || IS_ID("FEST", id))
+	{
+		return FORMAT_HMNT; // His Master's NoiseTracker
+	}
+	else if (id[1] == 'C' && id[2] == 'H' && id[3] == 'N')
+	{
+		*numChannels = id[0] - '0';
+		return FORMAT_FT2; // Fasttracker II 1..9 channels (or other trackers)
+	}
+
+	return FORMAT_UNKNOWN; // may be The Ultimate Soundtracker (set to FORMAT_STK later)
 }
 
 // converts zeroes to spaces in a string, up until the last zero found
@@ -208,176 +221,194 @@ static void fixZeroesInString(char *str, uint32_t maxLength)
 	}
 }
 
+static uint8_t *unpackPPModule(FILE *f, uint32_t *filesize)
+{
+	uint8_t *modBuffer, ppCrunchData[4], *ppBuffer;
+	uint32_t ppPackLen, ppUnpackLen;
+
+	ppPackLen = *filesize;
+	if ((ppPackLen & 3) || ppPackLen <= 12)
+	{
+		displayErrorMsg("POWERPACKER ERROR");
+		return NULL;
+	}
+
+	ppBuffer = (uint8_t *)malloc(ppPackLen);
+	if (ppBuffer == NULL)
+	{
+		statusOutOfMemory();
+		return NULL;
+	}
+
+	fseek(f, ppPackLen-4, SEEK_SET);
+
+	ppCrunchData[0] = (uint8_t)fgetc(f);
+	ppCrunchData[1] = (uint8_t)fgetc(f);
+	ppCrunchData[2] = (uint8_t)fgetc(f);
+	ppCrunchData[3] = (uint8_t)fgetc(f);
+
+	ppUnpackLen = (ppCrunchData[0] << 16) | (ppCrunchData[1] << 8) | ppCrunchData[2];
+
+	modBuffer = (uint8_t *)malloc(ppUnpackLen);
+	if (modBuffer == NULL)
+	{
+		free(ppBuffer);
+		statusOutOfMemory();
+		return NULL;
+	}
+
+	rewind(f);
+	fread(ppBuffer, 1, ppPackLen, f);
+	fclose(f);
+
+	if (!ppdecrunch(ppBuffer+8, modBuffer, ppBuffer+4, ppPackLen-12, ppUnpackLen, ppCrunchData[3]))
+	{
+		free(ppBuffer);
+		displayErrorMsg("POWERPACKER ERROR");
+		return NULL;
+	}
+
+	free(ppBuffer);
+	*filesize = ppUnpackLen;
+	return modBuffer;
+}
+
 module_t *modLoad(UNICHAR *fileName)
 {
 	bool mightBeSTK, lateSTKVerFlag, veryLateSTKVerFlag;
-	char modSig[4], tmpChar;
+	char modID[4], tmpChar;
 	int8_t numSamples;
-	uint8_t ppCrunchData[4], bytes[4], *ppBuffer;
-	uint8_t *modBuffer, ch, row, pattern, channels;
-	uint16_t ciaPeriod;
-	int32_t i, loopStart, loopLength, loopOverflowVal;
-	uint32_t j, PP20, ppPackLen, ppUnpackLen;
-	FILE *fmodule;
-	module_t *newModule;
+	uint8_t bytes[4], restartPos, modFormat;
+	uint8_t *modBuffer, numChannels;
+	int32_t i, j, k, loopStart, loopLength, loopOverflowVal, numPatterns;
+	uint32_t powerPackerID, filesize;
+	FILE *f;
+	MEMFILE *m;
+	module_t *newMod;
 	moduleSample_t *s;
 	note_t *note;
-	mem_t *mod;
 
-	/* these flags are kinda dumb and inaccurate, but we
-	** don't aim for excellent STK import anyway. */
-	veryLateSTKVerFlag = false; // "DFJ SoundTracker III" nad later
+	veryLateSTKVerFlag = false; // "DFJ SoundTracker III" and later
 	lateSTKVerFlag = false; // "TJC SoundTracker II" and later
 	mightBeSTK = false;
 
-	mod = NULL;
-	ppBuffer = NULL;
+	m = NULL;
+	f = NULL;
 	modBuffer = NULL;
-	fmodule = NULL;
-	newModule = NULL;
 
-	newModule = (module_t *)calloc(1, sizeof (module_t));
-	if (newModule == NULL)
+	newMod = (module_t *)calloc(1, sizeof (module_t));
+	if (newMod == NULL)
 	{
 		statusOutOfMemory();
 		goto modLoadError;
 	}
 
-	fmodule = UNICHAR_FOPEN(fileName, "rb");
-	if (fmodule == NULL)
+	f = UNICHAR_FOPEN(fileName, "rb");
+	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
 		goto modLoadError;
 	}
 
-	fseek(fmodule, 0, SEEK_END);
-	newModule->head.moduleSize = ftell(fmodule);
-	fseek(fmodule, 0, SEEK_SET);
+	fseek(f, 0, SEEK_END);
+	filesize = ftell(f);
+	rewind(f);
 
 	// check if mod is a powerpacker mod
-	fread(&PP20, 4, 1, fmodule);
-	if (PP20 == 0x30325850) // "PX20"
+	fread(&powerPackerID, 4, 1, f);
+	if (powerPackerID == 0x30325850) // "PX20"
 	{
-		displayErrorMsg("ENCRYPTED PPACK !");
+		displayErrorMsg("ENCRYPTED MOD !");
 		goto modLoadError;
 	}
-	else if (PP20 == 0x30325050) // "PP20"
+	else if (powerPackerID == 0x30325050) // "PP20"
 	{
-		ppPackLen = newModule->head.moduleSize;
-		if (ppPackLen & 3)
-		{
-			displayErrorMsg("POWERPACKER ERROR");
-			goto modLoadError;
-		}
-
-		fseek(fmodule, ppPackLen - 4, SEEK_SET);
-
-		ppCrunchData[0] = (uint8_t)fgetc(fmodule);
-		ppCrunchData[1] = (uint8_t)fgetc(fmodule);
-		ppCrunchData[2] = (uint8_t)fgetc(fmodule);
-		ppCrunchData[3] = (uint8_t)fgetc(fmodule);
-
-		ppUnpackLen = (ppCrunchData[0] << 16) | (ppCrunchData[1] << 8) | ppCrunchData[2];
-
-		// smallest and biggest possible .MOD
-		if (ppUnpackLen < 2108 || ppUnpackLen > 4195326)
-		{
-			displayErrorMsg("NOT A MOD FILE !");
-			goto modLoadError;
-		}
-
-		ppBuffer = (uint8_t *)malloc(ppPackLen);
-		if (ppBuffer == NULL)
-		{
-			statusOutOfMemory();
-			goto modLoadError;
-		}
-
-		modBuffer = (uint8_t *)malloc(ppUnpackLen);
+		modBuffer = unpackPPModule(f, &filesize);
 		if (modBuffer == NULL)
-		{
-			statusOutOfMemory();
-			goto modLoadError;
-		}
-
-		fseek(fmodule, 0, SEEK_SET);
-		fread(ppBuffer, 1, ppPackLen, fmodule);
-		fclose(fmodule);
-		ppdecrunch(ppBuffer + 8, modBuffer, ppBuffer + 4, ppPackLen - 12, ppUnpackLen, ppCrunchData[3]);
-		free(ppBuffer);
-		newModule->head.moduleSize = ppUnpackLen;
+			goto modLoadError; // error msg is set in unpackPPModule()
 	}
 	else
 	{
-		// smallest and biggest possible PT .MOD
-		if (newModule->head.moduleSize < 2108 || newModule->head.moduleSize > 4195326)
-		{
-			displayErrorMsg("NOT A MOD FILE !");
-			goto modLoadError;
-		}
-
-		modBuffer = (uint8_t *)malloc(newModule->head.moduleSize);
+		modBuffer = (uint8_t *)malloc(filesize);
 		if (modBuffer == NULL)
 		{
 			statusOutOfMemory();
 			goto modLoadError;
 		}
 
-		fseek(fmodule, 0, SEEK_SET);
-		fread(modBuffer, 1, newModule->head.moduleSize, fmodule);
-		fclose(fmodule);
+		fseek(f, 0, SEEK_SET);
+		fread(modBuffer, 1, filesize, f);
+		fclose(f);
 	}
 
-	mod = mopen(modBuffer, newModule->head.moduleSize);
-	if (mod == NULL)
+	// smallest and biggest possible PT .MOD
+	if (filesize < 2108 || filesize > 4195326)
+	{
+		displayErrorMsg("NOT A MOD FILE !");
+		goto modLoadError;
+	}
+
+	// Use MEMFILE functions on module buffer (similar to FILE functions)
+
+	m = mopen(modBuffer, filesize);
+	if (m == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
 		goto modLoadError;
 	}
 
-	// check module tag
-	mseek(mod, 0x0438, SEEK_SET);
-	mread(modSig, 1, 4, mod);
+	// check magic ID
+	memset(modID, 0, 4); // in case mread fails
+	mseek(m, 1080, SEEK_SET);
+	mread(modID, 1, 4, m);
 
-	newModule->head.format = checkModType(modSig);
-	if (newModule->head.format == FORMAT_UNKNOWN)
+	modFormat = getModType(&numChannels, modID);
+	if (numChannels == 0 || numChannels > AMIGA_VOICES)
+	{
+		displayErrorMsg("UNSUPPORTED MOD !");
+		goto modLoadError;
+	}
+
+	if (modFormat == FORMAT_UNKNOWN)
 		mightBeSTK = true;
 
-	     if (newModule->head.format == FORMAT_1CHN) channels = 1;
-	else if (newModule->head.format == FORMAT_2CHN) channels = 2;
-	else if (newModule->head.format == FORMAT_3CHN) channels = 3;
-	else channels = 4;
+	mrewind(m);
+	mread(newMod->head.moduleTitle, 1, 20, m);
+	newMod->head.moduleTitle[20] = '\0';
 
-	mseek(mod, 0, SEEK_SET);
-
-	mread(newModule->head.moduleTitle, 1, 20, mod);
-	newModule->head.moduleTitle[20] = '\0';
-
+	// convert illegal song name characters to space
 	for (i = 0; i < 20; i++)
 	{
-		tmpChar = newModule->head.moduleTitle[i];
+		tmpChar = newMod->head.moduleTitle[i];
 		if ((tmpChar < ' ' || tmpChar > '~') && tmpChar != '\0')
 			tmpChar = ' ';
 
-		newModule->head.moduleTitle[i] = (char)tolower(tmpChar);
+		newMod->head.moduleTitle[i] = (char)tolower(tmpChar);
 	}
 
-	fixZeroesInString(newModule->head.moduleTitle, 20);
+	fixZeroesInString(newMod->head.moduleTitle, 20);
 
-	// read sample information
-	for (i = 0; i < MOD_SAMPLES; i++)
+	// read sample headers
+	s = newMod->samples;
+	for (i = 0; i < MOD_SAMPLES; i++, s++)
 	{
-		s = &newModule->samples[i];
-
-		if (mightBeSTK && i >= 15)
+		if (mightBeSTK && i >= 15) // skip reading sample headers past sample slot 15 in STK/UST modules
 		{
-			s->loopLength = 2;
+			s->loopLength = 2; // this be set though
+			continue;
+		}
+
+		mread(s->text, 1, 22, m);
+		s->text[22] = '\0';
+
+		if (modFormat == FORMAT_HMNT)
+		{
+			// most of "His Master's Noisetracker" songs have junk sample names, so let's wipe it.
+			memset(s->text, 0, 22);
 		}
 		else
 		{
-			mread(s->text, 1, 22, mod);
-			s->text[22] = '\0';
-
+			// convert illegal sample name characters to space
 			for (j = 0; j < 22; j++)
 			{
 				tmpChar = s->text[j];
@@ -388,165 +419,140 @@ module_t *modLoad(UNICHAR *fileName)
 			}
 
 			fixZeroesInString(s->text, 22);
+		}
 
-			s->realLength = ((mgetc(mod) << 8) | mgetc(mod)) * 2;
-			if (s->realLength > MAX_SAMPLE_LEN)
-				s->length = MAX_SAMPLE_LEN;
-			else
-				s->length = (uint16_t)s->realLength;
+		s->length = ((mgetc(m) << 8) | mgetc(m)) * 2;
 
-			if (s->length > 9999)
-				lateSTKVerFlag = true; // Only used if mightBeSTK is set
+		/* Only late versions of Ultimate SoundTracker could have samples larger than 9999 bytes.
+		** If found, we know for sure that this is a late STK module.
+		*/
+		if (mightBeSTK && s->length > 9999)
+			lateSTKVerFlag = true;
 
-			if (newModule->head.format == FORMAT_FEST)
-				s->fineTune = (uint8_t)((-mgetc(mod) & 0x1F) / 2); // One more bit of precision, + inverted
-			else
-				s->fineTune = (uint8_t)mgetc(mod) & 0x0F;
+		if (modFormat == FORMAT_HMNT) // finetune in "His Master's NoiseTracker" is different
+			s->fineTune = (uint8_t)((-mgetc(m) & 0x1F) / 2); // one more bit of precision, + inverted
+		else
+			s->fineTune = (uint8_t)mgetc(m) & 0xF;
 
-			s->volume = (int8_t)mgetc(mod);
-			s->volume = CLAMP(s->volume, 0, 64);
+		if (mightBeSTK)
+			s->fineTune = 0; // this is high byte of volume in STK/UST (has no finetune), set to zero
 
-			loopStart = ((mgetc(mod) << 8) | mgetc(mod)) * 2;
-			loopLength = ((mgetc(mod) << 8) | mgetc(mod)) * 2;
+		s->volume = (int8_t)mgetc(m);
+		if ((uint8_t)s->volume > 64)
+			s->volume = 64;
 
-			if (loopLength < 2)
-				loopLength = 2; // fixes empty samples in .MODs saved from FT2
+		loopStart = ((mgetc(m) << 8) | mgetc(m)) * 2;
+		loopLength = ((mgetc(m) << 8) | mgetc(m)) * 2;
 
-			if (loopStart > MAX_SAMPLE_LEN || loopStart+loopLength > MAX_SAMPLE_LEN)
-			{
-				s->loopStart = 0;
-				s->loopLength = 2;
-			}
-			else
-			{
-				s->loopStart = (uint16_t)loopStart;
-				s->loopLength = (uint16_t)loopLength;
-			}
+		if (loopLength < 2)
+			loopLength = 2; // fixes empty samples in .MODs saved from FT2
 
-			if (mightBeSTK)
+		// we don't support samples bigger than 65534 bytes, disable uncompatible loops
+		if (loopStart > MAX_SAMPLE_LEN || loopStart+loopLength > MAX_SAMPLE_LEN)
+		{
+			s->loopStart = 0;
+			s->loopLength = 2;
+		}
+		else
+		{
+			s->loopStart = (uint16_t)loopStart;
+			s->loopLength = (uint16_t)loopLength;
+		}
+
+		/* Ultimate SoundTracker before version 2.5 had loopStart in bytes, not words
+		** XXX: This has to be verified... It's possible that it was before that,
+		** and that this breaks some modules.
+		*/
+		if (mightBeSTK && !lateSTKVerFlag)
+			s->loopStart /= 2;
+
+		// fix for poorly converted STK (< v2.5) -> PT/NT modules (FIXME: Worth keeping or not?)
+		if (!mightBeSTK && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
+		{
+			if ((s->loopStart/2) + s->loopLength <= s->length)
 				s->loopStart /= 2;
-
-			// fix for poorly converted STK->PTMOD modules.
-			if (!mightBeSTK && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
-			{
-				if ((s->loopStart/2) + s->loopLength <= s->length)
-					s->loopStart /= 2;
-			}
-
-			if (mightBeSTK)
-			{
-				if (s->loopLength > 2 && s->loopStart < s->length)
-				{
-					s->tmpLoopStart = s->loopStart; // for sample data reading later on
-					s->length -= s->loopStart;
-					s->realLength -= s->loopStart;
-					s->loopStart = 0;
-				}
-
-				// no finetune in STK/UST
-				s->fineTune = 0;
-			}
-
-			// some modules are broken like this, adjust sample length if possible (this is ok if we have room)
-			if (s->length > 0 && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
-			{
-				loopOverflowVal = (s->loopStart+s->loopLength) - s->length;
-				if (s->length+loopOverflowVal <= MAX_SAMPLE_LEN)
-				{
-					s->length += loopOverflowVal; // this is safe, we're calloc()'ing 65535*(31+2) bytes
-				}
-				else
-				{
-					s->loopStart = 0;
-					s->loopLength = 2;
-				}
-			}
 		}
 	}
 
-	// STK 2.5 had loopStart in words, not bytes. Convert if late version STK.
-	if (mightBeSTK && lateSTKVerFlag)
-	{
-		for (i = 0; i < 15; i++)
-		{
-			s = &newModule->samples[i];
-			if (s->loopStart > 2)
-			{
-				s->length -= s->tmpLoopStart;
-				s->tmpLoopStart *= 2;
-			}
-		}
-	}
+	newMod->head.orderCount = (uint8_t)mgetc(m);
 
-	newModule->head.orderCount = (uint8_t)mgetc(mod);
+	if (modFormat == FORMAT_MK && newMod->head.orderCount == 129)
+		newMod->head.orderCount = 127; // fixes a specific copy of beatwave.mod
 
-	// fixes beatwave.mod (129 orders) and other weird MODs
-	if (newModule->head.orderCount > 128)
-	{
-		if (newModule->head.orderCount > 129)
-		{
-			displayErrorMsg("NOT A MOD FILE !");
-			goto modLoadError;
-		}
-
-		newModule->head.orderCount = 128;
-	}
-
-	if (newModule->head.orderCount == 0)
+	if (newMod->head.orderCount > 129)
 	{
 		displayErrorMsg("NOT A MOD FILE !");
 		goto modLoadError;
 	}
 
-	newModule->head.restartPos = (uint8_t)mgetc(mod);
-	if (mightBeSTK && (newModule->head.restartPos == 0 || newModule->head.restartPos > 220))
+	if (newMod->head.orderCount == 0)
 	{
 		displayErrorMsg("NOT A MOD FILE !");
 		goto modLoadError;
 	}
 
+	restartPos = (uint8_t)mgetc(m);
+	if (mightBeSTK && restartPos > 220)
+	{
+		displayErrorMsg("NOT A MOD FILE !");
+		goto modLoadError;
+	}
+
+	newMod->head.initialTempo = 125;
 	if (mightBeSTK)
 	{
 		/* If we're still here at this point and the mightBeSTK flag is set,
-		** then it's definitely a proper The Ultimate SoundTracker (STK) module. */
+		** then it's most likely a proper The Ultimate SoundTracker (STK/UST) module.
+		*/
+		modFormat = FORMAT_STK;
 
-		newModule->head.format = FORMAT_STK;
+		if (restartPos == 0)
+			restartPos = 120;
 
-		if (newModule->head.restartPos != 120) // 120 is a special case and means 50Hz (125BPM)
+		// jjk55.mod by Jesper Kyd has a bogus STK tempo value that should be ignored
+		if (!strcmp("jjk55", newMod->head.moduleTitle))
+			restartPos = 120;
+
+		// the "restart pos" field in STK is the inital tempo (must be converted to BPM first)
+		if (restartPos != 120) // 120 is a special case and means 50Hz (125BPM)
 		{
-			if (newModule->head.restartPos > 239)
-				newModule->head.restartPos = 239;
+			if (restartPos > 220)
+				restartPos = 220;
 
 			// convert UST tempo to BPM
+			uint16_t ciaPeriod = (240 - restartPos) * 122;
+			double dHz = (double)CIA_PAL_CLK / ciaPeriod;
+			int32_t BPM = (int32_t)((dHz * (125.0 / 50.0)) + 0.5);
 
-			ciaPeriod = (240 - newModule->head.restartPos) * 122;
-			newModule->head.initBPM = (uint16_t)round(((double)CIA_PAL_CLK / ciaPeriod) * (125.0 / 50.0));
+			newMod->head.initialTempo = (uint16_t)BPM;
 		}
-
-		newModule->head.restartPos = 0;
 	}
 
+	// read orders and count number of patterns
+	numPatterns = 0;
 	for (i = 0; i < MOD_ORDERS; i++)
 	{
-		newModule->head.order[i] = (int16_t)mgetc(mod);
-		if (newModule->head.order[i] > newModule->head.patternCount)
-			newModule->head.patternCount = newModule->head.order[i];
+		newMod->head.order[i] = (int16_t)mgetc(m);
+		if (newMod->head.order[i] > numPatterns)
+			numPatterns = newMod->head.order[i];
 	}
+	numPatterns++;
 
-	if (++newModule->head.patternCount > MAX_PATTERNS)
+	if (numPatterns > MAX_PATTERNS)
 	{
 		displayErrorMsg("UNSUPPORTED MOD !");
 		goto modLoadError;
 	}
 
-	if (newModule->head.format != FORMAT_STK) // The Ultimate SoundTracker MODs doesn't have this tag
-		mseek(mod, 4, SEEK_CUR); // we already read/tested the tag earlier, skip it
+	// skip magic ID (The Ultimate SoundTracker MODs doesn't have it)
+	if (modFormat != FORMAT_STK)
+		mseek(m, 4, SEEK_CUR);
 
-	// init 100 patterns and load patternCount of patterns
-	for (pattern = 0; pattern < MAX_PATTERNS; pattern++)
+	// allocate 100 patterns
+	for (i = 0; i < MAX_PATTERNS; i++)
 	{
-		newModule->patterns[pattern] = (note_t *)calloc(MOD_ROWS * AMIGA_VOICES, sizeof (note_t));
-		if (newModule->patterns[pattern] == NULL)
+		newMod->patterns[i] = (note_t *)calloc(MOD_ROWS * AMIGA_VOICES, sizeof (note_t));
+		if (newMod->patterns[i] == NULL)
 		{
 			statusOutOfMemory();
 			goto modLoadError;
@@ -554,21 +560,21 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 
 	// load pattern data
-	for (pattern = 0; pattern < newModule->head.patternCount; pattern++)
+	for (i = 0; i < numPatterns; i++)
 	{
-		note = newModule->patterns[pattern];
-		for (row = 0; row < MOD_ROWS; row++)
+		note = newMod->patterns[i];
+		for (j = 0; j < MOD_ROWS; j++)
 		{
-			for (ch = 0; ch < channels; ch++)
+			for (k = 0; k < numChannels; k++, note++)
 			{
-				mread(bytes, 1, 4, mod);
+				mread(bytes, 1, 4, m);
 
 				note->period = ((bytes[0] & 0x0F) << 8) | bytes[1];
-				note->sample = (bytes[0] & 0xF0) | (bytes[2] >> 4); // don't (!) clamp, the player checks for invalid samples
+				note->sample = (bytes[0] & 0xF0) | (bytes[2] >> 4);
 				note->command = bytes[2] & 0x0F;
 				note->param = bytes[3];
 
-				if (mightBeSTK)
+				if (modFormat == FORMAT_STK)
 				{
 					if (note->command == 0xC || note->command == 0xD || note->command == 0xE)
 					{
@@ -583,38 +589,44 @@ module_t *modLoad(UNICHAR *fileName)
 						veryLateSTKVerFlag = true;
 					}
 				}
-
-				note++;
 			}
 
-			if (channels < 4)
-				note += AMIGA_VOICES - channels;
+			if (numChannels < AMIGA_VOICES)
+				note += AMIGA_VOICES-numChannels;
 		}
 	}
 
-	/* TODO: Find out if song is FORMAT_NT through heuristics
-	** Only detected for FEST songs for now. */
-
-	// pattern command conversion
-	if (mightBeSTK || newModule->head.format == FORMAT_4CHN ||
-		newModule->head.format == FORMAT_NT || newModule->head.format == FORMAT_FEST)
+	// pattern command conversion for non-PT formats
+	if (modFormat == FORMAT_STK || modFormat == FORMAT_FT2 || modFormat == FORMAT_NT || modFormat == FORMAT_HMNT || modFormat == FORMAT_FLT)
 	{
-		for (pattern = 0; pattern < newModule->head.patternCount; pattern++)
+		for (i = 0; i < numPatterns; i++)
 		{
-			note = newModule->patterns[pattern];
-			for (j = 0; j < MOD_ROWS*4; j++)
+			note = newMod->patterns[i];
+			for (j = 0; j < MOD_ROWS*4; j++, note++)
 			{
-				if (newModule->head.format == FORMAT_NT || newModule->head.format == FORMAT_FEST)
+				if (modFormat == FORMAT_NT || modFormat == FORMAT_HMNT)
 				{
-					// any Dxx == D00 in N.T./FEST modules
+					// any Dxx == D00 in NT/HMNT
 					if (note->command == 0xD)
 						note->param = 0;
 
-					// effect F with param 0x00 does nothing in NT
+					// effect F with param 0x00 does nothing in NT/HMNT
 					if (note->command == 0xF && note->param == 0)
 						note->command = 0;
 				}
-				else if (mightBeSTK)
+				else if (modFormat == FORMAT_FLT) // Startrekker (4 channels)
+				{
+					if (note->command == 0xE) // remove unsupported "assembly macros" command
+					{
+						note->command = 0;
+						note->param = 0;
+					}
+
+					// Startrekker is always in vblank mode, and limits speed to 0x1F
+					if (note->command == 0xF && note->param > 0x1F)
+						note->param = 0x1F;
+				}
+				else if (modFormat == FORMAT_STK)
 				{
 					// convert STK effects to PT effects
 
@@ -661,85 +673,129 @@ module_t *modLoad(UNICHAR *fileName)
 							}
 						}
 					}
-				}
-				else if (newModule->head.format == FORMAT_4CHN) // 4CHN != PT MOD
-				{
-					// remove E8x (pan) commands as these are Karplus-Strong in ProTracker
-					if (note->command == 0xE && (note->param >> 4) == 0x8)
-					{
-						note->command = 0;
-						note->param = 0;
-					}
 
-					// effect F with param 0x00 does nothing in these 4CHN formats
+					// effect F with param 0x00 does nothing in UST/STK (I think?)
 					if (note->command == 0xF && note->param == 0)
-					{
 						note->command = 0;
-						note->param = 0;
-					}
 				}
 
-				note++;
+				// remove sample-trashing effects that were only present in ProTracker
+
+				// remove E8x (Karplus-Strong in ProTracker)
+				if (note->command == 0xE && (note->param >> 4) == 0x8)
+				{
+					note->command = 0;
+					note->param = 0;
+				}
+
+				// remove EFx (Invert Loop in ProTracker)
+				if (note->command == 0xE && (note->param >> 4) == 0xF)
+				{
+					note->command = 0;
+					note->param = 0;
+				}
 			}
 		}
 	}
 
-	// set static sample data pointers (sample data = one huge buffer internally)
-	for (i = 0; i < MOD_SAMPLES; i++)
-		newModule->samples[i].offset = MAX_SAMPLE_LEN * i;
-
-	// +2 sample slots for overflow safety (Paula and scopes)
-	newModule->sampleDataUnaligned = (int8_t *)CALLOC_PAD((MOD_SAMPLES + 2) * MAX_SAMPLE_LEN, 256);
-	if (newModule->sampleDataUnaligned == NULL)
+	// allocate sample data (+2 sample slots for overflow safety (Paula and scopes))
+	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN);
+	if (newMod->sampleData == NULL)
 	{
 		statusOutOfMemory();
 		goto modLoadError;
 	}
 
-	newModule->sampleData = (int8_t *)ALIGN_PTR(newModule->sampleDataUnaligned, 256);
+	// set sample data offsets (sample data = one huge buffer to rule them all)
+	for (i = 0; i < MOD_SAMPLES; i++)
+		newMod->samples[i].offset = MAX_SAMPLE_LEN * i;
 
 	// load sample data
-	numSamples = (newModule->head.format == FORMAT_STK) ? 15 : 31;
-	for (i = 0; i < numSamples; i++)
+	numSamples = (modFormat == FORMAT_STK) ? 15 : 31;
+	s = newMod->samples;
+	for (i = 0; i < numSamples; i++, s++)
 	{
-		s = &newModule->samples[i];
-		if (mightBeSTK && (s->loopLength > 2 && s->loopLength < s->length))
-			mseek(mod, s->tmpLoopStart, SEEK_CUR);
+		uint32_t bytesToSkip = 0;
 
-		mread(&newModule->sampleData[s->offset], 1, s->length, mod);
-		if (s->realLength > s->length)
-			mseek(mod, s->realLength - s->length, SEEK_CUR);
-
-		// fix beeping samples
-		if (s->length >= 2 && s->loopStart+s->loopLength <= 2)
+		/* For Ultimate SoundTracker modules, only the loop area of a looped sample is played.
+		** Skip loading of eventual data present before loop start.
+		*/
+		if (modFormat == FORMAT_STK && s->loopStart > 0 && s->loopLength < s->length)
 		{
-			newModule->sampleData[s->offset+0] = 0;
-			newModule->sampleData[s->offset+1] = 0;
+			s->length -= s->loopStart;
+			mseek(m, s->loopStart, SEEK_CUR);
+			s->loopStart = 0;
+		}
+
+		/* We don't support loading samples bigger than 65534 bytes in our PT2 clone,
+		** so clamp length and skip overflown data.
+		*/
+		if (s->length > MAX_SAMPLE_LEN)
+		{
+			s->length = MAX_SAMPLE_LEN;
+			bytesToSkip = s->length - MAX_SAMPLE_LEN;
+		}
+
+		// For Ultimate SoundTracker modules, don't load sample data after loop end
+		uint16_t loopEnd = s->loopStart + s->loopLength;
+		if (modFormat == FORMAT_STK && loopEnd > 2 && s->length > loopEnd)
+		{
+			bytesToSkip += s->length-loopEnd;
+			s->length = loopEnd;
+		}
+
+		mread(&newMod->sampleData[s->offset], 1, s->length, m);
+
+		if (bytesToSkip > 0)
+			mseek(m, bytesToSkip, SEEK_CUR);
+
+		// clear first two bytes of non-looping samples to prevent beep after sample has been played
+		if (s->length >= 2 && loopEnd <= 2)
+		{
+			newMod->sampleData[s->offset+0] = 0;
+			newMod->sampleData[s->offset+1] = 0;
+		}
+
+		// some modules are broken like this, adjust sample length if possible (this is ok if we have room)
+		if (s->length > 0 && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
+		{
+			loopOverflowVal = (s->loopStart + s->loopLength) - s->length;
+			if (s->length+loopOverflowVal <= MAX_SAMPLE_LEN)
+			{
+				s->length += loopOverflowVal; // this is safe, we're allocating 65534 bytes per sample slot
+			}
+			else
+			{
+				s->loopStart = 0;
+				s->loopLength = 2;
+			}
 		}
 	}
 
-	mclose(&mod);
+	mclose(&m);
 	free(modBuffer);
 
 	for (i = 0; i < AMIGA_VOICES; i++)
-		newModule->channels[i].n_chanindex = i;
+		newMod->channels[i].n_chanindex = i;
 
-	return newModule;
+	return newMod;
 
 modLoadError:
-	if (mod != NULL) mclose(&mod);
-	if (modBuffer != NULL) free(modBuffer);
-	if (ppBuffer != NULL) free(ppBuffer);
+	if (m != NULL)
+		mclose(&m);
 
-	if (newModule != NULL)
+	if (modBuffer != NULL)
+		free(modBuffer);
+
+	if (newMod != NULL)
 	{
 		for (i = 0; i < MAX_PATTERNS; i++)
 		{
-			if (newModule->patterns[i] != NULL)
-				free(newModule->patterns[i]);
+			if (newMod->patterns[i] != NULL)
+				free(newMod->patterns[i]);
 		}
 
-		free(newModule);
+		free(newMod);
 	}
 
 	return NULL;
@@ -860,14 +916,14 @@ bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
 	return modSave(fileName);
 }
 
-static mem_t *mopen(const uint8_t *src, uint32_t length)
+static MEMFILE *mopen(const uint8_t *src, uint32_t length)
 {
-	mem_t *b;
+	MEMFILE *b;
 
 	if (src == NULL || length == 0)
 		return NULL;
 
-	b = (mem_t *)malloc(sizeof (mem_t));
+	b = (MEMFILE *)malloc(sizeof (MEMFILE));
 	if (b == NULL)
 		return NULL;
 
@@ -880,7 +936,7 @@ static mem_t *mopen(const uint8_t *src, uint32_t length)
 	return b;
 }
 
-static void mclose(mem_t **buf)
+static void mclose(MEMFILE **buf)
 {
 	if (*buf != NULL)
 	{
@@ -889,7 +945,7 @@ static void mclose(mem_t **buf)
 	}
 }
 
-static int32_t mgetc(mem_t *buf)
+static int32_t mgetc(MEMFILE *buf)
 {
 	int32_t b;
 
@@ -911,7 +967,7 @@ static int32_t mgetc(mem_t *buf)
 	return (int32_t)b;
 }
 
-static size_t mread(void *buffer, size_t size, size_t count, mem_t *buf)
+static size_t mread(void *buffer, size_t size, size_t count, MEMFILE *buf)
 {
 	int32_t pcnt;
 	size_t wrcnt;
@@ -936,10 +992,10 @@ static size_t mread(void *buffer, size_t size, size_t count, mem_t *buf)
 		buf->_eof = true;
 	}
 
-	return pcnt/size;
+	return pcnt / size;
 }
 
-static void mseek(mem_t *buf, int32_t offset, int32_t whence)
+static void mseek(MEMFILE *buf, int32_t offset, int32_t whence)
 {
 	if (buf == NULL)
 		return;
@@ -948,41 +1004,51 @@ static void mseek(mem_t *buf, int32_t offset, int32_t whence)
 	{
 		switch (whence)
 		{
-			case SEEK_SET: buf->_ptr  = buf->_base + offset; break;
+			case SEEK_SET: buf->_ptr = buf->_base + offset; break;
 			case SEEK_CUR: buf->_ptr += offset; break;
-			case SEEK_END: buf->_ptr  = buf->_base + buf->_bufsiz + offset; break;
+			case SEEK_END: buf->_ptr = buf->_base + buf->_bufsiz + offset; break;
 			default: break;
 		}
 
 		buf->_eof = false;
 		if (buf->_ptr >= buf->_base+buf->_bufsiz)
 		{
-			buf->_ptr = buf->_base+buf->_bufsiz;
+			buf->_ptr = buf->_base + buf->_bufsiz;
 			buf->_eof = true;
 		}
 
-		buf->_cnt = (buf->_base+buf->_bufsiz) - buf->_ptr;
+		buf->_cnt = (buf->_base + buf->_bufsiz) - buf->_ptr;
 	}
 }
 
-/* Code taken from Heikki Orsila's amigadepack. Seems to have no license,
-** so I'll assume it fits into wtfpl (wtfpl.net). Heikki should contact me
-** if it shall not.
-** Modified by 8bitbubsy */
+static void mrewind(MEMFILE *buf)
+{
+	mseek(buf, 0, SEEK_SET);
+}
 
-#define PP_READ_BITS(nbits, var)            \
-  bitCnt = (nbits);                         \
-  while (bitsLeft < bitCnt) {               \
-	if (bufSrc < src) return false;         \
-	bitBuffer |= (*--bufSrc << bitsLeft);   \
-	bitsLeft += 8;                          \
-  }                                         \
-  (var) = 0;                                \
-  bitsLeft -= bitCnt;                       \
-  while (bitCnt--) {                        \
-	(var) = ((var) << 1) | (bitBuffer & 1); \
-	bitBuffer >>= 1;                        \
-  }                                         \
+/* PowerPacker unpack code taken from Heikki Orsila's amigadepack. Seems to have no license,
+** so I'll assume it fits into BSD 3-Clause. If not, feel free to contact me at my email
+** address found at the bottom of 16-bits.org.
+**
+** Modified by 8bitbubsy (me).
+*/
+
+#define PP_READ_BITS(nbits, var) \
+	bitCnt = (nbits); \
+	while (bitsLeft < bitCnt) \
+	{ \
+		if (bufSrc < src) \
+			return false; \
+		bitBuffer |= ((*--bufSrc) << bitsLeft); \
+		bitsLeft += 8; \
+	} \
+	(var) = 0; \
+	bitsLeft -= bitCnt; \
+	while (bitCnt--) \
+	{ \
+		(var) = ((var) << 1) | (bitBuffer & 1); \
+		bitBuffer >>= 1; \
+	} \
 
 static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint32_t srcLen, uint32_t dstLen, uint8_t skipBits)
 {
@@ -1017,7 +1083,6 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 			while (todo--)
 			{
 				PP_READ_BITS(8, x);
-
 				if (out <= dst)
 					return false;
 
@@ -1030,7 +1095,6 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 		}
 
 		PP_READ_BITS(2, x);
-
 		offBits = offsetLens[x];
 		todo = x + 2;
 
@@ -1058,7 +1122,6 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 		while (todo--)
 		{
 			x = out[offset];
-
 			if (out <= dst)
 				return false;
 
@@ -1114,12 +1177,10 @@ void setupNewMod(void)
 
 	updateWindowTitle(MOD_NOT_MODIFIED);
 
-	modSetSpeed(6);
+	editor.timingMode = TEMPO_MODE_CIA;
 
-	if (modEntry->head.initBPM > 0)
-		modSetTempo(modEntry->head.initBPM);
-	else
-		modSetTempo(125);
+	modSetSpeed(6);
+	modSetTempo(modEntry->head.initialTempo); // 125 for normal MODs, custom value for certain STK/UST MODs
 
 	updateCurrSample();
 	editor.samplePos = 0;
@@ -1136,7 +1197,7 @@ void loadModFromArg(char *arg)
 
 	filenameLen = (uint32_t)strlen(arg);
 
-	filenameU = (UNICHAR *)calloc((filenameLen + 2), sizeof (UNICHAR));
+	filenameU = (UNICHAR *)calloc(filenameLen + 2, sizeof (UNICHAR));
 	if (filenameU == NULL)
 	{
 		statusOutOfMemory();
@@ -1208,9 +1269,8 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 	UNICHAR *fullPathU;
 
 	// don't allow drag n' drop if the tracker is busy
-	if (editor.ui.pointerMode == POINTER_MODE_MSG1 ||
-		editor.diskop.isFilling || editor.isWAVRendering ||
-		editor.ui.samplerFiltersBoxShown || editor.ui.samplerVolBoxShown)
+	if (editor.ui.pointerMode == POINTER_MODE_MSG1 || editor.diskop.isFilling ||
+		editor.isWAVRendering || editor.ui.samplerFiltersBoxShown || editor.ui.samplerVolBoxShown)
 	{
 		return;
 	}
@@ -1222,7 +1282,7 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 		return;
 	}
 
-	fullPathU = (UNICHAR *)calloc((fullPathLen + 2), sizeof (UNICHAR));
+	fullPathU = (UNICHAR *)calloc(fullPathLen + 2, sizeof (UNICHAR));
 	if (fullPathU == NULL)
 	{
 		statusOutOfMemory();
@@ -1364,14 +1424,11 @@ module_t *createNewMod(void)
 	}
 
 	// +2 sample slots for overflow safety (Paula and scopes)
-	newMod->sampleDataUnaligned = (int8_t *)CALLOC_PAD((MOD_SAMPLES + 2) * MAX_SAMPLE_LEN, 256);
-	if (newMod->sampleDataUnaligned == NULL)
+	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN);
+	if (newMod->sampleData == NULL)
 		goto oom;
 
-	newMod->sampleData = (int8_t *)ALIGN_PTR(newMod->sampleDataUnaligned, 256);
-
 	newMod->head.orderCount = 1;
-	newMod->head.patternCount = 1;
 
 	for (i = 0; i < MOD_SAMPLES; i++)
 	{

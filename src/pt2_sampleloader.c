@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h> // round()/roundf()
 #include <ctype.h> // tolower()/toupper()
 #ifdef _WIN32
 #include <io.h>
@@ -847,7 +846,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 	if (sampleVolume > 65536)
 		sampleVolume = 65536;
 
-	sampleVolume = (int32_t)round(sampleVolume / 1024.0);
+	sampleVolume = (int32_t)((sampleVolume / 1024.0) + 0.5);
 	if (sampleVolume > 64)
 		sampleVolume = 64;
 
@@ -1079,7 +1078,7 @@ static int32_t getAIFFRate(uint8_t *in)
 	exp -= 16383;
 
 	dOut = ldexp(lo, -31 + exp) + ldexp(hi, -63 + exp);
-	return (int32_t)round(dOut);
+	return (int32_t)(dOut + 0.5);
 }
 
 bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)

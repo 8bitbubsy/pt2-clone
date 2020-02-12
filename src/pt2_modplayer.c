@@ -322,7 +322,7 @@ static void setSpeed(moduleChannel_t *ch)
 	{
 		editor.modTick = 0;
 
-		if ((editor.timingMode == TEMPO_MODE_VBLANK) || ((ch->n_cmd & 0xFF) < 32))
+		if (editor.timingMode == TEMPO_MODE_VBLANK || (ch->n_cmd & 0xFF) < 32)
 			modSetSpeed(ch->n_cmd & 0xFF);
 		else
 			setBPMFlag = ch->n_cmd & 0xFF; // CIA doesn't refresh its registers until the next interrupt, so change it later
@@ -1354,7 +1354,6 @@ void clearSong(void)
 		editor.swapChannelFlag = false;
 
 		modEntry->head.orderCount = 1;
-		modEntry->head.patternCount = 1;
 
 		for (i = 0; i < MAX_PATTERNS; i++)
 			memset(modEntry->patterns[i], 0, (MOD_ROWS * AMIGA_VOICES) * sizeof (note_t));
@@ -1447,10 +1446,10 @@ void modFree(void)
 			free(modEntry->patterns[i]);
 	}
 
-	if (modEntry->sampleDataUnaligned != NULL)
+	if (modEntry->sampleData != NULL)
 	{
 		clearPaulaAndScopes();
-		free(modEntry->sampleDataUnaligned);
+		free(modEntry->sampleData);
 	}
 
 	free(modEntry);

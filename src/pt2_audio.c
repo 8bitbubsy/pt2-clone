@@ -16,7 +16,7 @@
 #else
 #include <unistd.h>
 #endif
-#include <math.h> // sqrt(),tan(),M_PI,round(),roundf()
+#include <math.h> // sqrt(),tan(),M_PI
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -62,6 +62,7 @@ static uint16_t ch1Pan, ch2Pan, ch3Pan, ch4Pan, oldPeriod;
 static int32_t sampleCounter, maxSamplesToMix, randSeed = INITIAL_DITHER_SEED;
 static uint32_t oldScopeDelta;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
+static double dPrngStateL, dPrngStateR;
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
 static lossyIntegrator_t filterLo, filterHi;
 static ledFilterCoeff_t filterLEDC;
@@ -89,7 +90,8 @@ static uint16_t bpm2SmpsPerTick(uint32_t bpm, uint32_t audioFreq)
 	ciaVal = (uint32_t)(1773447 / bpm); // yes, PT truncates here
 	dFreqMul = ciaVal * (1.0 / CIA_PAL_CLK);
 
-	return (uint16_t)((audioFreq * dFreqMul) + 0.5);
+	int32_t smpsPerTick = (int32_t)((audioFreq * dFreqMul) + 0.5);
+	return (uint16_t)smpsPerTick;
 }
 
 static void generateBpmTables(void)
@@ -321,7 +323,7 @@ void turnOffVoices(void)
 	clearLossyIntegrator(&filterHi);
 	clearLEDFilter(&filterLED);
 
-	resetDitherSeed();
+	resetAudioDithering();
 
 	editor.tuningFlag = false;
 }
@@ -596,22 +598,25 @@ void mixChannels(int32_t numSamples)
 	}
 }
 
-void resetDitherSeed(void)
+void resetAudioDithering(void)
 {
 	randSeed = INITIAL_DITHER_SEED;
+	dPrngStateL = 0.0;
+	dPrngStateR = 0.0;
 }
 
-// Delphi/Pascal LCG Random() (without limit). Suitable for 32-bit random numbers
 static inline int32_t random32(void)
 {
-	randSeed = randSeed * 134775813 + 1;
+	// LCG random 32-bit generator (quite good and fast)
+	randSeed *= 134775813;
+	randSeed++;
 	return randSeed;
 }
 
 static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 {
 	int32_t smp32;
-	double dOut[2], dDither;
+	double dOut[2], dPrng;
 
 	dOut[0] = dMixBufferL[i];
 	dOut[1] = dMixBufferR[i];
@@ -626,19 +631,21 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 	lossyIntegratorHighPass(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= -((INT16_MAX+1.0) / AMIGA_VOICES);
-	dOut[1] *= -((INT16_MAX+1.0) / AMIGA_VOICES);
+	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
+	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
 
-	// apply 0.5-bit dither
-	dDither = random32() * (0.5 / (INT32_MAX+1.0)); // -0.5..0.5
-	dOut[0] += dDither;
-	dDither = random32() * (0.5 / (INT32_MAX+1.0));
-	dOut[1] += dDither;
-
+	// left channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dOut[0] = (dOut[0] + dPrng) - dPrngStateL;
+	dPrngStateL = dPrng;
 	smp32 = (int32_t)dOut[0];
 	CLAMP16(smp32);
 	out[0] = (int16_t)smp32;
 
+	// right channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dOut[1] = (dOut[1] + dPrng) - dPrngStateR;
+	dPrngStateR = dPrng;
 	smp32 = (int32_t)dOut[1];
 	CLAMP16(smp32);
 	out[1] = (int16_t)smp32;
@@ -647,7 +654,7 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 static inline void processMixedSamplesA500(int32_t i, int16_t *out)
 {
 	int32_t smp32;
-	double dOut[2], dDither;
+	double dOut[2], dPrng;
 
 	dOut[0] = dMixBufferL[i];
 	dOut[1] = dMixBufferR[i];
@@ -662,20 +669,21 @@ static inline void processMixedSamplesA500(int32_t i, int16_t *out)
 	// process high-pass filter
 	lossyIntegratorHighPass(&filterHi, dOut, dOut);
 
-	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= -((INT16_MAX+1.0) / AMIGA_VOICES);
-	dOut[1] *= -((INT16_MAX+1.0) / AMIGA_VOICES);
+	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
+	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
 
-	// apply 0.5-bit dither
-	dDither = random32() * (0.5 / (INT32_MAX+1.0)); // -0.5..0.5
-	dOut[0] += dDither;
-	dDither = random32() * (0.5 / (INT32_MAX+1.0));
-	dOut[1] += dDither;
-
+	// left channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dOut[0] = (dOut[0] + dPrng) - dPrngStateL;
+	dPrngStateL = dPrng;
 	smp32 = (int32_t)dOut[0];
 	CLAMP16(smp32);
 	out[0] = (int16_t)smp32;
 
+	// right channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dOut[1] = (dOut[1] + dPrng) - dPrngStateR;
+	dPrngStateR = dPrng;
 	smp32 = (int32_t)dOut[1];
 	CLAMP16(smp32);
 	out[1] = (int16_t)smp32;

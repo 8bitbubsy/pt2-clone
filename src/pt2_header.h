@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include "pt2_unicode.h"
 
-#define PROG_VER_STR "1.04"
+#define PROG_VER_STR "1.05"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -83,19 +83,17 @@
 
 #define KEYB_REPEAT_DELAY 17
 
+// .MOD types
 enum
 {
-	FORMAT_MK, // ProTracker 1.x
-	FORMAT_MK2, // ProTracker 2.x (if tune has >64 patterns)
-	FORMAT_FLT4, // StarTrekker
-	FORMAT_1CHN,
-	FORMAT_2CHN, // FastTracker II
-	FORMAT_3CHN,
-	FORMAT_4CHN, // rare type, not sure what tracker it comes from
+	FORMAT_MK, // ProTracker or compatible
+	FORMAT_FLT, // Startrekker (4 channels)
+	FORMAT_FT2, // FT2 (or other trackers, multichannel)
 	FORMAT_STK, // The Ultimate SoundTracker (15 samples)
 	FORMAT_NT, // NoiseTracker
-	FORMAT_FEST, // NoiseTracker (special one)
-	FORMAT_UNKNOWN
+	FORMAT_HMNT, // His Master's NoiseTracker (special one)
+
+	FORMAT_UNKNOWN // may be The Ultimate Soundtracker (set to FORMAT_STK later)
 };
 
 enum
@@ -249,9 +247,8 @@ typedef struct note_t
 typedef struct moduleHeader_t
 {
 	char moduleTitle[20 + 1];
-	uint8_t ticks, format, restartPos;
-	uint16_t order[MOD_ORDERS], orderCount, patternCount, tempo, initBPM;
-	uint32_t moduleSize, totalSampleSize;
+	uint16_t order[MOD_ORDERS], orderCount;
+	uint16_t initialTempo; // used for STK/UST modules after module is loaded
 } moduleHeader_t;
 
 typedef struct moduleSample_t
@@ -261,8 +258,8 @@ typedef struct moduleSample_t
 	char text[22 + 1];
 	int8_t volume;
 	uint8_t fineTune;
-	uint16_t length, loopStart, loopLength, tmpLoopStart;
-	int32_t offset, realLength;
+	uint16_t length, loopStart, loopLength;
+	int32_t offset;
 } moduleSample_t;
 
 typedef struct moduleChannel_t
@@ -278,7 +275,7 @@ typedef struct moduleChannel_t
 
 typedef struct module_t
 {
-	int8_t *sampleData, *sampleDataUnaligned, currRow, modified, row;
+	int8_t *sampleData, currRow, modified, row;
 	uint8_t currSpeed, moduleLoaded;
 	uint16_t currOrder, currPattern, currBPM;
 	uint32_t rowsCounter, rowsInTotal;
@@ -438,7 +435,7 @@ struct editor_t
 		uint16_t *numPtr16, tmpDisp16, *dstOffset, dstPos, textLength, editTextPos;
 		uint16_t dstOffsetEnd, lastSampleOffset;
 		int32_t askTempData, renderX, renderY, renderW, renderH, displayW, displayH;
-		uint32_t xScale, yScale;
+		int32_t xScale, yScale;
 		double dMouseXMul, dMouseYMul;
 		SDL_PixelFormat *pixelFormat;
 #ifdef _WIN32
