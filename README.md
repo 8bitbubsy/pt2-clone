@@ -11,8 +11,10 @@ Has additional audio filters and audio mixer improvements to make it sound close
 ![Example #2](https://16-bits.org/pt2-clone-4.png)
 
 # Releases
-Windows/macOS binary releases can always be found at [16-bits.org](https://16-bits.org/pt2.php). \
-Linux users will unfortunately have to compile the program manually.
+Windows/macOS binary releases can always be found at [16-bits.org](https://16-bits.org/pt2.php).
+
+Linux users can try to search for the "pt2-clone" package in the distribution's package repository, but it may not be present. \
+If it's not present, you will unfortunately have to compile the program manually, which may or may not be successful. Please don't contact me if it didn't go well, as I don't fully support Linux on my tracker clones.
 
 # Compiling the code
 Please read HOW-TO-COMPILE.txt file in the repository.
