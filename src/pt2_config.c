@@ -21,6 +21,7 @@
 #include "pt2_diskop.h"
 #include "pt2_config.h"
 #include "pt2_textout.h"
+#include "pt2_sampler.h"
 
 #ifndef _WIN32
 static char oldCwd[PATH_MAX];
@@ -59,6 +60,7 @@ void loadConfig(void)
 	ptConfig.autoCloseDiskOp = true;
 	ptConfig.vsyncOff = false;
 	ptConfig.hwMouse = false;
+	ptConfig.sampleLowpass = true;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -138,6 +140,9 @@ void loadConfig(void)
 #ifndef _WIN32
 	chdir(oldCwd);
 #endif
+
+	// use palette for generating sample data mark (invert) table
+	createSampleMarkTable();
 }
 
 static bool loadProTrackerDotIni(FILE *f)
@@ -188,6 +193,13 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			     if (!_strnicmp(&configLine[8], "TRUE",  4)) ptConfig.hwMouse = true;
 			else if (!_strnicmp(&configLine[8], "FALSE", 5)) ptConfig.hwMouse = false;
+		}
+
+		// SAMPLELOWPASS
+		else if (!_strnicmp(configLine, "SAMPLELOWPASS=", 14))
+		{
+			     if (!_strnicmp(&configLine[14], "TRUE",  4)) ptConfig.sampleLowpass = true;
+			else if (!_strnicmp(&configLine[14], "FALSE", 5)) ptConfig.sampleLowpass = false;
 		}
 
 		// VSYNCOFF

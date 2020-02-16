@@ -25,6 +25,7 @@
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"
 #include "pt2_unicode.h"
+#include "pt2_filters.h"
 
 enum
 {
@@ -177,7 +178,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			default: break;
 		}
 
-		bytesRead += (chunkSize + (chunkSize & 1));
+		bytesRead += chunkSize + (chunkSize & 1);
 		fseek(f, endOfChunk, SEEK_SET);
 	}
 
@@ -238,11 +239,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	{
 		if (forceDownSampling == -1)
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_DOWNSAMPLING;
-			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			setStatusMessage("2X DOWNSAMPLING ?", NO_CARRY);
-			renderAskDialog();
+			showDownsampleAskDialog();
 			fclose(f);
 			return true;
 		}
@@ -292,6 +289,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample8BitUnsigned(audioDataU8, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataU8[i] = audioDataU8[i * 2];
@@ -348,6 +348,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample16Bit(audioDataS16, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS16[i] = audioDataS16[i * 2];
@@ -407,6 +410,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample32Bit(audioDataS32, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS32[i] = audioDataS32[i * 2];
@@ -467,6 +473,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample32Bit(audioDataS32, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS32[i] = audioDataS32[i * 2];
@@ -527,6 +536,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSampleFloat(fAudioDataFloat, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				fAudioDataFloat[i] = fAudioDataFloat[i * 2];
@@ -593,6 +605,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSampleDouble(dAudioDataDouble, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				dAudioDataDouble[i] = dAudioDataDouble[i * 2];
@@ -1234,11 +1249,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	{
 		if (forceDownSampling == -1)
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_DOWNSAMPLING;
-			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			setStatusMessage("2X DOWNSAMPLING ?", NO_CARRY);
-			renderAskDialog();
+			showDownsampleAskDialog();
 			fclose(f);
 			return true;
 		}
@@ -1284,6 +1295,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample8Bit(audioDataS8, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS8[i] = audioDataS8[i * 2];
@@ -1344,6 +1358,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample16Bit(audioDataS16, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS16[i] = audioDataS16[i * 2];
@@ -1411,6 +1428,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample32Bit(audioDataS32, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS32[i] = audioDataS32[i * 2];
@@ -1475,6 +1495,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		// 2x downsampling - remove every other sample (if needed)
 		if (forceDownSampling)
 		{
+			if (ptConfig.sampleLowpass)
+				lowPassSample32Bit(audioDataS32, sampleLength, sampleRate, sampleRate / DOWNSAMPLE_CUTOFF_FACTOR);
+
 			sampleLength /= 2;
 			for (i = 1; i < sampleLength; i++)
 				audioDataS32[i] = audioDataS32[i * 2];

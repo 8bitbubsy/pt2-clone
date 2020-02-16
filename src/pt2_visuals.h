@@ -42,6 +42,8 @@ bool unpackBMPs(void);
 void createBitmaps(void);
 void displayMainScreen(void);
 void renderAskDialog(void);
+void renderBigAskDialog(void);
+void showDownsampleAskDialog(void);
 void renderPosEdScreen(void);
 void renderDiskOpScreen(void);
 void renderMuteButtons(void);

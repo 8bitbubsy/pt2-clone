@@ -66,6 +66,9 @@
     <ClInclude Include="..\..\src\pt2_visuals.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_filters.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -145,6 +148,7 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_yes_no_dialog.c">
       <Filter>gfx</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\pt2_filters.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

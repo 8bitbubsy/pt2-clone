@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define DENORMAL_OFFSET 1e-10
+
 typedef struct lossyIntegrator_t
 {
 	double dBuffer[2], b0, b1;
@@ -15,7 +17,9 @@ void resetCachedMixerPeriod(void);
 void resetAudioDithering(void);
 void calcCoeffLossyIntegrator(double dSr, double dHz, lossyIntegrator_t *filter);
 void lossyIntegrator(lossyIntegrator_t *filter, double *dIn, double *dOut);
+void lossyIntegratorMono(lossyIntegrator_t *filter, double dIn, double *dOut);
 void lossyIntegratorHighPass(lossyIntegrator_t *filter, double *dIn, double *dOut);
+void lossyIntegratorHighPassMono(lossyIntegrator_t *filter, double dIn, double *dOut);
 void normalize32bitSigned(int32_t *sampleData, uint32_t sampleLength);
 void normalize16bitSigned(int16_t *sampleData, uint32_t sampleLength);
 void normalize8bitFloatSigned(float *fSampleData, uint32_t sampleLength);

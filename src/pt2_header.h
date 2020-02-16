@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include "pt2_unicode.h"
 
-#define PROG_VER_STR "1.05"
+#define PROG_VER_STR "1.06"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -193,7 +193,7 @@ enum
 	ASK_MOD2WAV_OVERWRITE = 5,
 	ASK_SAVEMOD_OVERWRITE = 6,
 	ASK_SAVESMP_OVERWRITE = 7,
-	ASK_DOWNSAMPLING = 8,
+	ASK_LOAD_DOWNSAMPLE = 8,
 	ASK_RESAMPLE = 9,
 	ASK_KILL_SAMPLE = 10,
 	ASK_UPSAMPLE = 11,

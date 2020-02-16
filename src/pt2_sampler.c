@@ -18,6 +18,11 @@
 #include "pt2_mouse.h"
 #include "pt2_scopes.h"
 
+#define CENTER_LINE_COLOR 0x303030
+#define MARK_COLOR_1 0x666666 /* inverted background */
+#define MARK_COLOR_2 0xCCCCCC /* inverted waveform */
+#define MARK_COLOR_3 0x7D7D7D /* inverted center line */
+
 #define SAMPLE_AREA_Y_CENTER 169
 #define SAMPLE_AREA_HEIGHT 64
 
@@ -28,6 +33,7 @@ typedef struct sampleMixer_t
 } sampleMixer_t;
 
 static int32_t samOffsetScaled;
+static uint32_t waveInvertTable[8];
 
 static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
 {
@@ -41,12 +47,26 @@ extern uint32_t *pixelBuffer; // pt_main.c
 
 void setLoopSprites(void);
 
+void createSampleMarkTable(void)
+{
+	// used for invertRange()  (sample data marking)
+
+	waveInvertTable[0] = 0x00000000 | palette[PAL_BACKGRD];
+	waveInvertTable[1] = 0x01000000 | palette[PAL_QADSCP];
+	waveInvertTable[2] = 0x02000000 | CENTER_LINE_COLOR;
+	waveInvertTable[3] = 0x03000000; // spacer, not used
+	waveInvertTable[4] = 0x04000000 | MARK_COLOR_1;
+	waveInvertTable[5] = 0x05000000 | MARK_COLOR_2;
+	waveInvertTable[6] = 0x06000000 | MARK_COLOR_3;
+	waveInvertTable[7] = 0x07000000; // spacer, not used
+}
+
 static void updateSamOffset(void)
 {
 	if (editor.sampler.samDisplay == 0)
 		samOffsetScaled = 0;
 	else
-		samOffsetScaled = (editor.sampler.samOffset * SAMPLE_AREA_WIDTH) / editor.sampler.samDisplay;
+		samOffsetScaled = (editor.sampler.samOffset * SAMPLE_AREA_WIDTH) / editor.sampler.samDisplay; // truncate here
 }
 
 void fixSampleBeep(moduleSample_t *s)
@@ -86,9 +106,10 @@ void fillSampleFilterUndoBuffer(void)
 	}
 }
 
-static void line(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, int16_t line_y1, int16_t line_y2)
+static void sampleLine(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, int16_t line_y1, int16_t line_y2)
 {
 	int16_t d, x, y, ax, ay, sx, sy, dx, dy;
+	uint32_t color = 0x01000000 | palette[PAL_QADSCP];
 
 	assert(line_x1 >= 0 || line_x2 >= 0 || line_x1 < SCREEN_W || line_x2 < SCREEN_W);
 	assert(line_y1 >= 0 || line_y2 >= 0 || line_y1 < SCREEN_H || line_y2 < SCREEN_H);
@@ -109,7 +130,7 @@ static void line(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, int16_
 		{
 			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
 
-			frameBuffer[(y * SCREEN_W) + x] = palette[PAL_QADSCP];
+			frameBuffer[(y * SCREEN_W) + x] = color;
 
 			if (x == line_x2)
 				break;
@@ -131,7 +152,7 @@ static void line(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, int16_
 		{
 			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
 
-			frameBuffer[(y * SCREEN_W) + x] = palette[PAL_QADSCP];
+			frameBuffer[(y * SCREEN_W) + x] = color;
 
 			if (y == line_y2)
 				break;
@@ -150,21 +171,20 @@ static void line(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, int16_
 
 static void setDragBar(void)
 {
-	int32_t pos32;
+	int32_t pos;
 	uint32_t *dstPtr, pixel, bgPixel;
-	double dPos;
 
 	if (editor.sampler.samLength > 0 && editor.sampler.samDisplay != editor.sampler.samLength)
 	{
+		int32_t roundingBias = (uint32_t)editor.sampler.samLength / 2;
+
 		// update drag bar coordinates
-		dPos = (editor.sampler.samOffset * 311.0) / editor.sampler.samLength;
-		pos32 = (int32_t)(dPos + 0.5);
-		editor.sampler.dragStart = 4 + (uint16_t)pos32;
+		pos = ((editor.sampler.samOffset * 311) + roundingBias) / editor.sampler.samLength;
+		editor.sampler.dragStart = pos + 4;
 		editor.sampler.dragStart = CLAMP(editor.sampler.dragStart, 4, 315);
 
-		dPos = ((editor.sampler.samDisplay + editor.sampler.samOffset) * 311.0) / editor.sampler.samLength;
-		pos32 = (int32_t)(dPos + 0.5);
-		editor.sampler.dragEnd = 5 + (uint16_t)pos32;
+		pos = (((editor.sampler.samDisplay + editor.sampler.samOffset) * 311) + roundingBias) / editor.sampler.samLength;
+		editor.sampler.dragEnd = pos + 5;
 		editor.sampler.dragEnd = CLAMP(editor.sampler.dragEnd, 5, 316);
 
 		if (editor.sampler.dragStart > editor.sampler.dragEnd-1)
@@ -222,13 +242,12 @@ static int8_t getScaledSample(int32_t index)
 
 int32_t smpPos2Scr(int32_t pos) // sample pos -> screen x pos
 {
-	double dPos;
-
 	if (editor.sampler.samDisplay == 0)
 		return 0;
 
-	dPos = (pos * (double)SAMPLE_AREA_WIDTH) / editor.sampler.samDisplay;
-	pos = (int32_t)(dPos + 0.5);
+	uint32_t roundingBias = (uint32_t)editor.sampler.samDisplay >> 1;
+
+	pos = (((uint32_t)pos * SAMPLE_AREA_WIDTH) + roundingBias) / (uint32_t)editor.sampler.samDisplay; // rounded
 	pos -= samOffsetScaled;
 
 	return pos;
@@ -243,7 +262,7 @@ int32_t scr2SmpPos(int32_t x) // screen x pos -> sample pos
 		x = 0;
 
 	x += samOffsetScaled;
-	x  = (x * editor.sampler.samDisplay) / SAMPLE_AREA_WIDTH;
+	x = (uint32_t)(x * editor.sampler.samDisplay) / SAMPLE_AREA_WIDTH; // truncate here
 
 	return x;
 }
@@ -291,7 +310,11 @@ static void renderSampleData(void)
 
 	// display center line
 	if (ptConfig.dottedCenterFlag)
-		memset(&pixelBuffer[(SAMPLE_AREA_Y_CENTER * SCREEN_W) + 3], 0x373737, SAMPLE_AREA_WIDTH * sizeof (int32_t));
+	{
+		dstPtr = &pixelBuffer[(SAMPLE_AREA_Y_CENTER * SCREEN_W) + 3];
+		for (x = 0; x < SAMPLE_AREA_WIDTH; x++)
+			dstPtr[x] = 0x02000000 | CENTER_LINE_COLOR;
+	}
 
 	// render sample data
 	if (editor.sampler.samDisplay >= 0 && editor.sampler.samDisplay <= MAX_SAMPLE_LEN)
@@ -304,7 +327,7 @@ static void renderSampleData(void)
 			for (x = 1; x < SAMPLE_AREA_WIDTH; x++)
 			{
 				y2 = SAMPLE_AREA_Y_CENTER - getScaledSample(scr2SmpPos(x));
-				line(pixelBuffer, x + 2, x + 3, y1, y2);
+				sampleLine(pixelBuffer, x + 2, x + 3, y1, y2);
 				y1 = y2;
 			}
 		}
@@ -332,11 +355,11 @@ static void renderSampleData(void)
 
 				if (x > 0)
 				{
-					if (min > oldMax) line(pixelBuffer, x + 2, x + 3, oldMax, min);
-					if (max < oldMin) line(pixelBuffer, x + 2, x + 3, oldMin, max);
+					if (min > oldMax) sampleLine(pixelBuffer, x + 2, x + 3, oldMax, min);
+					if (max < oldMin) sampleLine(pixelBuffer, x + 2, x + 3, oldMin, max);
 				}
 
-				line(pixelBuffer, x + 3, x + 3, max, min);
+				sampleLine(pixelBuffer, x + 3, x + 3, max, min);
 
 				oldMin = min;
 				oldMax = max;
@@ -356,8 +379,8 @@ static void renderSampleData(void)
 
 void invertRange(void)
 {
-	int32_t x, y, rangeLen, dstPitch, start, end;
-	uint32_t *dstPtr, pixel1, pixel2;
+	int32_t x, y, rangeLen, start, end;
+	uint32_t *dstPtr;
 
 	if (editor.markStartOfs == -1)
 		return; // no marking
@@ -366,34 +389,22 @@ void invertRange(void)
 	end = smpPos2Scr(editor.markEndOfs);
 
 	if (editor.sampler.samDisplay < editor.sampler.samLength && (start >= SAMPLE_AREA_WIDTH || end < 0))
-		return; // range is outside of view (passed it by scrolling)
+		return; // range is outside of view
 
-	start = CLAMP(start, 0, SAMPLE_AREA_WIDTH - 1);
-	end = CLAMP(end, 0, SAMPLE_AREA_WIDTH - 1);
+	start = CLAMP(start, 0, SAMPLE_AREA_WIDTH-1);
+	end = CLAMP(end, 0, SAMPLE_AREA_WIDTH-1);
 
 	rangeLen = (end + 1) - start;
 	if (rangeLen < 1)
 		rangeLen = 1;
 
-	dstPtr = &pixelBuffer[(138 * SCREEN_W) + (3 + start)];
-	dstPitch = SCREEN_W - rangeLen;
-	pixel1 = palette[PAL_BACKGRD];
-	pixel2 = palette[PAL_QADSCP];
-
+	dstPtr = &pixelBuffer[(138 * SCREEN_W) + (start + 3)];
 	for (y = 0; y < 64; y++)
 	{
 		for (x = 0; x < rangeLen; x++)
-		{
-			// this is stupid...
-			     if (*dstPtr == pixel1) *dstPtr = 0x666666;
-			else if (*dstPtr == 0x666666) *dstPtr = pixel1;
-			else if (*dstPtr == 0xCCCCCC) *dstPtr = pixel2;
-			else if (*dstPtr == pixel2) *dstPtr = 0xCCCCCC;
+			dstPtr[x] = waveInvertTable[((dstPtr[x] >> 24) & 7) ^ 4]; // It's magic! ptr[x]>>24 = wave/invert color number
 
-			dstPtr++;
-		}
-
-		dstPtr += dstPitch;
+		dstPtr += SCREEN_W;
 	}
 }
 
@@ -454,7 +465,7 @@ void redrawSample(void)
 void highPassSample(int32_t cutOff)
 {
 	int32_t smp32, i, from, to;
-	double *dSampleData, dBaseFreq, dCutOff, dIn[2], dOut[2];
+	double *dSampleData, dBaseFreq, dCutOff;
 	moduleSample_t *s;
 	lossyIntegrator_t filterHi;
 
@@ -517,28 +528,11 @@ void highPassSample(int32_t cutOff)
 	for (i = 0; i < s->length; i++)
 		dSampleData[i] = modEntry->sampleData[s->offset+i];
 
-	// filter forwards
 	filterHi.dBuffer[0] = 0.0;
 	if (to <= s->length)
 	{
 		for (i = from; i < to; i++)
-		{
-			dIn[0] = dSampleData[i];
-			lossyIntegratorHighPass(&filterHi, dIn, dOut);
-			dSampleData[i] = dOut[0];
-		}
-	}
-
-	// filter backwards
-	filterHi.dBuffer[0] = 0.0;
-	if (to <= s->length)
-	{
-		for (i = to-1; i >= from; i--)
-		{
-			dIn[0] = dSampleData[i];
-			lossyIntegratorHighPass(&filterHi, dIn, dOut);
-			dSampleData[i] = dOut[0];
-		}
+			lossyIntegratorHighPassMono(&filterHi, dSampleData[i], &dSampleData[i]);
 	}
 
 	if (editor.normalizeFiltersFlag)
@@ -561,7 +555,7 @@ void highPassSample(int32_t cutOff)
 void lowPassSample(int32_t cutOff)
 {
 	int32_t smp32, i, from, to;
-	double *dSampleData, dBaseFreq, dCutOff, dIn[2], dOut[2];
+	double *dSampleData, dBaseFreq, dCutOff;
 	moduleSample_t *s;
 	lossyIntegrator_t filterLo;
 
@@ -624,28 +618,11 @@ void lowPassSample(int32_t cutOff)
 	for (i = 0; i < s->length; i++)
 		dSampleData[i] = modEntry->sampleData[s->offset+i];
 
-	// filter forwards
 	filterLo.dBuffer[0] = 0.0;
 	if (to <= s->length)
 	{
 		for (i = from; i < to; i++)
-		{
-			dIn[0] = dSampleData[i];
-			lossyIntegrator(&filterLo, dIn, dOut);
-			dSampleData[i] = dOut[0];
-		}
-	}
-
-	// filter backwards
-	filterLo.dBuffer[0] = 0.0;
-	if (to <= s->length)
-	{
-		for (i = to-1; i >= from; i--)
-		{
-			dIn[0] = dSampleData[i];
-			lossyIntegrator(&filterLo, dIn, dOut);
-			dSampleData[i] = dOut[0];
-		}
+			lossyIntegratorMono(&filterLo, dSampleData[i], &dSampleData[i]);
 	}
 
 	if (editor.normalizeFiltersFlag)
@@ -1491,7 +1468,7 @@ void sampleMarkerToCenter(void)
 	}
 	else
 	{
-		middlePos = editor.sampler.samOffset + (int32_t)((editor.sampler.samDisplay / 2.0) + 0.5);
+		middlePos = editor.sampler.samOffset + ((editor.sampler.samDisplay + 1) / 2);
 
 		invertRange();
 		if (input.keyb.shiftPressed && editor.markStartOfs != -1)
@@ -2047,7 +2024,9 @@ static void samplerZoomIn(int32_t step, int16_t x)
 	if (tmpDisplay < 2)
 		tmpDisplay = 2;
 
-	step += (((x - (SCREEN_W / 2)) * step) / (SCREEN_W / 2));
+	const int32_t roundingBias = SCREEN_W / 4;
+
+	step += (((x - (SCREEN_W / 2)) * step) + roundingBias) / (SCREEN_W / 2);
 
 	tmpOffset = editor.sampler.samOffset + step;
 	if (tmpOffset < 0)
@@ -2081,7 +2060,9 @@ static void samplerZoomOut(int32_t step, int16_t x)
 	}
 	else
 	{
-		step += (((x - (SCREEN_W / 2)) * step) / (SCREEN_W / 2));
+		const int32_t roundingBias = SCREEN_W / 4;
+
+		step += (((x - (SCREEN_W / 2)) * step) + roundingBias) / (SCREEN_W / 2);
 
 		tmpOffset = editor.sampler.samOffset - step;
 		if (tmpOffset < 0)
@@ -2100,20 +2081,17 @@ static void samplerZoomOut(int32_t step, int16_t x)
 
 void samplerZoomInMouseWheel(void)
 {
-	int32_t step = (int32_t)((editor.sampler.samDisplay / 10.0f) + 0.5f);
-	samplerZoomIn(step, input.mouse.x);
+	samplerZoomIn((editor.sampler.samDisplay + 5) / 10, input.mouse.x);
 }
 
 void samplerZoomOutMouseWheel(void)
 {
-	int32_t step = (int32_t)((editor.sampler.samDisplay / 10.0f) + 0.5f);
-	samplerZoomOut(step, input.mouse.x);
+	samplerZoomOut((editor.sampler.samDisplay + 5) / 10, input.mouse.x);
 }
 
 void samplerZoomOut2x(void)
 {
-	int32_t step = (int32_t)((editor.sampler.samDisplay / 2.0f) + 0.5f);
-	samplerZoomOut(step, SCREEN_W / 2);
+	samplerZoomOut((editor.sampler.samDisplay + 1) / 2, SCREEN_W / 2);
 }
 
 void samplerRangeAll(void)
@@ -2200,13 +2178,13 @@ void volBoxBarPressed(bool mouseButtonHeld)
 
 			if (editor.ui.forceVolDrag == 1)
 			{
-				editor.vol1 = (int16_t)((mouseX * 200) / 60);
+				editor.vol1 = (int16_t)(((mouseX * 200) + (60/2)) / 60); // rounded
 				editor.ui.updateVolFromText = true;
 				showVolFromSlider();
 			}
 			else if (editor.ui.forceVolDrag == 2)
 			{
-				editor.vol2 = (int16_t)((mouseX * 200) / 60);
+				editor.vol2 = (int16_t)(((mouseX * 200) + (60/2)) / 60); // rounded
 				editor.ui.updateVolToText = true;
 				showVolToSlider();
 			}
@@ -2280,7 +2258,7 @@ void samplerBarPressed(bool mouseButtonHeld)
 		if (tmp32 < 0)
 			tmp32 = 0;
 
-		tmp32 = (int32_t)(((tmp32 * editor.sampler.samLength) / 311.0) + 0.5);
+		tmp32 = (int32_t)(((tmp32 * editor.sampler.samLength) + (311/2)) / 311); // rounded
 		if (tmp32+editor.sampler.samDisplay <= editor.sampler.samLength)
 		{
 			if (tmp32 == editor.sampler.samOffset)

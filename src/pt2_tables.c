@@ -9,7 +9,7 @@ uint32_t *editOpScreen1BMP = NULL, *editOpScreen2BMP   = NULL, *samplerVolumeBMP
 uint32_t *editOpScreen3BMP = NULL, *editOpScreen4BMP   = NULL, *spectrumVisualsBMP = NULL;
 uint32_t *muteButtonsBMP   = NULL, *posEdBMP           = NULL, *samplerFiltersBMP  = NULL;
 uint32_t *samplerScreenBMP = NULL, *pat2SmpDialogBMP   = NULL, *trackerFrameBMP    = NULL;
-uint32_t *yesNoDialogBMP   = NULL;
+uint32_t *yesNoDialogBMP   = NULL, *bigYesNoDialogBMP  = NULL;
 
 const uint32_t cursorColors[6][3] =
 {

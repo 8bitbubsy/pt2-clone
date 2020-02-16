@@ -214,6 +214,42 @@ void renderAskDialog(void)
 	}
 }
 
+void renderBigAskDialog(void)
+{
+	const uint32_t *srcPtr;
+	uint32_t *dstPtr;
+
+	editor.ui.disablePosEd = true;
+	editor.ui.disableVisualizer = true;
+
+	// render custom big ask dialog
+
+	srcPtr = bigYesNoDialogBMP;
+	dstPtr = &pixelBuffer[(44 * SCREEN_W) + 120];
+
+	for (uint32_t y = 0; y < 55; y++)
+	{
+		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
+
+		srcPtr += 200;
+		dstPtr += SCREEN_W;
+	}
+}
+
+void showDownsampleAskDialog(void)
+{
+	editor.ui.askScreenShown = true;
+	editor.ui.askScreenType = ASK_LOAD_DOWNSAMPLE;
+	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
+	setStatusMessage("PLEASE SELECT", NO_CARRY);
+	renderBigAskDialog();
+
+	textOutTight(pixelBuffer, 133, 49, "THE SAMPLE'S FREQUENCY IS", palette[PAL_BACKGRD]);
+	textOutTight(pixelBuffer, 178, 57, "ABOVE 22KHZ.", palette[PAL_BACKGRD]);
+	textOutTight(pixelBuffer, 133, 65, "DO YOU WANT TO DOWNSAMPLE", palette[PAL_BACKGRD]);
+	textOutTight(pixelBuffer, 156, 73, "BEFORE LOADING IT?", palette[PAL_BACKGRD]);
+}
+
 static void fillFromVuMetersBgBuffer(void)
 {
 	const uint32_t *srcPtr;
@@ -594,7 +630,7 @@ void updateSampler(void)
 	{
 		if (!editor.ui.samplerVolBoxShown && !editor.ui.samplerFiltersBoxShown && s->length > 0)
 		{
-			tmpSampleOffset = (scr2SmpPos(input.mouse.x - 3) + 128) >> 8;
+			tmpSampleOffset = (scr2SmpPos(input.mouse.x-3) + (1 << 7)) >> 8; // rounded
 			tmpSampleOffset = 0x900 + CLAMP(tmpSampleOffset, 0x00, 0xFF);
 
 			if (tmpSampleOffset != editor.ui.lastSampleOffset)
@@ -674,7 +710,7 @@ void showVolFromSlider(void)
 {
 	uint32_t *dstPtr, pixel, bgPixel, sliderStart, sliderEnd;
 
-	sliderStart = (editor.vol1 * 3) / 10;
+	sliderStart = ((editor.vol1 * 3) + 5) / 10;
 	sliderEnd  = sliderStart + 4;
 	pixel = palette[PAL_QADSCP];
 	bgPixel = palette[PAL_BACKGRD];
@@ -698,7 +734,7 @@ void showVolToSlider(void)
 {
 	uint32_t *dstPtr, pixel, bgPixel, sliderStart, sliderEnd;
 
-	sliderStart = (editor.vol2 * 3) / 10;
+	sliderStart = ((editor.vol2 * 3) + 5) / 10;
 	sliderEnd = sliderStart + 4;
 	pixel = palette[PAL_QADSCP];
 	bgPixel = palette[PAL_BACKGRD];
@@ -1069,6 +1105,7 @@ void removeTextEditMarker(void)
 		pixel = palette[PAL_GENBKG2];
 		for (uint32_t x = 0; x < 7; x++)
 			dstPtr[x] = pixel;
+
 		// no need to clear the second row of pixels
 
 		editor.ui.updatePosEd = true;
@@ -1148,7 +1185,7 @@ void updateVisualizer(void)
 				if (y < tmpVol)
 					pixel = srcPtr[y];
 
-				for (uint32_t  x = 0; x < SPECTRUM_BAR_WIDTH; x++)
+				for (uint32_t x = 0; x < SPECTRUM_BAR_WIDTH; x++)
 					dstPtr[x] = pixel;
 
 				dstPtr += SCREEN_W;
@@ -1223,7 +1260,7 @@ void renderAboutScreen(void)
 	// draw version string
 
 	sprintf(verString, "v%s", PROG_VER_STR);
-	verStringX = 260 + (63 - ((uint32_t)strlen(verString) * (FONT_CHAR_W - 1))) / 2;
+	verStringX = 260 + (((63 - ((uint32_t)strlen(verString) * (FONT_CHAR_W - 1))) + 1) / 2);
 	textOutTight(pixelBuffer, verStringX, 67, verString, palette[PAL_GENBKG2]);
 }
 
@@ -1393,7 +1430,7 @@ void updateMOD2WAVDialog(void)
 			if (percent > 100)
 				percent = 100;
 
-			barLength = (percent * 180) / 100;
+			barLength = ((percent * 180) + 50) / 100;
 			dstPtr = &pixelBuffer[(42 * SCREEN_W) + 70];
 			pixel = palette[PAL_GENBKG2];
 			bgPixel = palette[PAL_BORDER];
@@ -1401,7 +1438,13 @@ void updateMOD2WAVDialog(void)
 			for (int32_t y = 0; y < 11; y++)
 			{
 				for (int32_t x = 0; x < 180; x++)
-					dstPtr[x] = (x < barLength) ? pixel : bgPixel;
+				{
+					uint32_t color = bgPixel;
+					if (x < barLength)
+						color = pixel;
+
+					dstPtr[x] = color;
+				}
 
 				dstPtr += SCREEN_W;
 			}
@@ -1690,7 +1733,7 @@ void handleAskNo(void)
 		}
 		break;
 
-		case ASK_DOWNSAMPLING:
+		case ASK_LOAD_DOWNSAMPLE:
 		{
 			restoreStatusAndMousePointer();
 			extLoadWAVOrAIFFSampleCallback(DONT_DOWNSAMPLE);
@@ -2021,7 +2064,7 @@ void handleAskYes(void)
 		}
 		break;
 
-		case ASK_DOWNSAMPLING:
+		case ASK_LOAD_DOWNSAMPLE:
 		{
 			// for WAV and AIFF sample loader
 			restoreStatusAndMousePointer();
@@ -2273,6 +2316,7 @@ void freeBMPs(void)
 	if (posEdBMP != NULL) free(posEdBMP);
 	if (spectrumVisualsBMP != NULL) free(spectrumVisualsBMP);
 	if (yesNoDialogBMP != NULL) free(yesNoDialogBMP);
+	if (bigYesNoDialogBMP != NULL) free(bigYesNoDialogBMP);
 	if (pat2SmpDialogBMP != NULL) free(pat2SmpDialogBMP);
 	if (editOpScreen1BMP != NULL) free(editOpScreen1BMP);
 	if (editOpScreen2BMP != NULL) free(editOpScreen2BMP);
@@ -2366,6 +2410,7 @@ bool unpackBMPs(void)
 	posEdBMP = unpackBMP(posEdPackedBMP, sizeof (posEdPackedBMP));
 	spectrumVisualsBMP = unpackBMP(spectrumVisualsPackedBMP, sizeof (spectrumVisualsPackedBMP));
 	yesNoDialogBMP = unpackBMP(yesNoDialogPackedBMP, sizeof (yesNoDialogPackedBMP));
+	bigYesNoDialogBMP = unpackBMP(bigYesNoDialogPackedBMP, sizeof (bigYesNoDialogPackedBMP));
 	pat2SmpDialogBMP = unpackBMP(pat2SmpDialogPackedBMP, sizeof (pat2SmpDialogPackedBMP));
 	editOpScreen1BMP = unpackBMP(editOpScreen1PackedBMP, sizeof (editOpScreen1PackedBMP));
 	editOpScreen2BMP = unpackBMP(editOpScreen2PackedBMP, sizeof (editOpScreen2PackedBMP));
@@ -2383,7 +2428,7 @@ bool unpackBMPs(void)
 		editOpScreen1BMP   == NULL || editOpScreen2BMP   == NULL || editOpScreen3BMP  == NULL ||
 		editOpScreen4BMP   == NULL || aboutScreenBMP     == NULL || muteButtonsBMP    == NULL ||
 		editOpModeCharsBMP == NULL || arrowBMP           == NULL || samplerFiltersBMP == NULL ||
-		yesNoDialogBMP     == NULL)
+		yesNoDialogBMP     == NULL || bigYesNoDialogBMP  == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false; // BMPs are free'd in cleanUp()

@@ -771,8 +771,6 @@ void sampleLengthUpButton(bool fast)
 	if (modEntry->samples[editor.currSample].length == MAX_SAMPLE_LEN)
 		return;
 
-	turnOffVoices();
-
 	val = modEntry->samples[editor.currSample].length;
 	if (input.mouse.rightButtonPressed)
 	{
@@ -813,8 +811,6 @@ void sampleLengthDownButton(bool fast)
 			return;
 	}
 
-	turnOffVoices();
-
 	val = modEntry->samples[editor.currSample].length;
 	if (input.mouse.rightButtonPressed)
 	{
@@ -834,12 +830,13 @@ void sampleLengthDownButton(bool fast)
 	if (val < 0)
 		val = 0;
 
-	s->length = val;
 	if (s->loopStart+s->loopLength > 2)
 	{
-		if (s->length < s->loopStart+s->loopLength)
-			s->length = s->loopStart+s->loopLength;
+		if (val < s->loopStart+s->loopLength)
+			val = s->loopStart+s->loopLength;
 	}
+
+	s->length = val;
 
 	editor.ui.updateCurrSampleLength = true;
 }
@@ -2183,6 +2180,34 @@ bool handleLeftMouseButton(void)
 	{
 		handleSamplerFiltersBox();
 		return true;
+	}
+
+	// "downsample before loading sample" ask dialog
+	if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_LOAD_DOWNSAMPLE)
+	{
+		if (input.mouse.y >= 83 && input.mouse.y <= 93)
+		{
+			if (input.mouse.x >= 179 && input.mouse.x <= 204)
+			{
+				// YES button
+				editor.ui.askScreenShown = false;
+				editor.ui.answerNo = false;
+				editor.ui.answerYes = true;
+				handleAskYes();
+				return true;
+			}
+			else if (input.mouse.x >= 242 && input.mouse.x <= 260)
+			{
+				// NO button
+				editor.ui.askScreenShown = false;
+				editor.ui.answerNo = true;
+				editor.ui.answerYes = false;
+				handleAskNo();
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// cancel note input gadgets with left/right mouse button

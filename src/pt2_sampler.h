@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+void createSampleMarkTable(void);
 int32_t smpPos2Scr(int32_t pos);
 int32_t scr2SmpPos(int32_t x);
 void fixSampleBeep(moduleSample_t *s);

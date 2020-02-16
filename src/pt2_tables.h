@@ -36,6 +36,7 @@ extern const uint8_t samplerScreenPackedBMP[3056];
 extern const uint8_t spectrumVisualsPackedBMP[2217];
 extern const uint8_t trackerFramePackedBMP[8486];
 extern const uint8_t yesNoDialogPackedBMP[476];
+extern const uint8_t bigYesNoDialogPackedBMP[472];
 extern const uint8_t pat2SmpDialogPackedBMP[520];
 
 // changable by config file
@@ -53,6 +54,7 @@ extern uint32_t *editOpScreen2BMP;
 extern uint32_t *editOpScreen3BMP;
 extern uint32_t *editOpScreen4BMP;
 extern uint32_t *yesNoDialogBMP;
+extern uint32_t *bigYesNoDialogBMP;
 extern uint32_t *spectrumVisualsBMP;
 extern uint32_t *posEdBMP;
 extern uint32_t *mod2wavBMP;

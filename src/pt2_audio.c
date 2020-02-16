@@ -34,8 +34,6 @@
 
 #define INITIAL_DITHER_SEED 0x12345000
 
-#define DENORMAL_OFFSET 1e-10
-
 typedef struct ledFilter_t
 {
 	double dLed[4];
@@ -197,6 +195,12 @@ void lossyIntegrator(lossyIntegrator_t *filter, double *dIn, double *dOut)
 	dOut[1] = filter->dBuffer[1];
 }
 
+void lossyIntegratorMono(lossyIntegrator_t *filter, double dIn, double *dOut)
+{
+	filter->dBuffer[0] = (filter->b0 * dIn) + (filter->b1 * filter->dBuffer[0]) + DENORMAL_OFFSET;
+	*dOut = filter->dBuffer[0];
+}
+
 void lossyIntegratorHighPass(lossyIntegrator_t *filter, double *dIn, double *dOut)
 {
 	double dLow[2];
@@ -205,6 +209,15 @@ void lossyIntegratorHighPass(lossyIntegrator_t *filter, double *dIn, double *dOu
 
 	dOut[0] = dIn[0] - dLow[0]; // left channel high-pass
 	dOut[1] = dIn[1] - dLow[1]; // right channel high-pass
+}
+
+void lossyIntegratorHighPassMono(lossyIntegrator_t *filter, double dIn, double *dOut)
+{
+	double dLow;
+
+	lossyIntegratorMono(filter, dIn, &dLow);
+
+	*dOut = dIn - dLow;
 }
 
 /* adejr/aciddose: these sin/cos approximations both use a 0..1
