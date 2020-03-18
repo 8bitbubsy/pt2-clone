@@ -69,7 +69,7 @@ bool lowPassSample8BitUnsigned(uint8_t *buffer, int32_t length, int32_t sampleFr
 		sample = CLAMP(sample, INT8_MIN, INT8_MAX);
 		buffer[i] = (uint8_t)(sample + 128);
 	}
-		
+
 	return true;
 }
 
@@ -125,7 +125,7 @@ bool lowPassSampleFloat(float *buffer, int32_t length, int32_t sampleFrequency, 
 	filter.dBuffer = 0.0;
 	for (int32_t i = 0; i < length; i++)
 		buffer[i] = (float)doLowpass(&filter, buffer[i]);
-		
+
 	return true;
 }
 
@@ -141,6 +141,6 @@ bool lowPassSampleDouble(double *buffer, int32_t length, int32_t sampleFrequency
 	filter.dBuffer = 0.0;
 	for (int32_t i = 0; i < length; i++)
 		buffer[i] = doLowpass(&filter, buffer[i]);
-		
+
 	return true;
 }
