@@ -68,7 +68,7 @@ void showVolToSlider(void);
 void updateCurrSample(void);
 void eraseSprites(void);
 void renderSprites(void);
-void updateDragBars(void);
+void handleLastGUIObjectDown(void);
 void invertRange(void);
 void updateCursorPos(void);
 void renderVuMeters(void);

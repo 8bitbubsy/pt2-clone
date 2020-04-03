@@ -70,9 +70,6 @@ extern uint32_t *arrowBMP;
 extern uint32_t *editOpModeCharsBMP;
 extern uint32_t *pat2SmpDialogBMP;
 
-// PALETTE
-extern uint32_t palette[PALETTE_NUM];
-
 // button tables taken from the ptplay project + modified
 
 // MODIFY THESE EVERY TIME YOU REMOVE/ADD A BUTTON!

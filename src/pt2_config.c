@@ -41,26 +41,26 @@ void loadConfig(void)
 	FILE *f;
 
 	// set default config values first
-	ptConfig.fullScreenStretch = false;
-	ptConfig.pattDots = false;
-	ptConfig.dottedCenterFlag = true;
-	ptConfig.a500LowPassFilter = false;
-	ptConfig.soundFrequency = 48000;
-	ptConfig.rememberPlayMode = false;
-	ptConfig.stereoSeparation = 20;
-	ptConfig.videoScaleFactor = 2;
-	ptConfig.realVuMeters = false;
-	ptConfig.modDot = false;
-	ptConfig.accidental = 0; // sharp
-	ptConfig.quantizeValue = 1;
-	ptConfig.transDel = false;
-	ptConfig.blankZeroFlag = false;
-	ptConfig.compoMode = false;
-	ptConfig.soundBufferSize = 1024;
-	ptConfig.autoCloseDiskOp = true;
-	ptConfig.vsyncOff = false;
-	ptConfig.hwMouse = false;
-	ptConfig.sampleLowpass = true;
+	config.fullScreenStretch = false;
+	config.pattDots = false;
+	config.dottedCenterFlag = true;
+	config.a500LowPassFilter = false;
+	config.soundFrequency = 48000;
+	config.rememberPlayMode = false;
+	config.stereoSeparation = 20;
+	config.videoScaleFactor = 2;
+	config.realVuMeters = false;
+	config.modDot = false;
+	config.accidental = 0; // sharp
+	config.quantizeValue = 1;
+	config.transDel = false;
+	config.blankZeroFlag = false;
+	config.compoMode = false;
+	config.soundBufferSize = 1024;
+	config.autoCloseDiskOp = true;
+	config.vsyncOff = false;
+	config.hwMouse = false;
+	config.sampleLowpass = true;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -191,127 +191,127 @@ static bool loadProTrackerDotIni(FILE *f)
 		// HWMOUSE
 		else if (!_strnicmp(configLine, "HWMOUSE=", 8))
 		{
-			     if (!_strnicmp(&configLine[8], "TRUE",  4)) ptConfig.hwMouse = true;
-			else if (!_strnicmp(&configLine[8], "FALSE", 5)) ptConfig.hwMouse = false;
+			     if (!_strnicmp(&configLine[8], "TRUE",  4)) config.hwMouse = true;
+			else if (!_strnicmp(&configLine[8], "FALSE", 5)) config.hwMouse = false;
 		}
 
 		// SAMPLELOWPASS
 		else if (!_strnicmp(configLine, "SAMPLELOWPASS=", 14))
 		{
-			     if (!_strnicmp(&configLine[14], "TRUE",  4)) ptConfig.sampleLowpass = true;
-			else if (!_strnicmp(&configLine[14], "FALSE", 5)) ptConfig.sampleLowpass = false;
+			     if (!_strnicmp(&configLine[14], "TRUE",  4)) config.sampleLowpass = true;
+			else if (!_strnicmp(&configLine[14], "FALSE", 5)) config.sampleLowpass = false;
 		}
 
 		// VSYNCOFF
 		else if (!_strnicmp(configLine, "VSYNCOFF=", 9))
 		{
-			     if (!_strnicmp(&configLine[9], "TRUE",  4)) ptConfig.vsyncOff = true;
-			else if (!_strnicmp(&configLine[9], "FALSE", 5)) ptConfig.vsyncOff = false;
+			     if (!_strnicmp(&configLine[9], "TRUE",  4)) config.vsyncOff = true;
+			else if (!_strnicmp(&configLine[9], "FALSE", 5)) config.vsyncOff = false;
 		}
 
 		// FULLSCREENSTRETCH
 		else if (!_strnicmp(configLine, "FULLSCREENSTRETCH=", 18))
 		{
-			     if (!_strnicmp(&configLine[18], "TRUE",  4)) ptConfig.fullScreenStretch = true;
-			else if (!_strnicmp(&configLine[18], "FALSE", 5)) ptConfig.fullScreenStretch = false;
+			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.fullScreenStretch = true;
+			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.fullScreenStretch = false;
 		}
 
 		// HIDEDISKOPDATES
 		else if (!_strnicmp(configLine, "HIDEDISKOPDATES=", 16))
 		{
-			     if (!_strnicmp(&configLine[16], "TRUE",  4)) ptConfig.hideDiskOpDates = true;
-			else if (!_strnicmp(&configLine[16], "FALSE", 5)) ptConfig.hideDiskOpDates = false;
+			     if (!_strnicmp(&configLine[16], "TRUE",  4)) config.hideDiskOpDates = true;
+			else if (!_strnicmp(&configLine[16], "FALSE", 5)) config.hideDiskOpDates = false;
 		}
 
 		// AUTOCLOSEDISKOP
 		else if (!_strnicmp(configLine, "AUTOCLOSEDISKOP=", 16))
 		{
-			     if (!_strnicmp(&configLine[16], "TRUE",  4)) ptConfig.autoCloseDiskOp = true;
-			else if (!_strnicmp(&configLine[16], "FALSE", 5)) ptConfig.autoCloseDiskOp = false;
+			     if (!_strnicmp(&configLine[16], "TRUE",  4)) config.autoCloseDiskOp = true;
+			else if (!_strnicmp(&configLine[16], "FALSE", 5)) config.autoCloseDiskOp = false;
 		}
 
 		// COMPOMODE
 		else if (!_strnicmp(configLine, "COMPOMODE=", 10))
 		{
-			     if (!_strnicmp(&configLine[10], "TRUE",  4)) ptConfig.compoMode = true;
-			else if (!_strnicmp(&configLine[10], "FALSE", 5)) ptConfig.compoMode = false;
+			     if (!_strnicmp(&configLine[10], "TRUE",  4)) config.compoMode = true;
+			else if (!_strnicmp(&configLine[10], "FALSE", 5)) config.compoMode = false;
 		}
 
 		// PATTDOTS
 		else if (!_strnicmp(configLine, "PATTDOTS=", 9))
 		{
-			     if (!_strnicmp(&configLine[9], "TRUE",  4)) ptConfig.pattDots = true;
-			else if (!_strnicmp(&configLine[9], "FALSE", 5)) ptConfig.pattDots = false;
+			     if (!_strnicmp(&configLine[9], "TRUE",  4)) config.pattDots = true;
+			else if (!_strnicmp(&configLine[9], "FALSE", 5)) config.pattDots = false;
 		}
 
 		// BLANKZERO
 		else if (!_strnicmp(configLine, "BLANKZERO=", 10))
 		{
-			     if (!_strnicmp(&configLine[10], "TRUE",  4)) ptConfig.blankZeroFlag = true;
-			else if (!_strnicmp(&configLine[10], "FALSE", 5)) ptConfig.blankZeroFlag = false;
+			     if (!_strnicmp(&configLine[10], "TRUE",  4)) config.blankZeroFlag = true;
+			else if (!_strnicmp(&configLine[10], "FALSE", 5)) config.blankZeroFlag = false;
 		}
 
 		// REALVUMETERS
 		else if (!_strnicmp(configLine, "REALVUMETERS=", 13))
 		{
-			     if (!_strnicmp(&configLine[13], "TRUE",  4)) ptConfig.realVuMeters = true;
-			else if (!_strnicmp(&configLine[13], "FALSE", 5)) ptConfig.realVuMeters = false;
+			     if (!_strnicmp(&configLine[13], "TRUE",  4)) config.realVuMeters = true;
+			else if (!_strnicmp(&configLine[13], "FALSE", 5)) config.realVuMeters = false;
 		}
 
 		// ACCIDENTAL
 		else if (!_strnicmp(configLine, "ACCIDENTAL=", 11))
 		{
-			     if (!_strnicmp(&configLine[11], "SHARP", 4)) ptConfig.accidental = 0;
-			else if (!_strnicmp(&configLine[11], "FLAT",  5)) ptConfig.accidental = 1;
+			     if (!_strnicmp(&configLine[11], "SHARP", 4)) config.accidental = 0;
+			else if (!_strnicmp(&configLine[11], "FLAT",  5)) config.accidental = 1;
 		}
 
 		// QUANTIZE
 		else if (!_strnicmp(configLine, "QUANTIZE=", 9))
 		{
 			if (configLine[9] != '\0')
-				ptConfig.quantizeValue = (int16_t)(CLAMP(atoi(&configLine[9]), 0, 63));
+				config.quantizeValue = (int16_t)(CLAMP(atoi(&configLine[9]), 0, 63));
 		}
 
 		// TRANSDEL
 		else if (!_strnicmp(configLine, "TRANSDEL=", 9))
 		{
-			     if (!_strnicmp(&configLine[9], "TRUE",  4)) ptConfig.transDel = true;
-			else if (!_strnicmp(&configLine[9], "FALSE", 5)) ptConfig.transDel = false;
+			     if (!_strnicmp(&configLine[9], "TRUE",  4)) config.transDel = true;
+			else if (!_strnicmp(&configLine[9], "FALSE", 5)) config.transDel = false;
 		}
 
 		// DOTTEDCENTER
 		else if (!_strnicmp(configLine, "DOTTEDCENTER=", 13))
 		{
-			     if (!_strnicmp(&configLine[13], "TRUE",  4)) ptConfig.dottedCenterFlag = true;
-			else if (!_strnicmp(&configLine[13], "FALSE", 5)) ptConfig.dottedCenterFlag = false;
+			     if (!_strnicmp(&configLine[13], "TRUE",  4)) config.dottedCenterFlag = true;
+			else if (!_strnicmp(&configLine[13], "FALSE", 5)) config.dottedCenterFlag = false;
 		}
 
 		// MODDOT
 		else if (!_strnicmp(configLine, "MODDOT=", 7))
 		{
-			     if (!_strnicmp(&configLine[7], "TRUE",  4)) ptConfig.modDot = true;
-			else if (!_strnicmp(&configLine[7], "FALSE", 5)) ptConfig.modDot = false;
+			     if (!_strnicmp(&configLine[7], "TRUE",  4)) config.modDot = true;
+			else if (!_strnicmp(&configLine[7], "FALSE", 5)) config.modDot = false;
 		}
 
 		// SCALE3X (deprecated)
 		else if (!_strnicmp(configLine, "SCALE3X=", 8))
 		{
-			     if (!_strnicmp(&configLine[8], "TRUE",  4)) ptConfig.videoScaleFactor = 3;
-			else if (!_strnicmp(&configLine[8], "FALSE", 5)) ptConfig.videoScaleFactor = 2;
+			     if (!_strnicmp(&configLine[8], "TRUE",  4)) config.videoScaleFactor = 3;
+			else if (!_strnicmp(&configLine[8], "FALSE", 5)) config.videoScaleFactor = 2;
 		}
 
 		// VIDEOSCALE
 		else if (!_strnicmp(configLine, "VIDEOSCALE=", 11))
 		{
 			if (lineLen >= 13 && configLine[12] == 'X' && isdigit(configLine[11]))
-				ptConfig.videoScaleFactor = configLine[11] - '0';
+				config.videoScaleFactor = configLine[11] - '0';
 		}
 
 		// REMEMBERPLAYMODE
 		else if (!_strnicmp(configLine, "REMEMBERPLAYMODE=", 17))
 		{
-			     if (!_strnicmp(&configLine[17], "TRUE",  4)) ptConfig.rememberPlayMode = true;
-			else if (!_strnicmp(&configLine[17], "FALSE", 5)) ptConfig.rememberPlayMode = false;
+			     if (!_strnicmp(&configLine[17], "TRUE",  4)) config.rememberPlayMode = true;
+			else if (!_strnicmp(&configLine[17], "FALSE", 5)) config.rememberPlayMode = false;
 		}
 
 		// DEFAULTDIR
@@ -325,7 +325,7 @@ static bool loadProTrackerDotIni(FILE *f)
 
 				lineLen -= i;
 				if (lineLen > 0)
-					strncpy(ptConfig.defModulesDir, &configLine[i], (lineLen > PATH_MAX) ? PATH_MAX : lineLen);
+					strncpy(config.defModulesDir, &configLine[i], (lineLen > PATH_MAX) ? PATH_MAX : lineLen);
 			}
 		}
 
@@ -340,43 +340,43 @@ static bool loadProTrackerDotIni(FILE *f)
 
 				lineLen -= i;
 				if (lineLen > 0)
-					strncpy(ptConfig.defSamplesDir, &configLine[i], (lineLen > PATH_MAX) ? PATH_MAX : lineLen);
+					strncpy(config.defSamplesDir, &configLine[i], (lineLen > PATH_MAX) ? PATH_MAX : lineLen);
 			}
 		}
 
 		// A500LOWPASSFILTER
 		else if (!_strnicmp(configLine, "A500LOWPASSFILTER=", 18))
 		{
-			     if (!_strnicmp(&configLine[18], "TRUE",  4)) ptConfig.a500LowPassFilter = true;
-			else if (!_strnicmp(&configLine[18], "FALSE", 5)) ptConfig.a500LowPassFilter = false;
+			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.a500LowPassFilter = true;
+			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.a500LowPassFilter = false;
 		}
 
 		// A4000LOWPASSFILTER (deprecated, same as A500LOWPASSFILTER)
 		else if (!_strnicmp(configLine, "A4000LOWPASSFILTER=", 19))
 		{
-			     if (!_strnicmp(&configLine[19], "TRUE",  4)) ptConfig.a500LowPassFilter = true;
-			else if (!_strnicmp(&configLine[19], "FALSE", 5)) ptConfig.a500LowPassFilter = false;
+			     if (!_strnicmp(&configLine[19], "TRUE",  4)) config.a500LowPassFilter = true;
+			else if (!_strnicmp(&configLine[19], "FALSE", 5)) config.a500LowPassFilter = false;
 		}
 
 		// FREQUENCY
 		else if (!_strnicmp(configLine, "FREQUENCY=", 10))
 		{
 			if (configLine[10] != '\0')
-				ptConfig.soundFrequency = (uint32_t)(CLAMP(atoi(&configLine[10]), 32000, 96000));
+				config.soundFrequency = (uint32_t)(CLAMP(atoi(&configLine[10]), 32000, 96000));
 		}
 
 		// BUFFERSIZE
 		else if (!_strnicmp(configLine, "BUFFERSIZE=", 11))
 		{
 			if (configLine[11] != '\0')
-				ptConfig.soundBufferSize = (uint32_t)(CLAMP(atoi(&configLine[11]), 128, 8192));
+				config.soundBufferSize = (uint32_t)(CLAMP(atoi(&configLine[11]), 128, 8192));
 		}
 
 		// STEREOSEPARATION
 		else if (!_strnicmp(configLine, "STEREOSEPARATION=", 17))
 		{
 			if (configLine[17] != '\0')
-				ptConfig.stereoSeparation = (int8_t)(CLAMP(atoi(&configLine[17]), 0, 100));
+				config.stereoSeparation = (int8_t)(CLAMP(atoi(&configLine[17]), 0, 100));
 		}
 
 		configLine = strtok(NULL, "\n");
@@ -450,20 +450,20 @@ static bool loadPTDotConfig(FILE *f)
 	{
 		fread(&tmp16, 2, 1, f); // stored as Big-Endian
 		tmp16 = SWAP16(tmp16);
-		palette[i] = RGB12_to_RGB24(tmp16);
+		video.palette[i] = RGB12_to_RGB24(tmp16);
 	}
 
 	// Transpose Delete (delete out of range notes on transposing)
 	fseek(f, 174, SEEK_SET);
 	fread(&tmp8, 1, 1, f);
-	ptConfig.transDel = tmp8 ? true : false;
-	ptConfig.transDel = ptConfig.transDel;
+	config.transDel = tmp8 ? true : false;
+	config.transDel = config.transDel;
 
 	// Note style (sharps/flats)
 	fseek(f, 200, SEEK_SET);
 	fread(&tmp8, 1, 1, f);
-	ptConfig.accidental = tmp8 ? 1 : 0;
-	ptConfig.accidental = ptConfig.accidental;
+	config.accidental = tmp8 ? 1 : 0;
+	config.accidental = config.accidental;
 
 	// Multi Mode Next
 	fseek(f, 462, SEEK_SET);
@@ -489,8 +489,8 @@ static bool loadPTDotConfig(FILE *f)
 	// Blank Zeroes
 	fseek(f, 490, SEEK_SET);
 	fread(&tmp8, 1, 1, f);
-	ptConfig.blankZeroFlag = tmp8 ? true : false;
-	ptConfig.blankZeroFlag = ptConfig.blankZeroFlag;
+	config.blankZeroFlag = tmp8 ? true : false;
+	config.blankZeroFlag = config.blankZeroFlag;
 
 	// Initial Tempo (don't load if timing is set to VBLANK)
 	if (editor.timingMode == TEMPO_MODE_CIA)
@@ -603,7 +603,7 @@ static bool loadColorsDotIni(void)
 				{
 					color = (hex2int(configLine[0]) << 8) | (hex2int(configLine[1]) << 4) | hex2int(configLine[2]);
 					color &= 0xFFF;
-					palette[line] = RGB12_to_RGB24(color);
+					video.palette[line] = RGB12_to_RGB24(color);
 
 					configLine = strtok(NULL, "\n");
 					line++;

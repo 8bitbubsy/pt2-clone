@@ -256,14 +256,14 @@ void exitGetTextLine(bool updateValue)
 
 			case PTB_EO_QUANTIZE:
 			{
-				editor.quantizeValueDisp = &ptConfig.quantizeValue;
+				editor.quantizeValueDisp = &config.quantizeValue;
 
 				if (updateValue)
 				{
 					if (editor.ui.tmpDisp16 > 63)
 						editor.ui.tmpDisp16 = 63;
 
-					ptConfig.quantizeValue = editor.ui.tmpDisp16;
+					config.quantizeValue = editor.ui.tmpDisp16;
 					editor.ui.updateQuantizeText = true;
 				}
 			}
@@ -679,7 +679,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 	if (editor.ui.samplerScreenShown || (editor.currMode == MODE_IDLE || editor.currMode == MODE_PLAY))
 	{
 		// at this point it will only jam, not place it
-		if (!input.keyb.leftAltPressed && !input.keyb.leftAmigaPressed && !input.keyb.leftCtrlPressed && !input.keyb.shiftPressed)
+		if (!keyb.leftAltPressed && !keyb.leftAmigaPressed && !keyb.leftCtrlPressed && !keyb.shiftPressed)
 			jamAndPlaceSample(scancode, normalMode);
 
 		return;
@@ -701,7 +701,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 	if (editor.cursor.mode != CURSOR_NOTE)
 	{
 		// if we held down any key modifier at this point, then do nothing
-		if (input.keyb.leftAltPressed || input.keyb.leftAmigaPressed || input.keyb.leftCtrlPressed || input.keyb.shiftPressed)
+		if (keyb.leftAltPressed || keyb.leftAmigaPressed || keyb.leftCtrlPressed || keyb.shiftPressed)
 			return;
 
 		if (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD)
@@ -821,13 +821,13 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 			{
 				note = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + editor.cursor.channel];
 
-				if (!input.keyb.leftAltPressed)
+				if (!keyb.leftAltPressed)
 				{
 					note->sample = 0;
 					note->period = 0;
 				}
 
-				if (input.keyb.shiftPressed || input.keyb.leftAltPressed)
+				if (keyb.shiftPressed || keyb.leftAltPressed)
 				{
 					note->command = 0;
 					note->param = 0;
@@ -842,7 +842,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 		else
 		{
 			// if we held down any key modifier at this point, then do nothing
-			if (input.keyb.leftAltPressed || input.keyb.leftAmigaPressed || input.keyb.leftCtrlPressed || input.keyb.shiftPressed)
+			if (keyb.leftAltPressed || keyb.leftAmigaPressed || keyb.leftCtrlPressed || keyb.shiftPressed)
 				return;
 
 			jamAndPlaceSample(scancode, normalMode);
@@ -854,7 +854,7 @@ bool handleSpecialKeys(SDL_Scancode scancode)
 {
 	note_t *patt, *note, *prevNote;
 
-	if (!input.keyb.leftAltPressed)
+	if (!keyb.leftAltPressed)
 		return false;
 
 	patt = modEntry->patterns[modEntry->currPattern];
@@ -1015,7 +1015,7 @@ uint8_t quantizeCheck(uint8_t row)
 {
 	uint8_t tempRow, quantize;
 
-	quantize = (uint8_t)ptConfig.quantizeValue;
+	quantize = (uint8_t)config.quantizeValue;
 
 	editor.didQuantize = false;
 	if (editor.currMode == MODE_RECORD)
@@ -1307,7 +1307,7 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 			{
 				j = 35;
 
-				if (ptConfig.transDel)
+				if (config.transDel)
 				{
 					noteSrc->period = 0;
 					noteSrc->sample = 0;
@@ -1360,7 +1360,7 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 			{
 				j = 0;
 
-				if (ptConfig.transDel)
+				if (config.transDel)
 				{
 					noteSrc->period = 0;
 					noteSrc->sample = 0;
@@ -1409,7 +1409,7 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 			}
 
 			noteDeleted = false;
-			if (j+12 > 35 && ptConfig.transDel)
+			if (j+12 > 35 && config.transDel)
 			{
 				noteSrc->period = 0;
 				noteSrc->sample = 0;
@@ -1460,7 +1460,7 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 			}
 
 			noteDeleted = false;
-			if (j-12 < 0 && ptConfig.transDel)
+			if (j-12 < 0 && config.transDel)
 			{
 				noteSrc->period = 0;
 				noteSrc->sample = 0;
@@ -1510,7 +1510,7 @@ void pattNoteUp(bool sampleAllFlag)
 				{
 					k = 35;
 
-					if (ptConfig.transDel)
+					if (config.transDel)
 					{
 						noteSrc->period = 0;
 						noteSrc->sample = 0;
@@ -1559,7 +1559,7 @@ void pattNoteDown(bool sampleAllFlag)
 				{
 					k = 0;
 
-					if (ptConfig.transDel)
+					if (config.transDel)
 					{
 						noteSrc->period = 0;
 						noteSrc->sample = 0;
@@ -1604,7 +1604,7 @@ void pattOctaUp(bool sampleAllFlag)
 				}
 
 				noteDeleted = false;
-				if (k+12 > 35 && ptConfig.transDel)
+				if (k+12 > 35 && config.transDel)
 				{
 					noteSrc->period = 0;
 					noteSrc->sample = 0;
@@ -1651,7 +1651,7 @@ void pattOctaDown(bool sampleAllFlag)
 				}
 
 				noteDeleted = false;
-				if (k-12 < 0 && ptConfig.transDel)
+				if (k-12 < 0 && config.transDel)
 				{
 					noteSrc->period = 0;
 					noteSrc->sample = 0;

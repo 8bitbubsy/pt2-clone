@@ -37,7 +37,6 @@ void paulaSetLength(uint8_t ch, uint16_t len);
 void paulaSetData(uint8_t ch, const int8_t *src);
 void lockAudio(void);
 void unlockAudio(void);
-void clearPaulaAndScopes(void);
 void mixerUpdateLoops(void);
 void mixerKillVoice(uint8_t ch);
 void turnOffVoices(void);

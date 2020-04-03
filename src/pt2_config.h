@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-struct ptConfig_t
+struct config_t
 {
 	char *defModulesDir, *defSamplesDir;
 	bool dottedCenterFlag, pattDots, a500LowPassFilter, compoMode, autoCloseDiskOp, hideDiskOpDates, hwMouse;
@@ -12,6 +12,6 @@ struct ptConfig_t
 	int8_t stereoSeparation, videoScaleFactor, accidental;
 	uint16_t quantizeValue;
 	uint32_t soundFrequency, soundBufferSize;
-} ptConfig;
+} config;
 
 void loadConfig(void);

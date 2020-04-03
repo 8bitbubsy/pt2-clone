@@ -24,11 +24,8 @@ static uint32_t scopeTimeLen, scopeTimeLenFrac;
 static uint64_t timeNext64, timeNext64Frac;
 static SDL_Thread *scopeThread;
 
-scopeChannel_t scope[4]; // global
-scopeChannelExt_t scopeExt[4]; // global
-
-extern bool forceMixerOff; // pt_audio.c
-extern uint32_t *pixelBuffer; // pt_main.c
+scopeChannel_t scope[AMIGA_VOICES]; // global
+scopeChannelExt_t scopeExt[AMIGA_VOICES]; // global
 
 int32_t getSampleReadPos(uint8_t ch, uint8_t smpNum)
 {
@@ -47,9 +44,10 @@ int32_t getSampleReadPos(uint8_t ch, uint8_t smpNum)
 	{
 		s = &modEntry->samples[smpNum];
 
-		/* get real sampling position regardless of where the scope data points to
+		/* Get real sampling position regardless of where the scope data points to
 		** sc->data changes during loop, offset and so on, so this has to be done
-		** (sadly, because it's really hackish) */
+		** (sadly, because it's really hackish).
+		*/
 		pos = (int32_t)(&data[pos] - &modEntry->sampleData[s->offset]);
 		if (pos >= s->length)
 			return -1;
@@ -73,7 +71,7 @@ void updateScopes(void)
 	if (editor.isWAVRendering)
 		return;
 
-	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
 		sc = &scope[i];
 		se = &scopeExt[i];
@@ -93,8 +91,9 @@ void updateScopes(void)
 		{
 			// sample reached end, simulate Paula register update (sample swapping)
 
-			/* wrap pos around one time with current length, then set new length
-			** and wrap around it (handles one-shot loops and sample swapping) */
+			/* Wrap pos around one time with current length, then set new length
+			** and wrap around it (handles one-shot loops and sample swapping).
+			*/
 			tmp.pos -= tmp.length;
 			tmp.length = tmpExt.newLength;
 
@@ -114,7 +113,8 @@ void updateScopes(void)
 
 /* This routine gets the average sample peak through the running scope voices.
 ** This gives a much more smooth and stable result than getting the peak from
-** the mixer, and we don't care about including filters/BLEP in the peak calculation. */
+** the mixer, and we don't care about including filters/BLEP in the peak calculation.
+*/
 static void updateRealVuMeters(void) 
 {
 	bool didSwapData;
@@ -195,7 +195,7 @@ static void updateRealVuMeters(void)
 				}
 			}
 
-			smpPeak = ((smpPeak * 48) + (1 << 12)) >> 13;
+			smpPeak = ((smpPeak * 48) + (1 << 12)) >> 13; // rounded
 			if (smpPeak > editor.realVuMeterVolumes[i])
 				editor.realVuMeterVolumes[i] = smpPeak;
 		}
@@ -216,7 +216,7 @@ void drawScopes(void)
 	{
 		// --- QUADRASCOPE ---
 
-		scopePtr = &pixelBuffer[(71 * SCREEN_W) + 128];
+		scopePtr = &video.frameBuffer[(71 * SCREEN_W) + 128];
 		for (i = 0; i < AMIGA_VOICES; i++)
 		{
 			sc = &scope[i];
@@ -226,7 +226,7 @@ void drawScopes(void)
 			tmpScope = *sc;
 			didSwapData = se->didSwapData;
 
-			volume = -modEntry->channels[i].n_volume; // 0..64 -> -64..0
+			volume = -modEntry->channels[i].n_volume; // invert volume
 
 			// render scope
 			if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)
@@ -237,8 +237,8 @@ void drawScopes(void)
 
 				// draw scope background
 
-				dstPtr = &pixelBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
-				scopePixel = palette[PAL_BACKGRD]; // this palette can change
+				dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
+				scopePixel = video.palette[PAL_BACKGRD]; // this palette can change
 
 				for (y = 0; y < SCOPE_HEIGHT; y++)
 				{
@@ -250,7 +250,7 @@ void drawScopes(void)
 
 				// render scope data
 
-				scopePixel = palette[PAL_QADSCP];
+				scopePixel = video.palette[PAL_QADSCP];
 
 				readPos = tmpScope.pos;
 				if (tmpScope.loopFlag)
@@ -299,8 +299,8 @@ void drawScopes(void)
 				{
 					// draw scope background
 
-					dstPtr = &pixelBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
-					scopePixel = palette[PAL_BACKGRD];
+					dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
+					scopePixel = video.palette[PAL_BACKGRD];
 
 					for (y = 0; y < SCOPE_HEIGHT; y++)
 					{
@@ -312,7 +312,7 @@ void drawScopes(void)
 
 					// draw line
 
-					scopePixel = palette[PAL_QADSCP];
+					scopePixel = video.palette[PAL_QADSCP];
 					for (x = 0; x < SCOPE_WIDTH; x++)
 						scopePtr[x] = scopePixel;
 
@@ -332,8 +332,6 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 	uint32_t diff32;
 	uint64_t time64;
 
-	(void)ptr;
-
 	// this is needed for scope stability (confirmed)
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 
@@ -343,7 +341,7 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 	while (editor.programRunning)
 	{
-		if (ptConfig.realVuMeters)
+		if (config.realVuMeters)
 			updateRealVuMeters();
 
 		updateScopes();
@@ -372,6 +370,7 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 		}
 	}
 
+	(void)ptr;
 	return true;
 }
 
@@ -383,7 +382,7 @@ bool initScopes(void)
 	dFrac = modf(editor.dPerfFreq / SCOPE_HZ, &dInt);
 
 	// integer part
-	scopeTimeLen = (uint32_t)dInt;
+	scopeTimeLen = (int32_t)dInt;
 
 	// fractional part scaled to 0..2^32-1
 	dFrac *= UINT32_MAX;
@@ -400,18 +399,20 @@ bool initScopes(void)
 	return true;
 }
 
-void waitOnScopes(void)
+void stopScope(uint8_t ch)
 {
 	while (scopesReading);
+	memset(&scopeExt[ch], 0, sizeof (scopeChannelExt_t));
+
+	while (scopesReading);
+	memset(&scope[ch], 0, sizeof (scopeChannel_t));
+
+	scope[ch].length = scopeExt[ch].newLength = 2;
+	while (scopesReading); // final wait to make sure scopes are all inactive
 }
 
-void clearScopes(void)
+void stopAllScopes(void)
 {
-	waitOnScopes();
-
-	memset(scope, 0, sizeof (scope));
-	memset(scopeExt, 0, sizeof (scopeExt));
-
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
-		scope[i].length = scopeExt[i].newLength = 2;
+	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		stopScope(i);
 }

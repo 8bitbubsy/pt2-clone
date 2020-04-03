@@ -12,8 +12,9 @@
 #endif
 #include <stdint.h>
 #include "pt2_unicode.h"
+#include "pt2_palette.h"
 
-#define PROG_VER_STR "1.07"
+#define PROG_VER_STR "1.08"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -285,39 +286,53 @@ typedef struct module_t
 	note_t *patterns[MAX_PATTERNS];
 } module_t;
 
-struct cpu_t
-{
-	bool hasSSE, hasSSE2;
-} cpu;
-
 struct audio_t
 {
+	volatile bool locked;
+	bool forceMixerOff;
 	uint16_t bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32];
 	uint32_t audioFreq, audioBufferSize;
 	double dAudioFreq, dPeriodToDeltaDiv;
 } audio;
 
-struct input_t
+struct keyb_t
 {
-	struct keyb_t
-	{
-		bool repeatKey, delayKey;
-		bool shiftPressed, leftCtrlPressed, leftAltPressed;
-		bool leftCommandPressed, leftAmigaPressed, keypadEnterPressed;
-		uint8_t repeatCounter, delayCounter;
-		uint64_t repeatFrac;
-		SDL_Scancode lastRepKey, lastKey;
-	} keyb;
+	bool repeatKey, delayKey;
+	bool shiftPressed, leftCtrlPressed, leftAltPressed;
+	bool leftCommandPressed, leftAmigaPressed, keypadEnterPressed;
+	uint8_t repeatCounter, delayCounter;
+	uint64_t repeatFrac;
+	SDL_Scancode lastRepKey, lastKey;
+} keyb;
 
-	struct mouse_t
-	{
-		volatile bool setPosFlag;
-		bool buttonWaiting, leftButtonPressed, rightButtonPressed;
-		uint8_t repeatCounter, buttonWaitCounter;
-		int32_t setPosX, setPosY, lastGUIButton, lastSmpFilterButton, prevX, prevY;
-		int16_t x, y, lastMouseX;
-	} mouse;
-} input;
+struct mouse_t
+{
+	volatile bool setPosFlag;
+	bool buttonWaiting, leftButtonPressed, rightButtonPressed;
+	uint8_t repeatCounter, buttonWaitCounter;
+	int32_t x, y, lastMouseX, setPosX, setPosY, lastGUIButton, lastSmpFilterButton, prevX, prevY;
+	uint32_t buttonState;
+} mouse;
+
+struct video_t
+{
+	bool fullscreen, vsync60HzPresent, windowHidden;
+	int32_t renderX, renderY, renderW, renderH, displayW, displayH;
+	int32_t xScale, yScale;
+	double dMouseXMul, dMouseYMul;
+	SDL_PixelFormat *pixelFormat;
+	uint32_t *frameBuffer, *frameBufferUnaligned;
+
+	SDL_Window *window;
+	SDL_Renderer *renderer;
+	SDL_Texture  *texture;
+
+	uint32_t palette[PALETTE_NUM];
+
+#ifdef _WIN32
+	HWND hWnd;
+#endif
+} video;
 
 // this is massive...
 struct editor_t
@@ -337,7 +352,7 @@ struct editor_t
 
 	bool errorMsgActive, errorMsgBlock, multiFlag, metroFlag, keypadToggle8CFlag, normalizeFiltersFlag;
 	bool sampleAllFlag, halfClipFlag, newOldFlag, pat2SmpHQ, mixFlag, useLEDFilter;
-	bool modLoaded, fullscreen, autoInsFlag, repeatKeyFlag, sampleZero, tuningFlag;
+	bool modLoaded, autoInsFlag, repeatKeyFlag, sampleZero, tuningFlag;
 	bool stepPlayEnabled, stepPlayBackwards, blockBufferFlag, blockMarkFlag, didQuantize;
 	bool swapChannelFlag, configFound, abortMod2Wav, chordLengthMin, rowVisitTable[MOD_ORDERS * MOD_ROWS];
 	bool muted[AMIGA_VOICES];
@@ -430,17 +445,10 @@ struct editor_t
 		// these are used when things are drawn on top, for example clear/ask dialogs
 		bool disablePosEd, disableVisualizer;
 
-		bool vsync60HzPresent;
 		int16_t lineCurX, lineCurY, editObject, sampleMarkingPos;
 		uint16_t *numPtr16, tmpDisp16, *dstOffset, dstPos, textLength, editTextPos;
 		uint16_t dstOffsetEnd, lastSampleOffset;
-		int32_t askTempData, renderX, renderY, renderW, renderH, displayW, displayH;
-		int32_t xScale, yScale;
-		double dMouseXMul, dMouseYMul;
-		SDL_PixelFormat *pixelFormat;
-#ifdef _WIN32
-		HWND hWnd;
-#endif
+		int32_t askTempData;
 	} ui;
 
 	struct sampler_t
@@ -448,8 +456,8 @@ struct editor_t
 		const int8_t *samStart;
 		int8_t *blankSample, *copyBuf;
 		int16_t loopStartPos, loopEndPos;
-		uint16_t dragStart, dragEnd, saveMouseX, lastSamPos;
-		int32_t samPointWidth, samOffset, samDisplay, samLength;
+		uint16_t dragStart, dragEnd;
+		int32_t samPointWidth, samOffset, samDisplay, samLength, saveMouseX, lastSamPos;
 		int32_t lastMouseX, lastMouseY, tmpLoopStart, tmpLoopLength;
 		uint32_t copyBufSize, samDrawStart, samDrawEnd;
 	} sampler;

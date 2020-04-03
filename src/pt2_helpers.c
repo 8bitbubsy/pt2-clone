@@ -20,8 +20,6 @@
 #include "pt2_tables.h"
 #include "pt2_palette.h"
 
-extern SDL_Window *window; // pt_main.c
-
 // used for Windows usleep() implementation
 #ifdef _WIN32
 static NTSTATUS (__stdcall *NtDelayExecution)(BOOL Alertable, PLARGE_INTEGER DelayInterval);
@@ -71,7 +69,7 @@ void showErrorMsgBox(const char *fmt, ...)
 	va_end(args);
 
 	// window can be NULL here, no problem...
-	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Critical Error", strBuf, window);
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Critical Error", strBuf, video.window);
 }
 
 void sanitizeFilenameChar(char *chr)
@@ -129,14 +127,14 @@ void updateWindowTitle(bool modified)
 	{
 		if (modified)
 		{
-			if (ptConfig.modDot)
+			if (config.modDot)
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\" (unsaved)", PROG_VER_STR, modEntry->head.moduleTitle);
 			else
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\" (unsaved)", PROG_VER_STR, modEntry->head.moduleTitle);
 		}
 		else
 		{
-			if (ptConfig.modDot)
+			if (config.modDot)
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\"", PROG_VER_STR, modEntry->head.moduleTitle);
 			else
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\"", PROG_VER_STR, modEntry->head.moduleTitle);
@@ -146,21 +144,21 @@ void updateWindowTitle(bool modified)
 	{
 		if (modified)
 		{
-			if (ptConfig.modDot)
+			if (config.modDot)
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.untitled\" (unsaved)", PROG_VER_STR);
 			else
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"untitled.mod\" (unsaved)", PROG_VER_STR);
 		}
 		else
 		{
-			if (ptConfig.modDot)
+			if (config.modDot)
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.untitled\"", PROG_VER_STR);
 			else
 				sprintf(titleTemp, "ProTracker 2 clone v%s - \"untitled.mod\"", PROG_VER_STR);
 		}
 	}
 
-	 SDL_SetWindowTitle(window, titleTemp);
+	 SDL_SetWindowTitle(video.window, titleTemp);
 }
 
 void recalcChordLength(void)

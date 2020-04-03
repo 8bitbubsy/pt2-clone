@@ -25,12 +25,10 @@
 #include "pt2_keyboard.h"
 
 /* TODO: Move irrelevant routines outta here! Disgusting design!
- * Keep in mind that this was programmed in my early programming days... */
+** Keep in mind that this was programmed in my early programming days...
+**/
 
 SDL_Cursor *cursors[NUM_CURSORS];
-
-extern SDL_Renderer *renderer;
-extern SDL_Window *window;
 
 void edNote1UpButton(void);
 void edNote1DownButton(void);
@@ -80,11 +78,11 @@ static void pointerSetColor(uint8_t cursorColorIndex)
 {
 	assert(cursorColorIndex <= 5);
 
-	palette[PAL_MOUSE_1] = cursorColors[cursorColorIndex][0];
-	palette[PAL_MOUSE_2] = cursorColors[cursorColorIndex][1];
-	palette[PAL_MOUSE_3] = cursorColors[cursorColorIndex][2];
+	video.palette[PAL_MOUSE_1] = cursorColors[cursorColorIndex][0];
+	video.palette[PAL_MOUSE_2] = cursorColors[cursorColorIndex][1];
+	video.palette[PAL_MOUSE_3] = cursorColors[cursorColorIndex][2];
 
-	if (ptConfig.hwMouse)
+	if (config.hwMouse)
 		setSystemCursor(cursors[cursorColorIndex]);
 }
 
@@ -155,14 +153,15 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 {
 	freeMouseCursors();
 
-	uint8_t scaling = editor.ui.yScale;
+	uint8_t scaleFactor = video.yScale;
+
 	for (uint32_t i = 0; i < NUM_CURSORS; i++)
 	{
-		SDL_Surface *surface = SDL_CreateRGBSurface(0, POINTER_W*scaling, POINTER_H*scaling, 32, 0, 0, 0, 0);
+		SDL_Surface *surface = SDL_CreateRGBSurface(0, POINTER_W*scaleFactor, POINTER_H*scaleFactor, 32, 0, 0, 0, 0);
 		if (surface == NULL)
 		{
 			freeMouseCursors();
-			ptConfig.hwMouse = false; // enable software mouse
+			config.hwMouse = false; // enable software mouse
 			return false;
 		}
 
@@ -171,9 +170,9 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 		uint32_t color3 = cursorColors[i][2];
 		uint32_t colorkey = 0x12345678;
 
-		color1   = SDL_MapRGB(surface->format, R24(color1),   G24(color1),   B24(color1));
-		color2   = SDL_MapRGB(surface->format, R24(color2),   G24(color2),   B24(color2));
-		color3   = SDL_MapRGB(surface->format, R24(color3),   G24(color3),   B24(color3));
+		color1 = SDL_MapRGB(surface->format, R24(color1), G24(color1), B24(color1));
+		color2 = SDL_MapRGB(surface->format, R24(color2), G24(color2), B24(color2));
+		color3 = SDL_MapRGB(surface->format, R24(color3), G24(color3), B24(color3));
 		colorkey = SDL_MapRGB(surface->format, R24(colorkey), G24(colorkey), B24(colorkey));
 
 		SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE);
@@ -190,8 +189,8 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 		// blit upscaled cursor to surface
 		for (uint32_t y = 0; y < POINTER_H; y++)
 		{
-			uint32_t *outX = &dstPixels32[(y * scaling) * surface->w];
-			for (uint32_t yScale = 0; yScale < scaling; yScale++)
+			uint32_t *outX = &dstPixels32[(y * scaleFactor) * surface->w];
+			for (uint32_t yScale = 0; yScale < scaleFactor; yScale++)
 			{
 				for (uint32_t x = 0; x < POINTER_W; x++)
 				{
@@ -204,11 +203,11 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 						else if (srcPix == PAL_MOUSE_2) pixel = color2;
 						else if (srcPix == PAL_MOUSE_3) pixel = color3;
 
-						for (uint32_t xScale = 0; xScale < scaling; xScale++)
+						for (uint32_t xScale = 0; xScale < scaleFactor; xScale++)
 							outX[xScale] = pixel;
 					}
 
-					outX += scaling;
+					outX += scaleFactor;
 				}
 			}
 		}
@@ -220,7 +219,7 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 		{
 			SDL_FreeSurface(surface);
 			freeMouseCursors();
-			ptConfig.hwMouse = false; // enable software mouse
+			config.hwMouse = false; // enable software mouse
 			return false;
 		}
 
@@ -233,102 +232,112 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 
 void updateMouseScaling(void)
 {
-	if (editor.ui.renderW > 0) editor.ui.dMouseXMul = (double)SCREEN_W / editor.ui.renderW;
-	if (editor.ui.renderH > 0) editor.ui.dMouseYMul = (double)SCREEN_H / editor.ui.renderH;
+	if (video.renderW > 0) video.dMouseXMul = (double)SCREEN_W / video.renderW;
+	if (video.renderH > 0) video.dMouseYMul = (double)SCREEN_H / video.renderH;
 }
 
 void readMouseXY(void)
 {
-	int32_t mx, my;
+	int32_t mx, my, windowX, windowY;
 
-	if (input.mouse.setPosFlag)
+	if (mouse.setPosFlag)
 	{
-		input.mouse.setPosFlag = false;
+		if (!video.windowHidden)
+			SDL_WarpMouseInWindow(video.window, mouse.setPosX, mouse.setPosY);
 
-		if (SDL_GetWindowFlags(window) & SDL_WINDOW_SHOWN)
-			SDL_WarpMouseInWindow(window, input.mouse.setPosX, input.mouse.setPosY);
-
+		mouse.setPosFlag = false;
 		return;
 	}
 
-	SDL_PumpEvents(); // gathers all pending input from devices into the event queue (less mouse lag)
-	SDL_GetMouseState(&mx, &my);
+	mouse.buttonState = SDL_GetGlobalMouseState(&mx, &my);
 
-	/* in centered fullscreen mode, trap the mouse inside the framed image
-	 * and subtract the coords to match the OS mouse position (fixes touch from touchscreens) */
-	if (editor.fullscreen && !ptConfig.fullScreenStretch)
+	if (video.fullscreen)
 	{
-		if (mx < editor.ui.renderX)
-		{
-			mx = editor.ui.renderX;
-			SDL_WarpMouseInWindow(window, mx, my);
-		}
-		else if (mx >= editor.ui.renderX+editor.ui.renderW)
-		{
-			mx = (editor.ui.renderX + editor.ui.renderW) - 1;
-			SDL_WarpMouseInWindow(window, mx, my);
-		}
+		/* If fullscreen without filtering mode, translate coords and warp mouse
+		** inside the render space.
+		** Fullscreen + filtering mode takes up 100% of the screen area used, so no
+		** need to translate coords in that mode.
+		*/
 
-		if (my < editor.ui.renderY)
+		if (!config.fullScreenStretch)
 		{
-			my = editor.ui.renderY;
-			SDL_WarpMouseInWindow(window, mx, my);
-		}
-		else if (my >= editor.ui.renderY+editor.ui.renderH)
-		{
-			my = (editor.ui.renderY + editor.ui.renderH) - 1;
-			SDL_WarpMouseInWindow(window, mx, my);
-		}
+			if (!config.hwMouse)
+			{
+				bool warpMouse = false;
 
-		mx -= editor.ui.renderX;
-		my -= editor.ui.renderY;
+				if (mx < video.renderX)
+				{
+					mx = video.renderX;
+					warpMouse = true;
+				}
+				else if (mx >= video.renderX+video.renderW)
+				{
+					mx = (video.renderX + video.renderW) - 1;
+					warpMouse = true;
+				}
+
+				if (my < video.renderY)
+				{
+					my = video.renderY;
+					warpMouse = true;
+				}
+				else if (my >= video.renderY+video.renderH)
+				{
+					my = (video.renderY + video.renderH) - 1;
+					warpMouse = true;
+				}
+
+				if (warpMouse)
+					SDL_WarpMouseInWindow(video.window, mx, my);
+			}
+
+			// convert fullscreen coords to window (centered image) coords
+			mx -= video.renderX;
+			my -= video.renderY;
+		}
+	}
+	else
+	{
+		// convert desktop coords to window coords
+
+		// (a call to this function is really fast in windowed mode)
+		SDL_GetWindowPosition(video.window, &windowX, &windowY);
+
+		mx -= windowX;
+		my -= windowY;
 	}
 
-	if (mx < 0) mx = 0;
-	if (my < 0) my = 0;
+	// multiply coords by video upscaling factors (don't round)
+	mouse.x = (int32_t)(mx * video.dMouseXMul);
+	mouse.y = (int32_t)(my * video.dMouseYMul);
 
-	// multiply coords by video scaling factors (do not round)
-	mx = (int32_t)(mx * editor.ui.dMouseXMul);
-	my = (int32_t)(my * editor.ui.dMouseYMul);
-
-	if (mx >= SCREEN_W) mx = SCREEN_W - 1;
-	if (my >= SCREEN_H) my = SCREEN_H - 1;
-
-	input.mouse.x = (int16_t)mx;
-	input.mouse.y = (int16_t)my;
-
-	if (ptConfig.hwMouse)
+	if (config.hwMouse)
 	{
-		// hardware mouse
+		// hardware mouse mode (OS)
 		hideSprite(SPRITE_MOUSE_POINTER);
 	}
 	else
 	{
-		// software mouse
-		setSpritePos(SPRITE_MOUSE_POINTER, input.mouse.x, input.mouse.y);
+		// software mouse mode (PT mouse)
+		setSpritePos(SPRITE_MOUSE_POINTER, mouse.x, mouse.y);
 	}
 }
 
 void mouseButtonUpHandler(uint8_t mouseButton)
 {
-#ifndef __APPLE__
-	if (!editor.fullscreen)
-		SDL_SetWindowGrab(window, SDL_FALSE);
-#endif
-
-	input.mouse.buttonWaitCounter = 0;
-	input.mouse.buttonWaiting = false;
+	mouse.buttonWaitCounter = 0;
+	mouse.buttonWaiting = false;
 
 	if (mouseButton == SDL_BUTTON_LEFT)
 	{
-		input.mouse.leftButtonPressed = false;
+		mouse.leftButtonPressed = false;
 		editor.ui.forceSampleDrag = false;
 		editor.ui.forceVolDrag = false;
 		editor.ui.leftLoopPinMoving = false;
 		editor.ui.rightLoopPinMoving = false;
 		editor.ui.sampleMarkingPos = -1;
 
-		switch (input.mouse.lastGUIButton)
+		switch (mouse.lastGUIButton)
 		{
 			case PTB_SLENGTHU:
 			case PTB_SLENGTHD:
@@ -358,32 +367,27 @@ void mouseButtonUpHandler(uint8_t mouseButton)
 				break;
 		}
 
-		input.mouse.lastGUIButton = -1;
-		input.mouse.lastSmpFilterButton = -1;
+		mouse.lastGUIButton = -1;
+		mouse.lastSmpFilterButton = -1;
 	}
 
 	if (mouseButton == SDL_BUTTON_RIGHT)
 	{
-		input.mouse.rightButtonPressed = false;
+		mouse.rightButtonPressed = false;
 		editor.ui.forceSampleEdit = false;
 	}
 }
 
 void mouseButtonDownHandler(uint8_t mouseButton)
 {
-#ifndef __APPLE__
-	if (!editor.fullscreen)
-		SDL_SetWindowGrab(window, SDL_TRUE);
-#endif
-
 	if (mouseButton == SDL_BUTTON_LEFT)
 	{
-		input.mouse.leftButtonPressed = true;
-		input.mouse.buttonWaiting = true;
+		mouse.leftButtonPressed = true;
+		mouse.buttonWaiting = true;
 	}
 
 	if (mouseButton == SDL_BUTTON_RIGHT)
-		input.mouse.rightButtonPressed = true;
+		mouse.rightButtonPressed = true;
 
 	// when red mouse pointer (error), block further input for a while
 	if (editor.errorMsgActive && editor.errorMsgBlock)
@@ -397,10 +401,10 @@ void mouseButtonDownHandler(uint8_t mouseButton)
 
 void handleGUIButtonRepeat(void)
 {
-	if (!input.mouse.leftButtonPressed)
+	if (!mouse.leftButtonPressed)
 	{
 		// left mouse button released, stop repeating buttons
-		input.mouse.repeatCounter = 0;
+		mouse.repeatCounter = 0;
 		return;
 	}
 
@@ -410,20 +414,20 @@ void handleGUIButtonRepeat(void)
 		return;
 	}
 
-	if (input.mouse.lastGUIButton != checkGUIButtons()) // FIXME: This can potentially do a ton of iterations, bad design!
+	if (mouse.lastGUIButton != checkGUIButtons()) // FIXME: This can potentially do a ton of iterations, bad design!
 	{
 		// only repeat the button that was first clicked (e.g. if you hold and move mouse to another button)
-		input.mouse.repeatCounter = 0;
+		mouse.repeatCounter = 0;
 		return;
 	}
 
 	handleRepeatedGUIButtons();
-	input.mouse.repeatCounter++;
+	mouse.repeatCounter++;
 }
 
 void edNote1UpButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note1 += 12;
 	else
 		editor.note1++;
@@ -437,7 +441,7 @@ void edNote1UpButton(void)
 
 void edNote1DownButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note1 -= 12;
 	else
 		editor.note1--;
@@ -451,7 +455,7 @@ void edNote1DownButton(void)
 
 void edNote2UpButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note2 += 12;
 	else
 		editor.note2++;
@@ -465,7 +469,7 @@ void edNote2UpButton(void)
 
 void edNote2DownButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note2 -= 12;
 	else
 		editor.note2--;
@@ -479,7 +483,7 @@ void edNote2DownButton(void)
 
 void edNote3UpButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note3 += 12;
 	else
 		editor.note3++;
@@ -493,7 +497,7 @@ void edNote3UpButton(void)
 
 void edNote3DownButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note3 -= 12;
 	else
 		editor.note3--;
@@ -507,7 +511,7 @@ void edNote3DownButton(void)
 
 void edNote4UpButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note4 += 12;
 	else
 		editor.note4++;
@@ -521,7 +525,7 @@ void edNote4UpButton(void)
 
 void edNote4DownButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.note4 -= 12;
 	else
 		editor.note4--;
@@ -535,7 +539,7 @@ void edNote4DownButton(void)
 
 void edPosUpButton(bool fast)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 		{
@@ -578,7 +582,7 @@ void edPosUpButton(bool fast)
 
 void edPosDownButton(bool fast)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 		{
@@ -618,7 +622,7 @@ void edPosDownButton(bool fast)
 
 void edModUpButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		editor.modulateSpeed += 10;
 	else
 		editor.modulateSpeed++;
@@ -631,7 +635,7 @@ void edModUpButton(void)
 
 void edModDownButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		editor.modulateSpeed -= 10;
 	}
@@ -648,7 +652,7 @@ void edModDownButton(void)
 
 void edVolUpButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (editor.sampleVol <= 999-10)
 			editor.sampleVol += 10;
@@ -666,7 +670,7 @@ void edVolUpButton(void)
 
 void edVolDownButton(void)
 {
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (editor.sampleVol >= 10)
 			editor.sampleVol -= 10;
@@ -712,7 +716,7 @@ void sampleFineTuneUpButton(void)
 	if (finetune != 7)
 		modEntry->samples[editor.currSample].fineTune = (finetune + 1) & 0xF;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		modEntry->samples[editor.currSample].fineTune = 0;
 
 	recalcChordLength();
@@ -725,7 +729,7 @@ void sampleFineTuneDownButton(void)
 	if (finetune != 8)
 		modEntry->samples[editor.currSample].fineTune = (finetune - 1) & 0xF;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		modEntry->samples[editor.currSample].fineTune = 0;
 
 	recalcChordLength();
@@ -736,7 +740,7 @@ void sampleVolumeUpButton(void)
 {
 	int8_t val = modEntry->samples[editor.currSample].volume;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val += 16;
 	else
 		val++;
@@ -752,7 +756,7 @@ void sampleVolumeDownButton(void)
 {
 	int8_t val = modEntry->samples[editor.currSample].volume;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val -= 16;
 	else
 		val--;
@@ -772,7 +776,7 @@ void sampleLengthUpButton(bool fast)
 		return;
 
 	val = modEntry->samples[editor.currSample].length;
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 			val += 64;
@@ -812,7 +816,7 @@ void sampleLengthDownButton(bool fast)
 	}
 
 	val = modEntry->samples[editor.currSample].length;
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 			val -= 64;
@@ -855,7 +859,7 @@ void sampleRepeatUpButton(bool fast)
 		return;
 	}
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 			val += 64;
@@ -898,7 +902,7 @@ void sampleRepeatDownButton(bool fast)
 		return;
 	}
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 			val -= 64;
@@ -942,7 +946,7 @@ void sampleRepeatLengthUpButton(bool fast)
 		return;
 	}
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 			val += 64;
@@ -985,7 +989,7 @@ void sampleRepeatLengthDownButton(bool fast)
 		return;
 	}
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (fast)
 			val -= 64;
@@ -1023,7 +1027,7 @@ void tempoUpButton(void)
 		return;
 
 	val = modEntry->currBPM;
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val += 10;
 	else
 		val++;
@@ -1044,7 +1048,7 @@ void tempoDownButton(void)
 		return;
 
 	val = modEntry->currBPM;
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val -= 10;
 	else
 		val--;
@@ -1062,7 +1066,7 @@ void songLengthUpButton(void)
 	int16_t val;
 
 	val = modEntry->head.orderCount;
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val += 10;
 	else
 		val++;
@@ -1084,7 +1088,7 @@ void songLengthDownButton(void)
 {
 	int16_t val = modEntry->head.orderCount;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val -= 10;
 	else
 		val--;
@@ -1106,7 +1110,7 @@ void patternUpButton(void)
 {
 	int16_t val = modEntry->head.order[modEntry->currOrder];
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val += 10;
 	else
 		val++;
@@ -1126,7 +1130,7 @@ void patternDownButton(void)
 {
 	int16_t val = modEntry->head.order[modEntry->currOrder];
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val -= 10;
 	else
 		val--;
@@ -1146,7 +1150,7 @@ void positionUpButton(void)
 {
 	int16_t val = modEntry->currOrder;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val += 10;
 	else
 		val++;
@@ -1161,7 +1165,7 @@ void positionDownButton(void)
 {
 	int16_t val = modEntry->currOrder;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 		val -= 10;
 	else
 		val--;
@@ -1181,7 +1185,7 @@ void handleSamplerVolumeBox(void)
 	double dSmp;
 	moduleSample_t *s;
 
-	if (input.mouse.rightButtonPressed)
+	if (mouse.rightButtonPressed)
 	{
 		if (editor.ui.editTextFlag)
 		{
@@ -1200,14 +1204,14 @@ void handleSamplerVolumeBox(void)
 		return;
 
 	// check buttons
-	if (input.mouse.leftButtonPressed)
+	if (mouse.leftButtonPressed)
 	{
 		// restore sample ask dialog
 		if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_RESTORE_SAMPLE)
 		{
-			if (input.mouse.y >= 71 && input.mouse.y <= 81)
+			if (mouse.y >= 71 && mouse.y <= 81)
 			{
-				if (input.mouse.x >= 171 && input.mouse.x <= 196)
+				if (mouse.x >= 171 && mouse.x <= 196)
 				{
 					// YES button
 					editor.ui.askScreenShown = false;
@@ -1215,7 +1219,7 @@ void handleSamplerVolumeBox(void)
 					editor.ui.answerYes = true;
 					handleAskYes();
 				}
-				else if (input.mouse.x >= 234 && input.mouse.x <= 252)
+				else if (mouse.x >= 234 && mouse.x <= 252)
 				{
 					// NO button
 					editor.ui.askScreenShown = false;
@@ -1231,31 +1235,31 @@ void handleSamplerVolumeBox(void)
 		// MAIN SCREEN STOP
 		if (!editor.ui.diskOpScreenShown && !editor.ui.posEdScreenShown)
 		{
-			if (input.mouse.x >= 182 && input.mouse.x <= 243 && input.mouse.y >= 0 && input.mouse.y <= 10)
+			if (mouse.x >= 182 && mouse.x <= 243 && mouse.y >= 0 && mouse.y <= 10)
 			{
 				modStop();
 				return;
 			}
 		}
 
-		if (input.mouse.x >= 32 && input.mouse.x <= 95)
+		if (mouse.x >= 32 && mouse.x <= 95)
 		{
 			// SAMPLER SCREEN PLAY WAVEFORM
-			if (input.mouse.y >= 211 && input.mouse.y <= 221)
+			if (mouse.y >= 211 && mouse.y <= 221)
 			{
 				samplerPlayWaveform();
 				return;
 			}
 
 			// SAMPLER SCREEN PLAY DISPLAY
-			else if (input.mouse.y >= 222 && input.mouse.y <= 232)
+			else if (mouse.y >= 222 && mouse.y <= 232)
 			{
 				samplerPlayDisplay();
 				return;
 			}
 
 			// SAMPLER SCREEN PLAY RANGE
-			else if (input.mouse.y >= 233 && input.mouse.y <= 243)
+			else if (mouse.y >= 233 && mouse.y <= 243)
 			{
 				samplerPlayRange();
 				return;
@@ -1263,7 +1267,7 @@ void handleSamplerVolumeBox(void)
 		}
 
 		// SAMPLER SCREEN STOP
-		if (input.mouse.x >= 0 && input.mouse.x <= 31 && input.mouse.y >= 222 && input.mouse.y <= 243)
+		if (mouse.x >= 0 && mouse.x <= 31 && mouse.y >= 222 && mouse.y <= 243)
 		{
 			for (i = 0; i < AMIGA_VOICES; i++)
 				mixerKillVoice(i);
@@ -1271,7 +1275,7 @@ void handleSamplerVolumeBox(void)
 		}
 
 		// VOLUME button (toggle)
-		if (input.mouse.x >= 96 && input.mouse.x <= 135 && input.mouse.y >= 244 && input.mouse.y <= 254)
+		if (mouse.x >= 96 && mouse.x <= 135 && mouse.y >= 244 && mouse.y <= 254)
 		{
 			editor.ui.samplerVolBoxShown = false;
 			removeSamplerVolBox();
@@ -1279,16 +1283,16 @@ void handleSamplerVolumeBox(void)
 		}
 
 		// DRAG BOXES
-		if (input.mouse.x >= 72 && input.mouse.x <= 173 && input.mouse.y >= 154 && input.mouse.y <= 175)
+		if (mouse.x >= 72 && mouse.x <= 173 && mouse.y >= 154 && mouse.y <= 175)
 		{
 			volBoxBarPressed(MOUSE_BUTTON_NOT_HELD);
 			return;
 		}
 
-		if (input.mouse.x >= 174 && input.mouse.x <= 207)
+		if (mouse.x >= 174 && mouse.x <= 207)
 		{
 			// FROM NUM
-			if (input.mouse.y >= 154 && input.mouse.y <= 164)
+			if (mouse.y >= 154 && mouse.y <= 164)
 			{
 				editor.ui.tmpDisp16 = editor.vol1;
 				editor.vol1Disp = &editor.ui.tmpDisp16;
@@ -1300,7 +1304,7 @@ void handleSamplerVolumeBox(void)
 			}
 
 			// TO NUM
-			else if (input.mouse.y >= 165 && input.mouse.y <= 175)
+			else if (mouse.y >= 165 && mouse.y <= 175)
 			{
 				editor.ui.tmpDisp16 = editor.vol2;
 				editor.vol2Disp = &editor.ui.tmpDisp16;
@@ -1312,10 +1316,10 @@ void handleSamplerVolumeBox(void)
 			}
 		}
 
-		if (input.mouse.y >= 176 && input.mouse.y <= 186)
+		if (mouse.y >= 176 && mouse.y <= 186)
 		{
 			// NORMALIZE
-			if (input.mouse.x >= 101 && input.mouse.x <= 143)
+			if (mouse.x >= 101 && mouse.x <= 143)
 			{
 				s = &modEntry->samples[editor.currSample];
 				if (s->length == 0)
@@ -1374,7 +1378,7 @@ void handleSamplerVolumeBox(void)
 			}
 
 			// RAMP DOWN
-			else if (input.mouse.x >= 144 && input.mouse.x <= 153)
+			else if (mouse.x >= 144 && mouse.x <= 153)
 			{
 				editor.vol1 = 100;
 				editor.vol2 = 0;
@@ -1386,7 +1390,7 @@ void handleSamplerVolumeBox(void)
 			}
 
 			// RAMP UP
-			else if (input.mouse.x >= 154 && input.mouse.x <= 163)
+			else if (mouse.x >= 154 && mouse.x <= 163)
 			{
 				editor.vol1 = 0;
 				editor.vol2 = 100;
@@ -1398,7 +1402,7 @@ void handleSamplerVolumeBox(void)
 			}
 
 			// RAMP UNITY
-			else if (input.mouse.x >= 164 && input.mouse.x <= 173)
+			else if (mouse.x >= 164 && mouse.x <= 173)
 			{
 				editor.vol1 = 100;
 				editor.vol2 = 100;
@@ -1410,7 +1414,7 @@ void handleSamplerVolumeBox(void)
 			}
 
 			// CANCEL
-			else if (input.mouse.x >= 174 && input.mouse.x <= 207)
+			else if (mouse.x >= 174 && mouse.x <= 207)
 			{
 				editor.ui.samplerVolBoxShown = false;
 				removeSamplerVolBox();
@@ -1418,7 +1422,7 @@ void handleSamplerVolumeBox(void)
 			}
 
 			// RAMP
-			else if (input.mouse.x >= 72 && input.mouse.x <= 100)
+			else if (mouse.x >= 72 && mouse.x <= 100)
 			{
 				s = &modEntry->samples[editor.currSample];
 				if (s->length == 0)
@@ -1478,14 +1482,14 @@ void handleSamplerVolumeBox(void)
 
 static void handleRepeatedSamplerFilterButtons(void)
 {
-	if (!input.mouse.leftButtonPressed || input.mouse.lastSmpFilterButton == -1)
+	if (!mouse.leftButtonPressed || mouse.lastSmpFilterButton == -1)
 		return;
 
-	switch (input.mouse.lastSmpFilterButton)
+	switch (mouse.lastSmpFilterButton)
 	{
 		case 0: // low-pass cutoff up
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.lpCutOff <= 0xFFFF-50)
 					editor.lpCutOff += 50;
@@ -1509,7 +1513,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 
 		case 1: // low-pass cutoff down
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.lpCutOff >= 50)
 					editor.lpCutOff -= 50;
@@ -1530,7 +1534,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 
 		case 2: // high-pass cutoff up
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.hpCutOff <= 0xFFFF-50)
 					editor.hpCutOff += 50;
@@ -1554,7 +1558,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 
 		case 3: // high-pass cutoff down
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.hpCutOff >= 50)
 					editor.hpCutOff -= 50;
@@ -1582,21 +1586,21 @@ void handleSamplerFiltersBox(void)
 	uint8_t i;
 	moduleSample_t *s;
 
-	if (input.mouse.rightButtonPressed && editor.ui.editTextFlag)
+	if (mouse.rightButtonPressed && editor.ui.editTextFlag)
 	{
 		exitGetTextLine(EDIT_TEXT_NO_UPDATE);
 		return;
 	}
 
-	if (editor.ui.editTextFlag || input.mouse.lastSmpFilterButton > -1 || !input.mouse.leftButtonPressed)
+	if (editor.ui.editTextFlag || mouse.lastSmpFilterButton > -1 || !mouse.leftButtonPressed)
 		return;
 
 	// restore sample ask dialog
 	if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_RESTORE_SAMPLE)
 	{
-		if (input.mouse.y >= 71 && input.mouse.y <= 81)
+		if (mouse.y >= 71 && mouse.y <= 81)
 		{
-			if (input.mouse.x >= 171 && input.mouse.x <= 196)
+			if (mouse.x >= 171 && mouse.x <= 196)
 			{
 				// YES button
 				editor.ui.askScreenShown = false;
@@ -1604,7 +1608,7 @@ void handleSamplerFiltersBox(void)
 				editor.ui.answerYes = true;
 				handleAskYes();
 			}
-			else if ((input.mouse.x >= 234) && (input.mouse.x <= 252))
+			else if ((mouse.x >= 234) && (mouse.x <= 252))
 			{
 				// NO button
 				editor.ui.askScreenShown = false;
@@ -1618,7 +1622,7 @@ void handleSamplerFiltersBox(void)
 	}
 
 	// FILTERS button (toggle)
-	if (input.mouse.x >= 211 && input.mouse.x <= 245 && input.mouse.y >= 244 && input.mouse.y <= 254)
+	if (mouse.x >= 211 && mouse.x <= 245 && mouse.y >= 244 && mouse.y <= 254)
 	{
 		editor.ui.samplerFiltersBoxShown = false;
 		removeSamplerFiltersBox();
@@ -1628,31 +1632,31 @@ void handleSamplerFiltersBox(void)
 	// MAIN SCREEN STOP
 	if (!editor.ui.diskOpScreenShown && !editor.ui.posEdScreenShown)
 	{
-		if (input.mouse.x >= 182 && input.mouse.x <= 243 && input.mouse.y >= 0 && input.mouse.y <= 10)
+		if (mouse.x >= 182 && mouse.x <= 243 && mouse.y >= 0 && mouse.y <= 10)
 		{
 			modStop();
 			return;
 		}
 	}
 
-	if (input.mouse.x >= 32 && input.mouse.x <= 95)
+	if (mouse.x >= 32 && mouse.x <= 95)
 	{
 		// SAMPLER SCREEN PLAY WAVEFORM
-		if (input.mouse.y >= 211 && input.mouse.y <= 221)
+		if (mouse.y >= 211 && mouse.y <= 221)
 		{
 			samplerPlayWaveform();
 			return;
 		}
 
 		// SAMPLER SCREEN PLAY DISPLAY
-		else if (input.mouse.y >= 222 && input.mouse.y <= 232)
+		else if (mouse.y >= 222 && mouse.y <= 232)
 		{
 			samplerPlayDisplay();
 			return;
 		}
 
 		// SAMPLER SCREEN PLAY RANGE
-		else if (input.mouse.y >= 233 && input.mouse.y <= 243)
+		else if (mouse.y >= 233 && mouse.y <= 243)
 		{
 			samplerPlayRange();
 			return;
@@ -1660,7 +1664,7 @@ void handleSamplerFiltersBox(void)
 	}
 
 	// SAMPLER SCREEN STOP
-	if (input.mouse.x >= 0 && input.mouse.x <= 31 && input.mouse.y >= 222 && input.mouse.y <= 243)
+	if (mouse.x >= 0 && mouse.x <= 31 && mouse.y >= 222 && mouse.y <= 243)
 	{
 		for (i = 0; i < AMIGA_VOICES; i++)
 			mixerKillVoice(i);
@@ -1668,7 +1672,7 @@ void handleSamplerFiltersBox(void)
 	}
 
 	// UNDO
-	if (input.mouse.x >= 65 && input.mouse.x <= 75 && input.mouse.y >= 154 && input.mouse.y <= 184)
+	if (mouse.x >= 65 && mouse.x <= 75 && mouse.y >= 154 && mouse.y <= 184)
 	{
 		s = &modEntry->samples[editor.currSample];
 		if (s->length == 0)
@@ -1686,10 +1690,10 @@ void handleSamplerFiltersBox(void)
 		return;
 	}
 
-	if (input.mouse.y >= 154 && input.mouse.y <= 164)
+	if (mouse.y >= 154 && mouse.y <= 164)
 	{
 		// DO LOW-PASS FILTER
-		if (input.mouse.x >= 76 && input.mouse.x <= 165)
+		if (mouse.x >= 76 && mouse.x <= 165)
 		{
 			lowPassSample(editor.lpCutOff);
 			renderSamplerFiltersBox();
@@ -1697,9 +1701,9 @@ void handleSamplerFiltersBox(void)
 		}
 
 		// LOW-PASS CUTOFF
-		else if (input.mouse.x >= 166 && input.mouse.x <= 217)
+		else if (mouse.x >= 166 && mouse.x <= 217)
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.lpCutOff = 0;
 				editor.ui.updateLPText = true;
@@ -1718,10 +1722,10 @@ void handleSamplerFiltersBox(void)
 		}
 
 		// LOW-PASS CUTOFF UP
-		else if (input.mouse.x >= 218 && input.mouse.x <= 228)
+		else if (mouse.x >= 218 && mouse.x <= 228)
 		{
-			input.mouse.lastSmpFilterButton = 0;
-			if (input.mouse.rightButtonPressed)
+			mouse.lastSmpFilterButton = 0;
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.lpCutOff <= 0xFFFF-100)
 					editor.lpCutOff += 100;
@@ -1744,10 +1748,10 @@ void handleSamplerFiltersBox(void)
 		}
 
 		// LOW-PASS CUTOFF DOWN
-		else if (input.mouse.x >= 229 && input.mouse.x <= 239)
+		else if (mouse.x >= 229 && mouse.x <= 239)
 		{
-			input.mouse.lastSmpFilterButton = 1;
-			if (input.mouse.rightButtonPressed)
+			mouse.lastSmpFilterButton = 1;
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.lpCutOff >= 100)
 					editor.lpCutOff -= 100;
@@ -1767,10 +1771,10 @@ void handleSamplerFiltersBox(void)
 		}
 	}
 
-	if (input.mouse.y >= 164 && input.mouse.y <= 174)
+	if (mouse.y >= 164 && mouse.y <= 174)
 	{
 		// DO HIGH-PASS FILTER
-		if (input.mouse.x >= 76 && input.mouse.x <= 165)
+		if (mouse.x >= 76 && mouse.x <= 165)
 		{
 			highPassSample(editor.hpCutOff);
 			renderSamplerFiltersBox();
@@ -1778,9 +1782,9 @@ void handleSamplerFiltersBox(void)
 		}
 
 		// HIGH-PASS CUTOFF
-		else if (input.mouse.x >= 166 && input.mouse.x <= 217)
+		else if (mouse.x >= 166 && mouse.x <= 217)
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.hpCutOff = 0;
 				editor.ui.updateHPText = true;
@@ -1799,10 +1803,10 @@ void handleSamplerFiltersBox(void)
 		}
 
 		// HIGH-PASS CUTOFF UP
-		else if (input.mouse.x >= 218 && input.mouse.x <= 228)
+		else if (mouse.x >= 218 && mouse.x <= 228)
 		{
-			input.mouse.lastSmpFilterButton = 2;
-			if (input.mouse.rightButtonPressed)
+			mouse.lastSmpFilterButton = 2;
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.hpCutOff <= 0xFFFF-100)
 					editor.hpCutOff += 100;
@@ -1825,10 +1829,10 @@ void handleSamplerFiltersBox(void)
 		}
 
 		// HIGH-PASS CUTOFF DOWN
-		else if (input.mouse.x >= 229 && input.mouse.x <= 239)
+		else if (mouse.x >= 229 && mouse.x <= 239)
 		{
-			input.mouse.lastSmpFilterButton = 3;
-			if (input.mouse.rightButtonPressed)
+			mouse.lastSmpFilterButton = 3;
+			if (mouse.rightButtonPressed)
 			{
 				if (editor.hpCutOff >= 100)
 					editor.hpCutOff -= 100;
@@ -1849,7 +1853,7 @@ void handleSamplerFiltersBox(void)
 	}
 
 	// NORMALIZE SAMPLE FLAG
-	if (input.mouse.x >= 76 && input.mouse.x <= 239 && input.mouse.y >= 174 && input.mouse.y <= 186)
+	if (mouse.x >= 76 && mouse.x <= 239 && mouse.y >= 174 && mouse.y <= 186)
 	{
 		editor.normalizeFiltersFlag ^= 1;
 		editor.ui.updateNormFlag = true;
@@ -1857,7 +1861,7 @@ void handleSamplerFiltersBox(void)
 	}
 
 	// EXIT
-	if (input.mouse.x >= 240 && input.mouse.x <= 250 && input.mouse.y >= 154 && input.mouse.y <= 186)
+	if (mouse.x >= 240 && mouse.x <= 250 && mouse.y >= 154 && mouse.y <= 186)
 	{
 		editor.ui.samplerFiltersBoxShown = false;
 		removeSamplerFiltersBox();
@@ -1866,7 +1870,7 @@ void handleSamplerFiltersBox(void)
 
 static bool withinButtonRect(const guiButton_t *b)
 {
-	if (input.mouse.x >= b->x1 && input.mouse.x <= b->x2 && input.mouse.y >= b->y1 && input.mouse.y <= b->y2)
+	if (mouse.x >= b->x1 && mouse.x <= b->x2 && mouse.y >= b->y1 && mouse.y <= b->y2)
 		return true;
 
 	return false;
@@ -1900,7 +1904,7 @@ int32_t checkGUIButtons(void)
 	}
 
 	// QUIT (xy 0,0) works on all screens except for ask/clear screen
-	if (input.mouse.x == 0 && input.mouse.y == 0)
+	if (mouse.x == 0 && mouse.y == 0)
 		return PTB_QUIT;
 
 	// top screen buttons
@@ -1960,10 +1964,10 @@ void handleTextEditing(uint8_t mouseButton)
 		}
 		else if (mouseButton == SDL_BUTTON_LEFT && !editor.mixFlag)
 		{
-			tmp16 = input.mouse.y - editor.ui.lineCurY;
+			tmp16 = mouse.y - editor.ui.lineCurY;
 			if (tmp16 <= 2 && tmp16 >= -9)
 			{
-				tmp16 = (uint16_t)((input.mouse.x - editor.ui.lineCurX) + 4) >> 3;
+				tmp16 = (uint16_t)((mouse.x - editor.ui.lineCurX) + 4) >> 3;
 				while (tmp16 != 0) // 0 = pos we want
 				{
 					if (tmp16 > 0)
@@ -2038,7 +2042,7 @@ void mouseWheelUpHandler(void)
 	if (editor.ui.editTextFlag || editor.ui.askScreenShown || editor.ui.clearScreenShown || editor.swapChannelFlag)
 		return;
 
-	if (input.mouse.y < 121)
+	if (mouse.y < 121)
 	{
 		// upper part of screen
 		if (editor.ui.diskOpScreenShown)
@@ -2069,7 +2073,7 @@ void mouseWheelDownHandler(void)
 	if (editor.ui.editTextFlag || editor.ui.askScreenShown || editor.ui.clearScreenShown || editor.swapChannelFlag)
 		return;
 
-	if (input.mouse.y < 121)
+	if (mouse.y < 121)
 	{
 		// upper part of screen
 		if (editor.ui.diskOpScreenShown)
@@ -2097,7 +2101,7 @@ void mouseWheelDownHandler(void)
 
 bool handleRightMouseButton(void)
 {
-	if (!input.mouse.rightButtonPressed)
+	if (!mouse.rightButtonPressed)
 		return false;
 
 	// exit sample swap mode with right mouse button (if present)
@@ -2136,23 +2140,23 @@ bool handleRightMouseButton(void)
 	}
 
 	// toggle channel muting with right mouse button
-	if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE && input.mouse.y >= 55 && input.mouse.y <= 87)
+	if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE && mouse.y >= 55 && mouse.y <= 87)
 	{
 		if (!editor.ui.posEdScreenShown && !editor.ui.editOpScreenShown && !editor.ui.diskOpScreenShown &&
 			!editor.ui.aboutScreenShown && !editor.ui.samplerVolBoxShown &&
 			!editor.ui.samplerFiltersBoxShown && !editor.isWAVRendering)
 		{
-			     if (input.mouse.x > 127 && input.mouse.x <= 167) editor.muted[0] ^= 1;
-			else if (input.mouse.x > 175 && input.mouse.x <= 215) editor.muted[1] ^= 1;
-			else if (input.mouse.x > 223 && input.mouse.x <= 263) editor.muted[2] ^= 1;
-			else if (input.mouse.x > 271 && input.mouse.x <= 311) editor.muted[3] ^= 1;
+			     if (mouse.x > 127 && mouse.x <= 167) editor.muted[0] ^= 1;
+			else if (mouse.x > 175 && mouse.x <= 215) editor.muted[1] ^= 1;
+			else if (mouse.x > 223 && mouse.x <= 263) editor.muted[2] ^= 1;
+			else if (mouse.x > 271 && mouse.x <= 311) editor.muted[3] ^= 1;
 
 			renderMuteButtons();
 		}
 	}
 
 	// sample hand drawing
-	if (input.mouse.y >= 138 && input.mouse.y <= 201 && editor.ui.samplerScreenShown &&
+	if (mouse.y >= 138 && mouse.y <= 201 && editor.ui.samplerScreenShown &&
 		!editor.ui.samplerVolBoxShown && !editor.ui.samplerFiltersBoxShown)
 	{
 		samplerEditSample(false);
@@ -2185,9 +2189,9 @@ bool handleLeftMouseButton(void)
 	// "downsample before loading sample" ask dialog
 	if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_LOAD_DOWNSAMPLE)
 	{
-		if (input.mouse.y >= 83 && input.mouse.y <= 93)
+		if (mouse.y >= 83 && mouse.y <= 93)
 		{
-			if (input.mouse.x >= 179 && input.mouse.x <= 204)
+			if (mouse.x >= 179 && mouse.x <= 204)
 			{
 				// YES button
 				editor.ui.askScreenShown = false;
@@ -2196,7 +2200,7 @@ bool handleLeftMouseButton(void)
 				handleAskYes();
 				return true;
 			}
-			else if (input.mouse.x >= 242 && input.mouse.x <= 260)
+			else if (mouse.x >= 242 && mouse.x <= 260)
 			{
 				// NO button
 				editor.ui.askScreenShown = false;
@@ -2213,7 +2217,7 @@ bool handleLeftMouseButton(void)
 	// cancel note input gadgets with left/right mouse button
 	if (editor.ui.changingSmpResample || editor.ui.changingChordNote || editor.ui.changingDrumPadNote)
 	{
-		if (input.mouse.leftButtonPressed || input.mouse.rightButtonPressed)
+		if (mouse.leftButtonPressed || mouse.rightButtonPressed)
 		{
 			editor.ui.changingSmpResample = false;
 			editor.ui.changingChordNote = false;
@@ -2232,7 +2236,7 @@ bool handleLeftMouseButton(void)
 		return true;
 	}
 
-	if (!input.mouse.leftButtonPressed)
+	if (!mouse.leftButtonPressed)
 		return false;
 
 	// handle QUIT ask dialog while Disk Op. filling is ongoing
@@ -2240,9 +2244,9 @@ bool handleLeftMouseButton(void)
 	{
 		if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_QUIT)
 		{
-			if (input.mouse.y >= 71 && input.mouse.y <= 81)
+			if (mouse.y >= 71 && mouse.y <= 81)
 			{
-				if (input.mouse.x >= 171 && input.mouse.x <= 196)
+				if (mouse.x >= 171 && mouse.x <= 196)
 				{
 					// YES button
 					editor.ui.askScreenShown = false;
@@ -2250,7 +2254,7 @@ bool handleLeftMouseButton(void)
 					editor.ui.answerYes = true;
 					handleAskYes();
 				}
-				else if (input.mouse.x >= 234 && input.mouse.x <= 252)
+				else if (mouse.x >= 234 && mouse.x <= 252)
 				{
 					// NO button
 					editor.ui.askScreenShown = false;
@@ -2269,7 +2273,7 @@ bool handleLeftMouseButton(void)
 	{
 		if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_QUIT)
 		{
-			if (input.mouse.x >= 171 && input.mouse.x <= 196)
+			if (mouse.x >= 171 && mouse.x <= 196)
 			{
 				// YES button
 				editor.isWAVRendering = false;
@@ -2280,7 +2284,7 @@ bool handleLeftMouseButton(void)
 				editor.ui.answerYes = true;
 				handleAskYes();
 			}
-			else if (input.mouse.x >= 234 && input.mouse.x <= 252)
+			else if (mouse.x >= 234 && mouse.x <= 252)
 			{
 				// NO button
 				editor.ui.askScreenShown = false;
@@ -2292,7 +2296,7 @@ bool handleLeftMouseButton(void)
 				setStatusMessage("RENDERING MOD...", NO_CARRY);
 			}
 		}
-		else if (input.mouse.y >= 58 && input.mouse.y <= 68 && input.mouse.x >= 133 && input.mouse.x <= 186)
+		else if (mouse.y >= 58 && mouse.y <= 68 && mouse.x >= 133 && mouse.x <= 186)
 		{
 			// CANCEL button
 			editor.abortMod2Wav = true;
@@ -2310,12 +2314,12 @@ bool handleLeftMouseButton(void)
 
 void updateMouseCounters(void)
 {
-	if (input.mouse.buttonWaiting)
+	if (mouse.buttonWaiting)
 	{
-		if (++input.mouse.buttonWaitCounter > VBLANK_HZ/4) // quarter of a second
+		if (++mouse.buttonWaitCounter > VBLANK_HZ/4) // quarter of a second
 		{
-			input.mouse.buttonWaitCounter = 0;
-			input.mouse.buttonWaiting = false;
+			mouse.buttonWaitCounter = 0;
+			mouse.buttonWaiting = false;
 		}
 	}
 
@@ -2465,7 +2469,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_QUANTIZE:
 		{
-			editor.ui.tmpDisp16 = ptConfig.quantizeValue;
+			editor.ui.tmpDisp16 = config.quantizeValue;
 			editor.quantizeValueDisp = &editor.ui.tmpDisp16;
 			editor.ui.numPtr16 = &editor.ui.tmpDisp16;
 			editor.ui.numLen = 2;
@@ -2573,7 +2577,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_MIX:
 		{
-			if (!input.mouse.rightButtonPressed)
+			if (!mouse.rightButtonPressed)
 			{
 				editor.mixFlag = true;
 				editor.ui.showTextPtr = editor.mixText;
@@ -2729,7 +2733,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_POS_NUM:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.samplePos = 0;
 				editor.ui.updatePosText = true;
@@ -2786,7 +2790,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_MOD_NUM:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.modulateSpeed = 0;
 				editor.ui.updateModText = true;
@@ -3089,7 +3093,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_VOL_NUM:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.sampleVol = 100;
 				editor.ui.updateVolText = true;
@@ -3212,7 +3216,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_NOTE1:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.note1 = 36;
 			}
@@ -3231,7 +3235,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_NOTE2:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.note2 = 36;
 			}
@@ -3250,7 +3254,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_NOTE3:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.note3 = 36;
 			}
@@ -3269,7 +3273,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_NOTE4:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.note4 = 36;
 			}
@@ -3440,7 +3444,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (modEntry->samples[editor.currSample].loopLength == 2 && modEntry->samples[editor.currSample].loopStart == 0)
 			{
-				editor.chordLengthMin = input.mouse.rightButtonPressed ? true : false;
+				editor.chordLengthMin = mouse.rightButtonPressed ? true : false;
 				recalcChordLength();
 			}
 		}
@@ -3563,7 +3567,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 			{
-				if (input.mouse.rightButtonPressed)
+				if (mouse.rightButtonPressed)
 				{
 					modEntry->currOrder = 0;
 					editor.currPatternDisp = &modEntry->head.order[modEntry->currOrder];
@@ -3588,7 +3592,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 			{
-				if (input.mouse.rightButtonPressed)
+				if (mouse.rightButtonPressed)
 				{
 					modEntry->head.order[modEntry->currOrder] = 0;
 
@@ -3615,7 +3619,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 			{
-				if (input.mouse.rightButtonPressed)
+				if (mouse.rightButtonPressed)
 				{
 					modEntry->head.orderCount = 1;
 
@@ -3674,7 +3678,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SVOLUMES:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				modEntry->samples[editor.currSample].volume = 0;
 			}
@@ -3693,7 +3697,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SLENGTHS:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				s = &modEntry->samples[editor.currSample];
 
@@ -3730,7 +3734,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SREPEATS:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				s = &modEntry->samples[editor.currSample];
 
@@ -3770,7 +3774,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SREPLENS:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				s = &modEntry->samples[editor.currSample];
 
@@ -3813,12 +3817,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EDITOP:
 		{
-			if (editor.ui.editOpScreen == 3) // chord screen
-				editor.ui.editOpScreen = 0;
-			else if (editor.ui.editOpScreenShown)
-				editor.ui.editOpScreen = (editor.ui.editOpScreen + 1) % 3;
+			if (editor.ui.editOpScreenShown)
+			{
+				if (editor.ui.editOpScreen == 3)
+					editor.ui.editOpScreen = 0;
+				else
+					editor.ui.editOpScreen = (editor.ui.editOpScreen + 1) % 3;
+			}
 			else
+			{
 				editor.ui.editOpScreenShown = true;
+			}
 
 			renderEditOpScreen();
 		}
@@ -3927,7 +3936,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SA_ZOOMBARAREA:
 		{
-			input.mouse.lastGUIButton = button;
+			mouse.lastGUIButton = button;
 			if (!editor.ui.forceSampleDrag)
 			{
 				samplerBarPressed(MOUSE_BUTTON_NOT_HELD);
@@ -4083,7 +4092,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_DO_DATAPATH:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				memset(editor.currPath, 0, PATH_MAX + 1);
 				editor.ui.updateDiskOpPathText = true;
@@ -4101,7 +4110,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SONGNAME:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				memset(modEntry->head.moduleTitle, 0, sizeof (modEntry->head.moduleTitle));
 				editor.ui.updateSongName = true;
@@ -4122,7 +4131,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SAMPLENAME:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				memset(modEntry->samples[editor.currSample].text, 0, sizeof (modEntry->samples[editor.currSample].text));
 				editor.ui.updateCurrSampleName = true;
@@ -4186,7 +4195,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				editor.ui.aboutScreenShown = false;
 			}
-			else if (!input.mouse.rightButtonPressed)
+			else if (!mouse.rightButtonPressed)
 			{
 				editor.ui.visualizerMode = (editor.ui.visualizerMode + 1) % 2;
 				if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
@@ -4212,7 +4221,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CHAN1:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.muted[0] = false;
 				editor.muted[1] = true;
@@ -4230,7 +4239,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CHAN2:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.muted[0] = true;
 				editor.muted[1] = false;
@@ -4248,7 +4257,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CHAN3:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.muted[0] = true;
 				editor.muted[1] = true;
@@ -4266,7 +4275,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CHAN4:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.muted[0] = true;
 				editor.muted[1] = true;
@@ -4285,7 +4294,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_SAMPLER: samplerScreen(); break;
 		case PTB_SA_EXIT: exitFromSam();   break;
 
-		case PTB_DO_FILEAREA: diskOpLoadFile((input.mouse.y - 34) / 6, true); break;
+		case PTB_DO_FILEAREA: diskOpLoadFile((mouse.y - 34) / 6, true); break;
 		case PTB_DO_PARENT:
 		{
 #ifdef _WIN32
@@ -4366,7 +4375,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			editor.playMode = PLAY_MODE_NORMAL;
 
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 				modPlay(DONT_SET_PATTERN, modEntry->currOrder, modEntry->currRow);
 			else
 				modPlay(DONT_SET_PATTERN, modEntry->currOrder, DONT_SET_ROW);
@@ -4381,7 +4390,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			editor.playMode = PLAY_MODE_PATTERN;
 
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 				modPlay(modEntry->currPattern, DONT_SET_ORDER, modEntry->currRow);
 			else
 				modPlay(modEntry->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
@@ -4411,7 +4420,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				editor.playMode = PLAY_MODE_PATTERN;
 
-				if (input.mouse.rightButtonPressed)
+				if (mouse.rightButtonPressed)
 					modPlay(modEntry->currPattern, DONT_SET_ORDER, modEntry->currRow);
 				else
 					modPlay(modEntry->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
@@ -4486,7 +4495,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SAMPLEU:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.sampleZero = true;
 				editor.ui.updateCurrSampleNum = true;
@@ -4500,7 +4509,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SAMPLED:
 		{
-			if (input.mouse.rightButtonPressed)
+			if (mouse.rightButtonPressed)
 			{
 				editor.sampleZero = true;
 				editor.ui.updateCurrSampleNum = true;
@@ -4658,20 +4667,20 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		default: displayErrorMsg("NOT IMPLEMENTED"); return false; // button not mapped
 	}
 
-	input.mouse.lastGUIButton = button;
+	mouse.lastGUIButton = button;
 	return false;
 }
 
 static void handleRepeatedGUIButtons(void)
 {
 	// repeat button
-	switch (input.mouse.lastGUIButton)
+	switch (mouse.lastGUIButton)
 	{
 		case PTB_EO_NOTE1_UP:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote1UpButton();
 			}
 		}
@@ -4679,9 +4688,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE1_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote1DownButton();
 			}
 		}
@@ -4689,9 +4698,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE2_UP:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote2UpButton();
 			}
 		}
@@ -4699,9 +4708,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE2_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote2DownButton();
 			}
 		}
@@ -4709,9 +4718,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE3_UP:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote3UpButton();
 			}
 		}
@@ -4719,9 +4728,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE3_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote3DownButton();
 			}
 		}
@@ -4729,9 +4738,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE4_UP:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote4UpButton();
 			}
 		}
@@ -4739,9 +4748,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_NOTE4_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edNote4DownButton();
 			}
 		}
@@ -4749,9 +4758,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_VOL_UP:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edVolUpButton();
 			}
 		}
@@ -4759,9 +4768,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_VOL_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edVolDownButton();
 			}
 		}
@@ -4769,9 +4778,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_MOD_UP:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edModUpButton();
 			}
 		}
@@ -4779,9 +4788,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_MOD_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edModDownButton();
 			}
 		}
@@ -4789,9 +4798,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_POS_UP:
 		{
-			if (input.mouse.repeatCounter >= 1)
+			if (mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edPosUpButton(INCREMENT_FAST);
 			}
 		}
@@ -4799,9 +4808,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_POS_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 1)
+			if (mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				edPosDownButton(INCREMENT_FAST);
 			}
 		}
@@ -4809,9 +4818,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_FROM_UP:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (editor.sampleFrom < 0x1F)
 				{
 					editor.sampleFrom++;
@@ -4823,9 +4832,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_FROM_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (editor.sampleFrom > 0x00)
 				{
 					editor.sampleFrom--;
@@ -4837,9 +4846,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_TO_UP:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (editor.sampleTo < 0x1F)
 				{
 					editor.sampleTo++;
@@ -4851,9 +4860,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_EO_TO_DOWN:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (editor.sampleTo > 0x00)
 				{
 					editor.sampleTo--;
@@ -4865,10 +4874,10 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SAMPLEU:
 		{
-			if (input.mouse.repeatCounter >= 5)
+			if (mouse.repeatCounter >= 5)
 			{
-				input.mouse.repeatCounter = 0;
-				if (!input.mouse.rightButtonPressed)
+				mouse.repeatCounter = 0;
+				if (!mouse.rightButtonPressed)
 					sampleUpButton();
 				else
 					editor.ui.updateCurrSampleNum = true;
@@ -4878,10 +4887,10 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SAMPLED:
 		{
-			if (input.mouse.repeatCounter >= 5)
+			if (mouse.repeatCounter >= 5)
 			{
-				input.mouse.repeatCounter = 0;
-				if (!input.mouse.rightButtonPressed)
+				mouse.repeatCounter = 0;
+				if (!mouse.rightButtonPressed)
 					sampleDownButton();
 				else
 					editor.ui.updateCurrSampleNum = true;
@@ -4891,9 +4900,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_FTUNEU:
 		{
-			if (input.mouse.repeatCounter >= 5)
+			if (mouse.repeatCounter >= 5)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleFineTuneUpButton();
 			}
 		}
@@ -4901,9 +4910,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_FTUNED:
 		{
-			if (input.mouse.repeatCounter >= 5)
+			if (mouse.repeatCounter >= 5)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleFineTuneDownButton();
 			}
 		}
@@ -4911,9 +4920,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SVOLUMEU:
 		{
-			if (input.mouse.repeatCounter >= 5)
+			if (mouse.repeatCounter >= 5)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleVolumeUpButton();
 			}
 		}
@@ -4921,9 +4930,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SVOLUMED:
 		{
-			if (input.mouse.repeatCounter >= 5)
+			if (mouse.repeatCounter >= 5)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleVolumeDownButton();
 			}
 		}
@@ -4931,9 +4940,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SLENGTHU:
 		{
-			if (input.mouse.rightButtonPressed || input.mouse.repeatCounter >= 1)
+			if (mouse.rightButtonPressed || mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleLengthUpButton(INCREMENT_FAST);
 			}
 		}
@@ -4941,9 +4950,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SLENGTHD:
 		{
-			if (input.mouse.rightButtonPressed || input.mouse.repeatCounter >= 1)
+			if (mouse.rightButtonPressed || mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleLengthDownButton(INCREMENT_FAST);
 			}
 		}
@@ -4951,9 +4960,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SREPEATU:
 		{
-			if (input.mouse.rightButtonPressed || input.mouse.repeatCounter >= 1)
+			if (mouse.rightButtonPressed || mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleRepeatUpButton(INCREMENT_FAST);
 			}
 		}
@@ -4961,9 +4970,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SREPEATD:
 		{
-			if (input.mouse.rightButtonPressed || input.mouse.repeatCounter >= 1)
+			if (mouse.rightButtonPressed || mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleRepeatDownButton(INCREMENT_FAST);
 			}
 		}
@@ -4971,9 +4980,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SREPLENU:
 		{
-			if (input.mouse.rightButtonPressed || input.mouse.repeatCounter >= 1)
+			if (mouse.rightButtonPressed || mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleRepeatLengthUpButton(INCREMENT_FAST);
 			}
 		}
@@ -4981,9 +4990,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SREPLEND:
 		{
-			if (input.mouse.rightButtonPressed || input.mouse.repeatCounter >= 1)
+			if (mouse.rightButtonPressed || mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				sampleRepeatLengthDownButton(INCREMENT_FAST);
 			}
 		}
@@ -4991,9 +5000,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_TEMPOU:
 		{
-			if (input.mouse.repeatCounter >= 3)
+			if (mouse.repeatCounter >= 3)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				tempoUpButton();
 			}
 		}
@@ -5001,9 +5010,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_TEMPOD:
 		{
-			if (input.mouse.repeatCounter >= 3)
+			if (mouse.repeatCounter >= 3)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				tempoDownButton();
 			}
 		}
@@ -5011,9 +5020,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_LENGTHU:
 		{
-			if (input.mouse.repeatCounter >= 7)
+			if (mouse.repeatCounter >= 7)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				songLengthUpButton();
 			}
 		}
@@ -5021,9 +5030,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_LENGTHD:
 		{
-			if (input.mouse.repeatCounter >= 7)
+			if (mouse.repeatCounter >= 7)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				songLengthDownButton();
 			}
 		}
@@ -5031,9 +5040,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_PATTERNU:
 		{
-			if (input.mouse.repeatCounter >= 7)
+			if (mouse.repeatCounter >= 7)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				patternUpButton();
 			}
 		}
@@ -5041,9 +5050,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_PATTERND:
 		{
-			if (input.mouse.repeatCounter >= 7)
+			if (mouse.repeatCounter >= 7)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				patternDownButton();
 			}
 		}
@@ -5051,9 +5060,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_POSU:
 		{
-			if (input.mouse.repeatCounter >= 7)
+			if (mouse.repeatCounter >= 7)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				positionUpButton();
 			}
 		}
@@ -5061,9 +5070,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_POSD:
 		{
-			if (input.mouse.repeatCounter >= 7)
+			if (mouse.repeatCounter >= 7)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				positionDownButton();
 			}
 		}
@@ -5071,9 +5080,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_PE_SCROLLUP:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (modEntry->currOrder > 0)
 					modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
 			}
@@ -5082,9 +5091,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_PE_SCROLLDOWN:
 		{
-			if (input.mouse.repeatCounter >= 2)
+			if (mouse.repeatCounter >= 2)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (modEntry->currOrder < modEntry->head.orderCount-1)
 					modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
 			}
@@ -5093,12 +5102,12 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_DO_SCROLLUP:
 		{
-			if (input.mouse.repeatCounter >= 1)
+			if (mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 
 				editor.diskop.scrollOffset--;
-				if (input.mouse.rightButtonPressed)
+				if (mouse.rightButtonPressed)
 					editor.diskop.scrollOffset -= 3;
 
 				if (editor.diskop.scrollOffset < 0)
@@ -5111,14 +5120,14 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_DO_SCROLLDOWN:
 		{
-			if (input.mouse.repeatCounter >= 1)
+			if (mouse.repeatCounter >= 1)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 
 				if (editor.diskop.numEntries > DISKOP_LINES)
 				{
 					editor.diskop.scrollOffset++;
-					if (input.mouse.rightButtonPressed)
+					if (mouse.rightButtonPressed)
 						editor.diskop.scrollOffset += 3;
 
 					if (editor.diskop.scrollOffset > editor.diskop.numEntries-DISKOP_LINES)
@@ -5132,9 +5141,9 @@ static void handleRepeatedGUIButtons(void)
 
 		case PTB_SA_ZOOMBARAREA:
 		{
-			if (input.mouse.repeatCounter >= 4)
+			if (mouse.repeatCounter >= 4)
 			{
-				input.mouse.repeatCounter = 0;
+				mouse.repeatCounter = 0;
 				if (!editor.ui.forceSampleDrag)
 					samplerBarPressed(MOUSE_BUTTON_NOT_HELD);
 			}

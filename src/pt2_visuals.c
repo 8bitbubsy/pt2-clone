@@ -40,23 +40,15 @@ typedef struct sprite_t
 {
 	bool visible;
 	int8_t pixelType;
-	uint16_t newX, newY, x, y, w, h;
+	int16_t newX, newY, x, y, w, h;
 	uint32_t colorKey, *refreshBuffer;
 	const void *data;
 } sprite_t;
 
 static uint32_t vuMetersBg[4 * (10 * 48)];
-static uint64_t timeNext64, timeNext64Frac, _50HzCounter;
+static uint64_t timeNext64, timeNext64Frac;
 
 sprite_t sprites[SPRITE_NUM]; // globalized
-
-extern bool forceMixerOff; // pt_audio.c
-
-// pt_main.c
-extern uint32_t *pixelBuffer;
-extern SDL_Window *window;
-extern SDL_Renderer *renderer;
-extern SDL_Texture *texture;
 
 static const uint16_t cursorPosTable[24] =
 {
@@ -98,7 +90,7 @@ void setupPerfFreq(void)
 	dFrac = modf(editor.dPerfFreq / VBLANK_HZ, &dInt);
 
 	// integer part
-	editor.vblankTimeLen = (uint32_t)dInt;
+	editor.vblankTimeLen = (int32_t)dInt;
 
 	// fractional part scaled to 0..2^32-1
 	dFrac *= UINT32_MAX;
@@ -156,7 +148,7 @@ void renderFrame(void)
 	updateSampler();
 	updatePosEd();
 	updateVisualizer();
-	updateDragBars();
+	handleLastGUIObjectDown();
 	drawSamplerLine();
 }
 
@@ -203,7 +195,7 @@ void renderAskDialog(void)
 	// render ask dialog
 
 	srcPtr = editor.ui.pat2SmpDialogShown ? pat2SmpDialogBMP : yesNoDialogBMP;
-	dstPtr = &pixelBuffer[(51 * SCREEN_W) + 160];
+	dstPtr = &video.frameBuffer[(51 * SCREEN_W) + 160];
 
 	for (uint32_t y = 0; y < 39; y++)
 	{
@@ -225,7 +217,7 @@ void renderBigAskDialog(void)
 	// render custom big ask dialog
 
 	srcPtr = bigYesNoDialogBMP;
-	dstPtr = &pixelBuffer[(44 * SCREEN_W) + 120];
+	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
 
 	for (uint32_t y = 0; y < 55; y++)
 	{
@@ -244,10 +236,10 @@ void showDownsampleAskDialog(void)
 	setStatusMessage("PLEASE SELECT", NO_CARRY);
 	renderBigAskDialog();
 
-	textOutTight(pixelBuffer, 133, 49, "THE SAMPLE'S FREQUENCY IS", palette[PAL_BACKGRD]);
-	textOutTight(pixelBuffer, 178, 57, "ABOVE 22KHZ.", palette[PAL_BACKGRD]);
-	textOutTight(pixelBuffer, 133, 65, "DO YOU WANT TO DOWNSAMPLE", palette[PAL_BACKGRD]);
-	textOutTight(pixelBuffer, 156, 73, "BEFORE LOADING IT?", palette[PAL_BACKGRD]);
+	textOutTight(133, 49, "THE SAMPLE'S FREQUENCY IS", video.palette[PAL_BACKGRD]);
+	textOutTight(178, 57, "ABOVE 22KHZ.", video.palette[PAL_BACKGRD]);
+	textOutTight(133, 65, "DO YOU WANT TO DOWNSAMPLE", video.palette[PAL_BACKGRD]);
+	textOutTight(156, 73, "BEFORE LOADING IT?", video.palette[PAL_BACKGRD]);
 }
 
 static void fillFromVuMetersBgBuffer(void)
@@ -259,7 +251,7 @@ static void fillFromVuMetersBgBuffer(void)
 		return;
 
 	srcPtr = vuMetersBg;
-	dstPtr = &pixelBuffer[(187 * SCREEN_W) + 55];
+	dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
 
 	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
 	{
@@ -284,7 +276,7 @@ void fillToVuMetersBgBuffer(void)
 	if (editor.ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
 		return;
 
-	srcPtr = &pixelBuffer[(187 * SCREEN_W) + 55];
+	srcPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
 	dstPtr = vuMetersBg;
 
 	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
@@ -312,10 +304,10 @@ void renderVuMeters(void)
 
 	fillToVuMetersBgBuffer();
 	
-	dstPtr = &pixelBuffer[(187 * SCREEN_W) + 55];
+	dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
 	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
 	{
-		if (ptConfig.realVuMeters)
+		if (config.realVuMeters)
 			h = editor.realVuMeterVolumes[i];
 		else
 			h = editor.vuMeterVolumes[i];
@@ -349,20 +341,20 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	if (editor.ui.updateSongPos)
 	{
 		editor.ui.updateSongPos = false;
-		printThreeDecimalsBg(pixelBuffer, 72, 3, *editor.currPosDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printThreeDecimalsBg(72, 3, *editor.currPosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateSongPattern)
 	{
 		editor.ui.updateSongPattern = false;
-		printTwoDecimalsBg(pixelBuffer, 80, 14, *editor.currPatternDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printTwoDecimalsBg(80, 14, *editor.currPatternDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateSongLength)
 	{
 		editor.ui.updateSongLength = false;
 		if (!editor.isWAVRendering)
-			printThreeDecimalsBg(pixelBuffer, 72, 25, *editor.currLengthDisp,palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printThreeDecimalsBg(72, 25, *editor.currLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateCurrSampleFineTune)
@@ -373,18 +365,18 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 		{
 			if (currSample->fineTune >= 8)
 			{
-				charOutBg(pixelBuffer, 80, 36, '-', palette[PAL_GENTXT], palette[PAL_GENBKG]);
-				charOutBg(pixelBuffer, 88, 36, '0' + (0x10 - (currSample->fineTune & 0xF)), palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				charOutBg(80, 36, '-', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+				charOutBg(88, 36, '0' + (0x10 - (currSample->fineTune & 0xF)), video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			}
 			else if (currSample->fineTune > 0)
 			{
-				charOutBg(pixelBuffer, 80, 36, '+', palette[PAL_GENTXT], palette[PAL_GENBKG]);
-				charOutBg(pixelBuffer, 88, 36, '0' + (currSample->fineTune & 0xF), palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				charOutBg(80, 36, '+', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+				charOutBg(88, 36, '0' + (currSample->fineTune & 0xF), video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			}
 			else
 			{
-				charOutBg(pixelBuffer, 80, 36, ' ', palette[PAL_GENBKG], palette[PAL_GENBKG]);
-				charOutBg(pixelBuffer, 88, 36, '0', palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				charOutBg(80, 36, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
+				charOutBg(88, 36, '0', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			}
 		}
 	}
@@ -394,8 +386,8 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 		editor.ui.updateCurrSampleNum = false;
 		if (!editor.isWAVRendering)
 		{
-			printTwoHexBg(pixelBuffer, 80, 47,
-				editor.sampleZero ? 0 : ((*editor.currSampleDisp) + 1), palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoHexBg(80, 47,
+				editor.sampleZero ? 0 : ((*editor.currSampleDisp) + 1), video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 
@@ -403,26 +395,26 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	{
 		editor.ui.updateCurrSampleVolume = false;
 		if (!editor.isWAVRendering)
-			printTwoHexBg(pixelBuffer, 80, 58, *currSample->volumeDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoHexBg(80, 58, *currSample->volumeDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateCurrSampleLength)
 	{
 		editor.ui.updateCurrSampleLength = false;
 		if (!editor.isWAVRendering)
-			printFourHexBg(pixelBuffer, 64, 69, *currSample->lengthDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printFourHexBg(64, 69, *currSample->lengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateCurrSampleRepeat)
 	{
 		editor.ui.updateCurrSampleRepeat = false;
-		printFourHexBg(pixelBuffer, 64, 80, *currSample->loopStartDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printFourHexBg(64, 80, *currSample->loopStartDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateCurrSampleReplen)
 	{
 		editor.ui.updateCurrSampleReplen = false;
-		printFourHexBg(pixelBuffer, 64, 91, *currSample->loopLengthDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printFourHexBg(64, 91, *currSample->loopLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 }
 
@@ -437,30 +429,30 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		editor.ui.updateStatusText = false;
 
 		// clear background
-		textOutBg(pixelBuffer, 88, 127, "                 ", palette[PAL_GENBKG], palette[PAL_GENBKG]);
+		textOutBg(88, 127, "                 ", video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
 
 		// render status text
 		if (!editor.errorMsgActive && editor.blockMarkFlag && !editor.ui.askScreenShown
 			&& !editor.ui.clearScreenShown && !editor.swapChannelFlag)
 		{
-			textOut(pixelBuffer, 88, 127, "MARK BLOCK", palette[PAL_GENTXT]);
-			charOut(pixelBuffer, 192, 127, '-', palette[PAL_GENTXT]);
+			textOut(88, 127, "MARK BLOCK", video.palette[PAL_GENTXT]);
+			charOut(192, 127, '-', video.palette[PAL_GENTXT]);
 
 			editor.blockToPos = modEntry->currRow;
 			if (editor.blockFromPos >= editor.blockToPos)
 			{
-				printTwoDecimals(pixelBuffer, 176, 127, editor.blockToPos, palette[PAL_GENTXT]);
-				printTwoDecimals(pixelBuffer, 200, 127, editor.blockFromPos, palette[PAL_GENTXT]);
+				printTwoDecimals(176, 127, editor.blockToPos, video.palette[PAL_GENTXT]);
+				printTwoDecimals(200, 127, editor.blockFromPos, video.palette[PAL_GENTXT]);
 			}
 			else
 			{
-				printTwoDecimals(pixelBuffer, 176, 127, editor.blockFromPos, palette[PAL_GENTXT]);
-				printTwoDecimals(pixelBuffer, 200, 127, editor.blockToPos, palette[PAL_GENTXT]);
+				printTwoDecimals(176, 127, editor.blockFromPos, video.palette[PAL_GENTXT]);
+				printTwoDecimals(200, 127, editor.blockToPos, video.palette[PAL_GENTXT]);
 			}
 		}
 		else
 		{
-			textOut(pixelBuffer, 88, 127, editor.ui.statusMessage, palette[PAL_GENTXT]);
+			textOut(88, 127, editor.ui.statusMessage, video.palette[PAL_GENTXT]);
 		}
 	}
 
@@ -468,62 +460,62 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	{
 		editor.ui.updateSongBPM = false;
 		if (!editor.ui.samplerScreenShown)
-			printThreeDecimalsBg(pixelBuffer, 32, 123, modEntry->currBPM, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printThreeDecimalsBg(32, 123, modEntry->currBPM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateCurrPattText)
 	{
 		editor.ui.updateCurrPattText = false;
 		if (!editor.ui.samplerScreenShown)
-			printTwoDecimalsBg(pixelBuffer, 8, 127, *editor.currEditPatternDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoDecimalsBg(8, 127, *editor.currEditPatternDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateTrackerFlags)
 	{
 		editor.ui.updateTrackerFlags = false;
 
-		charOutBg(pixelBuffer, 1, 113, ' ', palette[PAL_GENTXT], palette[PAL_GENBKG]);
-		charOutBg(pixelBuffer, 8, 113, ' ', palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		charOutBg(1, 113, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		charOutBg(8, 113, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 		if (editor.autoInsFlag)
 		{
-			charOut(pixelBuffer, 0, 113, 'I', palette[PAL_GENTXT]);
+			charOut(0, 113, 'I', video.palette[PAL_GENTXT]);
 
 			// in Amiga PT, "auto insert" 9 means 0
 			if (editor.autoInsSlot == 9)
-				charOut(pixelBuffer, 8, 113, '0', palette[PAL_GENTXT]);
+				charOut(8, 113, '0', video.palette[PAL_GENTXT]);
 			else
-				charOut(pixelBuffer, 8, 113, '1' + editor.autoInsSlot, palette[PAL_GENTXT]);
+				charOut(8, 113, '1' + editor.autoInsSlot, video.palette[PAL_GENTXT]);
 		}
 
-		charOutBg(pixelBuffer, 1, 102, ' ', palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		charOutBg(1, 102, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		if (editor.metroFlag)
-			charOut(pixelBuffer, 0, 102, 'M', palette[PAL_GENTXT]);
+			charOut(0, 102, 'M', video.palette[PAL_GENTXT]);
 
-		charOutBg(pixelBuffer, 16, 102, ' ', palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		charOutBg(16, 102, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		if (editor.multiFlag)
-			charOut(pixelBuffer, 16, 102, 'M', palette[PAL_GENTXT]);
+			charOut(16, 102, 'M', video.palette[PAL_GENTXT]);
 
-		charOutBg(pixelBuffer, 24, 102, '0' + editor.editMoveAdd,palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		charOutBg(24, 102, '0' + editor.editMoveAdd, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
-		charOutBg(pixelBuffer, 311, 128, ' ', palette[PAL_GENBKG], palette[PAL_GENBKG]);
+		charOutBg(311, 128, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
 		if (editor.pNoteFlag == 1)
 		{
-			pixelBuffer[(129 * SCREEN_W) + 314] = palette[PAL_GENTXT];
-			pixelBuffer[(129 * SCREEN_W) + 315] = palette[PAL_GENTXT];
+			video.frameBuffer[(129 * SCREEN_W) + 314] = video.palette[PAL_GENTXT];
+			video.frameBuffer[(129 * SCREEN_W) + 315] = video.palette[PAL_GENTXT];
 		}
 		else if (editor.pNoteFlag == 2)
 		{
-			pixelBuffer[(128 * SCREEN_W) + 314] = palette[PAL_GENTXT];
-			pixelBuffer[(128 * SCREEN_W) + 315] = palette[PAL_GENTXT];
-			pixelBuffer[(130 * SCREEN_W) + 314] = palette[PAL_GENTXT];
-			pixelBuffer[(130 * SCREEN_W) + 315] = palette[PAL_GENTXT];
+			video.frameBuffer[(128 * SCREEN_W) + 314] = video.palette[PAL_GENTXT];
+			video.frameBuffer[(128 * SCREEN_W) + 315] = video.palette[PAL_GENTXT];
+			video.frameBuffer[(130 * SCREEN_W) + 314] = video.palette[PAL_GENTXT];
+			video.frameBuffer[(130 * SCREEN_W) + 315] = video.palette[PAL_GENTXT];
 		}
 	}
 
 	// playback timer
 
-	secs = ((editor.musicTime / 256) * 5) / 512;
+	secs = ((editor.musicTime >> 8) * 5) >> 9;
 	secs -= ((secs / 3600) * 3600);
 
 	if (secs <= 5999) // below 99 minutes 59 seconds
@@ -532,14 +524,14 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		MI_TimeS = secs - (MI_TimeM * 60);
 
 		// xx:xx
-		printTwoDecimalsBg(pixelBuffer, 272, 102, MI_TimeM, palette[PAL_GENTXT], palette[PAL_GENBKG]);
-		printTwoDecimalsBg(pixelBuffer, 296, 102, MI_TimeS, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printTwoDecimalsBg(272, 102, MI_TimeM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		printTwoDecimalsBg(296, 102, MI_TimeS, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 	else
 	{
 		// 99:59
-		printTwoDecimalsBg(pixelBuffer, 272, 102, 99, palette[PAL_GENTXT], palette[PAL_GENBKG]);
-		printTwoDecimalsBg(pixelBuffer, 296, 102, 59, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printTwoDecimalsBg(272, 102, 99, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		printTwoDecimalsBg(296, 102, 59, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateSongName)
@@ -551,7 +543,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 			if (tempChar == '\0')
 				tempChar = '_';
 
-			charOutBg(pixelBuffer, 104 + (x * FONT_CHAR_W), 102, tempChar, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			charOutBg(104 + (x * FONT_CHAR_W), 102, tempChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 
@@ -566,7 +558,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 			if (tempChar == '\0')
 				tempChar = '_';
 
-			charOutBg(pixelBuffer, 104 + (x * FONT_CHAR_W), 113, tempChar, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			charOutBg(104 + (x * FONT_CHAR_W), 113, tempChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 
@@ -575,7 +567,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		editor.ui.updateSongSize = false;
 
 		// clear background
-		textOutBg(pixelBuffer, 264, 123, "      ", palette[PAL_GENBKG], palette[PAL_GENBKG]);
+		textOutBg(264, 123, "      ", video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
 
 		// calculate module length
 		uint32_t totalSampleDataSize = 0;
@@ -592,19 +584,19 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		uint32_t moduleSize = 2108 + (totalPatterns * 1024) + totalSampleDataSize;
 		if (moduleSize > 999999)
 		{
-			charOut(pixelBuffer, 304, 123, 'K', palette[PAL_GENTXT]);
-			printFourDecimals(pixelBuffer, 272, 123, moduleSize / 1000, palette[PAL_GENTXT]);
+			charOut(304, 123, 'K', video.palette[PAL_GENTXT]);
+			printFourDecimals(272, 123, moduleSize / 1000, video.palette[PAL_GENTXT]);
 		}
 		else
 		{
-			printSixDecimals(pixelBuffer, 264, 123, moduleSize, palette[PAL_GENTXT]);
+			printSixDecimals(264, 123, moduleSize, video.palette[PAL_GENTXT]);
 		}
 	}
 
 	if (editor.ui.updateSongTiming)
 	{
 		editor.ui.updateSongTiming = false;
-		textOutBg(pixelBuffer, 288, 130, (editor.timingMode == TEMPO_MODE_CIA) ? "CIA" : "VBL", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		textOutBg(288, 130, (editor.timingMode == TEMPO_MODE_CIA) ? "CIA" : "VBL", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 }
 
@@ -626,11 +618,11 @@ void updateSampler(void)
 	s = &modEntry->samples[editor.currSample];
 
 	// update 9xx offset
-	if (input.mouse.y >= 138 && input.mouse.y <= 201 && input.mouse.x >= 3 && input.mouse.x <= 316)
+	if (mouse.y >= 138 && mouse.y <= 201 && mouse.x >= 3 && mouse.x <= 316)
 	{
 		if (!editor.ui.samplerVolBoxShown && !editor.ui.samplerFiltersBoxShown && s->length > 0)
 		{
-			tmpSampleOffset = (scr2SmpPos(input.mouse.x-3) + (1 << 7)) >> 8; // rounded
+			tmpSampleOffset = (scr2SmpPos(mouse.x-3) + (1 << 7)) >> 8; // rounded
 			tmpSampleOffset = 0x900 + CLAMP(tmpSampleOffset, 0x00, 0xFF);
 
 			if (tmpSampleOffset != editor.ui.lastSampleOffset)
@@ -645,7 +637,7 @@ void updateSampler(void)
 	if (editor.ui.update9xxPos)
 	{
 		editor.ui.update9xxPos = false;
-		printThreeHexBg(pixelBuffer, 288, 247, editor.ui.lastSampleOffset, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printThreeHexBg(288, 247, editor.ui.lastSampleOffset, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateResampleNote)
@@ -655,14 +647,14 @@ void updateSampler(void)
 		// show resample note
 		if (editor.ui.changingSmpResample)
 		{
-			textOutBg(pixelBuffer, 288, 236, "---", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			textOutBg(288, 236, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 		else
 		{
 			assert(editor.resampleNote < 36);
-			textOutBg(pixelBuffer, 288, 236,
-				ptConfig.accidental ? noteNames2[editor.resampleNote] : noteNames1[editor.resampleNote],
-				palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			textOutBg(288, 236,
+				config.accidental ? noteNames2[editor.resampleNote] : noteNames1[editor.resampleNote],
+				video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 
@@ -671,13 +663,13 @@ void updateSampler(void)
 		if (editor.ui.updateVolFromText)
 		{
 			editor.ui.updateVolFromText = false;
-			printThreeDecimalsBg(pixelBuffer, 176, 157, *editor.vol1Disp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printThreeDecimalsBg(176, 157, *editor.vol1Disp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateVolToText)
 		{
 			editor.ui.updateVolToText = false;
-			printThreeDecimalsBg(pixelBuffer, 176, 168, *editor.vol2Disp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printThreeDecimalsBg(176, 168, *editor.vol2Disp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 	else if (editor.ui.samplerFiltersBoxShown)
@@ -685,13 +677,13 @@ void updateSampler(void)
 		if (editor.ui.updateLPText)
 		{
 			editor.ui.updateLPText = false;
-			printFourDecimalsBg(pixelBuffer, 168, 157, *editor.lpCutOffDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printFourDecimalsBg(168, 157, *editor.lpCutOffDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateHPText)
 		{
 			editor.ui.updateHPText = false;
-			printFourDecimalsBg(pixelBuffer, 168, 168, *editor.hpCutOffDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printFourDecimalsBg(168, 168, *editor.hpCutOffDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateNormFlag)
@@ -699,9 +691,9 @@ void updateSampler(void)
 			editor.ui.updateNormFlag = false;
 
 			if (editor.normalizeFiltersFlag)
-				textOutBg(pixelBuffer, 208, 179, "YES", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(208, 179, "YES", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(pixelBuffer, 208, 179, "NO ", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(208, 179, "NO ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 }
@@ -712,9 +704,9 @@ void showVolFromSlider(void)
 
 	sliderStart = ((editor.vol1 * 3) + 5) / 10;
 	sliderEnd  = sliderStart + 4;
-	pixel = palette[PAL_QADSCP];
-	bgPixel = palette[PAL_BACKGRD];
-	dstPtr = &pixelBuffer[(158 * SCREEN_W) + 105];
+	pixel = video.palette[PAL_QADSCP];
+	bgPixel = video.palette[PAL_BACKGRD];
+	dstPtr = &video.frameBuffer[(158 * SCREEN_W) + 105];
 
 	for (uint32_t y = 0; y < 3; y++)
 	{
@@ -736,9 +728,9 @@ void showVolToSlider(void)
 
 	sliderStart = ((editor.vol2 * 3) + 5) / 10;
 	sliderEnd = sliderStart + 4;
-	pixel = palette[PAL_QADSCP];
-	bgPixel = palette[PAL_BACKGRD];
-	dstPtr = &pixelBuffer[(169 * SCREEN_W) + 105];
+	pixel = video.palette[PAL_QADSCP];
+	bgPixel = video.palette[PAL_BACKGRD];
+	dstPtr = &video.frameBuffer[(169 * SCREEN_W) + 105];
 
 	for (uint32_t y = 0; y < 3; y++)
 	{
@@ -760,7 +752,7 @@ void renderSamplerVolBox(void)
 	uint32_t *dstPtr;
 
 	srcPtr = samplerVolumeBMP;
-	dstPtr = &pixelBuffer[(154 * SCREEN_W) + 72];
+	dstPtr = &video.frameBuffer[(154 * SCREEN_W) + 72];
 
 	for (uint32_t y = 0; y < 33; y++)
 	{
@@ -791,7 +783,7 @@ void renderSamplerFiltersBox(void)
 	uint32_t *dstPtr;
 
 	srcPtr = samplerFiltersBMP;
-	dstPtr = &pixelBuffer[(154 * SCREEN_W) + 65];
+	dstPtr = &video.frameBuffer[(154 * SCREEN_W) + 65];
 
 	for (uint32_t y = 0; y < 33; y++)
 	{
@@ -801,8 +793,8 @@ void renderSamplerFiltersBox(void)
 		dstPtr += SCREEN_W;
 	}
 
-	textOut(pixelBuffer, 200, 157, "HZ", palette[PAL_GENTXT]);
-	textOut(pixelBuffer, 200, 168, "HZ", palette[PAL_GENTXT]);
+	textOut(200, 157, "HZ", video.palette[PAL_GENTXT]);
+	textOut(200, 168, "HZ", video.palette[PAL_GENTXT]);
 
 	editor.ui.updateLPText = true;
 	editor.ui.updateHPText = true;
@@ -820,7 +812,7 @@ void removeSamplerFiltersBox(void)
 
 void renderDiskOpScreen(void)
 {
-	memcpy(pixelBuffer, diskOpScreenBMP, (99 * 320) * sizeof (int32_t));
+	memcpy(video.frameBuffer, diskOpScreenBMP, (99 * 320) * sizeof (int32_t));
 
 	editor.ui.updateDiskOpPathText = true;
 	editor.ui.updatePackText = true;
@@ -841,7 +833,7 @@ void updateDiskOp(void)
 	if (editor.ui.updateDiskOpFileList)
 	{
 		editor.ui.updateDiskOpFileList = false;
-		diskOpRenderFileList(pixelBuffer);
+		diskOpRenderFileList();
 	}
 
 	if (editor.ui.updateLoadMode)
@@ -849,13 +841,13 @@ void updateDiskOp(void)
 		editor.ui.updateLoadMode = false;
 
 		// clear backgrounds
-		charOutBg(pixelBuffer, 147,  3, ' ', palette[PAL_GENBKG], palette[PAL_GENBKG]);
-		charOutBg(pixelBuffer, 147, 14, ' ', palette[PAL_GENBKG], palette[PAL_GENBKG]);
+		charOutBg(147,  3, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
+		charOutBg(147, 14, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
 
 		// draw load mode arrow
 
 		srcPtr = arrowBMP;
-		dstPtr = &pixelBuffer[(((11 * editor.diskop.mode) + 3) * SCREEN_W) + 148];
+		dstPtr = &video.frameBuffer[(((11 * editor.diskop.mode) + 3) * SCREEN_W) + 148];
 
 		for (uint32_t y = 0; y < 5; y++)
 		{
@@ -870,15 +862,15 @@ void updateDiskOp(void)
 	if (editor.ui.updatePackText)
 	{
 		editor.ui.updatePackText = false;
-		textOutBg(pixelBuffer, 120, 3, editor.diskop.modPackFlg ? "ON " : "OFF", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		textOutBg(120, 3, editor.diskop.modPackFlg ? "ON " : "OFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateSaveFormatText)
 	{
 		editor.ui.updateSaveFormatText = false;
-		     if (editor.diskop.smpSaveType == DISKOP_SMP_WAV) textOutBg(pixelBuffer, 120, 14, "WAV", palette[PAL_GENTXT], palette[PAL_GENBKG]);
-		else if (editor.diskop.smpSaveType == DISKOP_SMP_IFF) textOutBg(pixelBuffer, 120, 14, "IFF", palette[PAL_GENTXT], palette[PAL_GENBKG]);
-		else if (editor.diskop.smpSaveType == DISKOP_SMP_RAW) textOutBg(pixelBuffer, 120, 14, "RAW", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		     if (editor.diskop.smpSaveType == DISKOP_SMP_WAV) textOutBg(120, 14, "WAV", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else if (editor.diskop.smpSaveType == DISKOP_SMP_IFF) textOutBg(120, 14, "IFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else if (editor.diskop.smpSaveType == DISKOP_SMP_RAW) textOutBg(120, 14, "RAW", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (editor.ui.updateDiskOpPathText)
@@ -892,7 +884,7 @@ void updateDiskOp(void)
 			if (tmpChar == '\0')
 				tmpChar = '_';
 
-			charOutBg(pixelBuffer, 24 + (i * FONT_CHAR_W), 25, tmpChar, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			charOutBg(24 + (i * FONT_CHAR_W), 25, tmpChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 }
@@ -910,7 +902,7 @@ void updatePosEd(void)
 
 	if (!editor.ui.disablePosEd)
 	{
-		bgPixel = palette[PAL_BACKGRD];
+		bgPixel = video.palette[PAL_BACKGRD];
 
 		posEdPosition = modEntry->currOrder;
 		if (posEdPosition > modEntry->head.orderCount-1)
@@ -921,15 +913,12 @@ void updatePosEd(void)
 		{
 			if (posEdPosition-(5-y) >= 0)
 			{
-				printThreeDecimalsBg(pixelBuffer, 128, 23+(y*6),
-					posEdPosition-(5-y), palette[PAL_QADSCP], palette[PAL_BACKGRD]);
-
-				printTwoDecimalsBg(pixelBuffer, 160, 23+(y*6), modEntry->head.order[posEdPosition-(5-y)],
-					palette[PAL_QADSCP], palette[PAL_BACKGRD]);
+				printThreeDecimalsBg(128, 23+(y*6), posEdPosition-(5-y), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+				printTwoDecimalsBg(160, 23+(y*6), modEntry->head.order[posEdPosition-(5-y)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
 			}
 			else
 			{
-				dstPtr = &pixelBuffer[((23+(y*6)) * SCREEN_W) + 128];
+				dstPtr = &video.frameBuffer[((23+(y*6)) * SCREEN_W) + 128];
 				for (y2 = 0; y2 < 5; y2++)
 				{
 					for (x = 0; x < FONT_CHAR_W*22; x++)
@@ -941,23 +930,20 @@ void updatePosEd(void)
 		}
 
 		// middle
-		printThreeDecimalsBg(pixelBuffer, 128, 53, posEdPosition, palette[PAL_GENTXT], palette[PAL_GENBKG]);
-		printTwoDecimalsBg(pixelBuffer, 160, 53, *editor.currPosEdPattDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printThreeDecimalsBg(128, 53, posEdPosition, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		printTwoDecimalsBg(160, 53, *editor.currPosEdPattDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 		// bottom six
 		for (y = 0; y < 6; y++)
 		{
 			if (posEdPosition+y < modEntry->head.orderCount-1)
 			{
-				printThreeDecimalsBg(pixelBuffer, 128, 59+(y*6), posEdPosition+(y+1),
-					palette[PAL_QADSCP], palette[PAL_BACKGRD]);
-
-				printTwoDecimalsBg(pixelBuffer, 160, 59+(y*6), modEntry->head.order[posEdPosition+(y+1)],
-					palette[PAL_QADSCP], palette[PAL_BACKGRD]);
+				printThreeDecimalsBg(128, 59+(y*6), posEdPosition+(y+1), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+				printTwoDecimalsBg(160, 59+(y*6), modEntry->head.order[posEdPosition+(y+1)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
 			}
 			else
 			{
-				dstPtr = &pixelBuffer[((59+(y*6)) * SCREEN_W) + 128];
+				dstPtr = &video.frameBuffer[((59+(y*6)) * SCREEN_W) + 128];
 				for (y2 = 0; y2 < 5; y2++)
 				{
 					for (x = 0; x < FONT_CHAR_W*22; x++)
@@ -980,7 +966,7 @@ void renderPosEdScreen(void)
 	uint32_t *dstPtr;
 
 	srcPtr = posEdBMP;
-	dstPtr = &pixelBuffer[120];
+	dstPtr = &video.frameBuffer[120];
 
 	for (uint32_t y = 0; y < 99; y++)
 	{
@@ -999,7 +985,7 @@ void renderMuteButtons(void)
 	if (editor.ui.diskOpScreenShown || editor.ui.posEdScreenShown)
 		return;
 
-	dstPtr = &pixelBuffer[(3 * SCREEN_W) + 310];
+	dstPtr = &video.frameBuffer[(3 * SCREEN_W) + 310];
 	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
 	{
 		if (editor.muted[i])
@@ -1035,7 +1021,7 @@ void renderClearScreen(void)
 	editor.ui.disableVisualizer = true;
 
 	srcPtr = clearDialogBMP;
-	dstPtr = &pixelBuffer[(51 * SCREEN_W) + 160];
+	dstPtr = &video.frameBuffer[(51 * SCREEN_W) + 160];
 
 	for (uint32_t y = 0; y < 39; y++)
 	{
@@ -1085,7 +1071,7 @@ void updatePatternData(void)
 	{
 		editor.ui.updatePatternData = false;
 		if (!editor.ui.samplerScreenShown)
-			redrawPattern(pixelBuffer);
+			redrawPattern();
 	}
 }
 
@@ -1096,13 +1082,13 @@ void removeTextEditMarker(void)
 	if (!editor.ui.editTextFlag)
 		return;
 
-	dstPtr = &pixelBuffer[((editor.ui.lineCurY - 1) * SCREEN_W) + (editor.ui.lineCurX - 4)];
+	dstPtr = &video.frameBuffer[((editor.ui.lineCurY - 1) * SCREEN_W) + (editor.ui.lineCurX - 4)];
 
 	if (editor.ui.editObject == PTB_PE_PATT)
 	{
 		// position editor text editing
 
-		pixel = palette[PAL_GENBKG2];
+		pixel = video.palette[PAL_GENBKG2];
 		for (uint32_t x = 0; x < 7; x++)
 			dstPtr[x] = pixel;
 
@@ -1114,7 +1100,7 @@ void removeTextEditMarker(void)
 	{
 		// all others
 
-		pixel = palette[PAL_GENBKG];
+		pixel = video.palette[PAL_GENBKG];
 		for (uint32_t y = 0; y < 2; y++)
 		{
 			for (uint32_t x = 0; x < 7; x++)
@@ -1132,8 +1118,8 @@ void renderTextEditMarker(void)
 	if (!editor.ui.editTextFlag)
 		return;
 
-	dstPtr = &pixelBuffer[((editor.ui.lineCurY - 1) * SCREEN_W) + (editor.ui.lineCurX - 4)];
-	pixel = palette[PAL_TEXTMARK];
+	dstPtr = &video.frameBuffer[((editor.ui.lineCurY - 1) * SCREEN_W) + (editor.ui.lineCurX - 4)];
+	pixel = video.palette[PAL_TEXTMARK];
 
 	for (uint32_t y = 0; y < 2; y++)
 	{
@@ -1144,12 +1130,60 @@ void renderTextEditMarker(void)
 	}
 }
 
-void updateDragBars(void)
+static void sendMouseButtonUpEvent(uint8_t button)
 {
-	if (editor.ui.sampleMarkingPos >= 0) samplerSamplePressed(MOUSE_BUTTON_HELD);
-	if (editor.ui.forceSampleDrag) samplerBarPressed(MOUSE_BUTTON_HELD);
-	if (editor.ui.forceSampleEdit) samplerEditSample(MOUSE_BUTTON_HELD);
-	if (editor.ui.forceVolDrag) volBoxBarPressed(MOUSE_BUTTON_HELD);
+	SDL_Event event;
+
+	memset(&event, 0, sizeof (event));
+
+	event.type = SDL_MOUSEBUTTONUP;
+	event.button.button = button;
+
+	SDL_PushEvent(&event);
+}
+
+void handleLastGUIObjectDown(void)
+{
+	bool testMouseButtonRelease = false;
+
+	if (editor.ui.sampleMarkingPos >= 0)
+	{
+		samplerSamplePressed(MOUSE_BUTTON_HELD);
+		testMouseButtonRelease = true;
+	}
+
+	if (editor.ui.forceSampleDrag)
+	{
+		samplerBarPressed(MOUSE_BUTTON_HELD);
+		testMouseButtonRelease = true;
+	}
+
+	if (editor.ui.forceSampleEdit)
+	{
+		samplerEditSample(MOUSE_BUTTON_HELD);
+		testMouseButtonRelease = true;
+	}
+
+	if (editor.ui.forceVolDrag)
+	{
+		volBoxBarPressed(MOUSE_BUTTON_HELD);
+		testMouseButtonRelease = true;
+	}
+
+	/* Hack to send "mouse button up" events if we released the mouse button(s)
+	** outside of the window...
+	*/
+	if (testMouseButtonRelease)
+	{
+		if (mouse.x < 0 || mouse.x >= SCREEN_W || mouse.y < 0 || mouse.y >= SCREEN_H)
+		{
+			if (mouse.leftButtonPressed && !(mouse.buttonState & SDL_BUTTON_LMASK))
+				sendMouseButtonUpEvent(SDL_BUTTON_LEFT);
+
+			if (mouse.rightButtonPressed && !(mouse.buttonState & SDL_BUTTON_RMASK))
+				sendMouseButtonUpEvent(SDL_BUTTON_RIGHT);
+		}
+	}
 }
 
 void updateVisualizer(void)
@@ -1170,11 +1204,11 @@ void updateVisualizer(void)
 	{
 		// spectrum analyzer
 
-		dstPtr = &pixelBuffer[(59 * SCREEN_W) + 129];
+		dstPtr = &video.frameBuffer[(59 * SCREEN_W) + 129];
 		for (uint32_t i = 0; i < SPECTRUM_BAR_NUM; i++)
 		{
 			srcPtr = spectrumAnaBMP;
-			pixel = palette[PAL_GENBKG];
+			pixel = video.palette[PAL_GENBKG];
 
 			tmpVol = editor.spectrumVolumes[i];
 			if (tmpVol > SPECTRUM_BAR_HEIGHT)
@@ -1206,7 +1240,7 @@ void renderQuadrascopeBg(void)
 	uint32_t *dstPtr;
 
 	srcPtr = &trackerFrameBMP[(44 * SCREEN_W) + 120];
-	dstPtr = &pixelBuffer[(44 * SCREEN_W) + 120];
+	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
 
 	for (uint32_t y = 0; y < 55; y++)
 	{
@@ -1226,7 +1260,7 @@ void renderSpectrumAnalyzerBg(void)
 	uint32_t *dstPtr;
 
 	srcPtr = spectrumVisualsBMP;
-	dstPtr = &pixelBuffer[(44 * SCREEN_W) + 120];
+	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
 
 	for (uint32_t y = 0; y < 55; y++)
 	{
@@ -1247,7 +1281,7 @@ void renderAboutScreen(void)
 		return;
 
 	srcPtr = aboutScreenBMP;
-	dstPtr = &pixelBuffer[(44 * SCREEN_W) + 120];
+	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
 
 	for (uint32_t y = 0; y < 55; y++)
 	{
@@ -1261,7 +1295,7 @@ void renderAboutScreen(void)
 
 	sprintf(verString, "v%s", PROG_VER_STR);
 	verStringX = 260 + (((63 - ((uint32_t)strlen(verString) * (FONT_CHAR_W - 1))) + 1) / 2);
-	textOutTight(pixelBuffer, verStringX, 67, verString, palette[PAL_GENBKG2]);
+	textOutTight(verStringX, 67, verString, video.palette[PAL_GENBKG2]);
 }
 
 void renderEditOpMode(void)
@@ -1297,7 +1331,7 @@ void renderEditOpMode(void)
 
 	// render it...
 
-	dstPtr = &pixelBuffer[(47 * SCREEN_W) + 310];
+	dstPtr = &video.frameBuffer[(47 * SCREEN_W) + 310];
 	for (uint32_t y = 0; y < 6; y++)
 	{
 		for (uint32_t x = 0; x < 7; x++)
@@ -1324,7 +1358,7 @@ void renderEditOpScreen(void)
 	}
 
 	// render background
-	dstPtr = &pixelBuffer[(44 * SCREEN_W) + 120];
+	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
 	for (uint32_t y = 0; y < 55; y++)
 	{
 		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
@@ -1338,11 +1372,11 @@ void renderEditOpScreen(void)
 	// render text and content
 	if (editor.ui.editOpScreen == 0)
 	{
-		textOut(pixelBuffer, 128, 47, "  TRACK      PATTERN  ", palette[PAL_GENTXT]);
+		textOut(128, 47, "  TRACK      PATTERN  ", video.palette[PAL_GENTXT]);
 	}
 	else if (editor.ui.editOpScreen == 1)
 	{
-		textOut(pixelBuffer, 128, 47, "  RECORD     SAMPLES  ", palette[PAL_GENTXT]);
+		textOut(128, 47, "  RECORD     SAMPLES  ", video.palette[PAL_GENTXT]);
 
 		editor.ui.updateRecordText = true;
 		editor.ui.updateQuantizeText = true;
@@ -1354,8 +1388,8 @@ void renderEditOpScreen(void)
 	}
 	else if (editor.ui.editOpScreen == 2)
 	{
-		textOut(pixelBuffer, 128, 47, "    SAMPLE EDITOR     ", palette[PAL_GENTXT]);
-		charOut(pixelBuffer, 272, 91, '%', palette[PAL_GENTXT]); // for Volume text
+		textOut(128, 47, "    SAMPLE EDITOR     ", video.palette[PAL_GENTXT]);
+		charOut(272, 91, '%', video.palette[PAL_GENTXT]); // for Volume text
 
 		editor.ui.updatePosText = true;
 		editor.ui.updateModText = true;
@@ -1363,7 +1397,7 @@ void renderEditOpScreen(void)
 	}
 	else if (editor.ui.editOpScreen == 3)
 	{
-		textOut(pixelBuffer, 128, 47, " SAMPLE CHORD EDITOR  ", palette[PAL_GENTXT]);
+		textOut(128, 47, " SAMPLE CHORD EDITOR  ", video.palette[PAL_GENTXT]);
 
 		editor.ui.updateLengthText = true;
 		editor.ui.updateNote1Text = true;
@@ -1379,7 +1413,7 @@ void renderMOD2WAVDialog(void)
 	uint32_t *dstPtr;
 
 	srcPtr = mod2wavBMP;
-	dstPtr = &pixelBuffer[(27 * SCREEN_W) + 64];
+	dstPtr = &video.frameBuffer[(27 * SCREEN_W) + 64];
 
 	for (uint32_t y = 0; y < 48; y++)
 	{
@@ -1431,9 +1465,9 @@ void updateMOD2WAVDialog(void)
 				percent = 100;
 
 			barLength = ((percent * 180) + 50) / 100;
-			dstPtr = &pixelBuffer[(42 * SCREEN_W) + 70];
-			pixel = palette[PAL_GENBKG2];
-			bgPixel = palette[PAL_BORDER];
+			dstPtr = &video.frameBuffer[(42 * SCREEN_W) + 70];
+			pixel = video.palette[PAL_GENBKG2];
+			bgPixel = video.palette[PAL_BORDER];
 
 			for (int32_t y = 0; y < 11; y++)
 			{
@@ -1450,13 +1484,13 @@ void updateMOD2WAVDialog(void)
 			}
 
 			// render percentage
-			pixel = palette[PAL_GENTXT];
+			pixel = video.palette[PAL_GENTXT];
 			if (percent > 99)
-				printThreeDecimals(pixelBuffer, 144, 45, percent, pixel);
+				printThreeDecimals(144, 45, percent, pixel);
 			else
-				printTwoDecimals(pixelBuffer, 152, 45, percent, pixel);
+				printTwoDecimals(152, 45, percent, pixel);
 
-			charOut(pixelBuffer, 168, 45, '%', pixel);
+			charOut(168, 45, '%', pixel);
 		}
 	}
 }
@@ -1471,44 +1505,43 @@ void updateEditOp(void)
 		if (editor.ui.updateRecordText)
 		{
 			editor.ui.updateRecordText = false;
-			textOutBg(pixelBuffer, 176, 58, (editor.recordMode == RECORD_PATT) ? "PATT" : "SONG",
-				palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			textOutBg(176, 58, (editor.recordMode == RECORD_PATT) ? "PATT" : "SONG", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateQuantizeText)
 		{
 			editor.ui.updateQuantizeText = false;
-			printTwoDecimalsBg(pixelBuffer, 192, 69, *editor.quantizeValueDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoDecimalsBg(192, 69, *editor.quantizeValueDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateMetro1Text)
 		{
 			editor.ui.updateMetro1Text = false;
-			printTwoDecimalsBg(pixelBuffer, 168, 80, *editor.metroSpeedDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoDecimalsBg(168, 80, *editor.metroSpeedDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateMetro2Text)
 		{
 			editor.ui.updateMetro2Text = false;
-			printTwoDecimalsBg(pixelBuffer, 192, 80, *editor.metroChannelDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoDecimalsBg(192, 80, *editor.metroChannelDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateFromText)
 		{
 			editor.ui.updateFromText = false;
-			printTwoHexBg(pixelBuffer, 264, 80, *editor.sampleFromDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoHexBg(264, 80, *editor.sampleFromDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateKeysText)
 		{
 			editor.ui.updateKeysText = false;
-			textOutBg(pixelBuffer, 160, 91, editor.multiFlag ? "MULTI " : "SINGLE", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			textOutBg(160, 91, editor.multiFlag ? "MULTI " : "SINGLE", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateToText)
 		{
 			editor.ui.updateToText = false;
-			printTwoHexBg(pixelBuffer, 264, 91, *editor.sampleToDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printTwoHexBg(264, 91, *editor.sampleToDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 	else if (editor.ui.editOpScreen == 2)
@@ -1518,38 +1551,38 @@ void updateEditOp(void)
 			editor.ui.updateMixText = false;
 			if (editor.mixFlag)
 			{
-				textOutBg(pixelBuffer, 128, 47, editor.mixText, palette[PAL_GENTXT], palette[PAL_GENBKG]);
-				textOutBg(pixelBuffer, 248, 47, "  ", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(128, 47, editor.mixText, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+				textOutBg(248, 47, "  ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			}
 			else
 			{
-				textOutBg(pixelBuffer, 128, 47, "    SAMPLE EDITOR     ", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(128, 47, "    SAMPLE EDITOR     ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			}
 		}
 
 		if (editor.ui.updatePosText)
 		{
 			editor.ui.updatePosText = false;
-			printFourHexBg(pixelBuffer, 248, 58, *editor.samplePosDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printFourHexBg(248, 58, *editor.samplePosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateModText)
 		{
 			editor.ui.updateModText = false;
-			printThreeDecimalsBg(pixelBuffer, 256, 69,
+			printThreeDecimalsBg(256, 69,
 				(editor.modulateSpeed < 0) ? (0 - editor.modulateSpeed) : editor.modulateSpeed,
-				palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 			if (editor.modulateSpeed < 0)
-				charOutBg(pixelBuffer, 248, 69, '-', palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				charOutBg(248, 69, '-', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				charOutBg(pixelBuffer, 248, 69, ' ', palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				charOutBg(248, 69, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateVolText)
 		{
 			editor.ui.updateVolText = false;
-			printThreeDecimalsBg(pixelBuffer, 248, 91, *editor.sampleVolDisp, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+			printThreeDecimalsBg(248, 91, *editor.sampleVolDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 	else if (editor.ui.editOpScreen == 3)
@@ -1559,17 +1592,17 @@ void updateEditOp(void)
 			editor.ui.updateLengthText = false;
 
 			// clear background
-			textOutBg(pixelBuffer, 168, 91, "    ", palette[PAL_GENTXT], palette[PAL_GENBKG]);
-			charOut(pixelBuffer, 198, 91,    ':', palette[PAL_GENBKG]);
+			textOutBg(168, 91, "    ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			charOut(198, 91,    ':', video.palette[PAL_GENBKG]);
 
 			if (modEntry->samples[editor.currSample].loopLength > 2 || modEntry->samples[editor.currSample].loopStart >= 2)
 			{
-				textOut(pixelBuffer, 168, 91, "LOOP", palette[PAL_GENTXT]);
+				textOut(168, 91, "LOOP", video.palette[PAL_GENTXT]);
 			}
 			else
 			{
-				printFourHex(pixelBuffer, 168, 91, *editor.chordLengthDisp, palette[PAL_GENTXT]); // CHORD MAX LENGTH
-				charOut(pixelBuffer, 198, 91, (editor.chordLengthMin) ? '.' : ':', palette[PAL_GENTXT]); // MIN/MAX FLAG
+				printFourHex(168, 91, *editor.chordLengthDisp, video.palette[PAL_GENTXT]); // chord max length
+				charOut(198, 91, (editor.chordLengthMin) ? '.' : ':', video.palette[PAL_GENTXT]); // min/max flag
 			}
 		}
 
@@ -1577,40 +1610,40 @@ void updateEditOp(void)
 		{
 			editor.ui.updateNote1Text = false;
 			if (editor.note1 > 35)
-				textOutBg(pixelBuffer, 256, 58, "---", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 58, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(pixelBuffer, 256, 58, ptConfig.accidental ? noteNames2[editor.note1] : noteNames1[editor.note1],
-					palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 58, config.accidental ? noteNames2[editor.note1] : noteNames1[editor.note1],
+					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateNote2Text)
 		{
 			editor.ui.updateNote2Text = false;
 			if (editor.note2 > 35)
-				textOutBg(pixelBuffer, 256, 69, "---", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 69, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(pixelBuffer, 256, 69, ptConfig.accidental ? noteNames2[editor.note2] : noteNames1[editor.note2],
-					palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 69, config.accidental ? noteNames2[editor.note2] : noteNames1[editor.note2],
+					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (editor.ui.updateNote3Text)
 		{
 			editor.ui.updateNote3Text = false;
 			if (editor.note3 > 35)
-				textOutBg(pixelBuffer, 256, 80, "---", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 80, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(pixelBuffer, 256, 80, ptConfig.accidental ? noteNames2[editor.note3] : noteNames1[editor.note3],
-					palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 80, config.accidental ? noteNames2[editor.note3] : noteNames1[editor.note3],
+					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 			
 		if (editor.ui.updateNote4Text)
 		{
 			editor.ui.updateNote4Text = false;
 			if (editor.note4 > 35)
-				textOutBg(pixelBuffer, 256, 91, "---", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 91, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(pixelBuffer, 256, 91, ptConfig.accidental ? noteNames2[editor.note4] : noteNames1[editor.note4],
-					palette[PAL_GENTXT], palette[PAL_GENBKG]);
+				textOutBg(256, 91, config.accidental ? noteNames2[editor.note4] : noteNames1[editor.note4],
+					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 }
@@ -1640,14 +1673,14 @@ void displayMainScreen(void)
 	if (editor.ui.samplerScreenShown)
 	{
 		if (!editor.ui.diskOpScreenShown)
-			memcpy(pixelBuffer, trackerFrameBMP, 320 * 121 * sizeof (int32_t));
+			memcpy(video.frameBuffer, trackerFrameBMP, 320 * 121 * sizeof (int32_t));
 	}
 	else
 	{
 		if (!editor.ui.diskOpScreenShown)
-			memcpy(pixelBuffer, trackerFrameBMP, 320 * 255 * sizeof (int32_t));
+			memcpy(video.frameBuffer, trackerFrameBMP, 320 * 255 * sizeof (int32_t));
 		else
-			memcpy(&pixelBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
+			memcpy(&video.frameBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
 
 		editor.ui.updateSongBPM = true;
 		editor.ui.updateCurrPattText = true;
@@ -1665,14 +1698,14 @@ void displayMainScreen(void)
 		editor.ui.updateSongLength = true;
 
 		// zeroes (can't integrate zeroes in the graphics, the palette entry is above the 2-bit range)
-		charOut(pixelBuffer, 64,  3, '0', palette[PAL_GENTXT]);
-		textOut(pixelBuffer, 64, 14, "00", palette[PAL_GENTXT]);
+		charOut(64,  3, '0', video.palette[PAL_GENTXT]);
+		textOut(64, 14, "00", video.palette[PAL_GENTXT]);
 
 		if (!editor.isWAVRendering)
 		{
-			charOut(pixelBuffer, 64, 25, '0', palette[PAL_GENTXT]);
-			textOut(pixelBuffer, 64, 47, "00", palette[PAL_GENTXT]);
-			textOut(pixelBuffer, 64, 58, "00", palette[PAL_GENTXT]);
+			charOut(64, 25, '0', video.palette[PAL_GENTXT]);
+			textOut(64, 47, "00", video.palette[PAL_GENTXT]);
+			textOut(64, 58, "00", video.palette[PAL_GENTXT]);
 		}
 
 		if (editor.ui.posEdScreenShown)
@@ -2167,7 +2200,7 @@ void createBitmaps(void)
 	uint16_t pixel12;
 	uint32_t i, j, x, y, pixel24;
 
-	pixel24 = palette[PAL_PATCURSOR];
+	pixel24 = video.palette[PAL_PATCURSOR];
 	for (y = 0; y < 14; y++)
 	{
 		// top two rows have a lighter color
@@ -2202,7 +2235,7 @@ void createBitmaps(void)
 			patternCursorBMP[(y * 11) + 0] = pixel24;
 
 			for (x = 1; x < 10; x++)
-				patternCursorBMP[(y * 11) + x] = palette[PAL_COLORKEY];
+				patternCursorBMP[(y * 11) + x] = video.palette[PAL_COLORKEY];
 
 			patternCursorBMP[(y * 11) + 10] = pixel24;
 		}
@@ -2299,7 +2332,7 @@ void createBitmaps(void)
 		vuMeterBMP[(i * 10) + 9] = pixel24;
 	}
 
-	for (i = 0; i < 30; i++) arrowBMP[i] = palette[arrowPaletteBMP[i]];
+	for (i = 0; i < 30; i++) arrowBMP[i] = video.palette[arrowPaletteBMP[i]];
 	for (i = 0; i < 64; i++) samplingPosBMP[i] = samplingPosBMP[i];
 	for (i = 0; i < 512; i++) loopPinsBMP[i] = loopPinsBMP[i];
 }
@@ -2379,19 +2412,19 @@ uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
 	{
 		byteIn = (tmpBuffer[i] & 0xC0) >> 6;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 0] = palette[byteIn];
+		dst[(i * 4) + 0] = video.palette[byteIn];
 
 		byteIn = (tmpBuffer[i] & 0x30) >> 4;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 1] = palette[byteIn];
+		dst[(i * 4) + 1] = video.palette[byteIn];
 
 		byteIn = (tmpBuffer[i] & 0x0C) >> 2;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 2] = palette[byteIn];
+		dst[(i * 4) + 2] = video.palette[byteIn];
 
 		byteIn = (tmpBuffer[i] & 0x03) >> 0;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 3] = palette[byteIn];
+		dst[(i * 4) + 3] = video.palette[byteIn];
 	}
 
 	free(tmpBuffer);
@@ -2440,10 +2473,10 @@ bool unpackBMPs(void)
 
 void videoClose(void)
 {
-	SDL_DestroyTexture(texture);
-	SDL_DestroyRenderer(renderer);
-	SDL_DestroyWindow(window);
-	free(pixelBuffer);
+	SDL_DestroyTexture(video.texture);
+	SDL_DestroyRenderer(video.renderer);
+	SDL_DestroyWindow(video.window);
+	free(video.frameBufferUnaligned);
 }
 
 void setupSprites(void)
@@ -2459,28 +2492,28 @@ void setupSprites(void)
 
 	sprites[SPRITE_PATTERN_CURSOR].data = patternCursorBMP;
 	sprites[SPRITE_PATTERN_CURSOR].pixelType = SPRITE_TYPE_RGB;
-	sprites[SPRITE_PATTERN_CURSOR].colorKey = palette[PAL_COLORKEY];
+	sprites[SPRITE_PATTERN_CURSOR].colorKey = video.palette[PAL_COLORKEY];
 	sprites[SPRITE_PATTERN_CURSOR].w = 11;
 	sprites[SPRITE_PATTERN_CURSOR].h = 14;
 	hideSprite(SPRITE_PATTERN_CURSOR);
 
 	sprites[SPRITE_LOOP_PIN_LEFT].data = loopPinsBMP;
 	sprites[SPRITE_LOOP_PIN_LEFT].pixelType = SPRITE_TYPE_RGB;
-	sprites[SPRITE_LOOP_PIN_LEFT].colorKey = palette[PAL_COLORKEY];
+	sprites[SPRITE_LOOP_PIN_LEFT].colorKey = video.palette[PAL_COLORKEY];
 	sprites[SPRITE_LOOP_PIN_LEFT].w = 4;
 	sprites[SPRITE_LOOP_PIN_LEFT].h = 64;
 	hideSprite(SPRITE_LOOP_PIN_LEFT);
 
 	sprites[SPRITE_LOOP_PIN_RIGHT].data = &loopPinsBMP[4 * 64];
 	sprites[SPRITE_LOOP_PIN_RIGHT].pixelType = SPRITE_TYPE_RGB;
-	sprites[SPRITE_LOOP_PIN_RIGHT].colorKey = palette[PAL_COLORKEY];
+	sprites[SPRITE_LOOP_PIN_RIGHT].colorKey = video.palette[PAL_COLORKEY];
 	sprites[SPRITE_LOOP_PIN_RIGHT].w = 4;
 	sprites[SPRITE_LOOP_PIN_RIGHT].h = 64;
 	hideSprite(SPRITE_LOOP_PIN_RIGHT);
 
 	sprites[SPRITE_SAMPLING_POS_LINE].data = samplingPosBMP;
 	sprites[SPRITE_SAMPLING_POS_LINE].pixelType = SPRITE_TYPE_RGB;
-	sprites[SPRITE_SAMPLING_POS_LINE].colorKey = palette[PAL_COLORKEY];
+	sprites[SPRITE_SAMPLING_POS_LINE].colorKey = video.palette[PAL_COLORKEY];
 	sprites[SPRITE_SAMPLING_POS_LINE].w = 1;
 	sprites[SPRITE_SAMPLING_POS_LINE].h = 64;
 	hideSprite(SPRITE_SAMPLING_POS_LINE);
@@ -2509,7 +2542,7 @@ void hideSprite(uint8_t sprite)
 
 void eraseSprites(void)
 {
-	int32_t sw, sh, srcPitch, dstPitch;
+	int32_t sx, sy, x, y, sw, sh, srcPitch, dstPitch;
 	const uint32_t *src32;
 	uint32_t *dst32;
 	sprite_t *s;
@@ -2517,26 +2550,43 @@ void eraseSprites(void)
 	for (int32_t i = SPRITE_NUM-1; i >= 0; i--) // erasing must be done in reverse order
 	{
 		s = &sprites[i];
-		if (s->x >= SCREEN_W) // sprite is hidden, don't erase
+		if (s->x >= SCREEN_W || s->y >= SCREEN_H) // sprite is hidden, don't draw nor fill clear buffer
 			continue;
 
-		assert(s->x >= 0 && s->y >= 0 && s->refreshBuffer != NULL);
+		assert(s->refreshBuffer != NULL);
 
 		sw = s->w;
 		sh = s->h;
-		dst32 = &pixelBuffer[(s->y * SCREEN_W) + s->x];
+		sx = s->x;
+		sy = s->y;
+
+		// if x is negative, adjust variables
+		if (sx < 0)
+		{
+			sw += sx; // subtraction
+			sx = 0;
+		}
+
+		// if y is negative, adjust variables
+		if (sy < 0)
+		{
+			sh += sy; // subtraction
+			sy = 0;
+		}
+
+		dst32 = &video.frameBuffer[(sy * SCREEN_W) + sx];
 		src32 = s->refreshBuffer;
 
-		// handle xy clipping
-		if (s->y+sh >= SCREEN_H) sh = SCREEN_H - s->y;
-		if (s->x+sw >= SCREEN_W) sw = SCREEN_W - s->x;
+		// handle x/y clipping
+		if (sx+sw >= SCREEN_W) sw = SCREEN_W - sx;
+		if (sy+sh >= SCREEN_H) sh = SCREEN_H - sy;
 
 		srcPitch = s->w - sw;
 		dstPitch = SCREEN_W - sw;
 
-		for (int32_t y = 0; y < sh; y++)
+		for (y = 0; y < sh; y++)
 		{
-			for (int32_t x = 0; x < sw; x++)
+			for (x = 0; x < sw; x++)
 				*dst32++ = *src32++;
 
 			src32 += srcPitch;
@@ -2550,10 +2600,9 @@ void eraseSprites(void)
 void renderSprites(void)
 {
 	const uint8_t *src8;
-	int32_t x, y, sw, sh, srcPitch, dstPitch;
+	int32_t sx, sy, x, y, srcPtrBias, sw, sh, srcPitch, dstPitch;
 	const uint32_t *src32;
-	uint32_t *dst32, *clr32;
-	register uint32_t colorKey;
+	uint32_t *dst32, *clr32, colorKey;
 	sprite_t *s;
 
 	renderVuMeters(); // let's put it here even though it's not sprite-based
@@ -2566,19 +2615,39 @@ void renderSprites(void)
 		s->x = s->newX;
 		s->y = s->newY;
 
-		if (s->x >= SCREEN_W) // sprite is hidden, don't draw nor fill clear buffer
+		if (s->x >= SCREEN_W || s->y >= SCREEN_H) // sprite is hidden, don't draw nor fill clear buffer
 			continue;
 
-		assert(s->x >= 0 && s->y >= 0 && s->data != NULL && s->refreshBuffer != NULL);
+		assert(s->data != NULL && s->refreshBuffer != NULL);
 
 		sw = s->w;
 		sh = s->h;
-		dst32 = &pixelBuffer[(s->y * SCREEN_W) + s->x];
+		sx = s->x;
+		sy = s->y;
+		srcPtrBias = 0;
+
+		// if x is negative, adjust variables
+		if (sx < 0)
+		{
+			sw += sx; // subtraction
+			srcPtrBias += -sx;
+			sx = 0;
+		}
+
+		// if y is negative, adjust variables
+		if (sy < 0)
+		{
+			sh += sy; // subtraction
+			srcPtrBias += (-sy * s->w);
+			sy = 0;
+		}
+
+		dst32 = &video.frameBuffer[(sy * SCREEN_W) + sx];
 		clr32 = s->refreshBuffer;
 
-		// handle xy clipping
-		if (s->y+sh >= SCREEN_H) sh = SCREEN_H - s->y;
-		if (s->x+sw >= SCREEN_W) sw = SCREEN_W - s->x;
+		// handle x/y clipping
+		if (sx+sw >= SCREEN_W) sw = SCREEN_W - sx;
+		if (sy+sh >= SCREEN_H) sh = SCREEN_H - sy;
 
 		srcPitch = s->w - sw;
 		dstPitch = SCREEN_W - sw;
@@ -2587,7 +2656,7 @@ void renderSprites(void)
 		if (sprites[i].pixelType == SPRITE_TYPE_RGB)
 		{
 			// 24-bit RGB sprite
-			src32 = (uint32_t *)sprites[i].data;
+			src32 = ((uint32_t *)sprites[i].data) + srcPtrBias;
 			for (y = 0; y < sh; y++)
 			{
 				for (x = 0; x < sw; x++)
@@ -2608,7 +2677,7 @@ void renderSprites(void)
 		else
 		{
 			// 8-bit paletted sprite
-			src8 = (uint8_t *)sprites[i].data;
+			src8 = ((uint8_t *)sprites[i].data) + srcPtrBias;
 			for (y = 0; y < sh; y++)
 			{
 				for (x = 0; x < sw; x++)
@@ -2617,7 +2686,7 @@ void renderSprites(void)
 					if (*src8 != colorKey)
 					{
 						assert(*src8 < PALETTE_NUM);
-						*dst32 = palette[*src8];
+						*dst32 = video.palette[*src8];
 					}
 
 					dst32++;
@@ -2634,21 +2703,21 @@ void renderSprites(void)
 
 void flipFrame(void)
 {
-	uint32_t windowFlags = SDL_GetWindowFlags(window);
-
 	renderSprites();
-	SDL_UpdateTexture(texture, NULL, pixelBuffer, SCREEN_W * sizeof (int32_t));
-	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, texture, NULL, NULL);
-	SDL_RenderPresent(renderer);
+	SDL_UpdateTexture(video.texture, NULL, video.frameBuffer, SCREEN_W * sizeof (int32_t));
+	SDL_RenderClear(video.renderer);
+	SDL_RenderCopy(video.renderer, video.texture, NULL, NULL);
+	SDL_RenderPresent(video.renderer);
 	eraseSprites();
 
-	if (!editor.ui.vsync60HzPresent)
+	if (!video.vsync60HzPresent)
 	{
 		waitVBL(); // we have no VSync, do crude thread sleeping to sync to ~60Hz
 	}
 	else
 	{
+		uint32_t windowFlags = SDL_GetWindowFlags(video.window);
+
 		/* We have VSync, but it can unexpectedly get inactive in certain scenarios.
 		** We have to force thread sleeping (to ~60Hz) if so.
 		*/
@@ -2658,7 +2727,7 @@ void flipFrame(void)
 			waitVBL();
 #elif __unix__
 		// *NIX: VSync gets disabled in fullscreen mode (at least on some distros/systems). Let's add a fix:
-		if ((windowFlags & SDL_WINDOW_MINIMIZED) || editor.fullscreen)
+		if ((windowFlags & SDL_WINDOW_MINIMIZED) || video.fullscreen)
 			waitVBL();
 #else
 		if (windowFlags & SDL_WINDOW_MINIMIZED)
@@ -2670,20 +2739,18 @@ void flipFrame(void)
 void updateSpectrumAnalyzer(int8_t vol, int16_t period)
 {
 	const uint8_t maxHeight = SPECTRUM_BAR_HEIGHT + 1; // +1 because of audio latency - allows full height to be seen
-	int16_t scaledVol;
-	int32_t scaledNote;
+	int32_t scaledVol, scaledNote;
 
 	if (editor.ui.visualizerMode != VISUAL_SPECTRUM || vol <= 0)
 		return;
 
-	scaledVol = (vol * 256) / ((64 * 256) / (SPECTRUM_BAR_NUM+1)); // 64 = max sample vol
+	scaledVol = (vol * 24600L) >> 16; // scaledVol = (vol << 8) / 682
 
 	period = CLAMP(period, 113, 856);
 
-	// 856 = C-1 period, 113 = B-3 period
-	scaledNote = (856-113) - (period - 113);
+	scaledNote = 856 - period;
 	scaledNote *= scaledNote;
-	scaledNote /= ((856 - 113) * (856 - 113)) / (SPECTRUM_BAR_NUM-1);
+	scaledNote = ((int64_t)scaledNote * 171162) >> 32; // scaledNote /= 25093
 
 	// scaledNote now ranges 0..22, no need to clamp
 
@@ -2711,24 +2778,27 @@ void updateSpectrumAnalyzer(int8_t vol, int16_t period)
 
 void sinkVisualizerBars(void)
 {
+	int32_t i;
+
 	// sink stuff @ 50Hz rate
 
-	const uint64_t _50HzCounterDelta = ((uint64_t)AMIGA_PAL_VBLANK_HZ << 32) / VBLANK_HZ;
+	static uint64_t counter50Hz;
+	const uint64_t counter50HzDelta = ((uint64_t)AMIGA_PAL_VBLANK_HZ << 32) / VBLANK_HZ;
 
-	_50HzCounter += _50HzCounterDelta; // 32.32 fixed-point counter
-	if (_50HzCounter > 0xFFFFFFFF)
+	counter50Hz += counter50HzDelta; // 32.32 fixed-point counter
+	if (counter50Hz > 0xFFFFFFFF)
 	{
-		_50HzCounter &= 0xFFFFFFFF;
+		counter50Hz &= 0xFFFFFFFF;
 
 		// sink VU-meters
-		for (uint32_t i = 0; i < AMIGA_VOICES; i++)
+		for (i = 0; i < AMIGA_VOICES; i++)
 		{
 			if (editor.vuMeterVolumes[i] > 0)
 				editor.vuMeterVolumes[i]--;
 		}
 
 		// sink "spectrum analyzer" bars
-		for (uint32_t i = 0; i < SPECTRUM_BAR_NUM; i++)
+		for (i = 0; i < SPECTRUM_BAR_NUM; i++)
 		{
 			if (editor.spectrumVolumes[i] > 0)
 				editor.spectrumVolumes[i]--;
@@ -2746,57 +2816,57 @@ void updateRenderSizeVars(void)
 	float fXScale, fYScale;
 	SDL_DisplayMode dm;
 
-	di = SDL_GetWindowDisplayIndex(window);
+	di = SDL_GetWindowDisplayIndex(video.window);
 	if (di < 0)
 		di = 0; /* return display index 0 (default) on error */
 
 	SDL_GetDesktopDisplayMode(di, &dm);
-	editor.ui.displayW = dm.w;
-	editor.ui.displayH = dm.h;
+	video.displayW = dm.w;
+	video.displayH = dm.h;
 
-	if (editor.fullscreen)
+	if (video.fullscreen)
 	{
-		if (ptConfig.fullScreenStretch)
+		if (config.fullScreenStretch)
 		{
-			editor.ui.renderW = editor.ui.displayW;
-			editor.ui.renderH = editor.ui.displayH;
-			editor.ui.renderX = 0;
-			editor.ui.renderY = 0;
+			video.renderW = video.displayW;
+			video.renderH = video.displayH;
+			video.renderX = 0;
+			video.renderY = 0;
 		}
 		else
 		{
-			SDL_RenderGetScale(renderer, &fXScale, &fYScale);
+			SDL_RenderGetScale(video.renderer, &fXScale, &fYScale);
 
-			editor.ui.renderW = (int32_t)(SCREEN_W * fXScale);
-			editor.ui.renderH = (int32_t)(SCREEN_H * fYScale);
+			video.renderW = (int32_t)(SCREEN_W * fXScale);
+			video.renderH = (int32_t)(SCREEN_H * fYScale);
 
 #ifdef __APPLE__
 			// retina high-DPI hackery (SDL2 is bad at reporting actual rendering sizes on macOS w/ high-DPI)
-			SDL_GL_GetDrawableSize(window, &actualScreenW, &actualScreenH);
+			SDL_GL_GetDrawableSize(video.window, &actualScreenW, &actualScreenH);
 			SDL_GetDesktopDisplayMode(0, &dm);
 
-			dXUpscale = ((double)actualScreenW / editor.ui.displayW);
-			dYUpscale = ((double)actualScreenH / editor.ui.displayH);
+			dXUpscale = ((double)actualScreenW / video.displayW);
+			dYUpscale = ((double)actualScreenH / video.displayH);
 
 			// downscale back to correct sizes
-			if (dXUpscale != 0.0) editor.ui.renderW = (int32_t)(editor.ui.renderW / dXUpscale);
-			if (dYUpscale != 0.0) editor.ui.renderH = (int32_t)(editor.ui.renderH / dYUpscale);
+			if (dXUpscale != 0.0) video.renderW = (int32_t)(video.renderW / dXUpscale);
+			if (dYUpscale != 0.0) video.renderH = (int32_t)(video.renderH / dYUpscale);
 #endif
-			editor.ui.renderX = (editor.ui.displayW - editor.ui.renderW) / 2;
-			editor.ui.renderY = (editor.ui.displayH - editor.ui.renderH) / 2;
+			video.renderX = (video.displayW - video.renderW) >> 1;
+			video.renderY = (video.displayH - video.renderH) >> 1;
 		}
 	}
 	else
 	{
-		SDL_GetWindowSize(window, &editor.ui.renderW, &editor.ui.renderH);
+		SDL_GetWindowSize(video.window, &video.renderW, &video.renderH);
 
-		editor.ui.renderX = 0;
-		editor.ui.renderY = 0;
+		video.renderX = 0;
+		video.renderY = 0;
 	}
 
 	// for mouse cursor creation
-	editor.ui.xScale = (int32_t)((editor.ui.renderW / (double)SCREEN_W) + 0.5);
-	editor.ui.yScale = (int32_t)((editor.ui.renderH / (double)SCREEN_H) + 0.5);
+	video.xScale = (int32_t)((video.renderW * (1.0 / SCREEN_W)) + 0.5);
+	video.yScale = (int32_t)((video.renderH * (1.0 / SCREEN_H)) + 0.5);
 	createMouseCursors();
 }
 
@@ -2804,47 +2874,47 @@ void toggleFullScreen(void)
 {
 	SDL_DisplayMode dm;
 
-	editor.fullscreen ^= 1;
-	if (editor.fullscreen)
+	video.fullscreen ^= 1;
+	if (video.fullscreen)
 	{
-		if (ptConfig.fullScreenStretch)
+		if (config.fullScreenStretch)
 		{
 			SDL_GetDesktopDisplayMode(0, &dm);
-			SDL_RenderSetLogicalSize(renderer, dm.w, dm.h);
+			SDL_RenderSetLogicalSize(video.renderer, dm.w, dm.h);
 		}
 		else
 		{
-			SDL_RenderSetLogicalSize(renderer, SCREEN_W, SCREEN_H);
+			SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
 		}
 
-		SDL_SetWindowSize(window, SCREEN_W, SCREEN_H);
-		SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-		SDL_SetWindowGrab(window, SDL_TRUE);
+		SDL_SetWindowSize(video.window, SCREEN_W, SCREEN_H);
+		SDL_SetWindowFullscreen(video.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+		SDL_SetWindowGrab(video.window, SDL_TRUE);
 	}
 	else
 	{
-		SDL_SetWindowFullscreen(window, 0);
-		SDL_RenderSetLogicalSize(renderer, SCREEN_W, SCREEN_H);
-		SDL_SetWindowSize(window, SCREEN_W * ptConfig.videoScaleFactor, SCREEN_H * ptConfig.videoScaleFactor);
-		SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-		SDL_SetWindowGrab(window, SDL_FALSE);
+		SDL_SetWindowFullscreen(video.window, 0);
+		SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
+		SDL_SetWindowSize(video.window, SCREEN_W * config.videoScaleFactor, SCREEN_H * config.videoScaleFactor);
+		SDL_SetWindowPosition(video.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+		SDL_SetWindowGrab(video.window, SDL_FALSE);
 	}
 
 	updateRenderSizeVars();
 	updateMouseScaling();
 
-	if (editor.fullscreen)
+	if (video.fullscreen)
 	{
-		input.mouse.setPosX = editor.ui.displayW / 2;
-		input.mouse.setPosY = editor.ui.displayH / 2;
+		mouse.setPosX = video.displayW >> 1;
+		mouse.setPosY = video.displayH >> 1;
 	}
 	else
 	{
-		input.mouse.setPosX = editor.ui.renderW / 2;
-		input.mouse.setPosY = editor.ui.renderH / 2;
+		mouse.setPosX = video.renderW >> 1;
+		mouse.setPosY = video.renderH >> 1;
 	}
 
-	input.mouse.setPosFlag = true;
+	mouse.setPosFlag = true;
 }
 
 bool setupVideo(void)
@@ -2853,8 +2923,8 @@ bool setupVideo(void)
 	uint32_t rendererFlags;
 	SDL_DisplayMode dm;
 
-	screenW = SCREEN_W * ptConfig.videoScaleFactor;
-	screenH = SCREEN_H * ptConfig.videoScaleFactor;
+	screenW = SCREEN_W * config.videoScaleFactor;
+	screenH = SCREEN_H * config.videoScaleFactor;
 
 	rendererFlags = 0;
 
@@ -2868,38 +2938,38 @@ bool setupVideo(void)
 	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 #endif
 
-	editor.ui.vsync60HzPresent = false;
-	if (!ptConfig.vsyncOff)
+	video.vsync60HzPresent = false;
+	if (!config.vsyncOff)
 	{
 		SDL_GetDesktopDisplayMode(0, &dm);
 		if (dm.refresh_rate >= 59 && dm.refresh_rate <= 61)
 		{
-			editor.ui.vsync60HzPresent = true;
+			video.vsync60HzPresent = true;
 			rendererFlags |= SDL_RENDERER_PRESENTVSYNC;
 		}
 	}
 
-	window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED,
+	video.window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED, screenW, screenH,
 		SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
 
-	if (window == NULL)
+	if (video.window == NULL)
 	{
 		showErrorMsgBox("Couldn't create SDL window:\n%s", SDL_GetError());
 		return false;
 	}
 
-	renderer = SDL_CreateRenderer(window, -1, rendererFlags);
-	if (renderer == NULL)
+	video.renderer = SDL_CreateRenderer(video.window, -1, rendererFlags);
+	if (video.renderer == NULL)
 	{
-		if (editor.ui.vsync60HzPresent) // try again without vsync flag
+		if (video.vsync60HzPresent) // try again without vsync flag
 		{
-			editor.ui.vsync60HzPresent = false;
+			video.vsync60HzPresent = false;
 			rendererFlags &= ~SDL_RENDERER_PRESENTVSYNC;
-			renderer = SDL_CreateRenderer(window, -1, rendererFlags);
+			video.renderer = SDL_CreateRenderer(video.window, -1, rendererFlags);
 		}
 
-		if (renderer == NULL)
+		if (video.renderer == NULL)
 		{
 			showErrorMsgBox("Couldn't create SDL renderer:\n%s\n\n" \
 			                "Is your GPU (+ driver) too old?", SDL_GetError());
@@ -2907,38 +2977,41 @@ bool setupVideo(void)
 		}
 	}
 
-	SDL_RenderSetLogicalSize(renderer, SCREEN_W, SCREEN_H);
+	SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
 
 #if SDL_PATCHLEVEL >= 5
-	SDL_RenderSetIntegerScale(renderer, SDL_TRUE);
+	SDL_RenderSetIntegerScale(video.renderer, SDL_TRUE);
 #endif
 
-	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+	SDL_SetRenderDrawBlendMode(video.renderer, SDL_BLENDMODE_NONE);
 
 	SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "nearest");
 
-	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
-	if (texture == NULL)
+	video.texture = SDL_CreateTexture(video.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
+	if (video.texture == NULL)
 	{
 		showErrorMsgBox("Couldn't create %dx%d GPU texture:\n%s\n\n" \
 		                "Is your GPU (+ driver) too old?", SCREEN_W, SCREEN_H, SDL_GetError());
 		return false;
 	}
 
-	SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+	SDL_SetTextureBlendMode(video.texture, SDL_BLENDMODE_NONE);
 
 	// frame buffer used by SDL (for texture)
-	pixelBuffer = (uint32_t *)malloc(SCREEN_W * SCREEN_H * sizeof (int32_t));
-	if (pixelBuffer == NULL)
+	video.frameBufferUnaligned = (uint32_t *)MALLOC_PAD(SCREEN_W * SCREEN_H * sizeof (int32_t), 256);
+	if (video.frameBufferUnaligned == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
 
+	// we want an aligned pointer
+	video.frameBuffer = (uint32_t *)ALIGN_PTR(video.frameBufferUnaligned, 256);
+
 	updateRenderSizeVars();
 	updateMouseScaling();
 
-	if (ptConfig.hwMouse)
+	if (config.hwMouse)
 		SDL_ShowCursor(SDL_TRUE);
 	else
 		SDL_ShowCursor(SDL_FALSE);

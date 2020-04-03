@@ -450,12 +450,12 @@ bool diskOpSetPath(UNICHAR *path, bool cache)
 void diskOpSetInitPath(void)
 {
 	// default module path
-	if (ptConfig.defModulesDir[0] != '\0')
+	if (config.defModulesDir[0] != '\0')
 	{
 #ifdef _WIN32
-		MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, ptConfig.defModulesDir, -1, pathTmp, PATH_MAX);
+		MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, config.defModulesDir, -1, pathTmp, PATH_MAX);
 #else
-		strcpy(pathTmp, ptConfig.defModulesDir);
+		strcpy(pathTmp, config.defModulesDir);
 #endif
 		UNICHAR_STRCPY(editor.modulesPathU, pathTmp);
 	}
@@ -466,12 +466,12 @@ void diskOpSetInitPath(void)
 	}
 
 	// default sample path
-	if (ptConfig.defSamplesDir[0] != '\0')
+	if (config.defSamplesDir[0] != '\0')
 	{
 #ifdef _WIN32
-		MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, ptConfig.defSamplesDir, -1, pathTmp, PATH_MAX);
+		MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, config.defSamplesDir, -1, pathTmp, PATH_MAX);
 #else
-		strcpy(pathTmp, ptConfig.defSamplesDir);
+		strcpy(pathTmp, config.defSamplesDir);
 #endif
 		UNICHAR_STRCPY(editor.samplesPathU, pathTmp);
 	}
@@ -715,14 +715,14 @@ static int32_t SDLCALL diskOpFillThreadFunc(void *ptr)
 	return true;
 }
 
-static void printFileSize(uint32_t *frameBuffer, fileEntry_t *entry, uint16_t x, uint16_t y)
+static void printFileSize(fileEntry_t *entry, uint16_t x, uint16_t y)
 {
 	char tmpStr[7];
 	uint32_t fileSize, j;
 
 	if (entry->filesize == -1) // -1 means that the original filesize is above 2GB in our directory reader
 	{
-		textOut(frameBuffer, x, y, "  >2GB", palette[PAL_QADSCP]);
+		textOut(x, y, "  >2GB", video.palette[PAL_QADSCP]);
 		return;
 	}
 
@@ -754,27 +754,27 @@ static void printFileSize(uint32_t *frameBuffer, fileEntry_t *entry, uint16_t x,
 		tmpStr[j] = ' ';
 	}
 
-	textOut(frameBuffer, x, y, tmpStr, palette[PAL_QADSCP]);
+	textOut(x, y, tmpStr, video.palette[PAL_QADSCP]);
 }
 
-static void printEntryName(uint32_t *frameBuffer, char *entryName, int32_t entryLength, int32_t maxLength, uint16_t x, uint16_t y)
+static void printEntryName(char *entryName, int32_t entryLength, int32_t maxLength, uint16_t x, uint16_t y)
 {
 	if (entryLength > maxLength)
 	{
 		// shorten name and add ".." to end
 		for (int32_t j = 0; j < maxLength-2; j++)
-			charOut(frameBuffer, x + (j * FONT_CHAR_W), y, entryName[j], palette[PAL_QADSCP]);
+			charOut(x + (j * FONT_CHAR_W), y, entryName[j], video.palette[PAL_QADSCP]);
 
-		textOut(frameBuffer, x + ((maxLength - 2) * FONT_CHAR_W), y, "..", palette[PAL_QADSCP]);
+		textOut(x + ((maxLength - 2) * FONT_CHAR_W), y, "..", video.palette[PAL_QADSCP]);
 	}
 	else
 	{
 		// print whole name
-		textOut(frameBuffer, x, y, entryName, palette[PAL_QADSCP]);
+		textOut(x, y, entryName, video.palette[PAL_QADSCP]);
 	}
 }
 
-void diskOpRenderFileList(uint32_t *frameBuffer)
+void diskOpRenderFileList(void)
 {
 	char *entryName;
 	uint8_t maxFilenameChars, maxDirNameChars;
@@ -783,7 +783,7 @@ void diskOpRenderFileList(uint32_t *frameBuffer)
 	uint32_t *dstPtr;
 	fileEntry_t *entry;
 
-	if (ptConfig.hideDiskOpDates)
+	if (config.hideDiskOpDates)
 	{
 		textXStart = 8;
 		maxFilenameChars = 30;
@@ -813,11 +813,11 @@ void diskOpRenderFileList(uint32_t *frameBuffer)
 	}
 
 	// clear list
-	dstPtr = &frameBuffer[(35 * SCREEN_W) + 8];
+	dstPtr = &video.frameBuffer[(35 * SCREEN_W) + 8];
 	for (y = 0; y < 59; y++)
 	{
 		for (x = 0; x < 295; x++)
-			dstPtr[x] = palette[PAL_BACKGRD];
+			dstPtr[x] = video.palette[PAL_BACKGRD];
 
 		dstPtr += SCREEN_W;
 	}
@@ -840,19 +840,19 @@ void diskOpRenderFileList(uint32_t *frameBuffer)
 
 		if (!entry->isDir)
 		{
-			printEntryName(frameBuffer, entryName, entryLength, maxFilenameChars, x, y);
+			printEntryName(entryName, entryLength, maxFilenameChars, x, y);
 
 			// print modification date
-			if (!ptConfig.hideDiskOpDates)
-				textOut(frameBuffer, 8, y, entry->dateChanged, palette[PAL_QADSCP]);
+			if (!config.hideDiskOpDates)
+				textOut(8, y, entry->dateChanged, video.palette[PAL_QADSCP]);
 
 			// print file size
-			printFileSize(frameBuffer, entry, 256, y);
+			printFileSize(entry, 256, y);
 		}
 		else
 		{
-			printEntryName(frameBuffer, entryName, entryLength, maxDirNameChars, x, y);
-			textOut(frameBuffer, 264, y, "(DIR)", palette[PAL_QADSCP]);
+			printEntryName(entryName, entryLength, maxDirNameChars, x, y);
+			textOut(264, y, "(DIR)", video.palette[PAL_QADSCP]);
 		}
 	}
 }
@@ -900,10 +900,10 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 
 					statusAllRight();
 
-					if (ptConfig.autoCloseDiskOp)
+					if (config.autoCloseDiskOp)
 						editor.ui.diskOpScreenShown = false;
 
-					if (ptConfig.rememberPlayMode)
+					if (config.rememberPlayMode)
 					{
 						if (oldMode == MODE_PLAY || oldMode == MODE_RECORD)
 						{

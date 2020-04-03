@@ -32,7 +32,7 @@ typedef struct sampleMixer_t
 	uint32_t posFrac, delta;
 } sampleMixer_t;
 
-static int32_t samOffsetScaled;
+static int32_t samOffsetScaled, lastDrawX, lastDrawY;
 static uint32_t waveInvertTable[8];
 
 static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
@@ -43,16 +43,14 @@ static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
 	-127,-126,-118,-106, -91, -71, -49, -25
 };
 
-extern uint32_t *pixelBuffer; // pt_main.c
-
 void setLoopSprites(void);
 
 void createSampleMarkTable(void)
 {
 	// used for invertRange()  (sample data marking)
 
-	waveInvertTable[0] = 0x00000000 | palette[PAL_BACKGRD];
-	waveInvertTable[1] = 0x01000000 | palette[PAL_QADSCP];
+	waveInvertTable[0] = 0x00000000 | video.palette[PAL_BACKGRD];
+	waveInvertTable[1] = 0x01000000 | video.palette[PAL_QADSCP];
 	waveInvertTable[2] = 0x02000000 | CENTER_LINE_COLOR;
 	waveInvertTable[3] = 0x03000000; // spacer, not used
 	waveInvertTable[4] = 0x04000000 | MARK_COLOR_1;
@@ -106,10 +104,10 @@ void fillSampleFilterUndoBuffer(void)
 	}
 }
 
-static void sampleLine(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, int16_t line_y1, int16_t line_y2)
+static void sampleLine(int16_t line_x1, int16_t line_x2, int16_t line_y1, int16_t line_y2)
 {
 	int16_t d, x, y, ax, ay, sx, sy, dx, dy;
-	uint32_t color = 0x01000000 | palette[PAL_QADSCP];
+	uint32_t color = 0x01000000 | video.palette[PAL_QADSCP];
 
 	assert(line_x1 >= 0 || line_x2 >= 0 || line_x1 < SCREEN_W || line_x2 < SCREEN_W);
 	assert(line_y1 >= 0 || line_y2 >= 0 || line_y1 < SCREEN_H || line_y2 < SCREEN_H);
@@ -130,7 +128,7 @@ static void sampleLine(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, 
 		{
 			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
 
-			frameBuffer[(y * SCREEN_W) + x] = color;
+			video.frameBuffer[(y * SCREEN_W) + x] = color;
 
 			if (x == line_x2)
 				break;
@@ -152,7 +150,7 @@ static void sampleLine(uint32_t *frameBuffer, int16_t line_x1, int16_t line_x2, 
 		{
 			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
 
-			frameBuffer[(y * SCREEN_W) + x] = color;
+			video.frameBuffer[(y * SCREEN_W) + x] = color;
 
 			if (y == line_y2)
 				break;
@@ -192,9 +190,9 @@ static void setDragBar(void)
 
 		// draw drag bar
 
-		dstPtr = &pixelBuffer[206 * SCREEN_W];
-		pixel = palette[PAL_QADSCP];
-		bgPixel = palette[PAL_BACKGRD];
+		dstPtr = &video.frameBuffer[206 * SCREEN_W];
+		pixel = video.palette[PAL_QADSCP];
+		bgPixel = video.palette[PAL_BACKGRD];
 
 		for (int32_t y = 0; y < 4; y++)
 		{
@@ -213,8 +211,8 @@ static void setDragBar(void)
 	{
 		// clear drag bar background
 
-		dstPtr = &pixelBuffer[(206 * SCREEN_W) + 4];
-		pixel = palette[PAL_BACKGRD];
+		dstPtr = &video.frameBuffer[(206 * SCREEN_W) + 4];
+		pixel = video.palette[PAL_BACKGRD];
 
 		for (int32_t y = 0; y < 4; y++)
 		{
@@ -264,6 +262,9 @@ int32_t scr2SmpPos(int32_t x) // screen x pos -> sample pos
 	x += samOffsetScaled;
 	x = (uint32_t)(x * editor.sampler.samDisplay) / SAMPLE_AREA_WIDTH; // truncate here
 
+	if (x > editor.sampler.samLength)
+		x = editor.sampler.samLength;
+
 	return x;
 }
 
@@ -297,8 +298,8 @@ static void renderSampleData(void)
 
 	// clear sample data background
 
-	dstPtr = &pixelBuffer[(138 * SCREEN_W) + 3];
-	pixel = palette[PAL_BACKGRD];
+	dstPtr = &video.frameBuffer[(138 * SCREEN_W) + 3];
+	pixel = video.palette[PAL_BACKGRD];
 
 	for (y = 0; y < SAMPLE_VIEW_HEIGHT; y++)
 	{
@@ -309,9 +310,9 @@ static void renderSampleData(void)
 	}
 
 	// display center line
-	if (ptConfig.dottedCenterFlag)
+	if (config.dottedCenterFlag)
 	{
-		dstPtr = &pixelBuffer[(SAMPLE_AREA_Y_CENTER * SCREEN_W) + 3];
+		dstPtr = &video.frameBuffer[(SAMPLE_AREA_Y_CENTER * SCREEN_W) + 3];
 		for (x = 0; x < SAMPLE_AREA_WIDTH; x++)
 			dstPtr[x] = 0x02000000 | CENTER_LINE_COLOR;
 	}
@@ -327,7 +328,7 @@ static void renderSampleData(void)
 			for (x = 1; x < SAMPLE_AREA_WIDTH; x++)
 			{
 				y2 = SAMPLE_AREA_Y_CENTER - getScaledSample(scr2SmpPos(x));
-				sampleLine(pixelBuffer, x + 2, x + 3, y1, y2);
+				sampleLine(x + 2, x + 3, y1, y2);
 				y1 = y2;
 			}
 		}
@@ -355,11 +356,11 @@ static void renderSampleData(void)
 
 				if (x > 0)
 				{
-					if (min > oldMax) sampleLine(pixelBuffer, x + 2, x + 3, oldMax, min);
-					if (max < oldMin) sampleLine(pixelBuffer, x + 2, x + 3, oldMin, max);
+					if (min > oldMax) sampleLine(x + 2, x + 3, oldMax, min);
+					if (max < oldMin) sampleLine(x + 2, x + 3, oldMin, max);
 				}
 
-				sampleLine(pixelBuffer, x + 3, x + 3, max, min);
+				sampleLine(x + 3, x + 3, max, min);
 
 				oldMin = min;
 				oldMax = max;
@@ -369,9 +370,9 @@ static void renderSampleData(void)
 
 	// render "sample display" text
 	if (editor.sampler.samStart == editor.sampler.blankSample)
-		printFiveDecimalsBg(pixelBuffer, 272, 214, 0, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printFiveDecimalsBg(272, 214, 0, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	else
-		printFiveDecimalsBg(pixelBuffer, 272, 214, editor.sampler.samDisplay, palette[PAL_GENTXT], palette[PAL_GENBKG]);
+		printFiveDecimalsBg(272, 214, editor.sampler.samDisplay, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 	setDragBar();
 	setLoopSprites();
@@ -398,7 +399,7 @@ void invertRange(void)
 	if (rangeLen < 1)
 		rangeLen = 1;
 
-	dstPtr = &pixelBuffer[(138 * SCREEN_W) + (start + 3)];
+	dstPtr = &video.frameBuffer[(138 * SCREEN_W) + (start + 3)];
 	for (y = 0; y < 64; y++)
 	{
 		for (x = 0; x < rangeLen; x++)
@@ -1435,7 +1436,7 @@ void sampleMarkerToBeg(void)
 	else
 	{
 		invertRange();
-		if (input.keyb.shiftPressed && editor.markStartOfs != -1)
+		if (keyb.shiftPressed && editor.markStartOfs != -1)
 		{
 			editor.markStartOfs = editor.sampler.samOffset;
 		}
@@ -1471,7 +1472,7 @@ void sampleMarkerToCenter(void)
 		middlePos = editor.sampler.samOffset + ((editor.sampler.samDisplay + 1) / 2);
 
 		invertRange();
-		if (input.keyb.shiftPressed && editor.markStartOfs != -1)
+		if (keyb.shiftPressed && editor.markStartOfs != -1)
 		{
 			if (editor.markStartOfs < middlePos)
 				editor.markEndOfs = middlePos;
@@ -1507,7 +1508,7 @@ void sampleMarkerToEnd(void)
 	else
 	{
 		invertRange();
-		if (input.keyb.shiftPressed && editor.markStartOfs != -1)
+		if (keyb.shiftPressed && editor.markStartOfs != -1)
 		{
 			editor.markEndOfs = s->length;
 		}
@@ -1995,7 +1996,7 @@ void setLoopSprites(void)
 		hideSprite(SPRITE_LOOP_PIN_RIGHT);
 	}
 
-	textOutBg(pixelBuffer, 288, 225, (s->loopStart+s->loopLength > 2) ? "ON " : "OFF", palette[PAL_GENTXT], palette[PAL_GENBKG]);
+	textOutBg(288, 225, (s->loopStart+s->loopLength > 2) ? "ON " : "OFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 }
 
 void samplerShowAll(void)
@@ -2081,12 +2082,12 @@ static void samplerZoomOut(int32_t step, int16_t x)
 
 void samplerZoomInMouseWheel(void)
 {
-	samplerZoomIn((editor.sampler.samDisplay + 5) / 10, input.mouse.x);
+	samplerZoomIn((editor.sampler.samDisplay + 5) / 10, mouse.x);
 }
 
 void samplerZoomOutMouseWheel(void)
 {
-	samplerZoomOut((editor.sampler.samDisplay + 5) / 10, input.mouse.x);
+	samplerZoomOut((editor.sampler.samDisplay + 5) / 10, mouse.x);
 }
 
 void samplerZoomOut2x(void)
@@ -2158,22 +2159,19 @@ void volBoxBarPressed(bool mouseButtonHeld)
 {
 	int32_t mouseX;
 
-	if (input.mouse.y < 0 || input.mouse.x < 0 || input.mouse.y >= SCREEN_H || input.mouse.x >= SCREEN_W)
-		return;
-
 	if (!mouseButtonHeld)
 	{
-		if (input.mouse.x >= 72 && input.mouse.x <= 173)
+		if (mouse.x >= 72 && mouse.x <= 173)
 		{
-			if (input.mouse.y >= 154 && input.mouse.y <= 174) editor.ui.forceVolDrag = 1;
-			if (input.mouse.y >= 165 && input.mouse.y <= 175) editor.ui.forceVolDrag = 2;
+			if (mouse.y >= 154 && mouse.y <= 174) editor.ui.forceVolDrag = 1;
+			if (mouse.y >= 165 && mouse.y <= 175) editor.ui.forceVolDrag = 2;
 		}
 	}
 	else
 	{
-		if (editor.sampler.lastMouseX != input.mouse.x)
+		if (editor.sampler.lastMouseX != mouse.x)
 		{
-			editor.sampler.lastMouseX = input.mouse.x;
+			editor.sampler.lastMouseX = mouse.x;
 			mouseX = CLAMP(editor.sampler.lastMouseX - 107, 0, 60);
 
 			if (editor.ui.forceVolDrag == 1)
@@ -2196,14 +2194,11 @@ void samplerBarPressed(bool mouseButtonHeld)
 {
 	int32_t tmp32;
 
-	if (input.mouse.y < 0 || input.mouse.x < 0 || input.mouse.y >= SCREEN_H || input.mouse.x >= SCREEN_W)
-		return;
-
 	if (!mouseButtonHeld)
 	{
-		if (input.mouse.x >= 4 && input.mouse.x <= 315)
+		if (mouse.x >= 4 && mouse.x <= 315)
 		{
-			if (input.mouse.x < editor.sampler.dragStart)
+			if (mouse.x < editor.sampler.dragStart)
 			{
 				tmp32 = editor.sampler.samOffset - editor.sampler.samDisplay;
 				if (tmp32 < 0)
@@ -2219,7 +2214,7 @@ void samplerBarPressed(bool mouseButtonHeld)
 				return;
 			}
 
-			if (input.mouse.x > editor.sampler.dragEnd)
+			if (mouse.x > editor.sampler.dragEnd)
 			{
 				tmp32 = editor.sampler.samOffset + editor.sampler.samDisplay;
 				if (tmp32+editor.sampler.samDisplay <= editor.sampler.samLength)
@@ -2243,22 +2238,21 @@ void samplerBarPressed(bool mouseButtonHeld)
 				return;
 			}
 
-			editor.sampler.lastSamPos = (uint16_t)input.mouse.x;
+			editor.sampler.lastSamPos = mouse.x;
 			editor.sampler.saveMouseX = editor.sampler.lastSamPos - editor.sampler.dragStart;
 
 			editor.ui.forceSampleDrag = true;
 		}
 	}
 
-	if (input.mouse.x != editor.sampler.lastSamPos)
+	if (mouse.x != editor.sampler.lastSamPos)
 	{
-		editor.sampler.lastSamPos = (uint16_t)input.mouse.x;
+		editor.sampler.lastSamPos = mouse.x;
 
 		tmp32 = editor.sampler.lastSamPos - editor.sampler.saveMouseX - 4;
-		if (tmp32 < 0)
-			tmp32 = 0;
+		tmp32 = CLAMP(tmp32, 0, SAMPLE_AREA_WIDTH);
 
-		tmp32 = (int32_t)(((tmp32 * editor.sampler.samLength) + (311/2)) / 311); // rounded
+		tmp32 = ((tmp32 * editor.sampler.samLength) + (311/2)) / 311; // rounded
 		if (tmp32+editor.sampler.samDisplay <= editor.sampler.samLength)
 		{
 			if (tmp32 == editor.sampler.samOffset)
@@ -2280,162 +2274,166 @@ void samplerBarPressed(bool mouseButtonHeld)
 	}
 }
 
-static int32_t x2LoopX(int32_t mouseX)
+static int32_t mouseYToSampleY(int32_t my)
 {
-	moduleSample_t *s = &modEntry->samples[editor.currSample];
+	int32_t tmp32;
 
-	mouseX -= 3;
-	if (mouseX < 0)
-		mouseX = 0;
+	if (my == SAMPLE_AREA_Y_CENTER) // center
+	{
+		return 128;
+	}
+	else
+	{
+		tmp32 = my - 138;
+		tmp32 = ((tmp32 << 8) + (SAMPLE_AREA_HEIGHT/2)) / SAMPLE_AREA_HEIGHT;
+		tmp32 = CLAMP(tmp32, 0, 255);
+		tmp32 ^= 0xFF;
+	}
 
-	mouseX = scr2SmpPos(mouseX);
-	mouseX = CLAMP(mouseX, 0, s->length);
-
-	return mouseX;
-}
-
-static int32_t xToSmpX(int32_t x, int32_t smpLen)
-{
-	x = scr2SmpPos(x);
-	x = CLAMP(x, 0, smpLen - 1);
-
-	return x;
-}
-
-static int8_t yToSmpY(int32_t mouseY)
-{
-	mouseY = (SAMPLE_AREA_Y_CENTER - mouseY) * 4;
-	CLAMP8(mouseY);
-
-	return mouseY;
+	return tmp32;
 }
 
 void samplerEditSample(bool mouseButtonHeld)
 {
-	int8_t y;
-	int32_t mouseY, x, smp_x0, smp_x1, xDistance, smp_y0, smp_y1, yDistance, smp;
+	int8_t *ptr8;
+	int32_t mx, my, tmp32, p, vl, tvl, r, rl, rvl, start, end;
 	moduleSample_t *s;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
-
-	if (input.mouse.y < 0 || input.mouse.x < 0 || input.mouse.y >= SCREEN_H || input.mouse.x >= SCREEN_W)
-		return;
-
 	s = &modEntry->samples[editor.currSample];
+
+	if (s->length == 0)
+	{
+		displayErrorMsg("SAMPLE LENGTH = 0");
+		return;
+	}
+
+	mx = mouse.x;
+	if (mx > 4+SAMPLE_AREA_WIDTH)
+		mx = 4+SAMPLE_AREA_WIDTH;
+
+	my = mouse.y;
 
 	if (!mouseButtonHeld)
 	{
-		if (input.mouse.x >= 3 && input.mouse.x <= 316 && input.mouse.y >= 138 && input.mouse.y <= 201)
-		{
-			if (s->length == 0)
-			{
-				displayErrorMsg("SAMPLE LENGTH = 0");
-			}
-			else
-			{
-				editor.sampler.lastMouseX = input.mouse.x;
-				editor.sampler.lastMouseY = input.mouse.y;
-				editor.ui.forceSampleEdit = true;
-				updateWindowTitle(MOD_IS_MODIFIED);
-			}
-		}
+		lastDrawX = scr2SmpPos(mx);
+		lastDrawY = mouseYToSampleY(my);
 
-		return;
+		editor.ui.forceSampleEdit = true;
+		updateWindowTitle(MOD_IS_MODIFIED);
 	}
-
-	mouseY = input.keyb.shiftPressed ? editor.sampler.lastMouseY : input.mouse.y;
-
-	x = xToSmpX(input.mouse.x - 3, s->length);
-	y = yToSmpY(mouseY);
-
-	modEntry->sampleData[s->offset+x] = y;
-
-	// interpolate x gaps
-	if (input.mouse.x != editor.sampler.lastMouseX)
+	else if (mx == editor.sampler.lastMouseX && my == editor.sampler.lastMouseY)
 	{
-		smp_y0 = yToSmpY(editor.sampler.lastMouseY);
-
-		smp_y1 = y;
-		yDistance = smp_y1 - smp_y0;
-
-		if (input.mouse.x > editor.sampler.lastMouseX)
-		{
-			smp_x1 = x;
-			smp_x0 = xToSmpX(editor.sampler.lastMouseX - 3, s->length);
-
-			xDistance = smp_x1 - smp_x0;
-			if (xDistance > 0)
-			{
-				for (x = smp_x0; x < smp_x1; x++)
-				{
-					assert(x < s->length);
-
-					smp = smp_y0 + (((x - smp_x0) * yDistance) / xDistance);
-					CLAMP8(smp);
-					modEntry->sampleData[s->offset + x] = (int8_t)smp;
-				}
-			}
-		}
-		else if (input.mouse.x < editor.sampler.lastMouseX)
-		{
-			smp_x0 = x;
-			smp_x1 = xToSmpX(editor.sampler.lastMouseX - 3, s->length);
-
-			xDistance = smp_x1 - smp_x0;
-			if (xDistance > 0)
-			{
-				for (x = smp_x0; x < smp_x1; x++)
-				{
-					assert(x < s->length);
-
-					smp = smp_y0 + (((smp_x1 - x) * yDistance) / xDistance);
-					CLAMP8(smp);
-					modEntry->sampleData[s->offset + x] = (int8_t)smp;
-				}
-			}
-		}
-
-		editor.sampler.lastMouseX = input.mouse.x;
-
-		if (!input.keyb.shiftPressed)
-			editor.sampler.lastMouseY = input.mouse.y;
+		return; // don't continue if we didn't move the mouse
 	}
+
+	if (mx != editor.sampler.lastMouseX)
+		p = scr2SmpPos(mx);
+	else
+		p = lastDrawX;
+
+	if (!keyb.shiftPressed && my != editor.sampler.lastMouseY)
+		vl = mouseYToSampleY(my);
+	else
+		vl = lastDrawY;
+
+	editor.sampler.lastMouseX = mx;
+	editor.sampler.lastMouseY = my;
+
+	r = p;
+	rvl = vl;
+
+	// swap x/y if needed
+	if (p > lastDrawX)
+	{
+		// swap x
+		tmp32 = p;
+		p = lastDrawX;
+		lastDrawX = tmp32;
+
+		// swap y
+		tmp32 = lastDrawY;
+		lastDrawY = vl;
+		vl = tmp32;
+	}
+
+	ptr8 = &modEntry->sampleData[s->offset];
+
+	start = p;
+	if (start < 0)
+		start = 0;
+
+	end = lastDrawX+1;
+	if (end > s->length)
+		end = s->length;
+
+	if (p == lastDrawX)
+	{
+		const int8_t smpVal = (int8_t)(vl ^ 0x80);
+		for (rl = start; rl < end; rl++)
+			ptr8[rl] = smpVal;
+	}
+	else
+	{
+		int32_t y = lastDrawY - vl;
+		int32_t x = lastDrawX - p;
+
+		if (x != 0)
+		{
+			double dMul = 1.0 / x;
+			int32_t i = 0;
+
+			for (rl = start; rl < end; rl++)
+			{
+				tvl = y * i;
+				tvl = (int32_t)(tvl * dMul); // tvl /= x
+				tvl += vl;
+				tvl ^= 0x80;
+
+				ptr8[rl] = (int8_t)tvl;
+				i++;
+			}
+		}
+	}
+
+	lastDrawY = rvl;
+	lastDrawX = r;
 
 	displaySample();
 }
 
 void samplerSamplePressed(bool mouseButtonHeld)
 {
-	int16_t mouseX;
-	int32_t tmpPos;
+	int32_t mouseX, tmpPos;
 	moduleSample_t *s;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
 	if (!mouseButtonHeld)
 	{
-		if (input.mouse.y < 142)
+		if (mouse.y < 142)
 		{
-			if (input.mouse.x >= editor.sampler.loopStartPos && input.mouse.x <= editor.sampler.loopStartPos+3)
+			if (mouse.x >= editor.sampler.loopStartPos && mouse.x <= editor.sampler.loopStartPos+3)
 			{
 				editor.ui.leftLoopPinMoving = true;
 				editor.ui.rightLoopPinMoving = false;
 				editor.ui.sampleMarkingPos = 1;
-				editor.sampler.lastMouseX = input.mouse.x;
+				editor.sampler.lastMouseX = mouse.x;
 				return;
 			}
-			else if (input.mouse.x >= editor.sampler.loopEndPos+3 && input.mouse.x <= editor.sampler.loopEndPos+6)
+			else if (mouse.x >= editor.sampler.loopEndPos+3 && mouse.x <= editor.sampler.loopEndPos+6)
 			{
 				editor.ui.rightLoopPinMoving = true;
 				editor.ui.leftLoopPinMoving = false;
 				editor.ui.sampleMarkingPos = 1;
-				editor.sampler.lastMouseX = input.mouse.x;
+				editor.sampler.lastMouseX = mouse.x;
 				return;
 			}
 		}
 	}
 
-	mouseX = (int16_t)input.mouse.x;
+	mouseX = CLAMP(mouse.x, 0, SCREEN_W+8); // allow some extra pixels outside of the screen
+
 	s = &modEntry->samples[editor.currSample];
 
 	if (editor.ui.leftLoopPinMoving)
@@ -2444,7 +2442,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		{
 			editor.sampler.lastMouseX = mouseX;
 
-			tmpPos = (x2LoopX(mouseX + 2) - s->loopStart) & 0xFFFFFFFE;
+			tmpPos = (scr2SmpPos(mouseX - 1) - s->loopStart) & 0xFFFFFFFE;
 			if (tmpPos > MAX_SAMPLE_LEN)
 				tmpPos = MAX_SAMPLE_LEN;
 
@@ -2482,7 +2480,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 			s = &modEntry->samples[editor.currSample];
 
-			tmpPos = (x2LoopX(mouseX - 1) - s->loopStart) & 0xFFFFFFFE;
+			tmpPos = (scr2SmpPos(mouseX - 4) - s->loopStart) & 0xFFFFFFFE;
 			tmpPos = CLAMP(tmpPos, 2, MAX_SAMPLE_LEN);
 
 			s->loopLength = tmpPos;
@@ -2500,7 +2498,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	if (!mouseButtonHeld)
 	{
-		if (mouseX < 3 || mouseX > 319)
+		if (mouseX < 3 || mouseX >= SCREEN_W)
 			return;
 
 		editor.ui.sampleMarkingPos = (int16_t)mouseX;
@@ -2540,7 +2538,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		return;
 	}
 
-	mouseX = CLAMP(mouseX, 3, 319);
+	mouseX = CLAMP(mouseX, 3, SCREEN_W);
 
 	if (mouseX != editor.sampler.lastSamPos)
 	{
@@ -2643,7 +2641,7 @@ void samplerLoopToggle(void)
 void exitFromSam(void)
 {
 	editor.ui.samplerScreenShown = false;
-	memcpy(&pixelBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
+	memcpy(&video.frameBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
 
 	updateCursorPos();
 	setLoopSprites();
@@ -2667,7 +2665,7 @@ void samplerScreen(void)
 	}
 
 	editor.ui.samplerScreenShown = true;
-	memcpy(&pixelBuffer[(121 * SCREEN_W)], samplerScreenBMP, 320 * 134 * sizeof (int32_t));
+	memcpy(&video.frameBuffer[(121 * SCREEN_W)], samplerScreenBMP, 320 * 134 * sizeof (int32_t));
 	hideSprite(SPRITE_PATTERN_CURSOR);
 
 	editor.ui.updateStatusText = true;

@@ -24,8 +24,6 @@
 #include "pt2_textout.h"
 #include "pt2_scopes.h"
 
-extern bool forceMixerOff; // pt_audio.c
-
 static bool posJumpAssert, pBreakFlag, updateUIPositions, modHasBeenPlayed;
 static int8_t pBreakPosition, oldRow, modPattern;
 static uint8_t pattDelTime, setBPMFlag, lowMask = 0xFF, pattDelTime2, oldSpeed;
@@ -63,13 +61,14 @@ void doStopIt(void)
 	moduleChannel_t *c;
 	uint8_t i;
 
+	editor.songPlaying = false;
+
 	resetCachedMixerPeriod();
 
 	pattDelTime = 0;
 	pattDelTime2 = 0;
 	editor.playMode = PLAY_MODE_NORMAL;
 	editor.currMode = MODE_IDLE;
-	editor.songPlaying = false;
 
 	pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
 
@@ -919,7 +918,7 @@ static void nextPosition(void)
 			modOrder = 0;
 			modHasBeenPlayed = true;
 
-			if (ptConfig.compoMode) // stop song for music competitions playing
+			if (config.compoMode) // stop song for music competitions playing
 			{
 				doStopIt();
 				turnOffVoices();
@@ -1249,6 +1248,10 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 {
 	uint8_t oldPlayMode, oldMode;
 
+	doStopIt();
+	turnOffVoices();
+	mixerClearSampleCounter();
+
 	if (row != -1)
 	{
 		if (row >= 0 && row <= 63)
@@ -1301,9 +1304,6 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	oldPlayMode = editor.playMode;
 	oldMode = editor.currMode;
 
-	doStopIt();
-	turnOffVoices();
-
 	editor.playMode = oldPlayMode;
 	editor.currMode = oldMode;
 
@@ -1320,8 +1320,6 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 		editor.ui.updateSongPattern = true;
 		editor.ui.updateCurrPattText = true;
 	}
-
-	mixerClearSampleCounter();
 }
 
 void clearSong(void)
@@ -1438,7 +1436,11 @@ void modFree(void)
 	if (modEntry == NULL)
 		return; // not allocated
 
-	lockAudio();
+	const bool wasLocked = audio.locked;
+	if (!wasLocked)
+		lockAudio();
+
+	turnOffVoices();
 
 	for (i = 0; i < MAX_PATTERNS; i++)
 	{
@@ -1447,15 +1449,13 @@ void modFree(void)
 	}
 
 	if (modEntry->sampleData != NULL)
-	{
-		clearPaulaAndScopes();
 		free(modEntry->sampleData);
-	}
 
 	free(modEntry);
 	modEntry = NULL;
 
-	unlockAudio();
+	if (!wasLocked)
+		unlockAudio();
 }
 
 void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
@@ -1465,7 +1465,7 @@ void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
 
 	editor.playMode = PLAY_MODE_NORMAL;
 	editor.blockMarkFlag = false;
-	forceMixerOff = true;
+	audio.forceMixerOff = true;
 
 	modEntry->row = 0;
 	modEntry->currRow = 0;
@@ -1528,5 +1528,5 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 
 	editor.modTick = 0;
 	modHasBeenPlayed = false;
-	forceMixerOff = false;
+	audio.forceMixerOff = false;
 }

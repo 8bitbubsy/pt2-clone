@@ -40,13 +40,6 @@
 
 module_t *modEntry = NULL; // globalized
 
-// accessed by pt_visuals.c
-uint32_t *pixelBuffer = NULL;
-SDL_Window *window = NULL;
-SDL_Renderer *renderer = NULL;
-SDL_Texture  *texture = NULL;
-// -----------------------------
-
 static bool backupMadeAfterCrash;
 
 #ifdef _WIN32
@@ -72,9 +65,6 @@ static LONG WINAPI exceptionHandler(EXCEPTION_POINTERS *ptr);
 static void exceptionHandler(int32_t signal);
 #endif
 #endif
-
-extern bool forceMixerOff; // pt_audio.c
-extern uint32_t palette[PALETTE_NUM]; // pt_palette.c
 
 #ifdef _WIN32
 static void makeSureDirIsProgramDir(void);
@@ -109,9 +99,6 @@ int main(int argc, char *argv[])
 #if SDL_PATCHLEVEL < 5
 	#pragma message("WARNING: The SDL2 dev lib is older than ver 2.0.5. You'll get fullscreen mode issues.")
 #endif
-
-	cpu.hasSSE = SDL_HasSSE();
-	cpu.hasSSE2 = SDL_HasSSE2();
 
 	// set up crash handler
 #ifndef _DEBUG
@@ -154,14 +141,14 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef _WIN32
-	if (!cpu.hasSSE)
+	if (!SDL_HasSSE())
 	{
-		showErrorMsgBox("Your computer's processor doesn't have the SSE instruction set\n" \
+		showErrorMsgBox("Your computer's processor doesn't have the SSE+SSE2 instruction set\n" \
 		                "which is needed for this program to run. Sorry!");
 		return 0;
 	}
 
-	if (!cpu.hasSSE2)
+	if (!SDL_HasSSE2())
 	{
 		showErrorMsgBox("Your computer's processor doesn't have the SSE2 instruction set\n" \
 		                "which is needed for this program to run. Sorry!");
@@ -170,12 +157,14 @@ int main(int argc, char *argv[])
 
 	setupWin32Usleep();
 	disableWasapi(); // disable problematic WASAPI SDL2 audio driver on Windows (causes clicks/pops sometimes...)
+	                 // 13.03.2020: This is still needed with SDL 2.0.12...
 #endif
 
 	/* SDL 2.0.9 for Windows has a serious bug where you need to initialize the joystick subsystem
 	** (even if you don't use it) or else weird things happen like random stutters, keyboard (rarely) being
 	** reinitialized in Windows and what not.
-	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4391 */
+	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4391
+	*/
 #if defined _WIN32 && SDL_PATCHLEVEL == 9
 	if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0)
 #else
@@ -190,7 +179,8 @@ int main(int argc, char *argv[])
 
 	/* Text input is started by default in SDL2, turn it off to remove ~2ms spikes per key press.
 	** We manuallay start it again when someone clicks on a text edit box, and stop it when done.
-	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4166 */
+	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4166
+	*/
 	SDL_StopTextInput();
 
  #ifdef __APPLE__
@@ -299,7 +289,7 @@ int main(int argc, char *argv[])
 	fillToVuMetersBgBuffer();
 	updateCursorPos();
 
-	SDL_ShowWindow(window);
+	SDL_ShowWindow(video.window);
 
 	changePathToHome(); // set path to home/user-dir now
 	diskOpSetInitPath(); // set path to custom path in config (if present)
@@ -313,9 +303,9 @@ int main(int argc, char *argv[])
 		readKeyModifiers(); // set/clear CTRL/ALT/SHIFT/AMIGA key states
 		handleInput();
 		updateMouseCounters();
-		handleKeyRepeat(input.keyb.lastRepKey);
+		handleKeyRepeat(keyb.lastRepKey);
 
-		if (!input.mouse.buttonWaiting && editor.ui.sampleMarkingPos == -1 &&
+		if (!mouse.buttonWaiting && editor.ui.sampleMarkingPos == -1 &&
 			!editor.ui.forceSampleDrag && !editor.ui.forceVolDrag && !editor.ui.forceSampleEdit)
 		{
 			handleGUIButtonRepeat();
@@ -339,16 +329,26 @@ static void handleInput(void)
 
 	while (SDL_PollEvent(&event))
 	{
-		if (editor.ui.vsync60HzPresent)
+		if (event.type == SDL_WINDOWEVENT)
 		{
-			/* if we minimize the window and vsync is present, vsync is temporarily turned off.
-			** recalc waitVBL() vars so that it can sleep properly in said mode. */
-			if (event.type == SDL_WINDOWEVENT &&
-				(event.window.event == SDL_WINDOWEVENT_MINIMIZED || event.window.event == SDL_WINDOWEVENT_FOCUS_LOST))
+			if (event.window.event == SDL_WINDOWEVENT_HIDDEN)
+				video.windowHidden = true;
+			else if (event.window.event == SDL_WINDOWEVENT_SHOWN)
+				video.windowHidden = false;
+
+			if (video.vsync60HzPresent)
 			{
-				setupWaitVBL();
+				/* if we minimize the window and vsync is present, vsync is temporarily turned off.
+				** recalc waitVBL() vars so that it can sleep properly in said mode.
+				*/
+				if (event.window.event == SDL_WINDOWEVENT_MINIMIZED ||
+					event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+				{
+					setupWaitVBL();
+				}
 			}
 		}
+
 
 #ifdef _WIN32
 		handleSysMsg(event);
@@ -373,7 +373,7 @@ static void handleInput(void)
 		{
 			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
 			SDL_free(event.drop.file);
-			SDL_RaiseWindow(window); // set window focus
+			SDL_RaiseWindow(video.window); // set window focus
 		}
 		if (event.type == SDL_QUIT)
 		{
@@ -385,7 +385,7 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_KEYDOWN)
 		{
-			if (editor.repeatKeyFlag || input.keyb.lastRepKey != event.key.keysym.scancode)
+			if (editor.repeatKeyFlag || keyb.lastRepKey != event.key.keysym.scancode)
 				keyDownHandler(event.key.keysym.scancode, event.key.keysym.sym);
 		}
 		else if (event.type == SDL_MOUSEBUTTONUP)
@@ -435,9 +435,13 @@ static void handleInput(void)
 static bool initializeVars(void)
 {
 	// clear common structs
-	memset(&input, 0, sizeof (input));
+	memset(&keyb, 0, sizeof (keyb));
+	memset(&mouse, 0, sizeof (mouse));
+	memset(&video, 0, sizeof (video));
 	memset(&editor, 0, sizeof (editor));
-	memset(&ptConfig, 0, sizeof (ptConfig));
+	memset(&config, 0, sizeof (config));
+
+	setDefaultPalette();
 
 	editor.repeatKeyFlag = (SDL_GetModState() & KMOD_CAPS) ? true : false;
 
@@ -450,17 +454,17 @@ static bool initializeVars(void)
 	if (!allocSamplerVars() || !allocDiskOpVars())
 		goto oom;
 
-	ptConfig.defModulesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
-	ptConfig.defSamplesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
+	config.defModulesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
+	config.defSamplesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
 	editor.tempSample = (int8_t *)calloc(MAX_SAMPLE_LEN, 1);
 
-	if (ptConfig.defModulesDir == NULL || ptConfig.defSamplesDir == NULL ||
+	if (config.defModulesDir == NULL || config.defSamplesDir == NULL ||
 		editor.tempSample == NULL)
 	{
 		goto oom;
 	}
 
-	clearPaulaAndScopes();
+	turnOffVoices();
 
 	// set various non-zero values
 	editor.vol1 = 100;
@@ -519,7 +523,7 @@ static bool initializeVars(void)
 	editor.sampleFromDisp = &editor.sampleFrom;
 	editor.chordLengthDisp = &editor.chordLength;
 	editor.metroChannelDisp = &editor.metroChannel;
-	editor.quantizeValueDisp = &ptConfig.quantizeValue;
+	editor.quantizeValueDisp = &config.quantizeValue;
 
 	editor.programRunning = true;
 	return true;
@@ -535,11 +539,11 @@ static void handleSigTerm(void)
 	{
 		resetAllScreens();
 
-		if (!editor.fullscreen)
+		if (!video.fullscreen)
 		{
 			// de-minimize window and set focus so that the user sees the message box
-			SDL_RestoreWindow(window);
-			SDL_RaiseWindow(window);
+			SDL_RestoreWindow(video.window);
+			SDL_RaiseWindow(video.window);
 		}
 
 		editor.ui.askScreenShown = true;
@@ -725,7 +729,7 @@ static bool instanceAlreadyOpen(void)
 		sharedMemBuf = (LPTSTR)MapViewOfFile(oneInstHandle, FILE_MAP_ALL_ACCESS, 0, 0, sizeof (HWND));
 		if (sharedMemBuf != NULL)
 		{
-			CopyMemory((PVOID)sharedMemBuf, &editor.ui.hWnd, sizeof (HWND));
+			CopyMemory((PVOID)sharedMemBuf, &video.hWnd, sizeof (HWND));
 			UnmapViewOfFile(sharedMemBuf);
 			sharedMemBuf = NULL;
 		}
@@ -739,10 +743,10 @@ static bool handleSingleInstancing(int32_t argc, char **argv)
 	SDL_SysWMinfo wmInfo;
 
 	SDL_VERSION(&wmInfo.version);
-	if (!SDL_GetWindowWMInfo(window, &wmInfo))
+	if (!SDL_GetWindowWMInfo(video.window, &wmInfo))
 		return false;
 
-	editor.ui.hWnd = wmInfo.info.win.window;
+	video.hWnd = wmInfo.info.win.window;
 	if (instanceAlreadyOpen() && argc >= 2 && argv[1][0] != '\0')
 	{
 		sharedMemBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof (HWND));
@@ -864,8 +868,8 @@ static void cleanUp(void) // never call this inside the main loop!
 	videoClose();
 	freeSprites();
 
-	if (ptConfig.defModulesDir != NULL) free(ptConfig.defModulesDir);
-	if (ptConfig.defSamplesDir != NULL) free(ptConfig.defSamplesDir);
+	if (config.defModulesDir != NULL) free(config.defModulesDir);
+	if (config.defSamplesDir != NULL) free(config.defSamplesDir);
 	if (editor.tempSample != NULL) free(editor.tempSample);
 
 #ifdef _WIN32

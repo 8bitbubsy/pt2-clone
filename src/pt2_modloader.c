@@ -39,8 +39,6 @@ static char oldFullPath[(PATH_MAX * 2) + 2];
 static uint32_t oldFullPathLen;
 static module_t *tempMod;
 
-extern SDL_Window *window;
-
 static MEMFILE *mopen(const uint8_t *src, uint32_t length);
 static void mclose(MEMFILE **buf);
 static int32_t mgetc(MEMFILE *buf);
@@ -656,6 +654,7 @@ module_t *modLoad(UNICHAR *fileName)
 					{
 						// "DFJ SoundTracker II" or later
 
+						// TODO: This needs more detection and is NOT correct!
 						if (note->command == 0xD)
 						{
 							if (veryLateSTKVerFlag) // "DFJ SoundTracker III" or later
@@ -806,7 +805,7 @@ bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
 
 	memset(fileName, 0, sizeof (fileName));
 
-	if (ptConfig.modDot)
+	if (config.modDot)
 	{
 		// extension.filename
 		if (*modEntry->head.moduleTitle == '\0')
@@ -848,7 +847,7 @@ bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
 		for (uint16_t j = 1; j <= 9999; j++)
 		{
 			memset(fileName, 0, sizeof (fileName));
-			if (ptConfig.modDot)
+			if (config.modDot)
 			{
 				// extension.filename
 				if (*modEntry->head.moduleTitle == '\0')
@@ -1326,8 +1325,8 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			oldAutoPlay = autoPlay;
 
 			// de-minimize window and set focus so that the user sees the message box
-			SDL_RestoreWindow(window);
-			SDL_RaiseWindow(window);
+			SDL_RestoreWindow(video.window);
+			SDL_RaiseWindow(video.window);
 
 			showSongUnsavedAskBox(ASK_DISCARD_SONG_DRAGNDROP);
 			return;

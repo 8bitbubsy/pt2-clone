@@ -1,8 +1,5 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
-
 enum
 {
 	// -----------------------------
@@ -26,3 +23,5 @@ enum
 	// -----------------------------
 	PALETTE_NUM
 };
+
+void setDefaultPalette(void);

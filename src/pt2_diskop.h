@@ -22,7 +22,7 @@ char *diskOpGetAnsiEntry(int32_t fileIndex);
 UNICHAR *diskOpGetUnicodeEntry(int32_t fileIndex);
 bool diskOpSetPath(UNICHAR *path, bool cache);
 void diskOpSetInitPath(void);
-void diskOpRenderFileList(uint32_t *frameBuffer);
+void diskOpRenderFileList(void);
 bool allocDiskOpVars(void);
 void freeDiskOpMem(void);
 void freeDiskOpEntryMem(void);

@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "pt2_header.h"
 
 typedef struct scopeChannel_t // internal scope state
 {
@@ -24,8 +25,8 @@ int32_t getSampleReadPos(uint8_t ch, uint8_t smpNum);
 void updateScopes(void);
 void drawScopes(void);
 bool initScopes(void);
-void waitOnScopes(void);
-void clearScopes(void);
+void stopScope(uint8_t ch);
+void stopAllScopes(void);
 
-extern scopeChannel_t scope[4];
-extern scopeChannelExt_t scopeExt[4];
+extern scopeChannel_t scope[AMIGA_VOICES];
+extern scopeChannelExt_t scopeExt[AMIGA_VOICES];
