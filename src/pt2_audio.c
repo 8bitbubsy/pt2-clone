@@ -379,12 +379,8 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 	setScopeDelta(ch, oldScopeDelta);
 
 	// for BLEP synthesis
-
-	if (v->dLastDelta == 0.0)
-		v->dLastDelta = v->dDelta;
-
-	if (v->dLastDeltaMul == 0.0)
-		v->dLastDeltaMul = v->dDeltaMul;
+	if (v->dLastDelta == 0.0) v->dLastDelta = v->dDelta;
+	if (v->dLastDeltaMul == 0.0) v->dLastDeltaMul = v->dDeltaMul;
 }
 
 void paulaSetVolume(uint8_t ch, uint16_t vol)

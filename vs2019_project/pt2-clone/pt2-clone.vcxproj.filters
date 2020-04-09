@@ -94,9 +94,6 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c">
       <Filter>gfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_arrow.c">
-      <Filter>gfx</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_clear.c">
       <Filter>gfx</Filter>
     </ClCompile>

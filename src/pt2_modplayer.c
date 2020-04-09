@@ -56,7 +56,7 @@ void modSetSpeed(uint8_t speed)
 	editor.modTick = 0;
 }
 
-void doStopIt(void)
+void doStopIt(bool resetPlayMode)
 {
 	moduleChannel_t *c;
 	uint8_t i;
@@ -67,10 +67,14 @@ void doStopIt(void)
 
 	pattDelTime = 0;
 	pattDelTime2 = 0;
-	editor.playMode = PLAY_MODE_NORMAL;
-	editor.currMode = MODE_IDLE;
 
-	pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
+	if (resetPlayMode)
+	{
+		editor.playMode = PLAY_MODE_NORMAL;
+		editor.currMode = MODE_IDLE;
+
+		pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
+	}
 
 	for (i = 0; i < AMIGA_VOICES; i++)
 	{
@@ -338,27 +342,38 @@ static void setSpeed(moduleChannel_t *ch)
 
 static void arpeggio(moduleChannel_t *ch)
 {
-	uint8_t dat;
-	const int16_t *arpPointer;
+	uint8_t arpTick, arpNote;
+	const int16_t *periods;
 
-	dat = editor.modTick % 3;
-	if (dat == 0)
+	assert(editor.modTick < 32);
+	arpTick = arpTickTable[editor.modTick]; // 0, 1, 2
+
+	if (arpTick == 1)
+	{
+		arpNote = ch->n_cmd >> 4;
+	}
+	else if (arpTick == 2)
+	{
+		arpNote = ch->n_cmd & 0xF;
+	}
+	else // arpTick 0
 	{
 		paulaSetPeriod(ch->n_chanindex, ch->n_period);
+		return;
 	}
-	else
-	{
-		     if (dat == 1) dat = (ch->n_cmd & 0xF0) >> 4;
-		else if (dat == 2) dat =  ch->n_cmd & 0x0F;
 
-		arpPointer = &periodTable[ch->n_finetune * 37];
-		for (uint8_t i = 0; i < 37; i++)
+	/* 8bitbubsy: If the finetune is -1, this can overflow up to
+	** 15 words outside of the table. The table is padded with
+	** the correct overflow values to allow this to safely happen
+	** and sound correct at the same time.
+	*/
+	periods = &periodTable[ch->n_finetune * 37];
+	for (int32_t baseNote = 0; baseNote < 37; baseNote++)
+	{
+		if (ch->n_period >= periods[baseNote])
 		{
-			if (ch->n_period >= arpPointer[i])
-			{
-				paulaSetPeriod(ch->n_chanindex, arpPointer[i+dat]);
-				break;
-			}
+			paulaSetPeriod(ch->n_chanindex, periods[baseNote+arpNote]);
+			break;
 		}
 	}
 }
@@ -901,7 +916,7 @@ static void nextPosition(void)
 	{
 		if (editor.stepPlayEnabled)
 		{
-			doStopIt();
+			doStopIt(true);
 
 			editor.stepPlayEnabled = false;
 			editor.stepPlayBackwards = false;
@@ -920,7 +935,7 @@ static void nextPosition(void)
 
 			if (config.compoMode) // stop song for music competitions playing
 			{
-				doStopIt();
+				doStopIt(true);
 				turnOffVoices();
 
 				modEntry->currOrder = 0;
@@ -1058,7 +1073,7 @@ bool intMusic(void)
 
 		if (editor.stepPlayEnabled)
 		{
-			doStopIt();
+			doStopIt(true);
 
 			modEntry->currRow = modEntry->row & 0x3F;
 			editor.ui.updatePatternData = true;
@@ -1248,7 +1263,7 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 {
 	uint8_t oldPlayMode, oldMode;
 
-	doStopIt();
+	doStopIt(false);
 	turnOffVoices();
 	mixerClearSampleCounter();
 
@@ -1524,7 +1539,7 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 	modSetSpeed(oldSpeed);
 	modSetTempo(oldBPM);
 
-	doStopIt();
+	doStopIt(true);
 
 	editor.modTick = 0;
 	modHasBeenPlayed = false;

@@ -853,7 +853,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					editor.stepPlayEnabled = true;
 					editor.stepPlayBackwards = false;
 
-					doStopIt();
+					doStopIt(true);
 					playPattern(modEntry->currRow);
 				}
 			}
@@ -4285,7 +4285,7 @@ bool handleTextEditMode(SDL_Scancode scancode)
 					editor.stepPlayEnabled = true;
 					editor.stepPlayBackwards = true;
 
-					doStopIt();
+					doStopIt(true);
 					playPattern((modEntry->currRow - 1) & 0x3F);
 				}
 			}

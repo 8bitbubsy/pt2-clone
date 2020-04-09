@@ -7,55 +7,82 @@
 #include "pt2_palette.h"
 #include "pt2_visuals.h"
 
-static const char hexTable[16] =
-{
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-};
-
 void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 {
 	const uint8_t *srcPtr;
 	uint32_t *dstPtr;
 
-	if (ch == '\0' && (ch <= ' ' || ch > '~'))
+	if (ch == '\0' || ch == ' ')
 		return;
-
-	srcPtr = &fontBMP[(uint8_t)ch * (FONT_CHAR_W * FONT_CHAR_H)];
+	
+	srcPtr = &fontBMP[(ch & 0x7F) << 3];
 	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
-	for (uint32_t y = 0; y < FONT_CHAR_H; y++)
+	for (int32_t y = 0; y < FONT_CHAR_H; y++)
 	{
-		for (uint32_t x = 0; x < FONT_CHAR_W; x++)
+		for (int32_t x = 0; x < FONT_CHAR_W; x++)
 		{
 			if (srcPtr[x])
 				dstPtr[x] = color;
 		}
 
-		srcPtr += FONT_CHAR_W;
+		srcPtr += 127*FONT_CHAR_W;
 		dstPtr += SCREEN_W;
+	}
+}
+
+void charOut2(uint32_t xPos, uint32_t yPos, char ch)
+{
+	const uint8_t *srcPtr;
+	uint32_t *dstPtr1, *dstPtr2;
+
+	if (ch == '\0' || ch == ' ')
+		return;
+
+	srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	dstPtr2 = dstPtr1 + (SCREEN_W+1);
+
+	const uint32_t color1 = video.palette[PAL_BORDER];
+	const uint32_t color2 = video.palette[PAL_GENBKG2];
+
+	for (int32_t y = 0; y < FONT_CHAR_H; y++)
+	{
+		for (int32_t x = 0; x < FONT_CHAR_W; x++)
+		{
+			if (srcPtr[x])
+			{
+				dstPtr2[x] = color2;
+				dstPtr1[x] = color1;
+			}
+		}
+
+		srcPtr += 127*FONT_CHAR_W;
+		dstPtr1 += SCREEN_W;
+		dstPtr2 += SCREEN_W;
 	}
 }
 
 void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t bgColor)
 {
 	const uint8_t *srcPtr;
-	uint32_t *dstPtr;
+	uint32_t *dstPtr, colors[2];
 
 	if (ch == '\0')
 		return;
 
-	if (ch < ' ' || ch > '~')
-		ch = ' ';
-
-	srcPtr = &fontBMP[(uint8_t)ch * (FONT_CHAR_W * FONT_CHAR_H)];
+	srcPtr = &fontBMP[(ch & 0x7F) << 3];
 	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
-	for (uint32_t y = 0; y < FONT_CHAR_H; y++)
-	{
-		for (uint32_t x = 0; x < FONT_CHAR_W; x++)
-			dstPtr[x] = srcPtr[x] ? fgColor : bgColor;
+	colors[0] = bgColor;
+	colors[1] = fgColor;
 
-		srcPtr += FONT_CHAR_W;
+	for (int32_t y = 0; y < FONT_CHAR_H; y++)
+	{
+		for (int32_t x = 0; x < FONT_CHAR_W; x++)
+			dstPtr[x] = colors[srcPtr[x]];
+
+		srcPtr += 127*FONT_CHAR_W;
 		dstPtr += SCREEN_W;
 	}
 }
@@ -63,67 +90,66 @@ void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t
 void charOutBig(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 {
 	const uint8_t *srcPtr;
-	uint32_t *dstPtr;
+	uint32_t *dstPtr1, *dstPtr2;
 
-	if (ch != '\0' && (ch <= ' ' || ch > '~'))
+	if (ch == '\0' || ch == ' ')
 		return;
 
-	srcPtr = &fontBMP[(uint8_t)ch * (FONT_CHAR_W * FONT_CHAR_H)];
-	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	dstPtr2 = dstPtr1 + SCREEN_W;
 
-	for (uint32_t y = 0; y < FONT_CHAR_H; y++)
+	for (int32_t y = 0; y < FONT_CHAR_H; y++)
 	{
-		for (uint32_t x = 0; x < FONT_CHAR_W; x++)
+		for (int32_t x = 0; x < FONT_CHAR_W; x++)
 		{
 			if (srcPtr[x])
 			{
-				dstPtr[x] = color;
-				dstPtr[x+SCREEN_W] = color;
+				dstPtr1[x] = color;
+				dstPtr2[x] = color;
 			}
 		}
 
-		srcPtr += FONT_CHAR_W;
-		dstPtr += SCREEN_W * 2;
+		srcPtr += 127*FONT_CHAR_W;
+		dstPtr1 += SCREEN_W*2;
+		dstPtr2 += SCREEN_W*2;
 	}
 }
 
 void charOutBigBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t bgColor)
 {
 	const uint8_t *srcPtr;
-	uint32_t *dstPtr;
+	uint32_t *dstPtr1, *dstPtr2, colors[2];
 
 	if (ch == '\0')
 		return;
 
-	if (ch < ' ' || ch > '~')
-		ch = ' ';
+	srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	dstPtr2 = dstPtr1 + SCREEN_W;
 
-	srcPtr = &fontBMP[(uint8_t)ch * (FONT_CHAR_W * FONT_CHAR_H)];
-	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	colors[0] = bgColor;
+	colors[1] = fgColor;
 
-	for (uint32_t y = 0; y < FONT_CHAR_H; y++)
+	for (int32_t y = 0; y < FONT_CHAR_H; y++)
 	{
-		for (uint32_t x = 0; x < FONT_CHAR_W; x++)
+		for (int32_t x = 0; x < FONT_CHAR_W; x++)
 		{
-			if (srcPtr[x])
-			{
-				dstPtr[x] = fgColor;
-				dstPtr[x+SCREEN_W] = fgColor;
-			}
-			else
-			{
-				dstPtr[x] = bgColor;
-				dstPtr[x+SCREEN_W] = bgColor;
-			}
+			const uint32_t pixel = colors[srcPtr[x]];
+			dstPtr1[x] = pixel;
+			dstPtr2[x] = pixel;
 		}
 
-		srcPtr += FONT_CHAR_W;
-		dstPtr += SCREEN_W * 2;
+		srcPtr += 127*FONT_CHAR_W;
+		dstPtr1 += SCREEN_W*2;
+		dstPtr2 += SCREEN_W*2;
 	}
 }
 
 void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
+	assert(text != NULL);
+
 	uint32_t x = xPos;
 	while (*text != '\0')
 	{
@@ -132,8 +158,22 @@ void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 	}
 }
 
+void textOut2(uint32_t xPos, uint32_t yPos, const char *text)
+{
+	assert(text != NULL);
+
+	uint32_t x = xPos;
+	while (*text != '\0')
+	{
+		charOut2(x, yPos, *text++);
+		x += FONT_CHAR_W;
+	}
+}
+
 void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
+	assert(text != NULL);
+
 	uint32_t x = xPos;
 	while (*text != '\0')
 	{
@@ -144,6 +184,8 @@ void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color
 
 void textOutBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor, uint32_t bgColor)
 {
+	assert(text != NULL);
+
 	uint32_t x = xPos;
 	while (*text != '\0')
 	{
@@ -154,6 +196,8 @@ void textOutBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor,
 
 void textOutBig(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
+	assert(text != NULL);
+
 	uint32_t x = xPos;
 	while (*text != '\0')
 	{
@@ -164,6 +208,8 @@ void textOutBig(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 
 void textOutBigBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor, uint32_t bgColor)
 {
+	assert(text != NULL);
+
 	uint32_t x = xPos;
 	while (*text != '\0')
 	{

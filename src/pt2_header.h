@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.08"
+#define PROG_VER_STR "1.09"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -54,6 +54,7 @@
 
 #define AMIGA_PAL_VBLANK_HZ 50
 
+#define FONT_BMP_WIDTH 
 #define FONT_CHAR_W 8 // actual data length is 7, includes right spacing (1px column)
 #define FONT_CHAR_H 5
 
@@ -469,7 +470,7 @@ void incPatt(void);
 void decPatt(void);
 void modSetPos(int16_t order, int16_t row);
 void modStop(void);
-void doStopIt(void);
+void doStopIt(bool resetPlayMode);
 void playPattern(int8_t startRow);
 void modPlay(int16_t patt, int16_t order, int8_t row);
 void modSetSpeed(uint8_t speed);

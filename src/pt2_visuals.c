@@ -824,8 +824,6 @@ void renderDiskOpScreen(void)
 void updateDiskOp(void)
 {
 	char tmpChar;
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
 
 	if (!editor.ui.diskOpScreenShown || editor.ui.posEdScreenShown)
 		return;
@@ -840,22 +838,16 @@ void updateDiskOp(void)
 	{
 		editor.ui.updateLoadMode = false;
 
-		// clear backgrounds
-		charOutBg(147,  3, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
-		charOutBg(147, 14, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
-
 		// draw load mode arrow
-
-		srcPtr = arrowBMP;
-		dstPtr = &video.frameBuffer[(((11 * editor.diskop.mode) + 3) * SCREEN_W) + 148];
-
-		for (uint32_t y = 0; y < 5; y++)
+		if (editor.diskop.mode == 0)
 		{
-			for (uint32_t x = 0; x < 6; x++)
-				dstPtr[x] = srcPtr[x];
-
-			srcPtr += 6;
-			dstPtr += SCREEN_W;
+			charOutBg(147,14, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]); // clear other box
+			charOutBg(147, 3, 0x3, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		}
+		else
+		{
+			charOutBg(147, 3, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]); // clear other box
+			charOutBg(147,14, 0x3, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 
@@ -2331,10 +2323,6 @@ void createBitmaps(void)
 		vuMeterBMP[(i * 10) + 8] = pixel24;
 		vuMeterBMP[(i * 10) + 9] = pixel24;
 	}
-
-	for (i = 0; i < 30; i++) arrowBMP[i] = video.palette[arrowPaletteBMP[i]];
-	for (i = 0; i < 64; i++) samplingPosBMP[i] = samplingPosBMP[i];
-	for (i = 0; i < 512; i++) loopPinsBMP[i] = loopPinsBMP[i];
 }
 
 void freeBMPs(void)
@@ -2358,7 +2346,6 @@ void freeBMPs(void)
 	if (aboutScreenBMP != NULL) free(aboutScreenBMP);
 	if (muteButtonsBMP != NULL) free(muteButtonsBMP);
 	if (editOpModeCharsBMP != NULL) free(editOpModeCharsBMP);
-	if (arrowBMP != NULL) free(arrowBMP);
 }
 
 uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
@@ -2453,15 +2440,13 @@ bool unpackBMPs(void)
 	muteButtonsBMP = unpackBMP(muteButtonsPackedBMP, sizeof (muteButtonsPackedBMP));
 	editOpModeCharsBMP = unpackBMP(editOpModeCharsPackedBMP, sizeof (editOpModeCharsPackedBMP));
 
-	arrowBMP = (uint32_t *)malloc(30 * sizeof (int32_t)); // different format
-
 	if (trackerFrameBMP    == NULL || samplerScreenBMP   == NULL || samplerVolumeBMP  == NULL ||
 		clearDialogBMP     == NULL || diskOpScreenBMP    == NULL || mod2wavBMP        == NULL ||
 		posEdBMP           == NULL || spectrumVisualsBMP == NULL || yesNoDialogBMP    == NULL ||
 		editOpScreen1BMP   == NULL || editOpScreen2BMP   == NULL || editOpScreen3BMP  == NULL ||
 		editOpScreen4BMP   == NULL || aboutScreenBMP     == NULL || muteButtonsBMP    == NULL ||
-		editOpModeCharsBMP == NULL || arrowBMP           == NULL || samplerFiltersBMP == NULL ||
-		yesNoDialogBMP     == NULL || bigYesNoDialogBMP  == NULL)
+		editOpModeCharsBMP == NULL || samplerFiltersBMP  == NULL || yesNoDialogBMP    == NULL ||
+		bigYesNoDialogBMP  == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false; // BMPs are free'd in cleanUp()

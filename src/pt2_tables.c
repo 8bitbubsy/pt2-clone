@@ -3,13 +3,18 @@
 #include <stdint.h>
 #include "pt2_mouse.h"
 
-uint32_t *aboutScreenBMP   = NULL, *arrowBMP           = NULL, *clearDialogBMP     = NULL;
+uint32_t *aboutScreenBMP   = NULL, *clearDialogBMP     = NULL;
 uint32_t *diskOpScreenBMP  = NULL, *editOpModeCharsBMP = NULL, *mod2wavBMP         = NULL;
 uint32_t *editOpScreen1BMP = NULL, *editOpScreen2BMP   = NULL, *samplerVolumeBMP   = NULL;
 uint32_t *editOpScreen3BMP = NULL, *editOpScreen4BMP   = NULL, *spectrumVisualsBMP = NULL;
 uint32_t *muteButtonsBMP   = NULL, *posEdBMP           = NULL, *samplerFiltersBMP  = NULL;
 uint32_t *samplerScreenBMP = NULL, *pat2SmpDialogBMP   = NULL, *trackerFrameBMP    = NULL;
 uint32_t *yesNoDialogBMP   = NULL, *bigYesNoDialogBMP  = NULL;
+
+const char hexTable[16] =
+{
+	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+};
 
 const uint32_t cursorColors[6][3] =
 {
@@ -29,18 +34,36 @@ int8_t pNoteTable[32] = // for drumpad
 	24, 24
 };
 
-const char noteNames1[36][4] =
+const char *noteNames1[2+36] =
 {
+	"---","???",
 	"C-1", "C#1", "D-1", "D#1", "E-1", "F-1", "F#1" ,"G-1", "G#1", "A-1", "A#1", "B-1",
 	"C-2", "C#2", "D-2", "D#2", "E-2", "F-2", "F#2" ,"G-2", "G#2", "A-2", "A#2", "B-2",
 	"C-3", "C#3", "D-3", "D#3", "E-3", "F-3", "F#3" ,"G-3", "G#3", "A-3", "A#3", "B-3"
 };
 
-const char noteNames2[36][4] =
+const char *noteNames2[2+36] =
 {
-	"C-1", { 'D', 127, '1'}, "D-1", { 'E', 127, '1'}, "E-1", "F-1", { 'G', 127, '1'}, "G-1", { 'A', 127, '1'}, "A-1", { 'B', 127, '1'}, "B-1",
-	"C-2", { 'D', 127, '2'}, "D-2", { 'E', 127, '2'}, "E-2", "F-2", { 'G', 127, '2'}, "G-2", { 'A', 127, '2'}, "A-2", { 'B', 127, '2'}, "B-2",
-	"C-3", { 'D', 127, '3'}, "D-3", { 'E', 127, '3'}, "E-3", "F-3", { 'G', 127, '3'}, "G-3", { 'A', 127, '3'}, "A-3", { 'B', 127, '3'}, "B-3"
+	"---","???",
+	"C-1", "D\x01""1", "D-1", "E\x01""1", "E-1", "F-1", "G\x01""1", "G-1", "A\x01""1", "A-1", "B\x01""1", "B-1",
+	"C-2", "D\x01""2", "D-2", "E\x01""2", "E-2", "F-2", "G\x01""2", "G-2", "A\x01""2", "A-2", "B\x01""2", "B-2",
+	"C-3", "D\x01""3", "D-3", "E\x01""3", "E-3", "F-3", "G\x01""3", "G-3", "A\x01""3", "A-3", "B\x01""3", "B-3"
+};
+
+const char *noteNames3[2+36] = // for PATTDOTS mode
+{
+	"\x02\x02\x02","???",
+	"C-1", "C#1", "D-1", "D#1", "E-1", "F-1", "F#1" ,"G-1", "G#1", "A-1", "A#1", "B-1",
+	"C-2", "C#2", "D-2", "D#2", "E-2", "F-2", "F#2" ,"G-2", "G#2", "A-2", "A#2", "B-2",
+	"C-3", "C#3", "D-3", "D#3", "E-3", "F-3", "F#3" ,"G-3", "G#3", "A-3", "A#3", "B-3"
+};
+
+const char *noteNames4[2+36] = // for PATTDOTS mode
+{
+	"\x02\x02\x02","???",
+	"C-1", "D\x01""1", "D-1", "E\x01""1", "E-1", "F-1", "G\x01""1", "G-1", "A\x01""1", "A-1", "B\x01""1", "B-1",
+	"C-2", "D\x01""2", "D-2", "E\x01""2", "E-2", "F-2", "G\x01""2", "G-2", "A\x01""2", "A-2", "B\x01""2", "B-2",
+	"C-3", "D\x01""3", "D-3", "E\x013""", "E-3", "F-3", "G\x01""3", "G-3", "A\x01""3", "A-3", "B\x01""3", "B-3"
 };
 
 const uint8_t vibratoTable[32] =
@@ -51,7 +74,14 @@ const uint8_t vibratoTable[32] =
 	0xB4, 0xA1, 0x8D, 0x78, 0x61, 0x4A, 0x31, 0x18
 };
 
-const int16_t periodTable[606] =
+const uint8_t arpTickTable[32] =
+{
+	0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,
+	0,1,2,0,1,2,0,1,2,0,1,2,0,1,2,
+	0,1
+};
+
+const int16_t periodTable[(37*16)+15] =
 {
 	856,808,762,720,678,640,604,570,538,508,480,453,
 	428,404,381,360,339,320,302,285,269,254,240,226,
@@ -102,8 +132,16 @@ const int16_t periodTable[606] =
 	431,407,384,363,342,323,305,288,272,256,242,228,
 	216,203,192,181,171,161,152,144,136,128,121,114,0,
 
-	// PT BUGFIX: overflowing arpeggio on -1 finetuned samples, add extra zeroes
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	/* Arpeggio on -1 finetuned samples can do an overflown read from
+	** the period table. Here's the correct overflow values from the
+	** "CursorPosTable" and "UnshiftedKeymap" table, which are located
+	** right after the period table. These tables and their order didn't
+	** seem to change in the different PT1.x/PT2.x versions (I checked
+	** the source codes).
+	** PS: This is not a guess, these values *are* correct!
+	*/
+	774,1800,2314,3087,4113,4627,5400,6426,6940,7713,
+	8739,9253,24625,12851,13365
 };
 
 // button tables taken from the ptplay project + modified

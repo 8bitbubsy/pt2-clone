@@ -5,18 +5,21 @@
 #include "pt2_mouse.h"
 
 // TABLES
+extern const char hexTable[16];
 extern const uint32_t cursorColors[6][3];
-extern const char noteNames1[36][4];
-extern const char noteNames2[36][4];
+extern const char *noteNames1[2+36];
+extern const char *noteNames2[2+36];
+extern const char *noteNames3[2+36];
+extern const char *noteNames4[2+36];
 extern const uint8_t vibratoTable[32];
-extern const int16_t periodTable[606];
+extern const uint8_t arpTickTable[32];
+extern const int16_t periodTable[(37*16)+15];
 extern int8_t pNoteTable[32];
 
 // GFX
 extern uint32_t iconBMP[1024];
 extern const uint8_t mousePointerBMP[256];
-extern const uint8_t fontBMP[5120];
-extern const uint8_t arrowPaletteBMP[30];
+extern const uint8_t fontBMP[6096];
 
 // PACKED GFX
 extern const uint8_t aboutScreenPackedBMP[1684];
@@ -66,7 +69,6 @@ extern uint32_t *samplerScreenBMP;
 extern uint32_t *trackerFrameBMP;
 extern uint32_t *aboutScreenBMP;
 extern uint32_t *muteButtonsBMP;
-extern uint32_t *arrowBMP;
 extern uint32_t *editOpModeCharsBMP;
 extern uint32_t *pat2SmpDialogBMP;
 

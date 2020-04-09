@@ -305,7 +305,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c" />
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_arrow.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_clear.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_diskop.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_editop.c" />
