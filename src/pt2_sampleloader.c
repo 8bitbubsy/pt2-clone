@@ -25,7 +25,8 @@
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"
 #include "pt2_unicode.h"
-#include "pt2_filters.h"
+
+#define DOWNSAMPLE_CUTOFF_FACTOR 4.0
 
 enum
 {
@@ -39,6 +40,145 @@ static bool loadRAWSample(UNICHAR *fileName, char *entryName);
 static bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling);
 
 static bool loadedFileWasAIFF;
+
+static bool lowPassSample8Bit(int8_t *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
+{
+	rcFilter_t filter;
+
+	if (buffer == NULL || length == 0 || cutoff == 0.0)
+		return false;
+
+	calcRCFilterCoeffs(sampleFrequency, cutoff, &filter);
+	clearRCFilterState(&filter);
+
+	for (int32_t i = 0; i < length; i++)
+	{
+		int32_t sample;
+		double dSample;
+
+		RCLowPassFilterMono(&filter, buffer[i], &dSample);
+		sample = (int32_t)dSample;
+
+		buffer[i] = (int8_t)CLAMP(sample, INT8_MIN, INT8_MAX);
+	}
+	
+	return true;
+}
+
+static bool lowPassSample8BitUnsigned(uint8_t *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
+{
+	rcFilter_t filter;
+
+	if (buffer == NULL || length == 0 || cutoff == 0.0)
+		return false;
+
+	calcRCFilterCoeffs(sampleFrequency, cutoff, &filter);
+	clearRCFilterState(&filter);
+
+	for (int32_t i = 0; i < length; i++)
+	{
+		int32_t sample;
+		double dSample;
+
+		RCLowPassFilterMono(&filter, buffer[i] - 128, &dSample);
+		sample = (int32_t)dSample;
+
+		sample = CLAMP(sample, INT8_MIN, INT8_MAX);
+		buffer[i] = (uint8_t)(sample + 128);
+	}
+
+	return true;
+}
+
+static bool lowPassSample16Bit(int16_t *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
+{
+	rcFilter_t filter;
+
+	if (buffer == NULL || length == 0 || cutoff == 0.0)
+		return false;
+
+	calcRCFilterCoeffs(sampleFrequency, cutoff, &filter);
+	clearRCFilterState(&filter);
+
+	for (int32_t i = 0; i < length; i++)
+	{
+		int32_t sample;
+		double dSample;
+
+		RCLowPassFilterMono(&filter, buffer[i], &dSample);
+		sample = (int32_t)dSample;
+
+		buffer[i] = (int16_t)CLAMP(sample, INT16_MIN, INT16_MAX);
+	}
+
+	return true;
+}
+
+static bool lowPassSample32Bit(int32_t *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
+{
+	rcFilter_t filter;
+
+	if (buffer == NULL || length == 0 || cutoff == 0.0)
+		return false;
+
+	calcRCFilterCoeffs(sampleFrequency, cutoff, &filter);
+	clearRCFilterState(&filter);
+
+	for (int32_t i = 0; i < length; i++)
+	{
+		int64_t sample;
+		double dSample;
+
+		RCLowPassFilterMono(&filter, buffer[i], &dSample);
+		sample = (int32_t)dSample;
+
+		buffer[i] = (int32_t)CLAMP(sample, INT32_MIN, INT32_MAX);
+	}
+
+	return true;
+}
+
+static bool lowPassSampleFloat(float *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
+{
+	rcFilter_t filter;
+
+	if (buffer == NULL || length == 0 || cutoff == 0.0)
+		return false;
+
+	calcRCFilterCoeffs(sampleFrequency, cutoff, &filter);
+	clearRCFilterState(&filter);
+
+	for (int32_t i = 0; i < length; i++)
+	{
+		double dSample;
+
+		RCLowPassFilterMono(&filter, buffer[i], &dSample);
+		buffer[i] = (float)dSample;
+	}
+
+	return true;
+}
+
+static bool lowPassSampleDouble(double *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
+{
+	rcFilter_t filter;
+
+	if (buffer == NULL || length == 0 || cutoff == 0.0)
+		return false;
+
+	calcRCFilterCoeffs(sampleFrequency, cutoff, &filter);
+	clearRCFilterState(&filter);
+
+	for (int32_t i = 0; i < length; i++)
+	{
+		double dSample;
+		RCLowPassFilterMono(&filter, buffer[i], &dSample);
+
+		buffer[i] = dSample;
+	}
+
+	return true;
+}
 
 void extLoadWAVOrAIFFSampleCallback(bool downsample)
 {

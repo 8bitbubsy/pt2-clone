@@ -1380,7 +1380,7 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
-	bool noteDeleted;
+	bool noteDeleted, noteChanged;
 	uint8_t j;
 	note_t *noteSrc;
 
@@ -1390,6 +1390,8 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 		from = to;
 		to = j;
 	}
+
+	noteChanged = false;
 
 	saveUndo();
 	for (uint8_t i = from; i <= to; i++)
@@ -1401,6 +1403,8 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 		if (noteSrc->period)
 		{
+			uint16_t oldPeriod = noteSrc->period;
+
 			// period -> note
 			for (j = 0; j < 36; j++)
 			{
@@ -1422,11 +1426,17 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 			if (!noteDeleted)
 				noteSrc->period = periodTable[j];
+
+			if (noteSrc->period != oldPeriod)
+				noteChanged = true;
 		}
 	}
 
-	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	if (noteChanged)
+	{
+		updateWindowTitle(MOD_IS_MODIFIED);
+		editor.ui.updatePatternData = true;
+	}
 }
 
 void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)

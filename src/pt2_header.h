@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.09"
+#define PROG_VER_STR "1.10"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -292,8 +292,8 @@ struct audio_t
 	volatile bool locked;
 	bool forceMixerOff;
 	uint16_t bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32];
-	uint32_t audioFreq, audioBufferSize;
-	double dAudioFreq, dPeriodToDeltaDiv;
+	uint32_t outputRate, audioBufferSize;
+	double dPeriodToDeltaDiv;
 } audio;
 
 struct keyb_t

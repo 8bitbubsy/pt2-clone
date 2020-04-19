@@ -468,7 +468,7 @@ void highPassSample(int32_t cutOff)
 	int32_t smp32, i, from, to;
 	double *dSampleData, dBaseFreq, dCutOff;
 	moduleSample_t *s;
-	lossyIntegrator_t filterHi;
+	rcFilter_t filterHi;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
@@ -523,17 +523,17 @@ void highPassSample(int32_t cutOff)
 		editor.hpCutOff = (uint16_t)dCutOff;
 	}
 
-	calcCoeffLossyIntegrator(dBaseFreq, dCutOff, &filterHi);
+	calcRCFilterCoeffs(dBaseFreq, dCutOff, &filterHi);
 
 	// copy over sample data to double buffer
 	for (i = 0; i < s->length; i++)
 		dSampleData[i] = modEntry->sampleData[s->offset+i];
 
-	filterHi.dBuffer[0] = 0.0;
+	clearRCFilterState(&filterHi);
 	if (to <= s->length)
 	{
 		for (i = from; i < to; i++)
-			lossyIntegratorHighPassMono(&filterHi, dSampleData[i], &dSampleData[i]);
+			RCHighPassFilterMono(&filterHi, dSampleData[i], &dSampleData[i]);
 	}
 
 	if (editor.normalizeFiltersFlag)
@@ -558,7 +558,7 @@ void lowPassSample(int32_t cutOff)
 	int32_t smp32, i, from, to;
 	double *dSampleData, dBaseFreq, dCutOff;
 	moduleSample_t *s;
-	lossyIntegrator_t filterLo;
+	rcFilter_t filterLo;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
@@ -613,17 +613,17 @@ void lowPassSample(int32_t cutOff)
 		editor.lpCutOff = (uint16_t)dCutOff;
 	}
 
-	calcCoeffLossyIntegrator(dBaseFreq, dCutOff, &filterLo);
+	calcRCFilterCoeffs(dBaseFreq, dCutOff, &filterLo);
 
 	// copy over sample data to double buffer
 	for (i = 0; i < s->length; i++)
 		dSampleData[i] = modEntry->sampleData[s->offset+i];
 
-	filterLo.dBuffer[0] = 0.0;
+	clearRCFilterState(&filterLo);
 	if (to <= s->length)
 	{
 		for (i = from; i < to; i++)
-			lossyIntegratorMono(&filterLo, dSampleData[i], &dSampleData[i]);
+			RCLowPassFilterMono(&filterLo, dSampleData[i], &dSampleData[i]);
 	}
 
 	if (editor.normalizeFiltersFlag)

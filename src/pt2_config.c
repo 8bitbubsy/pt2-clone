@@ -59,7 +59,7 @@ void loadConfig(void)
 	config.soundBufferSize = 1024;
 	config.autoCloseDiskOp = true;
 	config.vsyncOff = false;
-	config.hwMouse = false;
+	config.hwMouse = true;
 	config.sampleLowpass = true;
 
 #ifndef _WIN32

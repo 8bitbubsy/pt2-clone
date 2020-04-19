@@ -94,7 +94,10 @@ void setupPerfFreq(void)
 
 	// fractional part scaled to 0..2^32-1
 	dFrac *= UINT32_MAX;
-	editor.vblankTimeLenFrac = (uint32_t)(dFrac + 0.5);
+	dFrac += 0.5;
+	if (dFrac > UINT32_MAX)
+		dFrac = UINT32_MAX;
+	editor.vblankTimeLenFrac = (uint32_t)dFrac;
 }
 
 void setupWaitVBL(void)
@@ -653,7 +656,7 @@ void updateSampler(void)
 		{
 			assert(editor.resampleNote < 36);
 			textOutBg(288, 236,
-				config.accidental ? noteNames2[editor.resampleNote] : noteNames1[editor.resampleNote],
+				config.accidental ? noteNames2[2+editor.resampleNote] : noteNames1[2+editor.resampleNote],
 				video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
@@ -1604,7 +1607,7 @@ void updateEditOp(void)
 			if (editor.note1 > 35)
 				textOutBg(256, 58, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(256, 58, config.accidental ? noteNames2[editor.note1] : noteNames1[editor.note1],
+				textOutBg(256, 58, config.accidental ? noteNames2[2+editor.note1] : noteNames1[2+editor.note1],
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
@@ -1614,7 +1617,7 @@ void updateEditOp(void)
 			if (editor.note2 > 35)
 				textOutBg(256, 69, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(256, 69, config.accidental ? noteNames2[editor.note2] : noteNames1[editor.note2],
+				textOutBg(256, 69, config.accidental ? noteNames2[2+editor.note2] : noteNames1[2+editor.note2],
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
@@ -1624,7 +1627,7 @@ void updateEditOp(void)
 			if (editor.note3 > 35)
 				textOutBg(256, 80, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(256, 80, config.accidental ? noteNames2[editor.note3] : noteNames1[editor.note3],
+				textOutBg(256, 80, config.accidental ? noteNames2[2+editor.note3] : noteNames1[2+editor.note3],
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 			
@@ -1634,7 +1637,7 @@ void updateEditOp(void)
 			if (editor.note4 > 35)
 				textOutBg(256, 91, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
-				textOutBg(256, 91, config.accidental ? noteNames2[editor.note4] : noteNames1[editor.note4],
+				textOutBg(256, 91, config.accidental ? noteNames2[2+editor.note4] : noteNames1[2+editor.note4],
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}

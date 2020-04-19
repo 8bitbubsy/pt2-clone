@@ -6,20 +6,23 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// adding this forces the FPU to enter slow mode
 #define DENORMAL_OFFSET 1e-10
 
-typedef struct lossyIntegrator_t
+typedef struct rcFilter_t
 {
-	double dBuffer[2], b0, b1;
-} lossyIntegrator_t;
+	double buffer[2];
+	double c, c2, g, cg;
+} rcFilter_t;
 
 void resetCachedMixerPeriod(void);
 void resetAudioDithering(void);
-void calcCoeffLossyIntegrator(double dSr, double dHz, lossyIntegrator_t *filter);
-void lossyIntegrator(lossyIntegrator_t *filter, double *dIn, double *dOut);
-void lossyIntegratorMono(lossyIntegrator_t *filter, double dIn, double *dOut);
-void lossyIntegratorHighPass(lossyIntegrator_t *filter, double *dIn, double *dOut);
-void lossyIntegratorHighPassMono(lossyIntegrator_t *filter, double dIn, double *dOut);
+void calcRCFilterCoeffs(const double sr, const double hz, rcFilter_t *f);
+void clearRCFilterState(rcFilter_t *f);
+void RCLowPassFilter(rcFilter_t *f, const double *in, double *out);
+void RCHighPassFilter(rcFilter_t *f, const double *in, double *out);
+void RCLowPassFilterMono(rcFilter_t *f, const double in, double *out);
+void RCHighPassFilterMono(rcFilter_t *f, const double in, double *out);
 void normalize32bitSigned(int32_t *sampleData, uint32_t sampleLength);
 void normalize16bitSigned(int16_t *sampleData, uint32_t sampleLength);
 void normalize8bitFloatSigned(float *fSampleData, uint32_t sampleLength);

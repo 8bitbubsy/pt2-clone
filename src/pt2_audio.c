@@ -1,5 +1,4 @@
-/* The "LED" filter and BLEP routines were coded by aciddose.
-** Low-pass filter is based on https://bel.fi/alankila/modguide/interpolate.txt */
+// the audio filters and BLEP synthesis were coded by aciddose
 
 // for finding memory leaks in debug mode with Visual Studio 
 #if defined _DEBUG && defined _MSC_VER
@@ -36,13 +35,9 @@
 
 typedef struct ledFilter_t
 {
-	double dLed[4];
+	double buffer[4];
+	double c, ci, feedback, bg, cg, c2;
 } ledFilter_t;
-
-typedef struct ledFilterCoeff_t
-{
-	double dLed, dLedFb;
-} ledFilterCoeff_t;
 
 typedef struct voice_t
 {
@@ -56,13 +51,12 @@ static volatile int8_t filterFlags;
 static int8_t defStereoSep;
 static bool amigaPanFlag, wavRenderingDone;
 static uint16_t ch1Pan, ch2Pan, ch3Pan, ch4Pan;
-static int32_t oldPeriod, sampleCounter, maxSamplesToMix, randSeed = INITIAL_DITHER_SEED;
+static int32_t oldPeriod, sampleCounter, randSeed = INITIAL_DITHER_SEED;
 static uint32_t oldScopeDelta;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
 static double dPrngStateL, dPrngStateR;
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
-static lossyIntegrator_t filterLo, filterHi;
-static ledFilterCoeff_t filterLEDC;
+static rcFilter_t filterLo, filterHi;
 static ledFilter_t filterLED;
 static paulaVoice_t paula[AMIGA_VOICES];
 static SDL_AudioDeviceID dev;
@@ -77,16 +71,13 @@ void calcMod2WavTotalRows(void);
 
 static uint16_t bpm2SmpsPerTick(uint32_t bpm, uint32_t audioFreq)
 {
-	uint32_t ciaVal;
-	double dFreqMul;
-
 	if (bpm == 0)
 		return 0;
 
-	ciaVal = (uint32_t)(1773447 / bpm); // yes, PT truncates here
-	dFreqMul = ciaVal * (1.0 / CIA_PAL_CLK);
+	const uint32_t ciaVal = (uint32_t)(1773447 / bpm); // yes, PT truncates here
+	const double dCiaHz = (double)CIA_PAL_CLK / ciaVal;
 
-	int32_t smpsPerTick = (int32_t)((audioFreq * dFreqMul) + 0.5);
+	int32_t smpsPerTick = (int32_t)((audioFreq / dCiaHz) + 0.5);
 	return (uint16_t)smpsPerTick;
 }
 
@@ -94,133 +85,184 @@ static void generateBpmTables(void)
 {
 	for (uint32_t i = 32; i <= 255; i++)
 	{
-		audio.bpmTab[i-32] = bpm2SmpsPerTick(i, audio.audioFreq);
+		audio.bpmTab[i-32] = bpm2SmpsPerTick(i, audio.outputRate);
 		audio.bpmTab28kHz[i-32] = bpm2SmpsPerTick(i, 28836);
 		audio.bpmTab22kHz[i-32] = bpm2SmpsPerTick(i, 22168);
 	}
 }
 
+static void clearLEDFilterState(void)
+{
+	filterLED.buffer[0] = 0.0; // left channel
+	filterLED.buffer[1] = 0.0;
+	filterLED.buffer[2] = 0.0; // right channel
+	filterLED.buffer[3] = 0.0;
+}
+
 void setLEDFilter(bool state)
 {
 	editor.useLEDFilter = state;
-
 	if (editor.useLEDFilter)
-		filterFlags |=  FILTER_LED_ENABLED;
+	{
+		clearLEDFilterState();
+		filterFlags |= FILTER_LED_ENABLED;
+	}
 	else
+	{
 		filterFlags &= ~FILTER_LED_ENABLED;
+	}
 }
 
 void toggleLEDFilter(void)
 {
 	editor.useLEDFilter ^= 1;
-
 	if (editor.useLEDFilter)
-		filterFlags |=  FILTER_LED_ENABLED;
+	{
+		clearLEDFilterState();
+		filterFlags |= FILTER_LED_ENABLED;
+	}
 	else
+	{
 		filterFlags &= ~FILTER_LED_ENABLED;
+	}
 }
 
-static void calcCoeffLED(double dSr, double dHz, ledFilterCoeff_t *filter)
-{
-	static double dFb = 0.125;
+/* Imperfect "LED" filter implementation. This may be further improved in the future.
+** Based upon ideas posted by mystran @ the kvraudio.com forum.
+**
+** This filter may not function correctly used outside the fixed-cutoff context here!
+*/
 
-#ifndef NO_FILTER_FINETUNING
-	/* 8bitbubsy: makes the filter curve sound (and look) much closer to the real deal.
-	** This has been tested against both an A500 and A1200 (real units).
+static double sigmoid(double x, double coefficient)
+{
+	/* Coefficient from:
+	**   0.0 to  inf (linear)
+	**  -1.0 to -inf (linear)
 	*/
-	dFb *= 0.62;
-#endif
-
-	if (dHz < dSr/2.0)
-		filter->dLed = ((2.0 * M_PI) * dHz) / dSr;
-	else
-		filter->dLed = 1.0;
-
-	filter->dLedFb = dFb + (dFb / (1.0 - filter->dLed)); // Q ~= 1/sqrt(2) (Butterworth)
+	return x / (x + coefficient) * (coefficient + 1.0);
 }
 
-void calcCoeffLossyIntegrator(double dSr, double dHz, lossyIntegrator_t *filter)
+static void calcLEDFilterCoeffs(const double sr, const double hz, const double fb, ledFilter_t *filter)
 {
-	double dOmega = ((2.0 * M_PI) * dHz) / dSr;
-	filter->b0 = 1.0 / (1.0 + (1.0 / dOmega));
-	filter->b1 = 1.0 - filter->b0;
-}
-
-static void clearLossyIntegrator(lossyIntegrator_t *filter)
-{
-	filter->dBuffer[0] = 0.0; // L
-	filter->dBuffer[1] = 0.0; // R
-}
-
-static void clearLEDFilter(ledFilter_t *filter)
-{
-	filter->dLed[0] = 0.0; // L
-	filter->dLed[1] = 0.0;
-	filter->dLed[2] = 0.0; // R
-	filter->dLed[3] = 0.0;
-}
-
-static inline void lossyIntegratorLED(ledFilterCoeff_t filterC, ledFilter_t *filter, double *dIn, double *dOut)
-{
-	// left channel "LED" filter
-	filter->dLed[0] += filterC.dLed * (dIn[0] - filter->dLed[0])
-		+ filterC.dLedFb * (filter->dLed[0] - filter->dLed[1]) + DENORMAL_OFFSET;
-	filter->dLed[1] += filterC.dLed * (filter->dLed[0] - filter->dLed[1]) + DENORMAL_OFFSET;
-	dOut[0] = filter->dLed[1];
-
-	// right channel "LED" filter
-	filter->dLed[2] += filterC.dLed * (dIn[1] - filter->dLed[2])
-		+ filterC.dLedFb * (filter->dLed[2] - filter->dLed[3]) + DENORMAL_OFFSET;
-	filter->dLed[3] += filterC.dLed * (filter->dLed[2] - filter->dLed[3]) + DENORMAL_OFFSET;
-	dOut[1] = filter->dLed[3];
-}
-
-void lossyIntegrator(lossyIntegrator_t *filter, double *dIn, double *dOut)
-{
-	/* Low-pass filter implementation taken from:
-	** https://bel.fi/alankila/modguide/interpolate.txt
-	**
-	** This implementation has a less smooth cutoff curve compared to the old one, so it's
-	** maybe not the best. However, I stick to this one because it has a higher gain
-	** at the end of the curve (closer to real tested Amiga 500). It also sounds much closer when
-	** comparing whitenoise on an A500.
+	/* tan() may produce NaN or other bad results in some cases!
+	** It appears to work correctly with these specific coefficients.
 	*/
+	const double c = (hz < (sr / 2.0)) ? tan((M_PI * hz) / sr) : 1.0;
+	const double g = 1.0 / (1.0 + c);
 
-	// left channel low-pass
-	filter->dBuffer[0] = (filter->b0 * dIn[0]) + (filter->b1 * filter->dBuffer[0]) + DENORMAL_OFFSET;
-	dOut[0] = filter->dBuffer[0];
+	// dirty compensation
+	const double s = 0.5;
+	const double t = 0.5;
+	const double ic = c > t ? 1.0 / ((1.0 - s*t) + s*c) : 1.0;
+	const double cg = c * g;
+	const double fbg = 1.0 / (1.0 + fb * cg*cg);
 
-	// right channel low-pass
-	filter->dBuffer[1] = (filter->b0 * dIn[1]) + (filter->b1 * filter->dBuffer[1]) + DENORMAL_OFFSET;
-	dOut[1] = filter->dBuffer[1];
+	filter->c = c;
+	filter->ci = g;
+	filter->feedback = 2.0 * sigmoid(fb, 0.5);
+	filter->bg = fbg * filter->feedback * ic;
+	filter->cg = cg;
+	filter->c2 = c * 2.0;
 }
 
-void lossyIntegratorMono(lossyIntegrator_t *filter, double dIn, double *dOut)
+static inline void LEDFilter(ledFilter_t *f, const double *in, double *out)
 {
-	filter->dBuffer[0] = (filter->b0 * dIn) + (filter->b1 * filter->dBuffer[0]) + DENORMAL_OFFSET;
-	*dOut = filter->dBuffer[0];
+	const double in_1 = DENORMAL_OFFSET;
+	const double in_2 = DENORMAL_OFFSET;
+
+	const double c = f->c;
+	const double g = f->ci;
+	const double cg = f->cg;
+	const double bg = f->bg;
+	const double c2 = f->c2;
+
+	double *v = f->buffer;
+
+	// left channel
+	const double estimate_L = in_2 + g*(v[1] + c*(in_1 + g*(v[0] + c*in[0])));
+	const double y0_L = v[0]*g + in[0]*cg + in_1 + estimate_L * bg;
+	const double y1_L = v[1]*g + y0_L*cg + in_2;
+
+	v[0] += c2 * (in[0] - y0_L);
+	v[1] += c2 * (y0_L - y1_L);
+	out[0] = y1_L;
+
+	// right channel
+	const double estimate_R = in_2 + g*(v[3] + c*(in_1 + g*(v[2] + c*in[1])));
+	const double y0_R = v[2]*g + in[1]*cg + in_1 + estimate_R * bg;
+	const double y1_R = v[3]*g + y0_R*cg + in_2;
+
+	v[2] += c2 * (in[1] - y0_R);
+	v[3] += c2 * (y0_R - y1_R);
+	out[1] = y1_R;
 }
 
-void lossyIntegratorHighPass(lossyIntegrator_t *filter, double *dIn, double *dOut)
+void calcRCFilterCoeffs(double dSr, double dHz, rcFilter_t *f)
 {
-	double dLow[2];
-
-	lossyIntegrator(filter, dIn, dLow);
-
-	dOut[0] = dIn[0] - dLow[0]; // left channel high-pass
-	dOut[1] = dIn[1] - dLow[1]; // right channel high-pass
+	f->c = tan((M_PI * dHz) / dSr);
+	f->c2 = f->c * 2.0;
+	f->g = 1.0 / (1.0 + f->c);
+	f->cg = f->c * f->g;
 }
 
-void lossyIntegratorHighPassMono(lossyIntegrator_t *filter, double dIn, double *dOut)
+void clearRCFilterState(rcFilter_t *f)
 {
-	double dLow;
-
-	lossyIntegratorMono(filter, dIn, &dLow);
-
-	*dOut = dIn - dLow;
+	f->buffer[0] = 0.0; // left channel
+	f->buffer[1] = 0.0; // right channel
 }
 
-/* adejr/aciddose: these sin/cos approximations both use a 0..1
+// aciddose: input 0 is resistor side of capacitor (low-pass), input 1 is reference side (high-pass)
+static inline double getLowpassOutput(rcFilter_t *f, const double input_0, const double input_1, const double buffer)
+{
+	return buffer * f->g + input_0 * f->cg + input_1 * (1.0 - f->cg);
+}
+
+void RCLowPassFilter(rcFilter_t *f, const double *in, double *out)
+{
+	double output;
+
+	// left channel RC low-pass
+	output = getLowpassOutput(f, in[0], 0.0, f->buffer[0]);
+	f->buffer[0] += (in[0] - output) * f->c2;
+	out[0] = output;
+
+	// right channel RC low-pass
+	output = getLowpassOutput(f, in[1], 0.0, f->buffer[1]);
+	f->buffer[1] += (in[1] - output) * f->c2;
+	out[1] = output;
+}
+
+void RCHighPassFilter(rcFilter_t *f, const double *in, double *out)
+{
+	double low[2];
+
+	RCLowPassFilter(f, in, low);
+
+	out[0] = in[0] - low[0]; // left channel high-pass
+	out[1] = in[1] - low[1]; // right channel high-pass
+}
+
+/* These two are used for the filters in the SAMPLER screen, and
+** also the 2x downsampling when loading samples whose frequency
+** is above 22kHz.
+*/
+
+void RCLowPassFilterMono(rcFilter_t *f, const double in, double *out)
+{
+	double output = getLowpassOutput(f, in, 0.0, f->buffer[0]);
+	f->buffer[0] += (in - output) * f->c2;
+	*out = output;
+}
+
+void RCHighPassFilterMono(rcFilter_t *f, const double in, double *out)
+{
+	double low;
+
+	RCLowPassFilterMono(f, in, &low);
+	*out = in - low; // high-pass
+}
+
+/* aciddose: these sin/cos approximations both use a 0..1
 ** parameter range and have 'normalized' (1/2 = 0db) coeffs
 **
 ** the coeffs are for LERP(x, x * x, 0.224) * sqrt(2)
@@ -275,7 +317,7 @@ static void mixerSetVoicePan(uint8_t ch, uint16_t pan) // pan = 0..256
 {
 	double dPan;
 
-	/* proper 'normalized' equal-power panning is (assuming pan left to right):
+	/* aciddose: proper 'normalized' equal-power panning is (assuming pan left to right):
 	** L = cos(p * pi * 1/2) * sqrt(2);
 	** R = sin(p * pi * 1/2) * sqrt(2);
 	*/
@@ -318,9 +360,9 @@ void turnOffVoices(void)
 	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
 		mixerKillVoice(i);
 
-	clearLossyIntegrator(&filterLo);
-	clearLossyIntegrator(&filterHi);
-	clearLEDFilter(&filterLED);
+	clearRCFilterState(&filterLo);
+	clearRCFilterState(&filterHi);
+	clearLEDFilterState();
 
 	resetAudioDithering();
 
@@ -346,7 +388,7 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 	v = &paula[ch];
 
 	if (period == 0)
-		realPeriod = 65536; // confirmed behavior on real Amiga
+		realPeriod = 1+65535; // confirmed behavior on real Amiga
 	else if (period < 113)
 		realPeriod = 113; // confirmed behavior on real Amiga
 	else
@@ -494,9 +536,9 @@ void paulaStartDMA(uint8_t ch)
 void toggleA500Filters(void)
 {
 	lockAudio();
-	clearLossyIntegrator(&filterLo);
-	clearLossyIntegrator(&filterHi);
-	clearLEDFilter(&filterLED);
+	clearRCFilterState(&filterLo);
+	clearRCFilterState(&filterHi);
+	clearLEDFilterState();
 	unlockAudio();
 
 	if (filterFlags & FILTER_A500)
@@ -676,10 +718,10 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 	dOut[0] = dMixBufferL[i];
 	dOut[1] = dMixBufferR[i];
 
-	// don't process any low-pass filter since the cut-off is around 28-31kHz on A1200
+	// don't process any low-pass filter since the cut-off is around 34kHz on A1200
 
 	// process high-pass filter
-	lossyIntegratorHighPass(&filterHi, dOut, dOut);
+	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
 	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
@@ -710,13 +752,13 @@ static inline void processMixedSamplesA1200LED(int32_t i, int16_t *out)
 	dOut[0] = dMixBufferL[i];
 	dOut[1] = dMixBufferR[i];
 
-	// don't process any low-pass filter since the cut-off is around 28-31kHz on A1200
+	// don't process any low-pass filter since the cut-off is around 34kHz on A1200
 
 	// process "LED" filter
-	lossyIntegratorLED(filterLEDC, &filterLED, dOut, dOut);
+	LEDFilter(&filterLED, dOut, dOut);
 
 	// process high-pass filter
-	lossyIntegratorHighPass(&filterHi, dOut, dOut);
+	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
 	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
@@ -748,14 +790,10 @@ static inline void processMixedSamplesA500(int32_t i, int16_t *out)
 	dOut[1] = dMixBufferR[i];
 
 	// process low-pass filter
-	lossyIntegrator(&filterLo, dOut, dOut);
-
-	// process "LED" filter
-	if (filterFlags & FILTER_LED_ENABLED)
-		lossyIntegratorLED(filterLEDC, &filterLED, dOut, dOut);
+	RCLowPassFilter(&filterLo, dOut, dOut);
 
 	// process high-pass filter
-	lossyIntegratorHighPass(&filterHi, dOut, dOut);
+	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
 	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
@@ -786,13 +824,13 @@ static inline void processMixedSamplesA500LED(int32_t i, int16_t *out)
 	dOut[1] = dMixBufferR[i];
 
 	// process low-pass filter
-	lossyIntegrator(&filterLo, dOut, dOut);
+	RCLowPassFilter(&filterLo, dOut, dOut);
 
 	// process "LED" filter
-	lossyIntegratorLED(filterLEDC, &filterLED, dOut, dOut);
+	LEDFilter(&filterLED, dOut, dOut);
 
 	// process high-pass filter
-	lossyIntegratorHighPass(&filterHi, dOut, dOut);
+	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
 	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
@@ -899,8 +937,6 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 	int16_t *out;
 	int32_t sampleBlock, samplesTodo;
 
-	(void)userdata;
-
 	if (audio.forceMixerOff) // during MOD2WAV
 	{
 		memset(stream, 0, len);
@@ -929,12 +965,12 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 			sampleCounter = samplesPerTick;
 		}
 	}
+
+	(void)userdata;
 }
 
 static void calculateFilterCoeffs(void)
 {
-	double dCutOffHz;
-
 	/* Amiga 500 filter emulation, by aciddose
 	**
 	** First comes a static low-pass 6dB formed by the supply current
@@ -971,34 +1007,28 @@ static void calculateFilterCoeffs(void)
 	** Under spice simulation the circuit yields -3dB = 5.2Hz.
 	*/
 
-	// Amiga 500 rev6 RC low-pass filter:
-	const double dLp_R = 360.0; // R321 - 360 ohm resistor
-	const double dLp_C = 1e-7;  // C321 - 0.1uF capacitor
-	dCutOffHz = 1.0 / ((2.0 * M_PI) * dLp_R * dLp_C); // ~4420.97Hz
-#ifndef NO_FILTER_FINETUNING
-	dCutOffHz += 580.0; // 8bitbubsy: finetuning to better match A500 low-pass testing
-#endif
-	calcCoeffLossyIntegrator(audio.dAudioFreq, dCutOffHz, &filterLo);
+	double R, C, R1, R2, C1, C2, fc, fb;
 
-	// Amiga Sallen-Key "LED" filter:
-	const double dLed_R1 = 10000.0; // R322 - 10K ohm resistor
-	const double dLed_R2 = 10000.0; // R323 - 10K ohm resistor
-	const double dLed_C1 = 6.8e-9;  // C322 - 6800pF capacitor
-	const double dLed_C2 = 3.9e-9;  // C323 - 3900pF capacitor
-	dCutOffHz = 1.0 / ((2.0 * M_PI) * sqrt(dLed_R1 * dLed_R2 * dLed_C1 * dLed_C2)); // ~3090.53Hz
-#ifndef NO_FILTER_FINETUNING
-	dCutOffHz -= 300.0; // 8bitbubsy: finetuning to better match A500 & A1200 "LED" filter testing
-#endif
-	calcCoeffLED(audio.dAudioFreq, dCutOffHz, &filterLEDC);
+	// A500 one-pole 6db/oct static RC low-pass filter:
+	R = 360.0; // R321 (360 ohm resistor)
+	C = 1e-7;  // C321 (0.1uF capacitor)
+	fc = 1.0 / (2.0 * M_PI * R * C); // ~4420.97Hz
+	calcRCFilterCoeffs(audio.outputRate, fc, &filterLo);
 
-	// Amiga RC high-pass filter:
-	const double dHp_R = 1000.0 + 390.0; // R324 - 1K ohm resistor + R325 - 390 ohm resistor
-	const double dHp_C = 2.2e-5; // C334 - 22uF capacitor
-	dCutOffHz = 1.0 / ((2.0 * M_PI) * dHp_R * dHp_C); // ~5.20Hz
-#ifndef NO_FILTER_FINETUNING
-	dCutOffHz += 1.5; // 8bitbubsy: finetuning to better match A500 & A1200 high-pass testing
-#endif
-	calcCoeffLossyIntegrator(audio.dAudioFreq, dCutOffHz, &filterHi);
+	// A500/A1200 Sallen-Key filter ("LED"):
+	R1 = 10000.0; // R322 (10K ohm resistor)
+	R2 = 10000.0; // R323 (10K ohm resistor)
+	C1 = 6.8e-9;  // C322 (6800pF capacitor)
+	C2 = 3.9e-9;  // C323 (3900pF capacitor)
+	fc = 1.0 / (2.0 * M_PI * sqrt(R1 * R2 * C1 * C2)); // ~3090.53Hz
+	fb = 0.125; // Fb = 0.125 : Q ~= 1/sqrt(2) (Butterworth)
+	calcLEDFilterCoeffs(audio.outputRate, fc, fb, &filterLED);
+
+	// A500/A1200 one-pole 6db/oct static RC high-pass filter:
+	R = 1000.0 + 390.0;  // R324 (1K ohm resistor) + R325 (390 ohm resistor)
+	C = 2.2e-5;          // C334 (22uF capacitor) (+ C324 (0.33uF capacitor) if A500)
+	fc = 1.0 / (2.0 * M_PI * R * C); // ~5.20Hz
+	calcRCFilterCoeffs(audio.outputRate, fc, &filterHi);
 }
 
 void mixerCalcVoicePans(uint8_t stereoSeparation)
@@ -1021,11 +1051,11 @@ bool setupAudio(void)
 	SDL_AudioSpec want, have;
 
 	want.freq = config.soundFrequency;
+	want.samples = config.soundBufferSize;
 	want.format = AUDIO_S16;
 	want.channels = 2;
 	want.callback = audioCallback;
 	want.userdata = NULL;
-	want.samples = config.soundBufferSize;
 
 	dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
 	if (dev == 0)
@@ -1034,9 +1064,9 @@ bool setupAudio(void)
 		return false;
 	}
 
-	if (have.freq < 32000) // lower than this is not safe for one-step mixer w/ BLEP
+	if (have.freq < 32000) // lower than this is not safe for the BLEP synthesis in the mixer
 	{
-		showErrorMsgBox("Unable to open audio: The audio output rate couldn't be used!");
+		showErrorMsgBox("Unable to open audio: An audio rate below 32kHz can't be used!");
 		return false;
 	}
 
@@ -1046,12 +1076,16 @@ bool setupAudio(void)
 		return false;
 	}
 
-	maxSamplesToMix = (int32_t)ceil((have.freq * 2.5) / 32.0);
+	audio.outputRate = have.freq;
+	audio.audioBufferSize = have.samples;
+	audio.dPeriodToDeltaDiv = (double)PAULA_PAL_CLK / audio.outputRate;
+
+	generateBpmTables();
+	const int32_t maxSamplesToMix = audio.bpmTab[0]; // BPM 32
 
 	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
 	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
-
-	editor.mod2WavBuffer = (int16_t *)malloc(sizeof (int16_t) * maxSamplesToMix);
+	editor.mod2WavBuffer = (int16_t *)malloc(maxSamplesToMix * sizeof (int16_t));
 
 	if (dMixBufferLUnaligned == NULL || dMixBufferRUnaligned == NULL || editor.mod2WavBuffer == NULL)
 	{
@@ -1062,19 +1096,11 @@ bool setupAudio(void)
 	dMixBufferL = (double *)ALIGN_PTR(dMixBufferLUnaligned, 256);
 	dMixBufferR = (double *)ALIGN_PTR(dMixBufferRUnaligned, 256);
 
-	audio.audioBufferSize = have.samples;
-	config.soundFrequency = have.freq;
-	audio.audioFreq = config.soundFrequency;
-	audio.dAudioFreq = (double)config.soundFrequency;
-	audio.dPeriodToDeltaDiv = PAULA_PAL_CLK / audio.dAudioFreq;
-
 	mixerCalcVoicePans(config.stereoSeparation);
 	defStereoSep = config.stereoSeparation;
 
 	filterFlags = config.a500LowPassFilter ? FILTER_A500 : 0;
-
 	calculateFilterCoeffs();
-	generateBpmTables();
 
 	samplesPerTick = 0;
 	sampleCounter = 0;
@@ -1149,8 +1175,6 @@ uint32_t getAudioFrame(int16_t *outStream)
 	while (smpCounter > 0)
 	{
 		samplesToMix = smpCounter;
-		if (samplesToMix > maxSamplesToMix)
-			samplesToMix = maxSamplesToMix;
 
 		outputAudio(outStream, samplesToMix);
 		outStream += (uint32_t)samplesToMix * 2;
@@ -1210,7 +1234,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	wavHeader.subchunk1Size = 16;
 	wavHeader.audioFormat = 1;
 	wavHeader.numChannels = 2;
-	wavHeader.sampleRate = audio.audioFreq;
+	wavHeader.sampleRate = audio.outputRate;
 	wavHeader.bitsPerSample = 16;
 	wavHeader.byteRate = wavHeader.sampleRate * wavHeader.numChannels * (wavHeader.bitsPerSample / 8);
 	wavHeader.blockAlign = wavHeader.numChannels * (wavHeader.bitsPerSample / 8);
@@ -1353,30 +1377,23 @@ void calcMod2WavTotalRows(void)
 				{
 					n_pattpos[ch] = modRow;
 				}
-				else
+				else if (n_loopcount[ch] == 0)
 				{
-					// this is so ugly
-					if (n_loopcount[ch] == 0)
-					{
-						n_loopcount[ch] = pos;
+					n_loopcount[ch] = pos;
 
-						pBreakPosition = n_pattpos[ch];
-						pBreakFlag = true;
+					pBreakPosition = n_pattpos[ch];
+					pBreakFlag = true;
 
-						for (pos = pBreakPosition; pos <= modRow; pos++)
-							editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
-					}
-					else
-					{
-						if (--n_loopcount[ch])
-						{
-							pBreakPosition = n_pattpos[ch];
-							pBreakFlag = true;
+					for (pos = pBreakPosition; pos <= modRow; pos++)
+						editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
+				}
+				else if (--n_loopcount[ch])
+				{
+					pBreakPosition = n_pattpos[ch];
+					pBreakFlag = true;
 
-							for (pos = pBreakPosition; pos <= modRow; pos++)
-								editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
-						}
-					}
+					for (pos = pBreakPosition; pos <= modRow; pos++)
+						editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
 				}
 			}
 		}
