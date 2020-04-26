@@ -1174,7 +1174,7 @@ void modSetPos(int16_t order, int16_t row)
 
 void modSetTempo(uint16_t bpm)
 {
-	int16_t smpsPerTick;
+	uint32_t smpsPerTick;
 
 	if (bpm < 32)
 		return;
@@ -1190,6 +1190,8 @@ void modSetTempo(uint16_t bpm)
 
 	if (editor.isSMPRendering)
 		smpsPerTick = editor.pat2SmpHQ ? audio.bpmTab28kHz[bpm] : audio.bpmTab22kHz[bpm];
+	else if (editor.isWAVRendering)
+		smpsPerTick = audio.bpmTabMod2Wav[bpm];
 	else
 		smpsPerTick = audio.bpmTab[bpm];
 

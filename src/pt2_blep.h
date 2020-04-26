@@ -19,11 +19,11 @@
 ** the result of that is the filter cutoff is set at nyquist * (SP/OS), in this case nyquist/5.
 */
 
-#define BLEP_ZC 8
-#define BLEP_OS 5
-#define BLEP_SP 5
+#define BLEP_ZC 16
+#define BLEP_OS 16
+#define BLEP_SP 16
 #define BLEP_NS (BLEP_ZC * BLEP_OS / BLEP_SP)
-#define BLEP_RNS 7 // RNS = (2^ > NS) - 1
+#define BLEP_RNS 31 // RNS = (2^ > NS) - 1
 
 typedef struct blep_t
 {
@@ -33,4 +33,4 @@ typedef struct blep_t
 
 void blepAdd(blep_t *b, double dOffset, double dAmplitude);
 void blepVolAdd(blep_t *b, double dAmplitude);
-double blepRun(blep_t *b);
+double blepRun(blep_t *b, double dInput);

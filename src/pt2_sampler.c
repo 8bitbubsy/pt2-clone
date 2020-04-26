@@ -44,6 +44,87 @@ static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
 };
 
 void setLoopSprites(void);
+void fixSampleBeep(moduleSample_t *s);
+
+void upSample(void)
+{
+	moduleSample_t *s = &modEntry->samples[editor.currSample];
+
+	uint32_t newLength = (s->length >> 1) & 0xFFFE;
+	if (newLength < 2)
+		return;
+
+	turnOffVoices();
+
+	// upsample
+	int8_t *ptr8 = &modEntry->sampleData[s->offset];
+	for (uint32_t i = 0; i < newLength; i++)
+		ptr8[i] = ptr8[i << 1];
+
+	// clear junk after shrunk sample
+	if (newLength < MAX_SAMPLE_LEN)
+		memset(&ptr8[newLength], 0, MAX_SAMPLE_LEN - newLength);
+
+	s->length = (uint16_t)newLength;
+	s->loopStart = (s->loopStart >> 1) & 0xFFFE;
+	s->loopLength = (s->loopLength >> 1) & 0xFFFE;
+
+	if (s->loopLength < 2)
+	{
+		s->loopStart = 0;
+		s->loopLength = 2;
+	}
+
+	fixSampleBeep(s);
+	updateCurrSample();
+
+	editor.ui.updateSongSize = true;
+	updateWindowTitle(MOD_IS_MODIFIED);
+}
+
+void downSample(void)
+{
+	moduleSample_t *s = &modEntry->samples[editor.currSample];
+
+	uint32_t newLength = s->length << 1;
+	if (newLength > MAX_SAMPLE_LEN)
+		newLength = MAX_SAMPLE_LEN;
+
+	turnOffVoices();
+
+	// downsample
+
+	int8_t *ptr8 = &modEntry->sampleData[s->offset];
+	int8_t *ptr8_2 = ptr8 - 1;
+	for (int32_t i = s->length-1; i > 0; i--)
+	{
+		ptr8[i<<1] = ptr8[i];
+		ptr8_2[i<<1] = ptr8_2[i];
+	}
+
+	s->length = newLength;
+
+	if (s->loopLength > 2)
+	{
+		uint32_t loopStart = s->loopStart << 1;
+		uint32_t loopLength = s->loopLength << 1;
+
+		if (loopStart+loopLength > s->length)
+		{
+			loopStart = 0;
+			loopLength = 2;
+		}
+
+		s->loopStart = (uint16_t)loopStart;
+		s->loopLength = (uint16_t)loopLength;
+	}
+
+	fixSampleBeep(s);
+	updateCurrSample();
+
+	editor.ui.updateSongSize = true;
+	updateWindowTitle(MOD_IS_MODIFIED);
+}
 
 void createSampleMarkTable(void)
 {

@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.10"
+#define PROG_VER_STR "1.11"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -291,7 +291,7 @@ struct audio_t
 {
 	volatile bool locked;
 	bool forceMixerOff;
-	uint16_t bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32];
+	uint16_t bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32], bpmTabMod2Wav[256-32];
 	uint32_t outputRate, audioBufferSize;
 	double dPeriodToDeltaDiv;
 } audio;
@@ -365,7 +365,7 @@ struct editor_t
 	uint8_t blockFromPos, blockToPos, timingMode, f6Pos, f7Pos, f8Pos, f9Pos, f10Pos, keyOctave, pNoteFlag;
 	uint8_t tuningNote, resampleNote, initialTempo, initialSpeed, editMoveAdd;
 
-	int16_t *mod2WavBuffer, *pat2SmpBuf, modulateSpeed;
+	int16_t *pat2SmpBuf, modulateSpeed;
 	uint16_t metroSpeed, metroChannel, sampleVol, samplePos, chordLength;
 	uint16_t effectMacros[10], oldTempo, currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	int32_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];

@@ -1349,17 +1349,19 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 
 			if (autoPlay)
 			{
-				// start normal playback
 				editor.playMode = PLAY_MODE_NORMAL;
-				modPlay(DONT_SET_PATTERN, 0, 0);
 				editor.currMode = MODE_PLAY;
+
+				// start normal playback
+				modPlay(DONT_SET_PATTERN, 0, 0);
+
 				pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 			}
-			else if ((oldMode == MODE_PLAY) || (oldMode == MODE_RECORD))
+			else if (oldMode == MODE_PLAY || oldMode == MODE_RECORD)
 			{
 				// use last mode
 				editor.playMode = oldPlayMode;
-				if ((oldPlayMode == PLAY_MODE_PATTERN) || (oldMode == MODE_RECORD))
+				if (oldPlayMode == PLAY_MODE_PATTERN || oldMode == MODE_RECORD)
 					modPlay(0, 0, 0);
 				else
 					modPlay(DONT_SET_PATTERN, 0, 0);

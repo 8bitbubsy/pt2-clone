@@ -30,6 +30,7 @@
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
+#include "pt2_mod2wav.h"
 
 #define INITIAL_DITHER_SEED 0x12345000
 
@@ -49,10 +50,10 @@ typedef struct voice_t
 
 static volatile int8_t filterFlags;
 static int8_t defStereoSep;
-static bool amigaPanFlag, wavRenderingDone;
+static bool amigaPanFlag;
 static uint16_t ch1Pan, ch2Pan, ch3Pan, ch4Pan;
-static int32_t oldPeriod, sampleCounter, randSeed = INITIAL_DITHER_SEED;
-static uint32_t oldScopeDelta;
+static int32_t oldPeriod, randSeed = INITIAL_DITHER_SEED;
+static uint32_t oldScopeDelta, sampleCounter;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
 static double dPrngStateL, dPrngStateR;
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
@@ -62,12 +63,9 @@ static paulaVoice_t paula[AMIGA_VOICES];
 static SDL_AudioDeviceID dev;
 
 // globalized
-int32_t samplesPerTick;
+uint32_t samplesPerTick;
 
 bool intMusic(void); // defined in pt_modplayer.c
-void storeTempVariables(void); // defined in pt_modplayer.c
-
-void calcMod2WavTotalRows(void);
 
 static uint16_t bpm2SmpsPerTick(uint32_t bpm, uint32_t audioFreq)
 {
@@ -77,7 +75,7 @@ static uint16_t bpm2SmpsPerTick(uint32_t bpm, uint32_t audioFreq)
 	const uint32_t ciaVal = (uint32_t)(1773447 / bpm); // yes, PT truncates here
 	const double dCiaHz = (double)CIA_PAL_CLK / ciaVal;
 
-	int32_t smpsPerTick = (int32_t)((audioFreq / dCiaHz) + 0.5);
+	int32_t smpsPerTick = (int32_t)((audioFreq / dCiaHz) + 0.5); // rounded
 	return (uint16_t)smpsPerTick;
 }
 
@@ -86,8 +84,9 @@ static void generateBpmTables(void)
 	for (uint32_t i = 32; i <= 255; i++)
 	{
 		audio.bpmTab[i-32] = bpm2SmpsPerTick(i, audio.outputRate);
-		audio.bpmTab28kHz[i-32] = bpm2SmpsPerTick(i, 28836);
-		audio.bpmTab22kHz[i-32] = bpm2SmpsPerTick(i, 22168);
+		audio.bpmTab28kHz[i-32] = bpm2SmpsPerTick(i, 28836); // PAT2SMP hi quality
+		audio.bpmTab22kHz[i-32] = bpm2SmpsPerTick(i, 22168); // PAT2SMP low quality
+		audio.bpmTabMod2Wav[i-32] = bpm2SmpsPerTick(i, MOD2WAV_FREQ); // MOD2WAV
 	}
 }
 
@@ -404,9 +403,11 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 #if SCOPE_HZ != 64
 #error Scope Hz is not 64 (2^n), change rate calc. to use doubles+round in pt2_scope.c
 #endif
-		// if we are rendering pattern to sample (PAT2SMP), use different frequencies
+		// during PAT2SMP or doing MOD2WAV, use different audio output rates
 		if (editor.isSMPRendering)
 			dPeriodToDeltaDiv = editor.pat2SmpHQ ? (PAULA_PAL_CLK / 28836.0) : (PAULA_PAL_CLK / 22168.0);
+		else if (editor.isWAVRendering)
+			dPeriodToDeltaDiv = PAULA_PAL_CLK / (double)MOD2WAV_FREQ;
 		else
 			dPeriodToDeltaDiv = audio.dPeriodToDeltaDiv;
 
@@ -594,8 +595,8 @@ void mixChannels(int32_t numSamples)
 				bVol->dLastValue = dVol;
 			}
 
-			if (bSmp->samplesLeft > 0) dSmp += blepRun(bSmp);
-			if (bVol->samplesLeft > 0) dVol += blepRun(bVol);
+			if (bSmp->samplesLeft > 0) dSmp = blepRun(bSmp, dSmp);
+			if (bVol->samplesLeft > 0) dVol = blepRun(bVol, dVol);
 
 			dSmp *= dVol;
 
@@ -665,8 +666,8 @@ void mixChannelsMultiStep(int32_t numSamples) // for PAT2SMP
 				bVol->dLastValue = dVol;
 			}
 
-			if (bSmp->samplesLeft > 0) dSmp += blepRun(bSmp);
-			if (bVol->samplesLeft > 0) dVol += blepRun(bVol);
+			if (bSmp->samplesLeft > 0) dSmp = blepRun(bSmp, dSmp);
+			if (bVol->samplesLeft > 0) dVol = blepRun(bVol, dVol);
 
 			dSmp *= dVol;
 
@@ -724,8 +725,8 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
-	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
+	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -761,8 +762,8 @@ static inline void processMixedSamplesA1200LED(int32_t i, int16_t *out)
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
-	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
+	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -795,8 +796,8 @@ static inline void processMixedSamplesA500(int32_t i, int16_t *out)
 	// process high-pass filter
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
-	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
-	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
+	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -832,8 +833,8 @@ static inline void processMixedSamplesA500LED(int32_t i, int16_t *out)
 	// process high-pass filter
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
-	dOut[0] *= -(INT16_MAX / AMIGA_VOICES);
-	dOut[1] *= -(INT16_MAX / AMIGA_VOICES);
+	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -852,28 +853,53 @@ static inline void processMixedSamplesA500LED(int32_t i, int16_t *out)
 	out[1] = (int16_t)smp32;
 }
 
+// for PAT2SMP
+static inline void processMixedSamplesRaw(int32_t i, int16_t *out)
+{
+	int32_t smp32;
+	double dOut[2];
+
+	dOut[0] = dMixBufferL[i];
+	dOut[1] = dMixBufferR[i];
+
+	// normalize 
+	dOut[0] *= (INT16_MAX / (double)AMIGA_VOICES);
+	dOut[1] *= (INT16_MAX / (double)AMIGA_VOICES);
+
+	dOut[0] = (dOut[0] + dOut[1]) * 0.5; // mix to mono
+
+	smp32 = (int32_t)dOut[0];
+	CLAMP16(smp32);
+	out[0] = (int16_t)smp32;
+}
+
 void outputAudio(int16_t *target, int32_t numSamples)
 {
 	int16_t *outStream, out[2];
-	int32_t j;
+	int32_t i;
 
 	if (editor.isSMPRendering)
 	{
 		// render to sample (PAT2SMP)
 
+		int32_t samplesTodo = numSamples;
+		if (editor.pat2SmpPos+samplesTodo > MAX_SAMPLE_LEN)
+			samplesTodo = MAX_SAMPLE_LEN-editor.pat2SmpPos;
+
 		mixChannelsMultiStep(numSamples);
 
-		for (j = 0; j < numSamples; j++)
+		outStream = &editor.pat2SmpBuf[editor.pat2SmpPos];
+		for (i = 0; i < samplesTodo; i++)
 		{
-			processMixedSamplesA1200(j, out);
-			editor.pat2SmpBuf[editor.pat2SmpPos++] = (int16_t)((out[0] + out[1]) >> 1); // mix to mono
+			processMixedSamplesA1200(i, out);
+			outStream[i] = (out[0] + out[1]) >> 1;
+		}
 
-			if (editor.pat2SmpPos >= MAX_SAMPLE_LEN)
-			{
-				editor.smpRenderingDone = true;
-				updateWindowTitle(MOD_IS_MODIFIED);
-				break;
-			}
+		editor.pat2SmpPos += samplesTodo;
+		if (editor.pat2SmpPos >= MAX_SAMPLE_LEN)
+		{
+			editor.smpRenderingDone = true;
+			updateWindowTitle(MOD_IS_MODIFIED);
 		}
 	}
 	else
@@ -889,18 +915,18 @@ void outputAudio(int16_t *target, int32_t numSamples)
 
 			if (filterFlags & FILTER_LED_ENABLED)
 			{
-				for (j = 0; j < numSamples; j++)
+				for (i = 0; i < numSamples; i++)
 				{
-					processMixedSamplesA500LED(j, out);
+					processMixedSamplesA500LED(i, out);
 					*outStream++ = out[0];
 					*outStream++ = out[1];
 				}
 			}
 			else
 			{
-				for (j = 0; j < numSamples; j++)
+				for (i = 0; i < numSamples; i++)
 				{
-					processMixedSamplesA500(j, out);
+					processMixedSamplesA500(i, out);
 					*outStream++ = out[0];
 					*outStream++ = out[1];
 				}
@@ -912,18 +938,18 @@ void outputAudio(int16_t *target, int32_t numSamples)
 
 			if (filterFlags & FILTER_LED_ENABLED)
 			{
-				for (j = 0; j < numSamples; j++)
+				for (i = 0; i < numSamples; i++)
 				{
-					processMixedSamplesA1200LED(j, out);
+					processMixedSamplesA1200LED(i, out);
 					*outStream++ = out[0];
 					*outStream++ = out[1];
 				}
 			}
 			else
 			{
-				for (j = 0; j < numSamples; j++)
+				for (i = 0; i < numSamples; i++)
 				{
-					processMixedSamplesA1200(j, out);
+					processMixedSamplesA1200(i, out);
 					*outStream++ = out[0];
 					*outStream++ = out[1];
 				}
@@ -934,8 +960,8 @@ void outputAudio(int16_t *target, int32_t numSamples)
 
 static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 {
-	int16_t *out;
-	int32_t sampleBlock, samplesTodo;
+	int16_t *streamOut;
+	uint32_t samplesLeft;
 
 	if (audio.forceMixerOff) // during MOD2WAV
 	{
@@ -943,27 +969,28 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 		return;
 	}
 
-	out = (int16_t *)stream;
+	streamOut = (int16_t *)stream;
 
-	sampleBlock = len >> 2;
-	while (sampleBlock)
+	samplesLeft = len >> 2;
+	while (samplesLeft > 0)
 	{
-		samplesTodo = (sampleBlock < sampleCounter) ? sampleBlock : sampleCounter;
-		if (samplesTodo > 0)
-		{
-			outputAudio(out, samplesTodo);
-			out += (uint32_t)samplesTodo * 2;
-
-			sampleBlock -= samplesTodo;
-			sampleCounter -= samplesTodo;
-		}
-		else
+		if (sampleCounter == 0)
 		{
 			if (editor.songPlaying)
 				intMusic();
 
 			sampleCounter = samplesPerTick;
 		}
+
+		uint32_t samplesTodo = sampleCounter;
+		if (samplesTodo > samplesLeft)
+			samplesTodo = samplesLeft;
+
+		outputAudio(streamOut, samplesTodo);
+		streamOut += samplesTodo << 1;
+
+		samplesLeft -= samplesTodo;
+		sampleCounter -= samplesTodo;
 	}
 
 	(void)userdata;
@@ -1081,13 +1108,22 @@ bool setupAudio(void)
 	audio.dPeriodToDeltaDiv = (double)PAULA_PAL_CLK / audio.outputRate;
 
 	generateBpmTables();
-	const int32_t maxSamplesToMix = audio.bpmTab[0]; // BPM 32
+
+	/* If the audio output rate is lower than MOD2WAV_FREQ, we need
+	** to allocate slightly more space so that MOD2WAV rendering
+	** won't overflow.
+	*/
+
+	uint32_t maxSamplesToMix;
+	if (MOD2WAV_FREQ > audio.outputRate)
+		 maxSamplesToMix = audio.bpmTabMod2Wav[32-32]; // BPM 32
+	else
+		maxSamplesToMix = audio.bpmTab[32-32]; // BPM 32
 
 	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
 	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
-	editor.mod2WavBuffer = (int16_t *)malloc(maxSamplesToMix * sizeof (int16_t));
 
-	if (dMixBufferLUnaligned == NULL || dMixBufferRUnaligned == NULL || editor.mod2WavBuffer == NULL)
+	if (dMixBufferLUnaligned == NULL || dMixBufferRUnaligned == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false;
@@ -1102,7 +1138,7 @@ bool setupAudio(void)
 	filterFlags = config.a500LowPassFilter ? FILTER_A500 : 0;
 	calculateFilterCoeffs();
 
-	samplesPerTick = 0;
+	samplesPerTick = audio.bpmTab[125-32]; // BPM 125
 	sampleCounter = 0;
 
 	SDL_PauseAudioDevice(dev, false);
@@ -1129,15 +1165,9 @@ void audioClose(void)
 		free(dMixBufferRUnaligned);
 		dMixBufferRUnaligned = NULL;
 	}
-
-	if (editor.mod2WavBuffer != NULL)
-	{
-		free(editor.mod2WavBuffer);
-		editor.mod2WavBuffer = NULL;
-	}
 }
 
-void mixerSetSamplesPerTick(int32_t val)
+void mixerSetSamplesPerTick(uint32_t val)
 {
 	samplesPerTick = val;
 }
@@ -1159,280 +1189,6 @@ void toggleAmigaPanMode(void)
 	{
 		mixerCalcVoicePans(100);
 		displayMsg("AMIGA PANNING ON");
-	}
-}
-
-// PAT2SMP RELATED STUFF
-
-uint32_t getAudioFrame(int16_t *outStream)
-{
-	int32_t smpCounter, samplesToMix;
-
-	if (!intMusic())
-		wavRenderingDone = true;
-
-	smpCounter = samplesPerTick;
-	while (smpCounter > 0)
-	{
-		samplesToMix = smpCounter;
-
-		outputAudio(outStream, samplesToMix);
-		outStream += (uint32_t)samplesToMix * 2;
-
-		smpCounter -= samplesToMix;
-	}
-
-	return (uint32_t)samplesPerTick * 2; // * 2 for stereo
-}
-
-static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
-{
-	uint32_t size, totalSampleCounter, totalRiffChunkLen;
-	FILE *fOut;
-	wavHeader_t wavHeader;
-
-	fOut = (FILE *)ptr;
-	if (fOut == NULL)
-		return true;
-
-	// skip wav header place, render data first
-	fseek(fOut, sizeof (wavHeader_t), SEEK_SET);
-
-	wavRenderingDone = false;
-
-	totalSampleCounter = 0;
-	while (editor.isWAVRendering && !wavRenderingDone && !editor.abortMod2Wav)
-	{
-		size = getAudioFrame(editor.mod2WavBuffer);
-		if (size > 0)
-		{
-			fwrite(editor.mod2WavBuffer, sizeof (int16_t), size, fOut);
-			totalSampleCounter += size;
-		}
-
-		editor.ui.updateMod2WavDialog = true;
-	}
-
-	if (totalSampleCounter & 1)
-		fputc(0, fOut); // pad align byte
-
-	if ((ftell(fOut) - 8) > 0)
-		totalRiffChunkLen = ftell(fOut) - 8;
-	else
-		totalRiffChunkLen = 0;
-
-	editor.ui.mod2WavFinished = true;
-	editor.ui.updateMod2WavDialog = true;
-
-	// go back and fill the missing WAV header
-	fseek(fOut, 0, SEEK_SET);
-
-	wavHeader.chunkID = 0x46464952; // "RIFF"
-	wavHeader.chunkSize = totalRiffChunkLen;
-	wavHeader.format = 0x45564157; // "WAVE"
-	wavHeader.subchunk1ID = 0x20746D66; // "fmt "
-	wavHeader.subchunk1Size = 16;
-	wavHeader.audioFormat = 1;
-	wavHeader.numChannels = 2;
-	wavHeader.sampleRate = audio.outputRate;
-	wavHeader.bitsPerSample = 16;
-	wavHeader.byteRate = wavHeader.sampleRate * wavHeader.numChannels * (wavHeader.bitsPerSample / 8);
-	wavHeader.blockAlign = wavHeader.numChannels * (wavHeader.bitsPerSample / 8);
-	wavHeader.subchunk2ID = 0x61746164; // "data"
-	wavHeader.subchunk2Size = totalSampleCounter * (wavHeader.bitsPerSample / 8);
-
-	fwrite(&wavHeader, sizeof (wavHeader_t), 1, fOut);
-	fclose(fOut);
-
-	return true;
-}
-
-bool renderToWav(char *fileName, bool checkIfFileExist)
-{
-	FILE *fOut;
-	struct stat statBuffer;
-
-	if (checkIfFileExist)
-	{
-		if (stat(fileName, &statBuffer) == 0)
-		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_MOD2WAV_OVERWRITE;
-
-			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			setStatusMessage("OVERWRITE FILE?", NO_CARRY);
-
-			renderAskDialog();
-
-			return false;
-		}
-	}
-
-	if (editor.ui.askScreenShown)
-	{
-		editor.ui.askScreenShown = false;
-		editor.ui.answerNo = false;
-		editor.ui.answerYes = false;
-	}
-
-	fOut = fopen(fileName, "wb");
-	if (fOut == NULL)
-	{
-		displayErrorMsg("FILE I/O ERROR");
-		return false;
-	}
-
-	storeTempVariables();
-	calcMod2WavTotalRows();
-	restartSong();
-
-	editor.blockMarkFlag = false;
-
-	pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
-	setStatusMessage("RENDERING MOD...", NO_CARRY);
-
-	editor.ui.disableVisualizer = true;
-	editor.isWAVRendering = true;
-	renderMOD2WAVDialog();
-
-	editor.abortMod2Wav = false;
-
-	editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, NULL, fOut);
-	if (editor.mod2WavThread != NULL)
-	{
-		SDL_DetachThread(editor.mod2WavThread);
-	}
-	else
-	{
-		editor.ui.disableVisualizer = false;
-		editor.isWAVRendering = false;
-
-		displayErrorMsg("THREAD ERROR");
-
-		pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
-		statusAllRight();
-
-		return false;
-	}
-
-	return true;
-}
-
-// for MOD2WAV - ONLY used for a visual percentage counter, so accuracy is not important
-void calcMod2WavTotalRows(void)
-{
-	bool pBreakFlag, posJumpAssert, calcingRows;
-	int8_t n_pattpos[AMIGA_VOICES], n_loopcount[AMIGA_VOICES];
-	uint8_t modRow, pBreakPosition, ch, pos;
-	int16_t modOrder;
-	uint16_t modPattern;
-	note_t *note;
-
-	// for pattern loop
-	memset(n_pattpos, 0, sizeof (n_pattpos));
-	memset(n_loopcount, 0, sizeof (n_loopcount));
-
-	modEntry->rowsCounter = 0;
-	modEntry->rowsInTotal = 0;
-
-	modRow = 0;
-	modOrder = 0;
-	modPattern = modEntry->head.order[0];
-	pBreakPosition = 0;
-	posJumpAssert = false;
-	pBreakFlag = false;
-	calcingRows = true;
-
-	memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS);
-	while (calcingRows)
-	{
-		editor.rowVisitTable[(modOrder * MOD_ROWS) + modRow] = true;
-
-		for (ch = 0; ch < AMIGA_VOICES; ch++)
-		{
-			note = &modEntry->patterns[modPattern][(modRow * AMIGA_VOICES) + ch];
-			if (note->command == 0x0B) // Bxx - Position Jump
-			{
-				modOrder = note->param - 1;
-				pBreakPosition = 0;
-				posJumpAssert = true;
-			}
-			else if (note->command == 0x0D) // Dxx - Pattern Break
-			{
-				pBreakPosition = (((note->param >> 4) * 10) + (note->param & 0x0F));
-				if (pBreakPosition > 63)
-					pBreakPosition = 0;
-
-				posJumpAssert = true;
-			}
-			else if (note->command == 0x0F && note->param == 0) // F00 - Set Speed 0 (stop)
-			{
-				calcingRows = false;
-				break;
-			}
-			else if (note->command == 0x0E && (note->param >> 4) == 0x06) // E6x - Pattern Loop
-			{
-				pos = note->param & 0x0F;
-				if (pos == 0)
-				{
-					n_pattpos[ch] = modRow;
-				}
-				else if (n_loopcount[ch] == 0)
-				{
-					n_loopcount[ch] = pos;
-
-					pBreakPosition = n_pattpos[ch];
-					pBreakFlag = true;
-
-					for (pos = pBreakPosition; pos <= modRow; pos++)
-						editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
-				}
-				else if (--n_loopcount[ch])
-				{
-					pBreakPosition = n_pattpos[ch];
-					pBreakFlag = true;
-
-					for (pos = pBreakPosition; pos <= modRow; pos++)
-						editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
-				}
-			}
-		}
-
-		modRow++;
-		modEntry->rowsInTotal++;
-
-		if (pBreakFlag)
-		{
-			modRow = pBreakPosition;
-			pBreakPosition = 0;
-			pBreakFlag = false;
-		}
-
-		if (modRow >= MOD_ROWS || posJumpAssert)
-		{
-			modRow = pBreakPosition;
-			pBreakPosition = 0;
-			posJumpAssert = false;
-
-			modOrder = (modOrder + 1) & 0x7F;
-			if (modOrder >= modEntry->head.orderCount)
-			{
-				modOrder = 0;
-				calcingRows = false;
-				break;
-			}
-
-			modPattern = modEntry->head.order[modOrder];
-			if (modPattern > MAX_PATTERNS-1)
-				modPattern = MAX_PATTERNS-1;
-		}
-
-		if (editor.rowVisitTable[(modOrder * MOD_ROWS) + modRow])
-		{
-			// row has been visited before, we're now done!
-			calcingRows = false;
-			break;
-		}
 	}
 }
 

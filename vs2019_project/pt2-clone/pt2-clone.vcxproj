@@ -290,9 +290,11 @@
     <ClInclude Include="..\..\src\pt2_header.h" />
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
+    <ClInclude Include="..\..\src\pt2_mod2wav.h" />
     <ClInclude Include="..\..\src\pt2_modloader.h" />
     <ClInclude Include="..\..\src\pt2_mouse.h" />
     <ClInclude Include="..\..\src\pt2_palette.h" />
+    <ClInclude Include="..\..\src\pt2_pat2smp.h" />
     <ClInclude Include="..\..\src\pt2_patternviewer.h" />
     <ClInclude Include="..\..\src\pt2_sampleloader.h" />
     <ClInclude Include="..\..\src\pt2_sampler.h" />
@@ -331,10 +333,12 @@
     <ClCompile Include="..\..\src\pt2_helpers.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
+    <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_modloader.c" />
     <ClCompile Include="..\..\src\pt2_modplayer.c" />
     <ClCompile Include="..\..\src\pt2_mouse.c" />
     <ClCompile Include="..\..\src\pt2_palette.c" />
+    <ClCompile Include="..\..\src\pt2_pat2smp.c" />
     <ClCompile Include="..\..\src\pt2_patternviewer.c" />
     <ClCompile Include="..\..\src\pt2_sampleloader.c" />
     <ClCompile Include="..\..\src\pt2_sampler.c" />

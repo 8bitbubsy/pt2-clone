@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+void downSample(void);
+void upSample(void);
 void createSampleMarkTable(void);
 int32_t smpPos2Scr(int32_t pos);
 int32_t scr2SmpPos(int32_t x);

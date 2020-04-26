@@ -35,6 +35,8 @@
 #include "pt2_helpers.h"
 #include "pt2_scopes.h"
 #include "pt2_edit.h"
+#include "pt2_pat2smp.h"
+#include "pt2_mod2wav.h"
 
 typedef struct sprite_t
 {
@@ -58,9 +60,7 @@ static const uint16_t cursorPosTable[24] =
 	246, 270, 278, 286, 294, 302
 };
 
-bool intMusic(void); // pt_modplayer.c
-extern int32_t samplesPerTick; // pt_audio.c
-void storeTempVariables(void); // pt_modplayer.c
+
 void updateSongInfo1(void);
 void updateSongInfo2(void);
 void updateSampler(void);
@@ -1449,6 +1449,7 @@ void updateMOD2WAVDialog(void)
 			}
 
 			editor.isWAVRendering = false;
+			modSetTempo(modEntry->currBPM); // update BPM with normal audio output rate
 			displayMainScreen();
 		}
 		else
@@ -1785,8 +1786,7 @@ void handleAskNo(void)
 void handleAskYes(void)
 {
 	char fileName[20 + 4 + 1];
-	int8_t *tmpSmpBuffer, oldSample, oldRow;
-	int32_t j, newLength, oldSamplesPerTick, loopStart, loopLength;
+	int8_t oldSample;
 	uint32_t i;
 	moduleSample_t *s;
 
@@ -1816,90 +1816,7 @@ void handleAskYes(void)
 		case ASK_PAT2SMP:
 		{
 			restoreStatusAndMousePointer();
-
-			editor.ui.pat2SmpDialogShown = false;
-
-			editor.pat2SmpBuf = (int16_t *)malloc(MAX_SAMPLE_LEN * sizeof (int16_t));
-			if (editor.pat2SmpBuf == NULL)
-			{
-				statusOutOfMemory();
-				return;
-			}
-
-			oldRow = editor.songPlaying ? 0 : modEntry->currRow;
-			oldSamplesPerTick = samplesPerTick;
-
-			editor.isSMPRendering = true; // this must be set before restartSong()
-			storeTempVariables();
-			restartSong();
-			modEntry->row = oldRow;
-			modEntry->currRow = modEntry->row;
-
-			editor.blockMarkFlag = false;
-			pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
-			setStatusMessage("RENDERING...", NO_CARRY);
-			modSetTempo(modEntry->currBPM);
-			editor.pat2SmpPos = 0;
-
-			editor.smpRenderingDone = false;
-			while (!editor.smpRenderingDone)
-			{
-				if (!intMusic())
-					editor.smpRenderingDone = true;
-
-				outputAudio(NULL, samplesPerTick);
-			}
-			editor.isSMPRendering = false;
-			resetSong();
-
-			// set back old row and samplesPerTick
-			modEntry->row = oldRow;
-			modEntry->currRow = modEntry->row;
-			mixerSetSamplesPerTick(oldSamplesPerTick);
-
-			// normalize 16-bit samples
-			normalize16bitSigned(editor.pat2SmpBuf, MIN(editor.pat2SmpPos, MAX_SAMPLE_LEN));
-
-			s = &modEntry->samples[editor.currSample];
-
-			// quantize to 8-bit
-			for (i = 0; i < editor.pat2SmpPos; i++)
-				modEntry->sampleData[s->offset+i] = editor.pat2SmpBuf[i] >> 8;
-
-			// clear the rest of the sample
-			if (editor.pat2SmpPos < MAX_SAMPLE_LEN)
-				memset(&modEntry->sampleData[s->offset+editor.pat2SmpPos], 0, MAX_SAMPLE_LEN - editor.pat2SmpPos);
-
-			// free temp mixing buffer
-			free(editor.pat2SmpBuf);
-
-			// zero out sample text
-			memset(s->text, 0, sizeof (s->text));
-
-			// set new sample text
-			if (editor.pat2SmpHQ)
-			{
-				strcpy(s->text, "pat2smp (a-3 tune:+5)");
-				s->fineTune = 5;
-			}
-			else
-			{
-				strcpy(s->text, "pat2smp (f-3 tune:+1)");
-				s->fineTune = 1;
-			}
-
-			// new sample attributes
-			s->length = editor.pat2SmpPos;
-			s->volume = 64;
-			s->loopStart = 0;
-			s->loopLength = 2;
-
-			pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
-			displayMsg("ROWS RENDERED!");
-			setMsgPointer();
-			editor.samplePos = 0;
-			fixSampleBeep(s);
-			updateCurrSample();
+			doPat2Smp();
 		}
 		break;
 
@@ -1961,103 +1878,14 @@ void handleAskYes(void)
 		case ASK_UPSAMPLE:
 		{
 			restoreStatusAndMousePointer();
-
-			s = &modEntry->samples[editor.currSample];
-
-			tmpSmpBuffer = (int8_t *)malloc(s->length);
-			if (tmpSmpBuffer == NULL)
-			{
-				statusOutOfMemory();
-				return;
-			}
-
-			newLength = (s->length / 2) & 0xFFFE;
-			if (newLength < 2)
-				return;
-
-			turnOffVoices();
-
-			memcpy(tmpSmpBuffer, &modEntry->sampleData[s->offset], s->length);
-
-			// upsample
-			for (j = 0; j < newLength; j++)
-				modEntry->sampleData[s->offset + j] = tmpSmpBuffer[j * 2];
-
-			if (newLength < MAX_SAMPLE_LEN)
-				memset(&modEntry->sampleData[s->offset + newLength], 0, MAX_SAMPLE_LEN - newLength);
-
-			free(tmpSmpBuffer);
-
-			s->length = newLength;
-			s->loopStart = (s->loopStart / 2) & 0xFFFE;
-			s->loopLength = (s->loopLength / 2) & 0xFFFE;
-
-			if (s->loopLength < 2)
-			{
-				s->loopStart = 0;
-				s->loopLength = 2;
-			}
-
-			fixSampleBeep(s);
-			updateCurrSample();
-
-			editor.ui.updateSongSize = true;
-			updateWindowTitle(MOD_IS_MODIFIED);
+			upSample();
 		}
 		break;
 
 		case ASK_DOWNSAMPLE:
 		{
 			restoreStatusAndMousePointer();
-
-			s = &modEntry->samples[editor.currSample];
-
-			tmpSmpBuffer = (int8_t *)malloc(s->length);
-			if (tmpSmpBuffer == NULL)
-			{
-				statusOutOfMemory();
-				return;
-			}
-
-			newLength = s->length * 2;
-			if (newLength > MAX_SAMPLE_LEN)
-				newLength = MAX_SAMPLE_LEN;
-
-			turnOffVoices();
-
-			memcpy(tmpSmpBuffer, &modEntry->sampleData[s->offset], s->length);
-
-			// downsample
-			for (j = 0; j < newLength; j++)
-				modEntry->sampleData[s->offset+j] = tmpSmpBuffer[j >> 1];
-
-			if (newLength < MAX_SAMPLE_LEN)
-				memset(&modEntry->sampleData[s->offset+newLength], 0, MAX_SAMPLE_LEN - newLength);
-
-			free(tmpSmpBuffer);
-
-			s->length = newLength;
-
-			if (s->loopLength > 2)
-			{
-				loopStart = s->loopStart * 2;
-				loopLength = s->loopLength * 2;
-
-				if (loopStart+loopLength > s->length)
-				{
-					loopStart = 0;
-					loopLength = 2;
-				}
-
-				s->loopStart = (uint16_t)loopStart;
-				s->loopLength = (uint16_t)loopLength;
-			}
-
-			fixSampleBeep(s);
-			updateCurrSample();
-
-			editor.ui.updateSongSize = true;
-			updateWindowTitle(MOD_IS_MODIFIED);
+			downSample();
 		}
 		break;
 
