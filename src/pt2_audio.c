@@ -891,7 +891,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		outStream = &editor.pat2SmpBuf[editor.pat2SmpPos];
 		for (i = 0; i < samplesTodo; i++)
 		{
-			processMixedSamplesA1200(i, out);
+			processMixedSamplesRaw(i, out);
 			outStream[i] = (out[0] + out[1]) >> 1;
 		}
 

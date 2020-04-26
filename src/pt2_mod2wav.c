@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/stat.h> // stat()
 #include "pt2_header.h"
 #include "pt2_audio.h"
 #include "pt2_mouse.h"
