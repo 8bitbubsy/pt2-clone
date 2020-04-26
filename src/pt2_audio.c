@@ -892,7 +892,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		for (i = 0; i < samplesTodo; i++)
 		{
 			processMixedSamplesRaw(i, out);
-			outStream[i] = (out[0] + out[1]) >> 1;
+			outStream[i] = out[0];
 		}
 
 		editor.pat2SmpPos += samplesTodo;
