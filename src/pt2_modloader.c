@@ -49,8 +49,8 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 
 void showSongUnsavedAskBox(int8_t askScreenType)
 {
-	editor.ui.askScreenShown = true;
-	editor.ui.askScreenType = askScreenType;
+	ui.askScreenShown = true;
+	ui.askScreenType = askScreenType;
 
 	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	setStatusMessage("SONG IS UNSAVED !", NO_CARRY);
@@ -158,9 +158,9 @@ bool modSave(char *fileName)
 	displayMsg("MODULE SAVED !");
 	setMsgPointer();
 
-	editor.diskop.cached = false;
-	if (editor.ui.diskOpScreenShown)
-		editor.ui.updateDiskOpFileList = true;
+	diskop.cached = false;
+	if (ui.diskOpScreenShown)
+		ui.updateDiskOpFileList = true;
 
 	updateWindowTitle(MOD_NOT_MODIFIED);
 	return true;
@@ -419,7 +419,7 @@ module_t *modLoad(UNICHAR *fileName)
 			fixZeroesInString(s->text, 22);
 		}
 
-		s->length = ((mgetc(m) << 8) | mgetc(m)) * 2;
+		s->length = (uint16_t)(((mgetc(m) << 8) | mgetc(m)) * 2);
 
 		/* Only late versions of Ultimate SoundTracker could have samples larger than 9999 bytes.
 		** If found, we know for sure that this is a late STK module.
@@ -758,7 +758,7 @@ module_t *modLoad(UNICHAR *fileName)
 			loopOverflowVal = (s->loopStart + s->loopLength) - s->length;
 			if (s->length+loopOverflowVal <= MAX_SAMPLE_LEN)
 			{
-				s->length += loopOverflowVal; // this is safe, we're allocating 65534 bytes per sample slot
+				s->length = (uint16_t)(s->length + loopOverflowVal); // this is safe, we're allocating 65534 bytes per sample slot
 			}
 			else
 			{
@@ -772,7 +772,7 @@ module_t *modLoad(UNICHAR *fileName)
 	free(modBuffer);
 
 	for (i = 0; i < AMIGA_VOICES; i++)
-		newMod->channels[i].n_chanindex = i;
+		newMod->channels[i].n_chanindex = (int8_t)i;
 
 	return newMod;
 
@@ -893,8 +893,8 @@ bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
 	{
 		if (stat(fileName, &statBuffer) == 0)
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_SAVEMOD_OVERWRITE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_SAVEMOD_OVERWRITE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("OVERWRITE FILE ?", NO_CARRY);
 			renderAskDialog();
@@ -902,11 +902,11 @@ bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
 		}
 	}
 
-	if (editor.ui.askScreenShown)
+	if (ui.askScreenShown)
 	{
-		editor.ui.answerNo = false;
-		editor.ui.answerYes = false;
-		editor.ui.askScreenShown = false;
+		ui.answerNo = false;
+		ui.answerYes = false;
+		ui.askScreenShown = false;
 	}
 
 	return modSave(fileName);
@@ -1013,7 +1013,7 @@ static void mseek(MEMFILE *buf, int32_t offset, int32_t whence)
 			buf->_eof = true;
 		}
 
-		buf->_cnt = (buf->_base + buf->_bufsiz) - buf->_ptr;
+		buf->_cnt = (uint32_t)((buf->_base + buf->_bufsiz) - buf->_ptr);
 	}
 }
 
@@ -1154,7 +1154,7 @@ void setupNewMod(void)
 	editor.currLengthDisp = &modEntry->head.orderCount;
 
 	// calculate MOD size
-	editor.ui.updateSongSize = true;
+	ui.updateSongSize = true;
 
 	editor.muted[0] = false;
 	editor.muted[1] = false;
@@ -1188,7 +1188,7 @@ void loadModFromArg(char *arg)
 	uint32_t filenameLen;
 	UNICHAR *filenameU;
 
-	editor.ui.introScreenShown = false;
+	ui.introScreenShown = false;
 	statusAllRight();
 
 	filenameLen = (uint32_t)strlen(arg);
@@ -1265,8 +1265,8 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 	UNICHAR *fullPathU;
 
 	// don't allow drag n' drop if the tracker is busy
-	if (editor.ui.pointerMode == POINTER_MODE_MSG1 || editor.diskop.isFilling ||
-		editor.isWAVRendering || editor.ui.samplerFiltersBoxShown || editor.ui.samplerVolBoxShown)
+	if (ui.pointerMode == POINTER_MODE_MSG1 || diskop.isFilling ||
+		editor.isWAVRendering || ui.samplerFiltersBoxShown || ui.samplerVolBoxShown)
 	{
 		return;
 	}
@@ -1450,7 +1450,7 @@ module_t *createNewMod(void)
 	editor.currPosEdPattDisp = &newMod->head.order[0];
 	editor.currLengthDisp = &newMod->head.orderCount;
 
-	editor.ui.updateSongSize = true;
+	ui.updateSongSize = true;
 	return newMod;
 
 oom:

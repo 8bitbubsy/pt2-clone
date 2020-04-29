@@ -21,7 +21,7 @@ void doPat2Smp(void)
 {
 	moduleSample_t *s;
 
-	editor.ui.pat2SmpDialogShown = false;
+	ui.pat2SmpDialogShown = false;
 
 	editor.pat2SmpBuf = (int16_t *)malloc(MAX_SAMPLE_LEN * sizeof (int16_t));
 	if (editor.pat2SmpBuf == NULL)
@@ -66,7 +66,7 @@ void doPat2Smp(void)
 	s = &modEntry->samples[editor.currSample];
 
 	// quantize to 8-bit
-	for (uint32_t i = 0; i < editor.pat2SmpPos; i++)
+	for (int32_t i = 0; i < editor.pat2SmpPos; i++)
 		modEntry->sampleData[s->offset+i] = editor.pat2SmpBuf[i] >> 8;
 
 	// clear the rest of the sample
@@ -87,7 +87,7 @@ void doPat2Smp(void)
 		s->fineTune = 1;
 	}
 
-	s->length = editor.pat2SmpPos;
+	s->length = (uint16_t)editor.pat2SmpPos;
 	s->volume = 64;
 	s->loopStart = 0;
 	s->loopLength = 2;

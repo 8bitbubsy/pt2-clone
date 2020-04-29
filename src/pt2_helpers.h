@@ -33,7 +33,6 @@
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define CLAMP(x, low, high) (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
-#define LERP(x, y, z) ((x) + ((y) - (x)) * (z))
 
 #define R12(x) (((x) >> 8) & 0xF)
 #define G12(x) (((x) >> 4) & 0xF)

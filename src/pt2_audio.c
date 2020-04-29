@@ -31,6 +31,7 @@
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
 #include "pt2_mod2wav.h"
+#include "pt2_structs.h"
 
 #define INITIAL_DITHER_SEED 0x12345000
 
@@ -47,6 +48,8 @@ typedef struct voice_t
 	int32_t length, newLength, pos;
 	double dVolume, dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase, dPanL, dPanR;
 } paulaVoice_t;
+
+audio_t audio; // globalized
 
 static volatile int8_t filterFlags;
 static int8_t defStereoSep;
@@ -67,12 +70,12 @@ uint32_t samplesPerTick;
 
 bool intMusic(void); // defined in pt_modplayer.c
 
-static uint16_t bpm2SmpsPerTick(uint32_t bpm, uint32_t audioFreq)
+static uint16_t bpm2SmpsPerTick(int32_t bpm, uint32_t audioFreq)
 {
 	if (bpm == 0)
 		return 0;
 
-	const uint32_t ciaVal = (uint32_t)(1773447 / bpm); // yes, PT truncates here
+	const int32_t ciaVal = (int32_t)(1773447 / bpm); // yes, PT truncates here
 	const double dCiaHz = (double)CIA_PAL_CLK / ciaVal;
 
 	int32_t smpsPerTick = (int32_t)((audioFreq / dCiaHz) + 0.5); // rounded
@@ -81,7 +84,7 @@ static uint16_t bpm2SmpsPerTick(uint32_t bpm, uint32_t audioFreq)
 
 static void generateBpmTables(void)
 {
-	for (uint32_t i = 32; i <= 255; i++)
+	for (int32_t i = 32; i <= 255; i++)
 	{
 		audio.bpmTab[i-32] = bpm2SmpsPerTick(i, audio.outputRate);
 		audio.bpmTab28kHz[i-32] = bpm2SmpsPerTick(i, 28836); // PAT2SMP hi quality
@@ -100,6 +103,10 @@ static void clearLEDFilterState(void)
 
 void setLEDFilter(bool state)
 {
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	editor.useLEDFilter = state;
 	if (editor.useLEDFilter)
 	{
@@ -110,10 +117,17 @@ void setLEDFilter(bool state)
 	{
 		filterFlags &= ~FILTER_LED_ENABLED;
 	}
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void toggleLEDFilter(void)
 {
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	editor.useLEDFilter ^= 1;
 	if (editor.useLEDFilter)
 	{
@@ -124,6 +138,9 @@ void toggleLEDFilter(void)
 	{
 		filterFlags &= ~FILTER_LED_ENABLED;
 	}
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 /* Imperfect "LED" filter implementation. This may be further improved in the future.
@@ -326,10 +343,10 @@ static void mixerSetVoicePan(uint8_t ch, uint16_t pan) // pan = 0..256
 	paula[ch].dPanR = sinApx(dPan);
 }
 
-void mixerKillVoice(uint8_t ch)
+void mixerKillVoice(int32_t ch)
 {
-	const bool wasLocked = audio.locked;
-	if (!wasLocked)
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
 		lockAudio();
 
 	// copy old pans
@@ -346,17 +363,17 @@ void mixerKillVoice(uint8_t ch)
 	memset(&blep[ch], 0, sizeof (blep_t));
 	memset(&blepVol[ch], 0, sizeof (blep_t));
 
-	if (!wasLocked)
+	if (audioWasntLocked)
 		unlockAudio();
 }
 
 void turnOffVoices(void)
 {
-	const bool wasLocked = audio.locked;
-	if (!wasLocked)
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
 		lockAudio();
 
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 		mixerKillVoice(i);
 
 	clearRCFilterState(&filterLo);
@@ -367,18 +384,18 @@ void turnOffVoices(void)
 
 	editor.tuningFlag = false;
 
-	if (!wasLocked)
+	if (audioWasntLocked)
 		unlockAudio();
 }
 
 void resetCachedMixerPeriod(void)
 {
-	oldPeriod = 0xFFFFFFFF;
+	oldPeriod = -1;
 }
 
 // the following routines are only called from the mixer thread.
 
-void paulaSetPeriod(uint8_t ch, uint16_t period)
+void paulaSetPeriod(int32_t ch, uint16_t period)
 {
 	int32_t realPeriod;
 	double dPeriodToDeltaDiv;
@@ -426,7 +443,7 @@ void paulaSetPeriod(uint8_t ch, uint16_t period)
 	if (v->dLastDeltaMul == 0.0) v->dLastDeltaMul = v->dDeltaMul;
 }
 
-void paulaSetVolume(uint8_t ch, uint16_t vol)
+void paulaSetVolume(int32_t ch, uint16_t vol)
 {
 	vol &= 127; // confirmed behavior on real Amiga
 
@@ -436,7 +453,7 @@ void paulaSetVolume(uint8_t ch, uint16_t vol)
 	paula[ch].dVolume = vol * (1.0 / 64.0);
 }
 
-void paulaSetLength(uint8_t ch, uint16_t len)
+void paulaSetLength(int32_t ch, uint16_t len)
 {
 	if (len == 0)
 	{
@@ -450,7 +467,7 @@ void paulaSetLength(uint8_t ch, uint16_t len)
 	scopeExt[ch].newLength = paula[ch].newLength = len << 1;
 }
 
-void paulaSetData(uint8_t ch, const int8_t *src)
+void paulaSetData(int32_t ch, const int8_t *src)
 {
 	uint8_t smp;
 	moduleSample_t *s;
@@ -477,12 +494,12 @@ void paulaSetData(uint8_t ch, const int8_t *src)
 	*se = tmp; // update it
 }
 
-void paulaStopDMA(uint8_t ch)
+void paulaStopDMA(int32_t ch)
 {
 	scopeExt[ch].active = paula[ch].active = false;
 }
 
-void paulaStartDMA(uint8_t ch)
+void paulaStartDMA(int32_t ch)
 {
 	const int8_t *dat;
 	int32_t length;
@@ -536,11 +553,13 @@ void paulaStartDMA(uint8_t ch)
 
 void toggleA500Filters(void)
 {
-	lockAudio();
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	clearRCFilterState(&filterLo);
 	clearRCFilterState(&filterHi);
 	clearLEDFilterState();
-	unlockAudio();
 
 	if (filterFlags & FILTER_A500)
 	{
@@ -552,6 +571,9 @@ void toggleA500Filters(void)
 		filterFlags |= FILTER_A500;
 		displayMsg("LP FILTER: A500");
 	}
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void mixChannels(int32_t numSamples)
@@ -886,7 +908,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		if (editor.pat2SmpPos+samplesTodo > MAX_SAMPLE_LEN)
 			samplesTodo = MAX_SAMPLE_LEN-editor.pat2SmpPos;
 
-		mixChannelsMultiStep(numSamples);
+		mixChannelsMultiStep(samplesTodo);
 
 		outStream = &editor.pat2SmpBuf[editor.pat2SmpPos];
 		for (i = 0; i < samplesTodo; i++)
@@ -1078,7 +1100,7 @@ bool setupAudio(void)
 	SDL_AudioSpec want, have;
 
 	want.freq = config.soundFrequency;
-	want.samples = config.soundBufferSize;
+	want.samples = (uint16_t)config.soundBufferSize;
 	want.format = AUDIO_S16;
 	want.channels = 2;
 	want.callback = audioCallback;
@@ -1179,6 +1201,10 @@ void mixerClearSampleCounter(void)
 
 void toggleAmigaPanMode(void)
 {
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	amigaPanFlag ^= 1;
 	if (!amigaPanFlag)
 	{
@@ -1190,6 +1216,9 @@ void toggleAmigaPanMode(void)
 		mixerCalcVoicePans(100);
 		displayMsg("AMIGA PANNING ON");
 	}
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void normalize32bitSigned(int32_t *sampleData, uint32_t sampleLength)

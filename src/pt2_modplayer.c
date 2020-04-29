@@ -88,11 +88,10 @@ void doStopIt(bool resetPlayMode)
 
 void setPattern(int16_t pattern)
 {
-	modPattern = pattern;
-	if (modPattern > MAX_PATTERNS-1)
-		modPattern = MAX_PATTERNS-1;
+	if (pattern > MAX_PATTERNS-1)
+		pattern = MAX_PATTERNS-1;
 
-	modEntry->currPattern = modPattern;
+	modEntry->currPattern = modPattern = (int8_t)pattern;
 }
 
 void storeTempVariables(void) // this one is accessed in other files, so non-static
@@ -306,14 +305,14 @@ static void positionJump(moduleChannel_t *ch)
 static void volumeChange(moduleChannel_t *ch)
 {
 	ch->n_volume = ch->n_cmd & 0xFF;
-	if ((uint8_t)ch->n_volume > 64) /* unsigned comparison is important here */
+	if ((uint8_t)ch->n_volume > 64)
 		ch->n_volume = 64;
 }
 
 static void patternBreak(moduleChannel_t *ch)
 {
 	pBreakPosition = (((ch->n_cmd & 0xF0) >> 4) * 10) + (ch->n_cmd & 0x0F);
-	if ((uint8_t)pBreakPosition > 63) /* unsigned comparison is important here */
+	if ((uint8_t)pBreakPosition > 63)
 		pBreakPosition = 0;
 
 	posJumpAssert = true;
@@ -350,7 +349,7 @@ static void arpeggio(moduleChannel_t *ch)
 
 	if (arpTick == 1)
 	{
-		arpNote = ch->n_cmd >> 4;
+		arpNote = (uint8_t)(ch->n_cmd >> 4);
 	}
 	else if (arpTick == 2)
 	{
@@ -940,23 +939,23 @@ static void nextPosition(void)
 
 				modEntry->currOrder = 0;
 				modEntry->currRow = modEntry->row = 0;
-				modEntry->currPattern = modPattern = modEntry->head.order[0];
+				modEntry->currPattern = modPattern = (int8_t)modEntry->head.order[0];
 
 				editor.currPatternDisp = &modEntry->currPattern;
 				editor.currPosEdPattDisp = &modEntry->currPattern;
 				editor.currPatternDisp = &modEntry->currPattern;
 				editor.currPosEdPattDisp = &modEntry->currPattern;
 
-				if (editor.ui.posEdScreenShown)
-					editor.ui.updatePosEd = true;
+				if (ui.posEdScreenShown)
+					ui.updatePosEd = true;
 
-				editor.ui.updateSongPos = true;
-				editor.ui.updateSongPattern = true;
-				editor.ui.updateCurrPattText = true;
+				ui.updateSongPos = true;
+				ui.updateSongPattern = true;
+				ui.updateCurrPattText = true;
 			}
 		}
 
-		modPattern = modEntry->head.order[modOrder];
+		modPattern = (int8_t)modEntry->head.order[modOrder];
 		if (modPattern > MAX_PATTERNS-1)
 			modPattern = MAX_PATTERNS-1;
 
@@ -990,12 +989,12 @@ bool intMusic(void)
 				editor.currPatternDisp = patt;
 				editor.currPosEdPattDisp = patt;
 
-				if (editor.ui.posEdScreenShown)
-					editor.ui.updatePosEd = true;
+				if (ui.posEdScreenShown)
+					ui.updatePosEd = true;
 
-				editor.ui.updateSongPos = true;
-				editor.ui.updateSongPattern = true;
-				editor.ui.updateCurrPattText = true;
+				ui.updateSongPos = true;
+				ui.updateSongPattern = true;
+				ui.updateCurrPattText = true;
 			}
 		}
 	}
@@ -1040,7 +1039,7 @@ bool intMusic(void)
 		if (!editor.isWAVRendering && !editor.isSMPRendering)
 		{
 			modEntry->currRow = modEntry->row;
-			editor.ui.updatePatternData = true;
+			ui.updatePatternData = true;
 		}
 
 		if (!editor.stepPlayBackwards)
@@ -1069,18 +1068,18 @@ bool intMusic(void)
 		}
 
 		if (editor.blockMarkFlag)
-			editor.ui.updateStatusText = true;
+			ui.updateStatusText = true;
 
 		if (editor.stepPlayEnabled)
 		{
 			doStopIt(true);
 
 			modEntry->currRow = modEntry->row & 0x3F;
-			editor.ui.updatePatternData = true;
+			ui.updatePatternData = true;
 
 			editor.stepPlayEnabled = false;
 			editor.stepPlayBackwards = false;
-			editor.ui.updatePatternData = true;
+			ui.updatePatternData = true;
 
 			return true;
 		}
@@ -1118,7 +1117,7 @@ void modSetPattern(uint8_t pattern)
 {
 	modPattern = pattern;
 	modEntry->currPattern = modPattern;
-	editor.ui.updateCurrPattText = true;
+	ui.updateCurrPattText = true;
 }
 
 void modSetPos(int16_t order, int16_t row)
@@ -1140,19 +1139,19 @@ void modSetPos(int16_t order, int16_t row)
 		{
 			modOrder = order;
 			modEntry->currOrder = order;
-			editor.ui.updateSongPos = true;
+			ui.updateSongPos = true;
 
 			if (editor.currMode == MODE_PLAY && editor.playMode == PLAY_MODE_NORMAL)
 			{
-				modPattern = modEntry->head.order[order];
+				modPattern = (int8_t)modEntry->head.order[order];
 				if (modPattern > MAX_PATTERNS-1)
 					modPattern = MAX_PATTERNS-1;
 
 				modEntry->currPattern = modPattern;
-				editor.ui.updateCurrPattText = true;
+				ui.updateCurrPattText = true;
 			}
 
-			editor.ui.updateSongPattern = true;
+			ui.updateSongPattern = true;
 			editor.currPatternDisp = &modEntry->head.order[modOrder];
 
 			posEdPos = modEntry->currOrder;
@@ -1161,15 +1160,15 @@ void modSetPos(int16_t order, int16_t row)
 
 			editor.currPosEdPattDisp = &modEntry->head.order[posEdPos];
 
-			if (editor.ui.posEdScreenShown)
-				editor.ui.updatePosEd = true;
+			if (ui.posEdScreenShown)
+				ui.updatePosEd = true;
 		}
 	}
 
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 
 	if (editor.blockMarkFlag)
-		editor.ui.updateStatusText = true;
+		ui.updateStatusText = true;
 }
 
 void modSetTempo(uint16_t bpm)
@@ -1179,11 +1178,15 @@ void modSetTempo(uint16_t bpm)
 	if (bpm < 32)
 		return;
 
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	modBPM = bpm;
 	if (!editor.isSMPRendering && !editor.isWAVRendering)
 	{
 		modEntry->currBPM = bpm;
-		editor.ui.updateSongBPM = true;
+		ui.updateSongBPM = true;
 	}
 
 	bpm -= 32; // 32..255 -> 0..223
@@ -1196,6 +1199,9 @@ void modSetTempo(uint16_t bpm)
 		smpsPerTick = audio.bpmTab[bpm];
 
 	mixerSetSamplesPerTick(smpsPerTick);
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void modStop(void)
@@ -1246,8 +1252,8 @@ void incPatt(void)
 
 	modEntry->currPattern = modPattern;
 
-	editor.ui.updatePatternData = true;
-	editor.ui.updateCurrPattText = true;
+	ui.updatePatternData = true;
+	ui.updateCurrPattText = true;
 }
 
 void decPatt(void)
@@ -1257,8 +1263,8 @@ void decPatt(void)
 
 	modEntry->currPattern = modPattern;
 
-	editor.ui.updatePatternData = true;
-	editor.ui.updateCurrPattText = true;
+	ui.updatePatternData = true;
+	ui.updateCurrPattText = true;
 }
 
 void modPlay(int16_t patt, int16_t order, int8_t row)
@@ -1305,15 +1311,9 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	}
 
 	if (patt >= 0 && patt <= MAX_PATTERNS-1)
-	{
-		modPattern = patt;
-		modEntry->currPattern = patt;
-	}
+		modEntry->currPattern = modPattern = (int8_t)patt;
 	else
-	{
-		modPattern = modEntry->head.order[modOrder];
-		modEntry->currPattern = modEntry->head.order[modOrder];
-	}
+		modEntry->currPattern = modPattern = (int8_t)modEntry->head.order[modOrder];
 
 	editor.currPatternDisp = &modEntry->head.order[modOrder];
 	editor.currPosEdPattDisp = &modEntry->head.order[modOrder];
@@ -1332,10 +1332,10 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 
 	if (!editor.isSMPRendering && !editor.isWAVRendering)
 	{
-		editor.ui.updateSongPos = true;
-		editor.ui.updatePatternData = true;
-		editor.ui.updateSongPattern = true;
-		editor.ui.updateCurrPattText = true;
+		ui.updateSongPos = true;
+		ui.updatePatternData = true;
+		ui.updateSongPattern = true;
+		ui.updateCurrPattText = true;
 	}
 }
 
@@ -1396,7 +1396,7 @@ void clearSong(void)
 		setLEDFilter(false); // real PT doesn't do this there, but that's insane
 		updateCurrSample();
 
-		editor.ui.updateSongSize = true;
+		ui.updateSongSize = true;
 		renderMuteButtons();
 		updateWindowTitle(MOD_IS_MODIFIED);
 	}
@@ -1427,8 +1427,8 @@ void clearSamples(void)
 	editor.currSample = 0;
 	editor.keypadSampleOffset = 0;
 	editor.sampleZero = false;
-	editor.ui.editOpScreenShown = false;
-	editor.ui.aboutScreenShown = false;
+	ui.editOpScreenShown = false;
+	ui.aboutScreenShown = false;
 	editor.blockMarkFlag = false;
 
 	editor.samplePos = 0;
@@ -1453,8 +1453,8 @@ void modFree(void)
 	if (modEntry == NULL)
 		return; // not allocated
 
-	const bool wasLocked = audio.locked;
-	if (!wasLocked)
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
 		lockAudio();
 
 	turnOffVoices();
@@ -1471,7 +1471,7 @@ void modFree(void)
 	free(modEntry);
 	modEntry = NULL;
 
-	if (!wasLocked)
+	if (audioWasntLocked)
 		unlockAudio();
 }
 
@@ -1525,7 +1525,7 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 		modEntry->channels[i].n_chanindex = i;
 
 	modOrder = oldOrder;
-	modPattern = oldPattern;
+	modPattern = (int8_t)oldPattern;
 
 	modEntry->row = oldRow;
 	modEntry->currRow = oldRow;

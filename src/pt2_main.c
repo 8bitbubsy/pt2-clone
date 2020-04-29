@@ -35,8 +35,8 @@
 #include "pt2_audio.h"
 
 #define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
-                   "saved to the current module directory.\n\nPlease report this to 8bitbubsy " \
-                   "(IRC or olav.sorensen@live.no).\nTry to mention what you did before the crash happened."
+                   "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
+                   "Try to mention what you did before the crash happened."
 
 module_t *modEntry = NULL; // globalized
 
@@ -46,9 +46,11 @@ static bool backupMadeAfterCrash;
 #define SYSMSG_FILE_ARG (WM_USER + 1)
 #define ARGV_SHARED_MEM_MAX_LEN ((MAX_PATH * 2) + 2)
 
-// for taking control over windows key and numlock on keyboard if app has focus
+#ifndef _DEBUG
 bool windowsKeyIsDown;
 HHOOK g_hKeyboardHook;
+#endif
+
 static HWND hWnd_to;
 static HANDLE oneInstHandle, hMapFile;
 static LPCTSTR sharedMemBuf;
@@ -125,8 +127,7 @@ int main(int argc, char *argv[])
 #ifdef _WIN32
 		showErrorMsgBox("SDL2.dll is not the expected version, the program will terminate.\n\n" \
 		                "Loaded dll version: %d.%d.%d\n" \
-		                "Required (compiled with) version: %d.%d.%d\n\n" \
-		                "The needed SDL2.dll is located in the .zip from 16-bits.org/pt2.php\n",
+		                "Required (compiled with) version: %d.%d.%d",
 		                sdlVer.major, sdlVer.minor, sdlVer.patch,
 		                SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
 #else
@@ -196,9 +197,11 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef _WIN32
-	// for taking control over windows key and numlock on keyboard if app has focus
+
+#ifndef _DEBUG
 	windowsKeyIsDown = false;
 	g_hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, lowLevelKeyboardProc, GetModuleHandle(NULL), 0);
+#endif
 
 	makeSureDirIsProgramDir();
 #endif
@@ -305,8 +308,8 @@ int main(int argc, char *argv[])
 		updateMouseCounters();
 		handleKeyRepeat(keyb.lastRepKey);
 
-		if (!mouse.buttonWaiting && editor.ui.sampleMarkingPos == -1 &&
-			!editor.ui.forceSampleDrag && !editor.ui.forceVolDrag && !editor.ui.forceSampleEdit)
+		if (!mouse.buttonWaiting && ui.sampleMarkingPos == -1 &&
+			!ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
 		{
 			handleGUIButtonRepeat();
 		}
@@ -353,7 +356,7 @@ static void handleInput(void)
 #ifdef _WIN32
 		handleSysMsg(event);
 #endif
-		if (editor.ui.editTextFlag && event.type == SDL_TEXTINPUT)
+		if (ui.editTextFlag && event.type == SDL_TEXTINPUT)
 		{
 			// text input when editing texts/numbers
 
@@ -392,34 +395,34 @@ static void handleInput(void)
 		{
 			mouseButtonUpHandler(event.button.button);
 
-			if (!editor.ui.askScreenShown && editor.ui.introScreenShown)
+			if (!ui.askScreenShown && ui.introScreenShown)
 			{
-				if (!editor.ui.clearScreenShown && !editor.ui.diskOpScreenShown)
+				if (!ui.clearScreenShown && !ui.diskOpScreenShown)
 					statusAllRight();
 
-				editor.ui.introScreenShown = false;
+				ui.introScreenShown = false;
 			}
 		}
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
 		{
-			if (editor.ui.sampleMarkingPos == -1 &&
-				!editor.ui.forceSampleDrag && !editor.ui.forceVolDrag &&
-				!editor.ui.forceSampleEdit)
+			if (ui.sampleMarkingPos == -1 &&
+				!ui.forceSampleDrag && !ui.forceVolDrag &&
+				!ui.forceSampleEdit)
 			{
 				mouseButtonDownHandler(event.button.button);
 			}
 		}
 
-		if (editor.ui.throwExit)
+		if (ui.throwExit)
 		{
 			editor.programRunning = false;
 
-			if (editor.diskop.isFilling)
+			if (diskop.isFilling)
 			{
-				editor.diskop.isFilling = false;
+				diskop.isFilling = false;
 
-				editor.diskop.forceStopReading = true;
-				SDL_WaitThread(editor.diskop.fillThread, NULL);
+				diskop.forceStopReading = true;
+				SDL_WaitThread(diskop.fillThread, NULL);
 			}
 
 			if (editor.isWAVRendering)
@@ -504,11 +507,11 @@ static bool initializeVars(void)
 	editor.multiModeNext[1] = 3;
 	editor.multiModeNext[2] = 4;
 	editor.multiModeNext[3] = 1;
-	editor.ui.introScreenShown = true;
+	ui.introScreenShown = true;
 	editor.normalizeFiltersFlag = true;
 	editor.markStartOfs = -1;
-	editor.ui.sampleMarkingPos = -1;
-	editor.ui.previousPointerMode = editor.ui.pointerMode;
+	ui.sampleMarkingPos = -1;
+	ui.previousPointerMode = ui.pointerMode;
 
 	// setup GUI text pointers
 	editor.vol1Disp = &editor.vol1;
@@ -546,8 +549,8 @@ static void handleSigTerm(void)
 			SDL_RaiseWindow(video.window);
 		}
 
-		editor.ui.askScreenShown = true;
-		editor.ui.askScreenType = ASK_QUIT;
+		ui.askScreenShown = true;
+		ui.askScreenType = ASK_QUIT;
 
 		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 		setStatusMessage("REALLY QUIT ?", NO_CARRY);
@@ -555,7 +558,7 @@ static void handleSigTerm(void)
 	}
 	else
 	{
-		editor.ui.throwExit = true;
+		ui.throwExit = true;
 	}
 }
 
@@ -874,7 +877,9 @@ static void cleanUp(void) // never call this inside the main loop!
 
 #ifdef _WIN32
 	freeWin32Usleep();
+#ifndef _DEBUG
 	UnhookWindowsHookEx(g_hKeyboardHook);
+#endif
 	if (oneInstHandle != NULL) CloseHandle(oneInstHandle);
 #endif
 }

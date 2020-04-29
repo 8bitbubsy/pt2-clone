@@ -27,6 +27,7 @@
 #include "pt2_visuals.h"
 #include "pt2_keyboard.h"
 #include "pt2_scopes.h"
+#include "pt2_structs.h"
 
 const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
 {
@@ -63,32 +64,32 @@ void updateTextObject(int16_t editObject)
 	switch (editObject)
 	{
 		default: break;
-		case PTB_SONGNAME:  editor.ui.updateSongName = true; break;
-		case PTB_SAMPLENAME: editor.ui.updateCurrSampleName = true; break;
-		case PTB_PE_PATT: editor.ui.updatePosEd = true; break;
-		case PTB_EO_QUANTIZE: editor.ui.updateQuantizeText = true; break;
-		case PTB_EO_METRO_1: editor.ui.updateMetro1Text = true; break;
-		case PTB_EO_METRO_2: editor.ui.updateMetro2Text = true; break;
-		case PTB_EO_FROM_NUM: editor.ui.updateFromText = true; break;
-		case PTB_EO_TO_NUM: editor.ui.updateToText = true; break;
-		case PTB_EO_MIX: editor.ui.updateMixText = true; break;
-		case PTB_EO_POS_NUM: editor.ui.updatePosText = true; break;
-		case PTB_EO_MOD_NUM: editor.ui.updateModText = true; break;
-		case PTB_EO_VOL_NUM: editor.ui.updateVolText = true; break;
-		case PTB_DO_DATAPATH: editor.ui.updateDiskOpPathText = true; break;
-		case PTB_POSS: editor.ui.updateSongPos = true; break;
-		case PTB_PATTERNS: editor.ui.updateSongPattern = true; break;
-		case PTB_LENGTHS: editor.ui.updateSongLength = true; break;
-		case PTB_SAMPLES: editor.ui.updateCurrSampleNum = true; break;
-		case PTB_SVOLUMES: editor.ui.updateCurrSampleVolume = true; break;
-		case PTB_SLENGTHS: editor.ui.updateCurrSampleLength = true; break;
-		case PTB_SREPEATS: editor.ui.updateCurrSampleRepeat = true; break;
-		case PTB_SREPLENS: editor.ui.updateCurrSampleReplen = true; break;
-		case PTB_PATTDATA: editor.ui.updateCurrPattText = true; break;
-		case PTB_SA_VOL_FROM_NUM: editor.ui.updateVolFromText = true; break;
-		case PTB_SA_VOL_TO_NUM: editor.ui.updateVolToText = true; break;
-		case PTB_SA_FIL_LP_CUTOFF: editor.ui.updateLPText = true; break;
-		case PTB_SA_FIL_HP_CUTOFF: editor.ui.updateHPText = true; break;
+		case PTB_SONGNAME: ui.updateSongName = true; break;
+		case PTB_SAMPLENAME: ui.updateCurrSampleName = true; break;
+		case PTB_PE_PATT: ui.updatePosEd = true; break;
+		case PTB_EO_QUANTIZE: ui.updateQuantizeText = true; break;
+		case PTB_EO_METRO_1: ui.updateMetro1Text = true; break;
+		case PTB_EO_METRO_2: ui.updateMetro2Text = true; break;
+		case PTB_EO_FROM_NUM: ui.updateFromText = true; break;
+		case PTB_EO_TO_NUM: ui.updateToText = true; break;
+		case PTB_EO_MIX: ui.updateMixText = true; break;
+		case PTB_EO_POS_NUM: ui.updatePosText = true; break;
+		case PTB_EO_MOD_NUM: ui.updateModText = true; break;
+		case PTB_EO_VOL_NUM: ui.updateVolText = true; break;
+		case PTB_DO_DATAPATH: ui.updateDiskOpPathText = true; break;
+		case PTB_POSS: ui.updateSongPos = true; break;
+		case PTB_PATTERNS: ui.updateSongPattern = true; break;
+		case PTB_LENGTHS: ui.updateSongLength = true; break;
+		case PTB_SAMPLES: ui.updateCurrSampleNum = true; break;
+		case PTB_SVOLUMES: ui.updateCurrSampleVolume = true; break;
+		case PTB_SLENGTHS: ui.updateCurrSampleLength = true; break;
+		case PTB_SREPEATS: ui.updateCurrSampleRepeat = true; break;
+		case PTB_SREPLENS: ui.updateCurrSampleReplen = true; break;
+		case PTB_PATTDATA: ui.updateCurrPattText = true; break;
+		case PTB_SA_VOL_FROM_NUM: ui.updateVolFromText = true; break;
+		case PTB_SA_VOL_TO_NUM: ui.updateVolToText = true; break;
+		case PTB_SA_FIL_LP_CUTOFF: ui.updateLPText = true; break;
+		case PTB_SA_FIL_HP_CUTOFF: ui.updateHPText = true; break;
 	}
 }
 
@@ -104,7 +105,7 @@ void exitGetTextLine(bool updateValue)
 	SDL_StopTextInput();
 
 	// if user updated the disk op path text
-	if (editor.ui.diskOpScreenShown && editor.ui.editObject == PTB_DO_DATAPATH)
+	if (ui.diskOpScreenShown && ui.editObject == PTB_DO_DATAPATH)
 	{
 		pathU = (UNICHAR *)calloc(PATH_MAX + 2, sizeof (UNICHAR));
 		if (pathU != NULL)
@@ -119,35 +120,35 @@ void exitGetTextLine(bool updateValue)
 		}
 	}
 
-	if (editor.ui.editTextType != TEXT_EDIT_STRING)
+	if (ui.editTextType != TEXT_EDIT_STRING)
 	{
-		if (editor.ui.dstPos != editor.ui.numLen)
+		if (ui.dstPos != ui.numLen)
 			removeTextEditMarker();
 
-		updateTextObject(editor.ui.editObject);
+		updateTextObject(ui.editObject);
 	}
 	else
 	{
 		removeTextEditMarker();
 
 		// yet another kludge...
-		if (editor.ui.editObject == PTB_PE_PATT)
-			editor.ui.updatePosEd = true;
+		if (ui.editObject == PTB_PE_PATT)
+			ui.updatePosEd = true;
 	}
 
-	editor.ui.editTextFlag = false;
+	ui.editTextFlag = false;
 
-	editor.ui.lineCurX = 0;
-	editor.ui.lineCurY = 0;
-	editor.ui.editPos = NULL;
-	editor.ui.dstPos = 0;
+	ui.lineCurX = 0;
+	ui.lineCurY = 0;
+	ui.editPos = NULL;
+	ui.dstPos = 0;
 
-	if (editor.ui.editTextType == TEXT_EDIT_STRING)
+	if (ui.editTextType == TEXT_EDIT_STRING)
 	{
-		if (editor.ui.dstOffset != NULL)
-			*editor.ui.dstOffset = '\0';
+		if (ui.dstOffset != NULL)
+			*ui.dstOffset = '\0';
 
-		if (editor.ui.editObject == PTB_SONGNAME)
+		if (ui.editObject == PTB_SONGNAME)
 		{
 			for (i = 0; i < 20; i++)
 				modEntry->head.moduleTitle[i] = (char)tolower(modEntry->head.moduleTitle[i]);
@@ -163,7 +164,7 @@ void exitGetTextLine(bool updateValue)
 		// set back GUI text pointers and update values (if requested)
 
 		s = &modEntry->samples[editor.currSample];
-		switch (editor.ui.editObject)
+		switch (ui.editObject)
 		{
 			case PTB_SA_FIL_LP_CUTOFF:
 			{
@@ -171,11 +172,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.lpCutOff = editor.ui.tmpDisp16;
+					editor.lpCutOff = ui.tmpDisp16;
 					if (editor.lpCutOff > (uint16_t)(FILTERS_BASE_FREQ/2))
 						editor.lpCutOff = (uint16_t)(FILTERS_BASE_FREQ/2);
 
-					editor.ui.updateLPText = true;
+					ui.updateLPText = true;
 				}
 			}
 			break;
@@ -186,11 +187,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.hpCutOff = editor.ui.tmpDisp16;
+					editor.hpCutOff = ui.tmpDisp16;
 					if (editor.hpCutOff > (uint16_t)(FILTERS_BASE_FREQ/2))
 						editor.hpCutOff = (uint16_t)(FILTERS_BASE_FREQ/2);
 
-					editor.ui.updateHPText = true;
+					ui.updateHPText = true;
 				}
 			}
 			break;
@@ -201,11 +202,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.vol1 = editor.ui.tmpDisp16;
+					editor.vol1 = ui.tmpDisp16;
 					if (editor.vol1 > 200)
 						editor.vol1 = 200;
 
-					editor.ui.updateVolFromText = true;
+					ui.updateVolFromText = true;
 					showVolFromSlider();
 				}
 			}
@@ -217,11 +218,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.vol2 = editor.ui.tmpDisp16;
+					editor.vol2 = ui.tmpDisp16;
 					if (editor.vol2 > 200)
 						editor.vol2 = 200;
 
-					editor.ui.updateVolToText = true;
+					ui.updateVolToText = true;
 					showVolToSlider();
 				}
 			}
@@ -233,8 +234,8 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.sampleVol = editor.ui.tmpDisp16;
-					editor.ui.updateVolText = true;
+					editor.sampleVol = ui.tmpDisp16;
+					ui.updateVolText = true;
 				}
 			}
 			break;
@@ -245,11 +246,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.samplePos = editor.ui.tmpDisp16;
+					editor.samplePos = ui.tmpDisp16;
 					if (editor.samplePos > modEntry->samples[editor.currSample].length)
 						editor.samplePos = modEntry->samples[editor.currSample].length;
 
-					editor.ui.updatePosText = true;
+					ui.updatePosText = true;
 				}
 			}
 			break;
@@ -260,11 +261,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					if (editor.ui.tmpDisp16 > 63)
-						editor.ui.tmpDisp16 = 63;
+					if (ui.tmpDisp16 > 63)
+						ui.tmpDisp16 = 63;
 
-					config.quantizeValue = editor.ui.tmpDisp16;
-					editor.ui.updateQuantizeText = true;
+					config.quantizeValue = ui.tmpDisp16;
+					ui.updateQuantizeText = true;
 				}
 			}
 			break;
@@ -275,11 +276,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					if (editor.ui.tmpDisp16 > 64)
-						editor.ui.tmpDisp16 = 64;
+					if (ui.tmpDisp16 > 64)
+						ui.tmpDisp16 = 64;
 
-					editor.metroSpeed = editor.ui.tmpDisp16;
-					editor.ui.updateMetro1Text = true;
+					editor.metroSpeed = ui.tmpDisp16;
+					ui.updateMetro1Text = true;
 				}
 			}
 			break;
@@ -290,11 +291,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					if (editor.ui.tmpDisp16 > 4)
-						editor.ui.tmpDisp16 = 4;
+					if (ui.tmpDisp16 > 4)
+						ui.tmpDisp16 = 4;
 
-					editor.metroChannel = editor.ui.tmpDisp16;
-					editor.ui.updateMetro2Text = true;
+					editor.metroChannel = ui.tmpDisp16;
+					ui.updateMetro2Text = true;
 				}
 			}
 			break;
@@ -305,13 +306,13 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.sampleFrom = editor.ui.tmpDisp8;
+					editor.sampleFrom = ui.tmpDisp8;
 
 					// signed check + normal check
 					if (editor.sampleFrom < 0x00 || editor.sampleFrom > 0x1F)
 						editor.sampleFrom = 0x1F;
 
-					editor.ui.updateFromText = true;
+					ui.updateFromText = true;
 				}
 			}
 			break;
@@ -322,13 +323,13 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.sampleTo = editor.ui.tmpDisp8;
+					editor.sampleTo = ui.tmpDisp8;
 
 					// signed check + normal check
 					if (editor.sampleTo < 0x00 || editor.sampleTo > 0x1F)
 						editor.sampleTo = 0x1F;
 
-					editor.ui.updateToText = true;
+					ui.updateToText = true;
 				}
 			}
 			break;
@@ -343,18 +344,18 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					if (editor.ui.tmpDisp16 > MAX_PATTERNS-1)
-						editor.ui.tmpDisp16 = MAX_PATTERNS-1;
+					if (ui.tmpDisp16 > MAX_PATTERNS-1)
+						ui.tmpDisp16 = MAX_PATTERNS-1;
 
-					modEntry->head.order[posEdPos] = editor.ui.tmpDisp16;
+					modEntry->head.order[posEdPos] = ui.tmpDisp16;
 
 					updateWindowTitle(MOD_IS_MODIFIED);
 
-					if (editor.ui.posEdScreenShown)
-						editor.ui.updatePosEd = true;
+					if (ui.posEdScreenShown)
+						ui.updatePosEd = true;
 
-					editor.ui.updateSongPattern = true;
-					editor.ui.updateSongSize = true;
+					ui.updateSongPattern = true;
+					ui.updateSongSize = true;
 				}
 			}
 			break;
@@ -365,7 +366,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp16 = editor.ui.tmpDisp16;
+					tmp16 = ui.tmpDisp16;
 					if (tmp16 > 126)
 						tmp16 = 126;
 
@@ -374,11 +375,11 @@ void exitGetTextLine(bool updateValue)
 						modEntry->currOrder = tmp16;
 						editor.currPatternDisp = &modEntry->head.order[modEntry->currOrder];
 
-						if (editor.ui.posEdScreenShown)
-							editor.ui.updatePosEd = true;
+						if (ui.posEdScreenShown)
+							ui.updatePosEd = true;
 
-						editor.ui.updateSongPos = true;
-						editor.ui.updatePatternData = true;
+						ui.updateSongPos = true;
+						ui.updatePatternData = true;
 					}
 				}
 			}
@@ -390,7 +391,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp16 = editor.ui.tmpDisp16;
+					tmp16 = ui.tmpDisp16;
 					if (tmp16 > MAX_PATTERNS-1)
 						tmp16 = MAX_PATTERNS-1;
 
@@ -400,11 +401,11 @@ void exitGetTextLine(bool updateValue)
 
 						updateWindowTitle(MOD_IS_MODIFIED);
 
-						if (editor.ui.posEdScreenShown)
-							editor.ui.updatePosEd = true;
+						if (ui.posEdScreenShown)
+							ui.updatePosEd = true;
 
-						editor.ui.updateSongPattern = true;
-						editor.ui.updateSongSize = true;
+						ui.updateSongPattern = true;
+						ui.updateSongSize = true;
 					}
 				}
 			}
@@ -416,7 +417,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp16 = CLAMP(editor.ui.tmpDisp16, 1, 127);
+					tmp16 = CLAMP(ui.tmpDisp16, 1, 127);
 
 					if (modEntry->head.orderCount != tmp16)
 					{
@@ -428,11 +429,11 @@ void exitGetTextLine(bool updateValue)
 
 						editor.currPosEdPattDisp = &modEntry->head.order[posEdPos];
 
-						if (editor.ui.posEdScreenShown)
-							editor.ui.updatePosEd = true;
+						if (ui.posEdScreenShown)
+							ui.updatePosEd = true;
 
-						editor.ui.updateSongLength = true;
-						editor.ui.updateSongSize = true;
+						ui.updateSongLength = true;
+						ui.updateSongSize = true;
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
 				}
@@ -445,11 +446,11 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					if (modEntry->currPattern != editor.ui.tmpDisp16)
+					if (modEntry->currPattern != ui.tmpDisp16)
 					{
-						setPattern(editor.ui.tmpDisp16);
-						editor.ui.updatePatternData = true;
-						editor.ui.updateCurrPattText = true;
+						setPattern(ui.tmpDisp16);
+						ui.updatePatternData = true;
+						ui.updateCurrPattText = true;
 					}
 				}
 			}
@@ -461,7 +462,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp8 = editor.ui.tmpDisp8;
+					tmp8 = ui.tmpDisp8;
 					if (tmp8 < 0x00) // (signed) if >0x7F was entered, clamp to 0x1F
 						tmp8 = 0x1F;
 
@@ -482,7 +483,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp8 = editor.ui.tmpDisp8;
+					tmp8 = ui.tmpDisp8;
 
 					// signed check + normal check
 					if (tmp8 < 0x00 || tmp8 > 0x40)
@@ -491,7 +492,7 @@ void exitGetTextLine(bool updateValue)
 					if (s->volume != tmp8)
 					{
 						s->volume = tmp8;
-						editor.ui.updateCurrSampleVolume = true;
+						ui.updateCurrSampleVolume = true;
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
 				}
@@ -504,7 +505,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp32 = editor.ui.tmpDisp16 & 0xFFFE; // even'ify
+					tmp32 = ui.tmpDisp16 & 0xFFFE; // even'ify
 
 					if (s->loopStart+s->loopLength > 2)
 					{
@@ -517,13 +518,13 @@ void exitGetTextLine(bool updateValue)
 					if (s->length != tmp32)
 					{
 						turnOffVoices();
-						s->length = tmp32;
+						s->length = (uint16_t)tmp32;
 
-						editor.ui.updateCurrSampleLength = true;
-						editor.ui.updateSongSize = true;
+						ui.updateCurrSampleLength = true;
+						ui.updateSongSize = true;
 						updateSamplePos();
 
-						if (editor.ui.samplerScreenShown)
+						if (ui.samplerScreenShown)
 							redrawSample();
 
 						recalcChordLength();
@@ -539,7 +540,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp32 = editor.ui.tmpDisp16 & 0xFFFE; // even'ify
+					tmp32 = ui.tmpDisp16 & 0xFFFE; // even'ify
 
 					if (s->length >= s->loopLength)
 					{
@@ -556,15 +557,15 @@ void exitGetTextLine(bool updateValue)
 					if (s->loopStart != tmp32)
 					{
 						turnOffVoices();
-						s->loopStart = tmp32;
+						s->loopStart = (uint16_t)tmp32;
 						mixerUpdateLoops();
 
-						editor.ui.updateCurrSampleRepeat = true;
+						ui.updateCurrSampleRepeat = true;
 
-						if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3)
-							editor.ui.updateLengthText = true;
+						if (ui.editOpScreenShown && ui.editOpScreen == 3)
+							ui.updateLengthText = true;
 
-						if (editor.ui.samplerScreenShown)
+						if (ui.samplerScreenShown)
 							setLoopSprites();
 
 						updateWindowTitle(MOD_IS_MODIFIED);
@@ -579,7 +580,7 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp32 = editor.ui.tmpDisp16 & 0xFFFE; // even'ify
+					tmp32 = ui.tmpDisp16 & 0xFFFE; // even'ify
 
 					if (s->length >= s->loopStart)
 					{
@@ -599,14 +600,14 @@ void exitGetTextLine(bool updateValue)
 					if (s->loopLength != tmp32)
 					{
 						turnOffVoices();
-						s->loopLength = tmp32;
+						s->loopLength = (uint16_t)tmp32;
 						mixerUpdateLoops();
 
-						editor.ui.updateCurrSampleReplen = true;
-						if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3)
-							editor.ui.updateLengthText = true;
+						ui.updateCurrSampleReplen = true;
+						if (ui.editOpScreenShown && ui.editOpScreen == 3)
+							ui.updateLengthText = true;
 
-						if (editor.ui.samplerScreenShown)
+						if (ui.samplerScreenShown)
 							setLoopSprites();
 
 						updateWindowTitle(MOD_IS_MODIFIED);
@@ -621,24 +622,24 @@ void exitGetTextLine(bool updateValue)
 		pointerSetPreviousMode();
 	}
 
-	editor.ui.editTextType = 0;
+	ui.editTextType = 0;
 }
 
 void getTextLine(int16_t editObject)
 {
 	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 
-	editor.ui.lineCurY = (editor.ui.editTextPos / 40) + 5;
-	editor.ui.lineCurX = ((editor.ui.editTextPos % 40) * FONT_CHAR_W) + 4;
-	editor.ui.dstPtr = editor.ui.showTextPtr;
-	editor.ui.editPos = editor.ui.showTextPtr;
-	editor.ui.dstPos = 0;
-	editor.ui.editTextFlag = true;
-	editor.ui.editTextType = TEXT_EDIT_STRING;
-	editor.ui.editObject = editObject;
+	ui.lineCurY = (ui.editTextPos / 40) + 5;
+	ui.lineCurX = ((ui.editTextPos % 40) * FONT_CHAR_W) + 4;
+	ui.dstPtr = ui.showTextPtr;
+	ui.editPos = ui.showTextPtr;
+	ui.dstPos = 0;
+	ui.editTextFlag = true;
+	ui.editTextType = TEXT_EDIT_STRING;
+	ui.editObject = editObject;
 
-	if (editor.ui.dstOffset != NULL)
-	   *editor.ui.dstOffset  = '\0';
+	if (ui.dstOffset != NULL)
+	   *ui.dstOffset  = '\0';
 
 	// kludge
 	if (editor.mixFlag)
@@ -657,12 +658,12 @@ void getNumLine(uint8_t type, int16_t editObject)
 {
 	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 
-	editor.ui.lineCurY = (editor.ui.editTextPos / 40) + 5;
-	editor.ui.lineCurX = ((editor.ui.editTextPos % 40) * FONT_CHAR_W) + 4;
-	editor.ui.dstPos = 0;
-	editor.ui.editTextFlag = true;
-	editor.ui.editTextType = type;
-	editor.ui.editObject = editObject;
+	ui.lineCurY = (ui.editTextPos / 40) + 5;
+	ui.lineCurX = ((ui.editTextPos % 40) * FONT_CHAR_W) + 4;
+	ui.dstPos = 0;
+	ui.editTextFlag = true;
+	ui.editTextType = type;
+	ui.editObject = editObject;
 
 	renderTextEditMarker();
 	SDL_StartTextInput();
@@ -673,10 +674,10 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 	int8_t key, hexKey, numberKey;
 	note_t *note;
 
-	if (editor.ui.editTextFlag)
+	if (ui.editTextFlag)
 		return;
 
-	if (editor.ui.samplerScreenShown || (editor.currMode == MODE_IDLE || editor.currMode == MODE_PLAY))
+	if (ui.samplerScreenShown || (editor.currMode == MODE_IDLE || editor.currMode == MODE_PLAY))
 	{
 		// at this point it will only jam, not place it
 		if (!keyb.leftAltPressed && !keyb.leftAmigaPressed && !keyb.leftCtrlPressed && !keyb.shiftPressed)
@@ -698,7 +699,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 	}
 
 	// are we editing a note, or other stuff?
-	if (editor.cursor.mode != CURSOR_NOTE)
+	if (cursor.mode != CURSOR_NOTE)
 	{
 		// if we held down any key modifier at this point, then do nothing
 		if (keyb.leftAltPressed || keyb.leftAmigaPressed || keyb.leftCtrlPressed || keyb.shiftPressed)
@@ -735,9 +736,9 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 				key += hexKey;
 			}
 
-			note = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + editor.cursor.channel];
+			note = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
 
-			switch (editor.cursor.mode)
+			switch (cursor.mode)
 			{
 				case CURSOR_SAMPLE1:
 				{
@@ -819,7 +820,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 		{
 			if (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD)
 			{
-				note = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + editor.cursor.channel];
+				note = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
 
 				if (!keyb.leftAltPressed)
 				{
@@ -858,8 +859,8 @@ bool handleSpecialKeys(SDL_Scancode scancode)
 		return false;
 
 	patt = modEntry->patterns[modEntry->currPattern];
-	note = &patt[(modEntry->currRow * AMIGA_VOICES) + editor.cursor.channel];
-	prevNote = &patt[(((modEntry->currRow - 1) & 0x3F) * AMIGA_VOICES) + editor.cursor.channel];
+	note = &patt[(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+	prevNote = &patt[(((modEntry->currRow - 1) & 0x3F) * AMIGA_VOICES) + cursor.channel];
 
 	if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)
 	{
@@ -914,7 +915,7 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 	moduleSample_t *s;
 	note_t *note;
 
-	ch = editor.cursor.channel;
+	ch = cursor.channel;
 	assert(ch < AMIGA_VOICES);
 
 	chn = &modEntry->channels[ch];
@@ -939,9 +940,9 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			chn->n_volume = s->volume;
 			chn->n_period = tempPeriod;
 			chn->n_start = &modEntry->sampleData[s->offset];
-			chn->n_length = (s->loopStart > 0) ? (uint32_t)(s->loopStart + s->loopLength) / 2 : s->length / 2;
+			chn->n_length = (s->loopStart > 0) ? (s->loopStart + s->loopLength) >> 1 : s->length >> 1;
 			chn->n_loopstart = &modEntry->sampleData[s->offset + s->loopStart];
-			chn->n_replen = s->loopLength / 2;
+			chn->n_replen = s->loopLength >> 1;
 
 			if (chn->n_length == 0)
 				chn->n_length = 1;
@@ -967,7 +968,7 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			if (normalMode || editor.pNoteFlag == 2)
 			{
 				// insert note and sample number
-				if (!editor.ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
+				if (!ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
 				{
 					note->sample = editor.sampleZero ? 0 : (editor.currSample + 1);
 					note->period = cleanPeriod;
@@ -997,7 +998,7 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 
 		if (normalMode || editor.pNoteFlag == 2)
 		{
-			if (!editor.ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
+			if (!ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
 			{
 				note->period = 0;
 				note->sample = 0;
@@ -1062,7 +1063,7 @@ void undoLastChange(void)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void copySampleTrack(void)
@@ -1103,7 +1104,7 @@ void copySampleTrack(void)
 		memcpy(&modEntry->sampleData[smpTo->offset], &modEntry->sampleData[smpFrom->offset], MAX_SAMPLE_LEN);
 
 		updateCurrSample();
-		editor.ui.updateSongSize = true;
+		ui.updateSongSize = true;
 	}
 	else
 	{
@@ -1112,7 +1113,7 @@ void copySampleTrack(void)
 		{
 			for (i = 0; i < MOD_ROWS; i++)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+				noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 				if (noteSrc->sample == editor.sampleFrom)
 					noteSrc->sample = editor.sampleTo;
 			}
@@ -1130,7 +1131,7 @@ void copySampleTrack(void)
 			}
 		}
 
-		editor.ui.updatePatternData = true;
+		ui.updatePatternData = true;
 	}
 
 	editor.samplePos = 0;
@@ -1201,7 +1202,7 @@ void exchSampleTrack(void)
 		{
 			for (i = 0; i < MOD_ROWS; i++)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+				noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 				     if (noteSrc->sample == editor.sampleFrom) noteSrc->sample = editor.sampleTo;
 				else if (noteSrc->sample == editor.sampleTo) noteSrc->sample = editor.sampleFrom;
@@ -1221,7 +1222,7 @@ void exchSampleTrack(void)
 			}
 		}
 
-		editor.ui.updatePatternData = true;
+		ui.updatePatternData = true;
 	}
 
 	editor.samplePos = 0;
@@ -1240,7 +1241,7 @@ void delSampleTrack(void)
 	{
 		for (i = 0; i < MOD_ROWS; i++)
 		{
-			noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+			noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 			if (noteSrc->sample == editor.currSample+1)
 			{
 				noteSrc->period = 0;
@@ -1269,7 +1270,7 @@ void delSampleTrack(void)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
@@ -1288,7 +1289,7 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 	saveUndo();
 	for (uint8_t i = from; i <= to; i++)
 	{
-		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1322,7 +1323,7 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
@@ -1341,7 +1342,7 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 	saveUndo();
 	for (uint8_t i = from; i <= to; i++)
 	{
-		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1375,7 +1376,7 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
@@ -1396,7 +1397,7 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 	saveUndo();
 	for (uint8_t i = from; i <= to; i++)
 	{
-		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1435,7 +1436,7 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 	if (noteChanged)
 	{
 		updateWindowTitle(MOD_IS_MODIFIED);
-		editor.ui.updatePatternData = true;
+		ui.updatePatternData = true;
 	}
 }
 
@@ -1455,7 +1456,7 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 	saveUndo();
 	for (uint8_t i = from; i <= to; i++)
 	{
-		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + editor.cursor.channel];
+		noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1487,7 +1488,7 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void pattNoteUp(bool sampleAllFlag)
@@ -1536,7 +1537,7 @@ void pattNoteUp(bool sampleAllFlag)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void pattNoteDown(bool sampleAllFlag)
@@ -1585,7 +1586,7 @@ void pattNoteDown(bool sampleAllFlag)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void pattOctaUp(bool sampleAllFlag)
@@ -1632,7 +1633,7 @@ void pattOctaUp(bool sampleAllFlag)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 void pattOctaDown(bool sampleAllFlag)
@@ -1679,7 +1680,7 @@ void pattOctaDown(bool sampleAllFlag)
 	}
 
 	updateWindowTitle(MOD_IS_MODIFIED);
-	editor.ui.updatePatternData = true;
+	ui.updatePatternData = true;
 }
 
 int8_t keyToNote(SDL_Scancode scancode)

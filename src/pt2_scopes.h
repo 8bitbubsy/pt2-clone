@@ -20,12 +20,12 @@ typedef struct scopeChannelExt // external scope state
 	int32_t newLength, newLoopStart;
 } scopeChannelExt_t;
 
-void setScopeDelta(uint8_t ch, uint32_t delta);
-int32_t getSampleReadPos(uint8_t ch, uint8_t smpNum);
+void setScopeDelta(int32_t ch, uint32_t delta);
+int32_t getSampleReadPos(int32_t ch, uint8_t smpNum);
 void updateScopes(void);
 void drawScopes(void);
 bool initScopes(void);
-void stopScope(uint8_t ch);
+void stopScope(int32_t ch);
 void stopAllScopes(void);
 
 extern scopeChannel_t scope[AMIGA_VOICES];

@@ -4,6 +4,7 @@
 #include "pt2_palette.h"
 #include "pt2_tables.h"
 #include "pt2_textout.h"
+#include "pt2_structs.h"
 
 #define MIDDLE_ROW 7
 #define VISIBLE_ROWS 15

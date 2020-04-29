@@ -1,8 +1,9 @@
 // these BLEP routines were coded by aciddose
 
 #include <stdint.h>
+#include <stdbool.h>
+#include <assert.h>
 #include "pt2_blep.h"
-#include "pt2_helpers.h"
 
 /* Why this table is not represented as readable floating-point numbers:
 ** Accurate double representation in string format requires at least 14 digits and normalized
@@ -83,6 +84,8 @@ static const uint64_t minblepdata[] =
 
 const double *get_minblep_table(void) { return (const double *)minblepdata; }
 
+#define LERP(x, y, z) ((x) + ((y) - (x)) * (z))
+
 void blepAdd(blep_t *b, double dOffset, double dAmplitude)
 {
 	assert(dOffset >= 0.0 && dOffset < 1.0);
@@ -116,8 +119,9 @@ void blepVolAdd(blep_t *b, double dAmplitude)
 	for (int32_t n = 0; n < BLEP_NS; n++)
 	{
 		b->dBuffer[i] += dAmplitude * (*dBlepSrc);
-		i = (i + 1) & BLEP_RNS;
 		dBlepSrc += BLEP_SP;
+
+		i = (i + 1) & BLEP_RNS;
 	}
 
 	b->samplesLeft = BLEP_NS;

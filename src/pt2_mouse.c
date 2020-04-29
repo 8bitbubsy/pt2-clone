@@ -90,9 +90,9 @@ void pointerSetMode(uint8_t pointerMode, bool carry)
 {
 	assert(pointerMode <= 5);
 
-	editor.ui.pointerMode = pointerMode;
+	ui.pointerMode = pointerMode;
 	if (carry)
-		editor.ui.previousPointerMode = editor.ui.pointerMode;
+		ui.previousPointerMode = ui.pointerMode;
 
 	switch (pointerMode)
 	{
@@ -108,10 +108,10 @@ void pointerSetMode(uint8_t pointerMode, bool carry)
 
 void pointerSetPreviousMode(void)
 {
-	if (editor.ui.editTextFlag || editor.ui.askScreenShown || editor.ui.clearScreenShown)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown)
 		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	else
-		pointerSetMode(editor.ui.previousPointerMode, NO_CARRY);
+		pointerSetMode(ui.previousPointerMode, NO_CARRY);
 }
 
 void setMsgPointer(void)
@@ -124,15 +124,15 @@ void setErrPointer(void)
 	pointerSetColor(POINTER_RED);
 }
 
-bool setSystemCursor(SDL_Cursor *cursor)
+bool setSystemCursor(SDL_Cursor *cur)
 {
-	if (cursor == NULL)
+	if (cur == NULL)
 	{
 		SDL_SetCursor(SDL_GetDefaultCursor());
 		return false;
 	}
 
-	SDL_SetCursor(cursor);
+	SDL_SetCursor(cur);
 	return true;
 }
 
@@ -153,7 +153,7 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 {
 	freeMouseCursors();
 
-	uint8_t scaleFactor = video.yScale;
+	const uint32_t scaleFactor = video.yScale;
 
 	for (uint32_t i = 0; i < NUM_CURSORS; i++)
 	{
@@ -331,24 +331,24 @@ void mouseButtonUpHandler(uint8_t mouseButton)
 	if (mouseButton == SDL_BUTTON_LEFT)
 	{
 		mouse.leftButtonPressed = false;
-		editor.ui.forceSampleDrag = false;
-		editor.ui.forceVolDrag = false;
-		editor.ui.leftLoopPinMoving = false;
-		editor.ui.rightLoopPinMoving = false;
-		editor.ui.sampleMarkingPos = -1;
+		ui.forceSampleDrag = false;
+		ui.forceVolDrag = false;
+		ui.leftLoopPinMoving = false;
+		ui.rightLoopPinMoving = false;
+		ui.sampleMarkingPos = -1;
 
 		switch (mouse.lastGUIButton)
 		{
 			case PTB_SLENGTHU:
 			case PTB_SLENGTHD:
 			{
-				if (editor.ui.samplerScreenShown)
+				if (ui.samplerScreenShown)
 					redrawSample();
 
 				recalcChordLength();
 				updateSamplePos();
 
-				editor.ui.updateSongSize = true;
+				ui.updateSongSize = true;
 			}
 			break;
 
@@ -357,9 +357,9 @@ void mouseButtonUpHandler(uint8_t mouseButton)
 			case PTB_PATTERNU:
 			case PTB_PATTERND:
 			{
-				editor.ui.updateSongSize = true;
-				if (editor.ui.posEdScreenShown)
-					editor.ui.updatePosEd = true;
+				ui.updateSongSize = true;
+				if (ui.posEdScreenShown)
+					ui.updatePosEd = true;
 			}
 			break;
 
@@ -374,7 +374,7 @@ void mouseButtonUpHandler(uint8_t mouseButton)
 	if (mouseButton == SDL_BUTTON_RIGHT)
 	{
 		mouse.rightButtonPressed = false;
-		editor.ui.forceSampleEdit = false;
+		ui.forceSampleEdit = false;
 	}
 }
 
@@ -408,7 +408,7 @@ void handleGUIButtonRepeat(void)
 		return;
 	}
 
-	if (editor.ui.samplerFiltersBoxShown)
+	if (ui.samplerFiltersBoxShown)
 	{
 		handleRepeatedSamplerFilterButtons();
 		return;
@@ -435,7 +435,7 @@ void edNote1UpButton(void)
 	if (editor.note1 > 36)
 		editor.note1 = 36;
 
-	editor.ui.updateNote1Text = true;
+	ui.updateNote1Text = true;
 	recalcChordLength();
 }
 
@@ -449,7 +449,7 @@ void edNote1DownButton(void)
 	if (editor.note1 < 0)
 		editor.note1 = 0;
 
-	editor.ui.updateNote1Text = true;
+	ui.updateNote1Text = true;
 	recalcChordLength();
 }
 
@@ -463,7 +463,7 @@ void edNote2UpButton(void)
 	if (editor.note2 > 36)
 		editor.note2 = 36;
 
-	editor.ui.updateNote2Text = true;
+	ui.updateNote2Text = true;
 	recalcChordLength();
 }
 
@@ -477,7 +477,7 @@ void edNote2DownButton(void)
 	if (editor.note2 < 0)
 		editor.note2 = 0;
 
-	editor.ui.updateNote2Text = true;
+	ui.updateNote2Text = true;
 	recalcChordLength();
 }
 
@@ -491,7 +491,7 @@ void edNote3UpButton(void)
 	if (editor.note3 > 36)
 		editor.note3 = 36;
 
-	editor.ui.updateNote3Text = true;
+	ui.updateNote3Text = true;
 	recalcChordLength();
 }
 
@@ -505,7 +505,7 @@ void edNote3DownButton(void)
 	if (editor.note3 < 0)
 		editor.note3 = 0;
 
-	editor.ui.updateNote3Text = true;
+	ui.updateNote3Text = true;
 	recalcChordLength();
 }
 
@@ -519,7 +519,7 @@ void edNote4UpButton(void)
 	if (editor.note4 > 36)
 		editor.note4 = 36;
 
-	editor.ui.updateNote4Text = true;
+	ui.updateNote4Text = true;
 	recalcChordLength();
 }
 
@@ -533,7 +533,7 @@ void edNote4DownButton(void)
 	if (editor.note4 < 0)
 		editor.note4 = 0;
 
-	editor.ui.updateNote4Text = true;
+	ui.updateNote4Text = true;
 	recalcChordLength();
 }
 
@@ -577,7 +577,7 @@ void edPosUpButton(bool fast)
 	if (editor.samplePos > modEntry->samples[editor.currSample].length)
 		editor.samplePos = modEntry->samples[editor.currSample].length;
 
-	editor.ui.updatePosText = true;
+	ui.updatePosText = true;
 }
 
 void edPosDownButton(bool fast)
@@ -617,7 +617,7 @@ void edPosDownButton(bool fast)
 		}
 	}
 
-	editor.ui.updatePosText = true;
+	ui.updatePosText = true;
 }
 
 void edModUpButton(void)
@@ -630,7 +630,7 @@ void edModUpButton(void)
 	if (editor.modulateSpeed > 127)
 		editor.modulateSpeed = 127;
 
-	editor.ui.updateModText = true;
+	ui.updateModText = true;
 }
 
 void edModDownButton(void)
@@ -647,7 +647,7 @@ void edModDownButton(void)
 	if (editor.modulateSpeed < -128)
 		editor.modulateSpeed = -128;
 
-	editor.ui.updateModText = true;
+	ui.updateModText = true;
 }
 
 void edVolUpButton(void)
@@ -665,7 +665,7 @@ void edVolUpButton(void)
 			editor.sampleVol++;
 	}
 
-	editor.ui.updateVolText = true;
+	ui.updateVolText = true;
 }
 
 void edVolDownButton(void)
@@ -683,7 +683,7 @@ void edVolDownButton(void)
 			editor.sampleVol--;
 	}
 
-	editor.ui.updateVolText = true;
+	ui.updateVolText = true;
 }
 
 void sampleUpButton(void)
@@ -720,7 +720,7 @@ void sampleFineTuneUpButton(void)
 		modEntry->samples[editor.currSample].fineTune = 0;
 
 	recalcChordLength();
-	editor.ui.updateCurrSampleFineTune = true;
+	ui.updateCurrSampleFineTune = true;
 }
 
 void sampleFineTuneDownButton(void)
@@ -733,7 +733,7 @@ void sampleFineTuneDownButton(void)
 		modEntry->samples[editor.currSample].fineTune = 0;
 
 	recalcChordLength();
-	editor.ui.updateCurrSampleFineTune = true;
+	ui.updateCurrSampleFineTune = true;
 }
 
 void sampleVolumeUpButton(void)
@@ -749,7 +749,7 @@ void sampleVolumeUpButton(void)
 		val = 64;
 
 	modEntry->samples[editor.currSample].volume = (uint8_t)val;
-	editor.ui.updateCurrSampleVolume = true;
+	ui.updateCurrSampleVolume = true;
 }
 
 void sampleVolumeDownButton(void)
@@ -765,7 +765,7 @@ void sampleVolumeDownButton(void)
 		val = 0;
 
 	modEntry->samples[editor.currSample].volume = (uint8_t)val;
-	editor.ui.updateCurrSampleVolume = true;
+	ui.updateCurrSampleVolume = true;
 }
 
 void sampleLengthUpButton(bool fast)
@@ -794,8 +794,8 @@ void sampleLengthUpButton(bool fast)
 	if (val > MAX_SAMPLE_LEN)
 		val = MAX_SAMPLE_LEN;
 
-	modEntry->samples[editor.currSample].length = val;
-	editor.ui.updateCurrSampleLength = true;
+	modEntry->samples[editor.currSample].length = (uint16_t)val;
+	ui.updateCurrSampleLength = true;
 }
 
 void sampleLengthDownButton(bool fast)
@@ -840,9 +840,9 @@ void sampleLengthDownButton(bool fast)
 			val = s->loopStart+s->loopLength;
 	}
 
-	s->length = val;
+	s->length = (uint16_t)val;
 
-	editor.ui.updateCurrSampleLength = true;
+	ui.updateCurrSampleLength = true;
 }
 
 void sampleRepeatUpButton(bool fast)
@@ -877,16 +877,16 @@ void sampleRepeatUpButton(bool fast)
 	if (val > len-loopLen)
 		val = len-loopLen;
 
-	modEntry->samples[editor.currSample].loopStart = val;
-	editor.ui.updateCurrSampleRepeat = true;
+	modEntry->samples[editor.currSample].loopStart = (uint16_t)val;
+	ui.updateCurrSampleRepeat = true;
 
 	mixerUpdateLoops();
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 		setLoopSprites();
 
-	if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3) // sample chord editor
-		editor.ui.updateLengthText = true;
+	if (ui.editOpScreenShown && ui.editOpScreen == 3) // sample chord editor
+		ui.updateLengthText = true;
 }
 
 void sampleRepeatDownButton(bool fast)
@@ -920,16 +920,16 @@ void sampleRepeatDownButton(bool fast)
 	if (val < 0)
 		val = 0;
 
-	modEntry->samples[editor.currSample].loopStart = val;
-	editor.ui.updateCurrSampleRepeat = true;
+	modEntry->samples[editor.currSample].loopStart = (uint16_t)val;
+	ui.updateCurrSampleRepeat = true;
 
 	mixerUpdateLoops();
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 		setLoopSprites();
 
-	if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3) // sample chord editor
-		editor.ui.updateLengthText = true;
+	if (ui.editOpScreenShown && ui.editOpScreen == 3) // sample chord editor
+		ui.updateLengthText = true;
 }
 
 void sampleRepeatLengthUpButton(bool fast)
@@ -964,16 +964,16 @@ void sampleRepeatLengthUpButton(bool fast)
 	if (val > len-loopStart)
 		val = len-loopStart;
 
-	modEntry->samples[editor.currSample].loopLength = val;
-	editor.ui.updateCurrSampleReplen = true;
+	modEntry->samples[editor.currSample].loopLength = (uint16_t)val;
+	ui.updateCurrSampleReplen = true;
 
 	mixerUpdateLoops();
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 		setLoopSprites();
 
-	if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3) // sample chord editor
-		editor.ui.updateLengthText = true;
+	if (ui.editOpScreenShown && ui.editOpScreen == 3) // sample chord editor
+		ui.updateLengthText = true;
 }
 
 void sampleRepeatLengthDownButton(bool fast)
@@ -1007,16 +1007,16 @@ void sampleRepeatLengthDownButton(bool fast)
 	if (val < 2)
 		val = 2;
 
-	modEntry->samples[editor.currSample].loopLength = val;
-	editor.ui.updateCurrSampleReplen = true;
+	modEntry->samples[editor.currSample].loopLength = (uint16_t)val;
+	ui.updateCurrSampleReplen = true;
 
 	mixerUpdateLoops();
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 		setLoopSprites();
 
-	if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3) // sample chord editor
-		editor.ui.updateLengthText = true;
+	if (ui.editOpScreenShown && ui.editOpScreen == 3) // sample chord editor
+		ui.updateLengthText = true;
 }
 
 void tempoUpButton(void)
@@ -1037,7 +1037,7 @@ void tempoUpButton(void)
 
 	modEntry->currBPM = val;
 	modSetTempo(modEntry->currBPM);
-	editor.ui.updateSongBPM = true;
+	ui.updateSongBPM = true;
 }
 
 void tempoDownButton(void)
@@ -1058,7 +1058,7 @@ void tempoDownButton(void)
 
 	modEntry->currBPM = val;
 	modSetTempo(modEntry->currBPM);
-	editor.ui.updateSongBPM = true;
+	ui.updateSongBPM = true;
 }
 
 void songLengthUpButton(void)
@@ -1081,7 +1081,7 @@ void songLengthUpButton(void)
 		val = modEntry->head.orderCount-1;
 
 	editor.currPosEdPattDisp = &modEntry->head.order[val];
-	editor.ui.updateSongLength = true;
+	ui.updateSongLength = true;
 }
 
 void songLengthDownButton(void)
@@ -1103,7 +1103,7 @@ void songLengthDownButton(void)
 		val = modEntry->head.orderCount-1;
 
 	editor.currPosEdPattDisp = &modEntry->head.order[val];
-	editor.ui.updateSongLength = true;
+	ui.updateSongLength = true;
 }
 
 void patternUpButton(void)
@@ -1120,10 +1120,10 @@ void patternUpButton(void)
 
 	modEntry->head.order[modEntry->currOrder] = (uint8_t)val;
 
-	if (editor.ui.posEdScreenShown)
-		editor.ui.updatePosEd = true;
+	if (ui.posEdScreenShown)
+		ui.updatePosEd = true;
 
-	editor.ui.updateSongPattern = true;
+	ui.updateSongPattern = true;
 }
 
 void patternDownButton(void)
@@ -1140,10 +1140,10 @@ void patternDownButton(void)
 
 	modEntry->head.order[modEntry->currOrder] = (uint8_t)val;
 
-	if (editor.ui.posEdScreenShown)
-		editor.ui.updatePosEd = true;
+	if (ui.posEdScreenShown)
+		ui.updatePosEd = true;
 
-	editor.ui.updateSongPattern = true;
+	ui.updateSongPattern = true;
 }
 
 void positionUpButton(void)
@@ -1187,44 +1187,44 @@ void handleSamplerVolumeBox(void)
 
 	if (mouse.rightButtonPressed)
 	{
-		if (editor.ui.editTextFlag)
+		if (ui.editTextFlag)
 		{
 			exitGetTextLine(EDIT_TEXT_NO_UPDATE);
 		}
 		else
 		{
-			editor.ui.samplerVolBoxShown = false;
+			ui.samplerVolBoxShown = false;
 			removeSamplerVolBox();
 		}
 
 		return;
 	}
 
-	if (editor.ui.editTextFlag)
+	if (ui.editTextFlag)
 		return;
 
 	// check buttons
 	if (mouse.leftButtonPressed)
 	{
 		// restore sample ask dialog
-		if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_RESTORE_SAMPLE)
+		if (ui.askScreenShown && ui.askScreenType == ASK_RESTORE_SAMPLE)
 		{
 			if (mouse.y >= 71 && mouse.y <= 81)
 			{
 				if (mouse.x >= 171 && mouse.x <= 196)
 				{
 					// YES button
-					editor.ui.askScreenShown = false;
-					editor.ui.answerNo = false;
-					editor.ui.answerYes = true;
+					ui.askScreenShown = false;
+					ui.answerNo = false;
+					ui.answerYes = true;
 					handleAskYes();
 				}
 				else if (mouse.x >= 234 && mouse.x <= 252)
 				{
 					// NO button
-					editor.ui.askScreenShown = false;
-					editor.ui.answerNo = true;
-					editor.ui.answerYes = false;
+					ui.askScreenShown = false;
+					ui.answerNo = true;
+					ui.answerYes = false;
 					handleAskNo();
 				}
 			}
@@ -1233,7 +1233,7 @@ void handleSamplerVolumeBox(void)
 		}
 
 		// MAIN SCREEN STOP
-		if (!editor.ui.diskOpScreenShown && !editor.ui.posEdScreenShown)
+		if (!ui.diskOpScreenShown && !ui.posEdScreenShown)
 		{
 			if (mouse.x >= 182 && mouse.x <= 243 && mouse.y >= 0 && mouse.y <= 10)
 			{
@@ -1277,7 +1277,7 @@ void handleSamplerVolumeBox(void)
 		// VOLUME button (toggle)
 		if (mouse.x >= 96 && mouse.x <= 135 && mouse.y >= 244 && mouse.y <= 254)
 		{
-			editor.ui.samplerVolBoxShown = false;
+			ui.samplerVolBoxShown = false;
 			removeSamplerVolBox();
 			return;
 		}
@@ -1294,11 +1294,11 @@ void handleSamplerVolumeBox(void)
 			// FROM NUM
 			if (mouse.y >= 154 && mouse.y <= 164)
 			{
-				editor.ui.tmpDisp16 = editor.vol1;
-				editor.vol1Disp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 3;
-				editor.ui.editTextPos = 6342; // (y * 40) + x
+				ui.tmpDisp16 = editor.vol1;
+				editor.vol1Disp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 3;
+				ui.editTextPos = 6342; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_VOL_FROM_NUM);
 				return;
 			}
@@ -1306,11 +1306,11 @@ void handleSamplerVolumeBox(void)
 			// TO NUM
 			else if (mouse.y >= 165 && mouse.y <= 175)
 			{
-				editor.ui.tmpDisp16 = editor.vol2;
-				editor.vol2Disp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 3;
-				editor.ui.editTextPos = 6782; // (y * 40) + x
+				ui.tmpDisp16 = editor.vol2;
+				editor.vol2Disp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 3;
+				ui.editTextPos = 6782; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_VOL_TO_NUM);
 				return;
 			}
@@ -1369,8 +1369,8 @@ void handleSamplerVolumeBox(void)
 					editor.vol2 = (uint16_t)((100 * 127) / sampleVol);
 				}
 
-				editor.ui.updateVolFromText = true;
-				editor.ui.updateVolToText = true;
+				ui.updateVolFromText = true;
+				ui.updateVolToText = true;
 
 				showVolFromSlider();
 				showVolToSlider();
@@ -1382,8 +1382,8 @@ void handleSamplerVolumeBox(void)
 			{
 				editor.vol1 = 100;
 				editor.vol2 = 0;
-				editor.ui.updateVolFromText = true;
-				editor.ui.updateVolToText = true;
+				ui.updateVolFromText = true;
+				ui.updateVolToText = true;
 				showVolFromSlider();
 				showVolToSlider();
 				return;
@@ -1394,8 +1394,8 @@ void handleSamplerVolumeBox(void)
 			{
 				editor.vol1 = 0;
 				editor.vol2 = 100;
-				editor.ui.updateVolFromText = true;
-				editor.ui.updateVolToText = true;
+				ui.updateVolFromText = true;
+				ui.updateVolToText = true;
 				showVolFromSlider();
 				showVolToSlider();
 				return;
@@ -1406,8 +1406,8 @@ void handleSamplerVolumeBox(void)
 			{
 				editor.vol1 = 100;
 				editor.vol2 = 100;
-				editor.ui.updateVolFromText = true;
-				editor.ui.updateVolToText = true;
+				ui.updateVolFromText = true;
+				ui.updateVolToText = true;
 				showVolFromSlider();
 				showVolToSlider();
 				return;
@@ -1416,7 +1416,7 @@ void handleSamplerVolumeBox(void)
 			// CANCEL
 			else if (mouse.x >= 174 && mouse.x <= 207)
 			{
-				editor.ui.samplerVolBoxShown = false;
+				ui.samplerVolBoxShown = false;
 				removeSamplerVolBox();
 				return;
 			}
@@ -1433,7 +1433,7 @@ void handleSamplerVolumeBox(void)
 
 				if (editor.vol1 == 100 && editor.vol2 == 100)
 				{
-					editor.ui.samplerVolBoxShown = false;
+					ui.samplerVolBoxShown = false;
 					removeSamplerVolBox();
 					return;
 				}
@@ -1471,7 +1471,7 @@ void handleSamplerVolumeBox(void)
 
 				fixSampleBeep(s);
 
-				editor.ui.samplerVolBoxShown = false;
+				ui.samplerVolBoxShown = false;
 				removeSamplerVolBox();
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -1507,7 +1507,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 			if (editor.lpCutOff > (uint16_t)(FILTERS_BASE_FREQ/2))
 				editor.lpCutOff = (uint16_t)(FILTERS_BASE_FREQ/2);
 
-			editor.ui.updateLPText = true;
+			ui.updateLPText = true;
 		}
 		break;
 
@@ -1528,7 +1528,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 					editor.lpCutOff = 0;
 			}
 
-			editor.ui.updateLPText = true;
+			ui.updateLPText = true;
 		}
 		break;
 
@@ -1552,7 +1552,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 			if (editor.hpCutOff > (uint16_t)(FILTERS_BASE_FREQ/2))
 				editor.hpCutOff = (uint16_t)(FILTERS_BASE_FREQ/2);
 
-			editor.ui.updateHPText = true;
+			ui.updateHPText = true;
 		}
 		break;
 
@@ -1573,7 +1573,7 @@ static void handleRepeatedSamplerFilterButtons(void)
 					editor.hpCutOff = 0;
 			}
 
-			editor.ui.updateHPText = true;
+			ui.updateHPText = true;
 		}
 		break;
 
@@ -1586,34 +1586,34 @@ void handleSamplerFiltersBox(void)
 	uint8_t i;
 	moduleSample_t *s;
 
-	if (mouse.rightButtonPressed && editor.ui.editTextFlag)
+	if (mouse.rightButtonPressed && ui.editTextFlag)
 	{
 		exitGetTextLine(EDIT_TEXT_NO_UPDATE);
 		return;
 	}
 
-	if (editor.ui.editTextFlag || mouse.lastSmpFilterButton > -1 || !mouse.leftButtonPressed)
+	if (ui.editTextFlag || mouse.lastSmpFilterButton > -1 || !mouse.leftButtonPressed)
 		return;
 
 	// restore sample ask dialog
-	if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_RESTORE_SAMPLE)
+	if (ui.askScreenShown && ui.askScreenType == ASK_RESTORE_SAMPLE)
 	{
 		if (mouse.y >= 71 && mouse.y <= 81)
 		{
 			if (mouse.x >= 171 && mouse.x <= 196)
 			{
 				// YES button
-				editor.ui.askScreenShown = false;
-				editor.ui.answerNo = false;
-				editor.ui.answerYes = true;
+				ui.askScreenShown = false;
+				ui.answerNo = false;
+				ui.answerYes = true;
 				handleAskYes();
 			}
 			else if ((mouse.x >= 234) && (mouse.x <= 252))
 			{
 				// NO button
-				editor.ui.askScreenShown = false;
-				editor.ui.answerNo = true;
-				editor.ui.answerYes = false;
+				ui.askScreenShown = false;
+				ui.answerNo = true;
+				ui.answerYes = false;
 				handleAskNo();
 			}
 		}
@@ -1624,13 +1624,13 @@ void handleSamplerFiltersBox(void)
 	// FILTERS button (toggle)
 	if (mouse.x >= 211 && mouse.x <= 245 && mouse.y >= 244 && mouse.y <= 254)
 	{
-		editor.ui.samplerFiltersBoxShown = false;
+		ui.samplerFiltersBoxShown = false;
 		removeSamplerFiltersBox();
 		return;
 	}
 
 	// MAIN SCREEN STOP
-	if (!editor.ui.diskOpScreenShown && !editor.ui.posEdScreenShown)
+	if (!ui.diskOpScreenShown && !ui.posEdScreenShown)
 	{
 		if (mouse.x >= 182 && mouse.x <= 243 && mouse.y >= 0 && mouse.y <= 10)
 		{
@@ -1706,15 +1706,15 @@ void handleSamplerFiltersBox(void)
 			if (mouse.rightButtonPressed)
 			{
 				editor.lpCutOff = 0;
-				editor.ui.updateLPText = true;
+				ui.updateLPText = true;
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = editor.lpCutOff;
-				editor.lpCutOffDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 4;
-				editor.ui.editTextPos = 6341; // (y * 40) + x
+				ui.tmpDisp16 = editor.lpCutOff;
+				editor.lpCutOffDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 4;
+				ui.editTextPos = 6341; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_FIL_LP_CUTOFF);
 			}
 
@@ -1743,7 +1743,7 @@ void handleSamplerFiltersBox(void)
 			if (editor.lpCutOff > (uint16_t)(FILTERS_BASE_FREQ/2))
 				editor.lpCutOff = (uint16_t)(FILTERS_BASE_FREQ/2);
 
-			editor.ui.updateLPText = true;
+			ui.updateLPText = true;
 			return;
 		}
 
@@ -1766,7 +1766,7 @@ void handleSamplerFiltersBox(void)
 					editor.lpCutOff = 0;
 			}
 
-			editor.ui.updateLPText = true;
+			ui.updateLPText = true;
 			return;
 		}
 	}
@@ -1787,15 +1787,15 @@ void handleSamplerFiltersBox(void)
 			if (mouse.rightButtonPressed)
 			{
 				editor.hpCutOff = 0;
-				editor.ui.updateHPText = true;
+				ui.updateHPText = true;
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = editor.hpCutOff;
-				editor.hpCutOffDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 4;
-				editor.ui.editTextPos = 6781; // (y * 40) + x
+				ui.tmpDisp16 = editor.hpCutOff;
+				editor.hpCutOffDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 4;
+				ui.editTextPos = 6781; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_FIL_HP_CUTOFF);
 			}
 
@@ -1824,7 +1824,7 @@ void handleSamplerFiltersBox(void)
 			if (editor.hpCutOff > (uint16_t)(FILTERS_BASE_FREQ/2))
 				editor.hpCutOff = (uint16_t)(FILTERS_BASE_FREQ/2);
 
-			editor.ui.updateHPText = true;
+			ui.updateHPText = true;
 			return;
 		}
 
@@ -1847,7 +1847,7 @@ void handleSamplerFiltersBox(void)
 					editor.hpCutOff = 0;
 			}
 
-			editor.ui.updateHPText = true;
+			ui.updateHPText = true;
 			return;
 		}
 	}
@@ -1856,14 +1856,14 @@ void handleSamplerFiltersBox(void)
 	if (mouse.x >= 76 && mouse.x <= 239 && mouse.y >= 174 && mouse.y <= 186)
 	{
 		editor.normalizeFiltersFlag ^= 1;
-		editor.ui.updateNormFlag = true;
+		ui.updateNormFlag = true;
 		return;
 	}
 
 	// EXIT
 	if (mouse.x >= 240 && mouse.x <= 250 && mouse.y >= 154 && mouse.y <= 186)
 	{
-		editor.ui.samplerFiltersBoxShown = false;
+		ui.samplerFiltersBoxShown = false;
 		removeSamplerFiltersBox();
 	}
 }
@@ -1884,9 +1884,9 @@ for (uint32_t i = 0; i < bNum; i++) \
 int32_t checkGUIButtons(void)
 {
 	// these two makes *no other* buttons clickable
-	if (editor.ui.askScreenShown)
+	if (ui.askScreenShown)
 	{
-		if (editor.ui.pat2SmpDialogShown)
+		if (ui.pat2SmpDialogShown)
 		{
 			TEST_BUTTONS(bPat2SmpAsk, PAT2SMP_ASK_BUTTONS);
 		}
@@ -1897,7 +1897,7 @@ int32_t checkGUIButtons(void)
 
 		return -1;
 	}
-	else if (editor.ui.clearScreenShown)
+	else if (ui.clearScreenShown)
 	{
 		TEST_BUTTONS(bClear, CLEAR_BUTTONS);
 		return -1;
@@ -1908,19 +1908,19 @@ int32_t checkGUIButtons(void)
 		return PTB_QUIT;
 
 	// top screen buttons
-	if (editor.ui.diskOpScreenShown)
+	if (ui.diskOpScreenShown)
 	{
 		TEST_BUTTONS(bDiskOp, DISKOP_BUTTONS);
 	}
 	else
 	{
-		if (editor.ui.posEdScreenShown)
+		if (ui.posEdScreenShown)
 		{
 			TEST_BUTTONS(bPosEd, POSED_BUTTONS);
 		}
-		else if (editor.ui.editOpScreenShown)
+		else if (ui.editOpScreenShown)
 		{
-			switch (editor.ui.editOpScreen)
+			switch (ui.editOpScreen)
 			{
 				default:
 				case 0: TEST_BUTTONS(bEditOp1, EDITOP1_BUTTONS); break;
@@ -1937,7 +1937,7 @@ int32_t checkGUIButtons(void)
 	TEST_BUTTONS(bMidScreen, MIDSCREEN_BUTTONS);
 
 	// bottom screen buttons
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 	{
 		TEST_BUTTONS(bSampler, SAMPLER_BUTTONS);
 	}
@@ -1952,41 +1952,41 @@ int32_t checkGUIButtons(void)
 void handleTextEditing(uint8_t mouseButton)
 {
 	char *tmpRead;
-	int16_t tmp16;
+	int32_t tmp32;
 
 	// handle mouse while editing text/numbers
-	if (editor.ui.editTextFlag)
+	if (ui.editTextFlag)
 	{
-		if (editor.ui.editTextType != TEXT_EDIT_STRING)
+		if (ui.editTextType != TEXT_EDIT_STRING)
 		{
 			if (mouseButton == SDL_BUTTON_RIGHT)
 				exitGetTextLine(EDIT_TEXT_NO_UPDATE);
 		}
 		else if (mouseButton == SDL_BUTTON_LEFT && !editor.mixFlag)
 		{
-			tmp16 = mouse.y - editor.ui.lineCurY;
-			if (tmp16 <= 2 && tmp16 >= -9)
+			tmp32 = mouse.y - ui.lineCurY;
+			if (tmp32 <= 2 && tmp32 >= -9)
 			{
-				tmp16 = (uint16_t)((mouse.x - editor.ui.lineCurX) + 4) >> 3;
-				while (tmp16 != 0) // 0 = pos we want
+				tmp32 = (uint32_t)((mouse.x - ui.lineCurX) + 4) >> 3;
+				while (tmp32 != 0) // 0 = pos we want
 				{
-					if (tmp16 > 0)
+					if (tmp32 > 0)
 					{
-						if (editor.ui.editPos < editor.ui.textEndPtr && *editor.ui.editPos != '\0')
+						if (ui.editPos < ui.textEndPtr && *ui.editPos != '\0')
 						{
-							editor.ui.editPos++;
+							ui.editPos++;
 							textMarkerMoveRight();
 						}
-						tmp16--;
+						tmp32--;
 					}
-					else if (tmp16 < 0)
+					else if (tmp32 < 0)
 					{
-						if (editor.ui.editPos > editor.ui.dstPtr)
+						if (ui.editPos > ui.dstPtr)
 						{
-							editor.ui.editPos--;
+							ui.editPos--;
 							textMarkerMoveLeft();
 						}
-						tmp16++;
+						tmp32++;
 					}
 				}
 			}
@@ -2001,34 +2001,34 @@ void handleTextEditing(uint8_t mouseButton)
 			{
 				exitGetTextLine(EDIT_TEXT_UPDATE);
 				editor.mixFlag = false;
-				editor.ui.updateMixText = true;
+				ui.updateMixText = true;
 			}
 			else
 			{
-				tmpRead = editor.ui.dstPtr;
-				while (tmpRead < editor.ui.textEndPtr)
+				tmpRead = ui.dstPtr;
+				while (tmpRead < ui.textEndPtr)
 					*tmpRead++ = '\0';
 
-				*editor.ui.textEndPtr = '\0';
+				*ui.textEndPtr = '\0';
 
 				// don't exit text edit mode if the disk op. path was about to be deleted
-				if (editor.ui.editObject == PTB_DO_DATAPATH)
+				if (ui.editObject == PTB_DO_DATAPATH)
 				{
 					// move text cursor to pos 0
-					while (editor.ui.editPos > editor.ui.dstPtr)
+					while (ui.editPos > ui.dstPtr)
 					{
-						editor.ui.editPos--;
+						ui.editPos--;
 						textMarkerMoveLeft();
 					}
 
-					editor.ui.updateDiskOpPathText = true;
+					ui.updateDiskOpPathText = true;
 				}
 				else
 				{
-					if (editor.ui.editObject == PTB_SONGNAME)
-						editor.ui.updateSongName = true;
-					else if (editor.ui.editObject == PTB_SAMPLENAME)
-						editor.ui.updateCurrSampleName = true;
+					if (ui.editObject == PTB_SONGNAME)
+						ui.updateSongName = true;
+					else if (ui.editObject == PTB_SAMPLENAME)
+						ui.updateCurrSampleName = true;
 
 					exitGetTextLine(EDIT_TEXT_UPDATE);
 				}
@@ -2039,26 +2039,26 @@ void handleTextEditing(uint8_t mouseButton)
 
 void mouseWheelUpHandler(void)
 {
-	if (editor.ui.editTextFlag || editor.ui.askScreenShown || editor.ui.clearScreenShown || editor.swapChannelFlag)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag)
 		return;
 
 	if (mouse.y < 121)
 	{
 		// upper part of screen
-		if (editor.ui.diskOpScreenShown)
+		if (ui.diskOpScreenShown)
 		{
-			if (editor.diskop.scrollOffset > 0)
+			if (diskop.scrollOffset > 0)
 			{
-				editor.diskop.scrollOffset--;
-				editor.ui.updateDiskOpFileList = true;
+				diskop.scrollOffset--;
+				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (editor.ui.posEdScreenShown && modEntry->currOrder > 0)
+		else if (ui.posEdScreenShown && modEntry->currOrder > 0)
 		{
 			modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
 		}
 	}
-	else if (editor.ui.samplerScreenShown)
+	else if (ui.samplerScreenShown)
 	{
 		samplerZoomInMouseWheel(); // lower part of screen
 	}
@@ -2070,26 +2070,26 @@ void mouseWheelUpHandler(void)
 
 void mouseWheelDownHandler(void)
 {
-	if (editor.ui.editTextFlag || editor.ui.askScreenShown || editor.ui.clearScreenShown || editor.swapChannelFlag)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag)
 		return;
 
 	if (mouse.y < 121)
 	{
 		// upper part of screen
-		if (editor.ui.diskOpScreenShown)
+		if (ui.diskOpScreenShown)
 		{
-			if (editor.diskop.numEntries > DISKOP_LINES && editor.diskop.scrollOffset < editor.diskop.numEntries-DISKOP_LINES)
+			if (diskop.numEntries > DISKOP_LINES && diskop.scrollOffset < diskop.numEntries-DISKOP_LINES)
 			{
-				editor.diskop.scrollOffset++;
-				editor.ui.updateDiskOpFileList = true;
+				diskop.scrollOffset++;
+				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (editor.ui.posEdScreenShown && modEntry->currOrder < modEntry->head.orderCount-1)
+		else if (ui.posEdScreenShown && modEntry->currOrder < modEntry->head.orderCount-1)
 		{
 			modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
 		}
 	}
-	else if (editor.ui.samplerScreenShown)
+	else if (ui.samplerScreenShown)
 	{
 		samplerZoomOutMouseWheel(); // lower part of screen
 	}
@@ -2114,9 +2114,9 @@ bool handleRightMouseButton(void)
 	}
 
 	// close clear dialog with right mouse button
-	if (editor.ui.clearScreenShown)
+	if (ui.clearScreenShown)
 	{
-		editor.ui.clearScreenShown = false;
+		ui.clearScreenShown = false;
 		setPrevStatusMessage();
 		pointerSetPreviousMode();
 
@@ -2130,21 +2130,21 @@ bool handleRightMouseButton(void)
 	}
 
 	// close ask dialogs with right mouse button
-	if (editor.ui.askScreenShown)
+	if (ui.askScreenShown)
 	{
-		editor.ui.askScreenShown = false;
-		editor.ui.answerNo = true;
-		editor.ui.answerYes = false;
+		ui.askScreenShown = false;
+		ui.answerNo = true;
+		ui.answerYes = false;
 		handleAskNo(); // mouse pointer is set to error (red) in here
 		return true;
 	}
 
 	// toggle channel muting with right mouse button
-	if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE && mouse.y >= 55 && mouse.y <= 87)
+	if (ui.visualizerMode == VISUAL_QUADRASCOPE && mouse.y >= 55 && mouse.y <= 87)
 	{
-		if (!editor.ui.posEdScreenShown && !editor.ui.editOpScreenShown && !editor.ui.diskOpScreenShown &&
-			!editor.ui.aboutScreenShown && !editor.ui.samplerVolBoxShown &&
-			!editor.ui.samplerFiltersBoxShown && !editor.isWAVRendering)
+		if (!ui.posEdScreenShown && !ui.editOpScreenShown && !ui.diskOpScreenShown &&
+			!ui.aboutScreenShown && !ui.samplerVolBoxShown &&
+			!ui.samplerFiltersBoxShown && !editor.isWAVRendering)
 		{
 			     if (mouse.x > 127 && mouse.x <= 167) editor.muted[0] ^= 1;
 			else if (mouse.x > 175 && mouse.x <= 215) editor.muted[1] ^= 1;
@@ -2156,8 +2156,8 @@ bool handleRightMouseButton(void)
 	}
 
 	// sample hand drawing
-	if (mouse.y >= 138 && mouse.y <= 201 && editor.ui.samplerScreenShown &&
-		!editor.ui.samplerVolBoxShown && !editor.ui.samplerFiltersBoxShown)
+	if (mouse.y >= 138 && mouse.y <= 201 && ui.samplerScreenShown &&
+		!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown)
 	{
 		samplerEditSample(false);
 	}
@@ -2169,43 +2169,43 @@ bool handleLeftMouseButton(void)
 {
 	int32_t guiButton;
 
-	if (editor.swapChannelFlag || editor.ui.editTextFlag)
+	if (editor.swapChannelFlag || ui.editTextFlag)
 		return false;
 
 	// handle volume toolbox in sampler screen
-	if (editor.ui.samplerVolBoxShown)
+	if (ui.samplerVolBoxShown)
 	{
 		handleSamplerVolumeBox();
 		return true;
 	}
 
 	// handle filters toolbox in sampler
-	else if (editor.ui.samplerFiltersBoxShown)
+	else if (ui.samplerFiltersBoxShown)
 	{
 		handleSamplerFiltersBox();
 		return true;
 	}
 
 	// "downsample before loading sample" ask dialog
-	if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_LOAD_DOWNSAMPLE)
+	if (ui.askScreenShown && ui.askScreenType == ASK_LOAD_DOWNSAMPLE)
 	{
 		if (mouse.y >= 83 && mouse.y <= 93)
 		{
 			if (mouse.x >= 179 && mouse.x <= 204)
 			{
 				// YES button
-				editor.ui.askScreenShown = false;
-				editor.ui.answerNo = false;
-				editor.ui.answerYes = true;
+				ui.askScreenShown = false;
+				ui.answerNo = false;
+				ui.answerYes = true;
 				handleAskYes();
 				return true;
 			}
 			else if (mouse.x >= 242 && mouse.x <= 260)
 			{
 				// NO button
-				editor.ui.askScreenShown = false;
-				editor.ui.answerNo = true;
-				editor.ui.answerYes = false;
+				ui.askScreenShown = false;
+				ui.answerNo = true;
+				ui.answerYes = false;
 				handleAskNo();
 				return true;
 			}
@@ -2215,19 +2215,19 @@ bool handleLeftMouseButton(void)
 	}
 
 	// cancel note input gadgets with left/right mouse button
-	if (editor.ui.changingSmpResample || editor.ui.changingChordNote || editor.ui.changingDrumPadNote)
+	if (ui.changingSmpResample || ui.changingChordNote || ui.changingDrumPadNote)
 	{
 		if (mouse.leftButtonPressed || mouse.rightButtonPressed)
 		{
-			editor.ui.changingSmpResample = false;
-			editor.ui.changingChordNote = false;
-			editor.ui.changingDrumPadNote = false;
+			ui.changingSmpResample = false;
+			ui.changingChordNote = false;
+			ui.changingDrumPadNote = false;
 
-			editor.ui.updateResampleNote = true;
-			editor.ui.updateNote1Text = true;
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateResampleNote = true;
+			ui.updateNote1Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			setPrevStatusMessage();
 			pointerSetPreviousMode();
@@ -2240,26 +2240,26 @@ bool handleLeftMouseButton(void)
 		return false;
 
 	// handle QUIT ask dialog while Disk Op. filling is ongoing
-	if (editor.diskop.isFilling)
+	if (diskop.isFilling)
 	{
-		if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_QUIT)
+		if (ui.askScreenShown && ui.askScreenType == ASK_QUIT)
 		{
 			if (mouse.y >= 71 && mouse.y <= 81)
 			{
 				if (mouse.x >= 171 && mouse.x <= 196)
 				{
 					// YES button
-					editor.ui.askScreenShown = false;
-					editor.ui.answerNo = false;
-					editor.ui.answerYes = true;
+					ui.askScreenShown = false;
+					ui.answerNo = false;
+					ui.answerYes = true;
 					handleAskYes();
 				}
 				else if (mouse.x >= 234 && mouse.x <= 252)
 				{
 					// NO button
-					editor.ui.askScreenShown = false;
-					editor.ui.answerNo = true;
-					editor.ui.answerYes = false;
+					ui.askScreenShown = false;
+					ui.answerNo = true;
+					ui.answerYes = false;
 					handleAskNo();
 				}
 			}
@@ -2271,7 +2271,7 @@ bool handleLeftMouseButton(void)
 	// CANCEL and YES/NO (ask exit) buttons while MOD2WAV is ongoing
 	if (editor.isWAVRendering)
 	{
-		if (editor.ui.askScreenShown && editor.ui.askScreenType == ASK_QUIT)
+		if (ui.askScreenShown && ui.askScreenType == ASK_QUIT)
 		{
 			if (mouse.x >= 171 && mouse.x <= 196)
 			{
@@ -2279,17 +2279,17 @@ bool handleLeftMouseButton(void)
 				editor.isWAVRendering = false;
 				SDL_WaitThread(editor.mod2WavThread, NULL);
 
-				editor.ui.askScreenShown = false;
-				editor.ui.answerNo = false;
-				editor.ui.answerYes = true;
+				ui.askScreenShown = false;
+				ui.answerNo = false;
+				ui.answerYes = true;
 				handleAskYes();
 			}
 			else if (mouse.x >= 234 && mouse.x <= 252)
 			{
 				// NO button
-				editor.ui.askScreenShown = false;
-				editor.ui.answerNo = true;
-				editor.ui.answerYes = false;
+				ui.askScreenShown = false;
+				ui.answerNo = true;
+				ui.answerYes = false;
 				handleAskNo();
 
 				pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
@@ -2330,9 +2330,9 @@ void updateMouseCounters(void)
 			editor.errorMsgCounter = 0;
 
 			// don't reset status text/mouse color during certain modes
-			if (!editor.ui.askScreenShown && !editor.ui.clearScreenShown &&
-				!editor.ui.pat2SmpDialogShown && !editor.ui.changingChordNote &&
-				!editor.ui.changingDrumPadNote && !editor.ui.changingSmpResample &&
+			if (!ui.askScreenShown && !ui.clearScreenShown &&
+				!ui.pat2SmpDialogShown && !ui.changingChordNote &&
+				!ui.changingDrumPadNote && !ui.changingSmpResample &&
 				!editor.swapChannelFlag)
 			{
 				pointerSetPreviousMode();
@@ -2363,9 +2363,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PAT2SMP:
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_PAT2SMP;
-			editor.ui.pat2SmpDialogShown = true;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_PAT2SMP;
+			ui.pat2SmpDialogShown = true;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 
 			if (editor.songPlaying)
@@ -2381,10 +2381,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		// Edit Op. All Screens
 		case PTB_EO_TITLEBAR:
 		{
-			     if (editor.ui.editOpScreen == 0) editor.sampleAllFlag ^= 1;
-			else if (editor.ui.editOpScreen == 1) editor.trackPattFlag = (editor.trackPattFlag + 1) % 3;
-			else if (editor.ui.editOpScreen == 2) editor.halfClipFlag ^= 1;
-			else if (editor.ui.editOpScreen == 3) editor.newOldFlag ^= 1;
+			     if (ui.editOpScreen == 0) editor.sampleAllFlag ^= 1;
+			else if (ui.editOpScreen == 1) editor.trackPattFlag = (editor.trackPattFlag + 1) % 3;
+			else if (ui.editOpScreen == 2) editor.halfClipFlag ^= 1;
+			else if (ui.editOpScreen == 3) editor.newOldFlag ^= 1;
 
 			renderEditOpMode();
 		}
@@ -2392,29 +2392,29 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_1:
 		{
-			editor.ui.editOpScreen = 0;
+			ui.editOpScreen = 0;
 			renderEditOpScreen();
 		}
 		break;
 
 		case PTB_EO_2:
 		{
-			editor.ui.editOpScreen = 1;
+			ui.editOpScreen = 1;
 			renderEditOpScreen();
 		}
 		break;
 
 		case PTB_EO_3:
 		{
-			editor.ui.editOpScreen = 2;
+			ui.editOpScreen = 2;
 			renderEditOpScreen();
 		}
 		break;
 
 		case PTB_EO_EXIT:
 		{
-			editor.ui.aboutScreenShown = false;
-			editor.ui.editOpScreenShown = false;
+			ui.aboutScreenShown = false;
+			ui.editOpScreenShown = false;
 			displayMainScreen();
 		}
 		break;
@@ -2435,7 +2435,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_EO_RECORD:
 		{
 			editor.recordMode ^= 1;
-			editor.ui.updateRecordText = true;
+			ui.updateRecordText = true;
 		}
 		break;
 
@@ -2446,21 +2446,21 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_EO_FROM:
 		{
 			editor.sampleFrom = editor.currSample + 1;
-			editor.ui.updateFromText = true;
+			ui.updateFromText = true;
 		}
 		break;
 
 		case PTB_EO_TO:
 		{
 			editor.sampleTo = editor.currSample + 1;
-			editor.ui.updateToText = true;
+			ui.updateToText = true;
 		}
 		break;
 
 		case PTB_EO_KILL:
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_KILL_SAMPLE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_KILL_SAMPLE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("KILL SAMPLE ?", NO_CARRY);
 			renderAskDialog();
@@ -2469,57 +2469,57 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_QUANTIZE:
 		{
-			editor.ui.tmpDisp16 = config.quantizeValue;
-			editor.quantizeValueDisp = &editor.ui.tmpDisp16;
-			editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-			editor.ui.numLen = 2;
-			editor.ui.editTextPos = 2824; // (y * 40) + x
+			ui.tmpDisp16 = config.quantizeValue;
+			editor.quantizeValueDisp = &ui.tmpDisp16;
+			ui.numPtr16 = &ui.tmpDisp16;
+			ui.numLen = 2;
+			ui.editTextPos = 2824; // (y * 40) + x
 			getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_QUANTIZE);
 		}
 		break;
 
 		case PTB_EO_METRO_1: // metronome speed
 		{
-			editor.ui.tmpDisp16 = editor.metroSpeed;
-			editor.metroSpeedDisp = &editor.ui.tmpDisp16;
-			editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-			editor.ui.numLen = 2;
-			editor.ui.editTextPos = 3261; // (y * 40) + x
+			ui.tmpDisp16 = editor.metroSpeed;
+			editor.metroSpeedDisp = &ui.tmpDisp16;
+			ui.numPtr16 = &ui.tmpDisp16;
+			ui.numLen = 2;
+			ui.editTextPos = 3261; // (y * 40) + x
 			getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_METRO_1);
 		}
 		break;
 
 		case PTB_EO_METRO_2: // metronome channel
 		{
-			editor.ui.tmpDisp16 = editor.metroChannel;
-			editor.metroChannelDisp = &editor.ui.tmpDisp16;
-			editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-			editor.ui.numLen = 2;
-			editor.ui.editTextPos = 3264; // (y * 40) + x
+			ui.tmpDisp16 = editor.metroChannel;
+			editor.metroChannelDisp = &ui.tmpDisp16;
+			ui.numPtr16 = &ui.tmpDisp16;
+			ui.numLen = 2;
+			ui.editTextPos = 3264; // (y * 40) + x
 			getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_METRO_2);
 		}
 		break;
 
 		case PTB_EO_FROM_NUM:
 		{
-			editor.ui.tmpDisp8 = editor.sampleFrom;
-			editor.sampleFromDisp = &editor.ui.tmpDisp8;
-			editor.ui.numPtr8 = &editor.ui.tmpDisp8;
-			editor.ui.numLen = 2;
-			editor.ui.numBits = 8;
-			editor.ui.editTextPos = 3273; // (y * 40) + x
+			ui.tmpDisp8 = editor.sampleFrom;
+			editor.sampleFromDisp = &ui.tmpDisp8;
+			ui.numPtr8 = &ui.tmpDisp8;
+			ui.numLen = 2;
+			ui.numBits = 8;
+			ui.editTextPos = 3273; // (y * 40) + x
 			getNumLine(TEXT_EDIT_HEX, PTB_EO_FROM_NUM);
 		}
 		break;
 
 		case PTB_EO_TO_NUM:
 		{
-			editor.ui.tmpDisp8 = editor.sampleTo;
-			editor.sampleToDisp = &editor.ui.tmpDisp8;
-			editor.ui.numPtr8 = &editor.ui.tmpDisp8;
-			editor.ui.numLen = 2;
-			editor.ui.numBits = 8;
-			editor.ui.editTextPos = 3713; // (y * 40) + x
+			ui.tmpDisp8 = editor.sampleTo;
+			editor.sampleToDisp = &ui.tmpDisp8;
+			ui.numPtr8 = &ui.tmpDisp8;
+			ui.numLen = 2;
+			ui.numBits = 8;
+			ui.editTextPos = 3713; // (y * 40) + x
 			getNumLine(TEXT_EDIT_HEX, PTB_EO_TO_NUM);
 		}
 		break;
@@ -2529,7 +2529,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.sampleFrom < 0x1F)
 			{
 				editor.sampleFrom++;
-				editor.ui.updateFromText = true;
+				ui.updateFromText = true;
 			}
 		}
 		break;
@@ -2539,7 +2539,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.sampleFrom > 0x00)
 			{
 				editor.sampleFrom--;
-				editor.ui.updateFromText = true;
+				ui.updateFromText = true;
 			}
 		}
 		break;
@@ -2549,7 +2549,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.sampleTo < 0x1F)
 			{
 				editor.sampleTo++;
-				editor.ui.updateToText = true;
+				ui.updateToText = true;
 			}
 		}
 		break;
@@ -2559,7 +2559,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.sampleTo > 0x00)
 			{
 				editor.sampleTo--;
-				editor.ui.updateToText = true;
+				ui.updateToText = true;
 			}
 		}
 		break;
@@ -2567,8 +2567,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_EO_KEYS:
 		{
 			editor.multiFlag ^= 1;
-			editor.ui.updateTrackerFlags = true;
-			editor.ui.updateKeysText = true;
+			ui.updateTrackerFlags = true;
+			ui.updateKeysText = true;
 		}
 		break;
 		// ----------------------------------------------------------
@@ -2580,13 +2580,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (!mouse.rightButtonPressed)
 			{
 				editor.mixFlag = true;
-				editor.ui.showTextPtr = editor.mixText;
-				editor.ui.textEndPtr = editor.mixText + 15;
-				editor.ui.textLength = 16;
-				editor.ui.editTextPos = 1936; // (y * 40) + x
-				editor.ui.dstOffset = NULL;
-				editor.ui.dstOffsetEnd = false;
-				editor.ui.updateMixText = true;
+				ui.showTextPtr = editor.mixText;
+				ui.textEndPtr = editor.mixText + 15;
+				ui.textLength = 16;
+				ui.editTextPos = 1936; // (y * 40) + x
+				ui.dstOffset = NULL;
+				ui.dstOffsetEnd = false;
+				ui.updateMixText = true;
 				getTextLine(PTB_EO_MIX);
 			}
 			else
@@ -2651,7 +2651,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				free(ptr8_4);
 
 				fixSampleBeep(s);
-				if (editor.ui.samplerScreenShown)
+				if (ui.samplerScreenShown)
 					displaySample();
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -2724,7 +2724,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 
 			fixSampleBeep(s);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -2736,16 +2736,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				editor.samplePos = 0;
-				editor.ui.updatePosText = true;
+				ui.updatePosText = true;
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = editor.samplePos;
-				editor.samplePosDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 4;
-				editor.ui.numBits = 16;
-				editor.ui.editTextPos = 2391; // (y * 40) + x
+				ui.tmpDisp16 = editor.samplePos;
+				editor.samplePosDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 4;
+				ui.numBits = 16;
+				ui.editTextPos = 2391; // (y * 40) + x
 				getNumLine(TEXT_EDIT_HEX, PTB_EO_POS_NUM);
 			}
 		}
@@ -2764,7 +2764,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 
 			boostSample(editor.currSample, false);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -2781,7 +2781,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 
 			filterSample(editor.currSample, false);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -2793,7 +2793,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				editor.modulateSpeed = 0;
-				editor.ui.updateModText = true;
+				ui.updateModText = true;
 			}
 		}
 		break;
@@ -2849,7 +2849,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			free(ptr8_3);
 
 			fixSampleBeep(s);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -2887,7 +2887,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			while (ptr8_1 < ptr8_2);
 
 			fixSampleBeep(s);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -2923,7 +2923,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			while (ptr8_1 < ptr8_2);
 
 			fixSampleBeep(s);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -2978,7 +2978,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_CHORD:
 		{
-			editor.ui.editOpScreen = 3;
+			ui.editOpScreen = 3;
 			renderEditOpScreen();
 		}
 		break;
@@ -3011,7 +3011,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 
 			fixSampleBeep(s);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -3050,7 +3050,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 
 			fixSampleBeep(s);
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				displaySample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -3066,8 +3066,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_UPSAMPLE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_UPSAMPLE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("UPSAMPLE ?", NO_CARRY);
 			renderAskDialog();
@@ -3083,8 +3083,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_DOWNSAMPLE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_DOWNSAMPLE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("DOWNSAMPLE ?", NO_CARRY);
 			renderAskDialog();
@@ -3096,15 +3096,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				editor.sampleVol = 100;
-				editor.ui.updateVolText = true;
+				ui.updateVolText = true;
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = editor.sampleVol;
-				editor.sampleVolDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 3;
-				editor.ui.editTextPos = 3711; // (y * 40) + x
+				ui.tmpDisp16 = editor.sampleVol;
+				editor.sampleVolDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 3;
+				ui.editTextPos = 3711; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_VOL_NUM);
 			}
 		}
@@ -3132,7 +3132,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				}
 
 				fixSampleBeep(s);
-				if (editor.ui.samplerScreenShown)
+				if (ui.samplerScreenShown)
 					displaySample();
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -3148,8 +3148,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_DOCHORD:
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_MAKE_CHORD;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_MAKE_CHORD;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("MAKE CHORD?", NO_CARRY);
 			renderAskDialog();
@@ -3177,9 +3177,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			editor.note4 = 36;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3206,9 +3206,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.note3 >= 36) editor.note3 -= 12;
 			if (editor.note4 >= 36) editor.note4 -= 12;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3222,11 +3222,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.changingChordNote = 1;
+				ui.changingChordNote = 1;
 				setStatusMessage("SELECT NOTE", NO_CARRY);
 				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			}
-			editor.ui.updateNote1Text = true;
+			ui.updateNote1Text = true;
 		}
 		break;
 
@@ -3241,11 +3241,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.changingChordNote = 2;
+				ui.changingChordNote = 2;
 				setStatusMessage("SELECT NOTE", NO_CARRY);
 				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			}
-			editor.ui.updateNote2Text = true;
+			ui.updateNote2Text = true;
 		}
 		break;
 
@@ -3260,11 +3260,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.changingChordNote = 3;
+				ui.changingChordNote = 3;
 				setStatusMessage("SELECT NOTE", NO_CARRY);
 				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			}
-			editor.ui.updateNote3Text = true;
+			ui.updateNote3Text = true;
 		}
 		break;
 
@@ -3279,11 +3279,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.changingChordNote = 4;
+				ui.changingChordNote = 4;
 				setStatusMessage("SELECT NOTE", NO_CARRY);
 				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			}
-			editor.ui.updateNote4Text = true;
+			ui.updateNote4Text = true;
 		}
 		break;
 
@@ -3299,10 +3299,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			editor.chordLengthMin = false;
 
-			editor.ui.updateNote1Text = true;
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote1Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3329,9 +3329,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			editor.note4 = 36;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3358,9 +3358,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.note3 >= 36) editor.note3 -= 12;
 			if (editor.note4 >= 36) editor.note4 -= 12;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3373,10 +3373,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			editor.note3 = editor.oldNote3;
 			editor.note4 = editor.oldNote4;
 
-			editor.ui.updateNote1Text = true;
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote1Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3403,9 +3403,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			editor.note4 = 36;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3432,9 +3432,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.note3 >= 36) editor.note3 -= 12;
 			if (editor.note4 >= 36) editor.note4 -= 12;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3471,9 +3471,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.note3 >= 36) editor.note3 -= 12;
 			if (editor.note4 >= 36) editor.note4 -= 12;
 
-			editor.ui.updateNote2Text = true;
-			editor.ui.updateNote3Text = true;
-			editor.ui.updateNote4Text = true;
+			ui.updateNote2Text = true;
+			ui.updateNote3Text = true;
+			ui.updateNote4Text = true;
 
 			recalcChordLength();
 		}
@@ -3482,13 +3482,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_ABOUT:
 		{
-			editor.ui.aboutScreenShown ^= 1;
+			ui.aboutScreenShown ^= 1;
 
-			if (editor.ui.aboutScreenShown)
+			if (ui.aboutScreenShown)
 				renderAboutScreen();
-			else if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE)
+			else if (ui.visualizerMode == VISUAL_QUADRASCOPE)
 				renderQuadrascopeBg();
-			else if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
+			else if (ui.visualizerMode == VISUAL_SPECTRUM)
 				renderSpectrumAnalyzerBg();
 		}
 		break;
@@ -3497,15 +3497,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 			{
-				editor.ui.tmpDisp16 = modEntry->currOrder;
-				if (editor.ui.tmpDisp16 > modEntry->head.orderCount-1)
-					editor.ui.tmpDisp16 = modEntry->head.orderCount-1;
+				ui.tmpDisp16 = modEntry->currOrder;
+				if (ui.tmpDisp16 > modEntry->head.orderCount-1)
+					ui.tmpDisp16 = modEntry->head.orderCount-1;
 
-				editor.ui.tmpDisp16 = modEntry->head.order[editor.ui.tmpDisp16];
-				editor.currPosEdPattDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 2;
-				editor.ui.editTextPos = 2180; // (y * 40) + x
+				ui.tmpDisp16 = modEntry->head.order[ui.tmpDisp16];
+				editor.currPosEdPattDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 2;
+				ui.editTextPos = 2180; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_PE_PATT);
 			}
 		}
@@ -3541,8 +3541,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PE_EXIT:
 		{
-			editor.ui.aboutScreenShown = false;
-			editor.ui.posEdScreenShown = false;
+			ui.aboutScreenShown = false;
+			ui.posEdScreenShown = false;
 			displayMainScreen();
 		}
 		break;
@@ -3550,11 +3550,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_POS:
 		case PTB_POSED:
 		{
-			editor.ui.posEdScreenShown ^= 1;
-			if (editor.ui.posEdScreenShown)
+			ui.posEdScreenShown ^= 1;
+			if (ui.posEdScreenShown)
 			{
 				renderPosEdScreen();
-				editor.ui.updatePosEd = true;
+				ui.updatePosEd = true;
 			}
 			else
 			{
@@ -3572,16 +3572,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 					modEntry->currOrder = 0;
 					editor.currPatternDisp = &modEntry->head.order[modEntry->currOrder];
 
-					if (editor.ui.posEdScreenShown)
-						editor.ui.updatePosEd = true;
+					if (ui.posEdScreenShown)
+						ui.updatePosEd = true;
 				}
 				else
 				{
-					editor.ui.tmpDisp16 = modEntry->currOrder;
-					editor.currPosDisp = &editor.ui.tmpDisp16;
-					editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-					editor.ui.numLen = 3;
-					editor.ui.editTextPos = 169; // (y * 40) + x
+					ui.tmpDisp16 = modEntry->currOrder;
+					editor.currPosDisp = &ui.tmpDisp16;
+					ui.numPtr16 = &ui.tmpDisp16;
+					ui.numLen = 3;
+					ui.editTextPos = 169; // (y * 40) + x
 					getNumLine(TEXT_EDIT_DECIMAL, PTB_POSS);
 				}
 			}
@@ -3596,19 +3596,19 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				{
 					modEntry->head.order[modEntry->currOrder] = 0;
 
-					editor.ui.updateSongSize = true;
+					ui.updateSongSize = true;
 					updateWindowTitle(MOD_IS_MODIFIED);
 
-					if (editor.ui.posEdScreenShown)
-						editor.ui.updatePosEd = true;
+					if (ui.posEdScreenShown)
+						ui.updatePosEd = true;
 				}
 				else
 				{
-					editor.ui.tmpDisp16 = modEntry->head.order[modEntry->currOrder];
-					editor.currPatternDisp = &editor.ui.tmpDisp16;
-					editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-					editor.ui.numLen = 2;
-					editor.ui.editTextPos = 610; // (y * 40) + x
+					ui.tmpDisp16 = modEntry->head.order[modEntry->currOrder];
+					editor.currPatternDisp = &ui.tmpDisp16;
+					ui.numPtr16 = &ui.tmpDisp16;
+					ui.numLen = 2;
+					ui.editTextPos = 610; // (y * 40) + x
 					getNumLine(TEXT_EDIT_DECIMAL, PTB_PATTERNS);
 				}
 			}
@@ -3629,19 +3629,19 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 					editor.currPosEdPattDisp = &modEntry->head.order[tmp16];
 
-					editor.ui.updateSongSize = true;
+					ui.updateSongSize = true;
 					updateWindowTitle(MOD_IS_MODIFIED);
 
-					if (editor.ui.posEdScreenShown)
-						editor.ui.updatePosEd = true;
+					if (ui.posEdScreenShown)
+						ui.updatePosEd = true;
 				}
 				else
 				{
-					editor.ui.tmpDisp16 = modEntry->head.orderCount;
-					editor.currLengthDisp = &editor.ui.tmpDisp16;
-					editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-					editor.ui.numLen = 3;
-					editor.ui.editTextPos = 1049; // (y * 40) + x
+					ui.tmpDisp16 = modEntry->head.orderCount;
+					editor.currLengthDisp = &ui.tmpDisp16;
+					ui.numPtr16 = &ui.tmpDisp16;
+					ui.numLen = 3;
+					ui.editTextPos = 1049; // (y * 40) + x
 					getNumLine(TEXT_EDIT_DECIMAL, PTB_LENGTHS);
 				}
 			}
@@ -3651,13 +3651,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_PATTBOX:
 		case PTB_PATTDATA:
 		{
-			if (!editor.ui.introScreenShown && (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT || editor.playMode != PLAY_MODE_NORMAL))
+			if (!ui.introScreenShown && (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT || editor.playMode != PLAY_MODE_NORMAL))
 			{
-				editor.ui.tmpDisp16 = modEntry->currPattern;
-				editor.currEditPatternDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 2;
-				editor.ui.editTextPos = 5121; // (y * 40) + x
+				ui.tmpDisp16 = modEntry->currPattern;
+				editor.currEditPatternDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 2;
+				ui.editTextPos = 5121; // (y * 40) + x
 				getNumLine(TEXT_EDIT_DECIMAL, PTB_PATTDATA);
 			}
 		}
@@ -3666,12 +3666,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_SAMPLES:
 		{
 			editor.sampleZero = false;
-			editor.ui.tmpDisp8 = editor.currSample;
-			editor.currSampleDisp = &editor.ui.tmpDisp8;
-			editor.ui.numPtr8 = &editor.ui.tmpDisp8;
-			editor.ui.numLen = 2;
-			editor.ui.numBits = 8;
-			editor.ui.editTextPos = 1930; // (y * 40) + x
+			ui.tmpDisp8 = editor.currSample;
+			editor.currSampleDisp = &ui.tmpDisp8;
+			ui.numPtr8 = &ui.tmpDisp8;
+			ui.numLen = 2;
+			ui.numBits = 8;
+			ui.editTextPos = 1930; // (y * 40) + x
 			getNumLine(TEXT_EDIT_HEX, PTB_SAMPLES);
 		}
 		break;
@@ -3684,12 +3684,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.tmpDisp8 = modEntry->samples[editor.currSample].volume;
-				modEntry->samples[editor.currSample].volumeDisp = &editor.ui.tmpDisp8;
-				editor.ui.numPtr8 = &editor.ui.tmpDisp8;
-				editor.ui.numLen = 2;
-				editor.ui.numBits = 8;
-				editor.ui.editTextPos = 2370; // (y * 40) + x
+				ui.tmpDisp8 = modEntry->samples[editor.currSample].volume;
+				modEntry->samples[editor.currSample].volumeDisp = &ui.tmpDisp8;
+				ui.numPtr8 = &ui.tmpDisp8;
+				ui.numLen = 2;
+				ui.numBits = 8;
+				ui.editTextPos = 2370; // (y * 40) + x
 				getNumLine(TEXT_EDIT_HEX, PTB_SVOLUMES);
 			}
 		}
@@ -3710,10 +3710,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 						s->length = s->loopStart+s->loopLength;
 				}
 
-				editor.ui.updateSongSize = true;
-				editor.ui.updateCurrSampleLength = true;
+				ui.updateSongSize = true;
+				ui.updateCurrSampleLength = true;
 
-				if (editor.ui.samplerScreenShown)
+				if (ui.samplerScreenShown)
 					redrawSample();
 
 				recalcChordLength();
@@ -3721,12 +3721,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = modEntry->samples[editor.currSample].length;
-				modEntry->samples[editor.currSample].lengthDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 4;
-				editor.ui.numBits = 16;
-				editor.ui.editTextPos = 2808; // (y * 40) + x
+				ui.tmpDisp16 = modEntry->samples[editor.currSample].length;
+				modEntry->samples[editor.currSample].lengthDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 4;
+				ui.numBits = 16;
+				ui.editTextPos = 2808; // (y * 40) + x
 				getNumLine(TEXT_EDIT_HEX, PTB_SLENGTHS);
 			}
 		}
@@ -3749,11 +3749,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 					s->loopStart = 0;
 				}
 
-				editor.ui.updateCurrSampleRepeat = true;
-				if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3)
-					editor.ui.updateLengthText = true;
+				ui.updateCurrSampleRepeat = true;
+				if (ui.editOpScreenShown && ui.editOpScreen == 3)
+					ui.updateLengthText = true;
 
-				if (editor.ui.samplerScreenShown)
+				if (ui.samplerScreenShown)
 					setLoopSprites();
 
 				mixerUpdateLoops();
@@ -3761,12 +3761,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = modEntry->samples[editor.currSample].loopStart;
-				modEntry->samples[editor.currSample].loopStartDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 4;
-				editor.ui.numBits = 16;
-				editor.ui.editTextPos = 3248; // (y * 40) + x
+				ui.tmpDisp16 = modEntry->samples[editor.currSample].loopStart;
+				modEntry->samples[editor.currSample].loopStartDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 4;
+				ui.numBits = 16;
+				ui.editTextPos = 3248; // (y * 40) + x
 				getNumLine(TEXT_EDIT_HEX, PTB_SREPEATS);
 			}
 		}
@@ -3792,11 +3792,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				if (s->loopLength < 2)
 					s->loopLength = 2;
 
-				editor.ui.updateCurrSampleReplen = true;
-				if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3)
-					editor.ui.updateLengthText = true;
+				ui.updateCurrSampleReplen = true;
+				if (ui.editOpScreenShown && ui.editOpScreen == 3)
+					ui.updateLengthText = true;
 
-				if (editor.ui.samplerScreenShown)
+				if (ui.samplerScreenShown)
 					setLoopSprites();
 
 				mixerUpdateLoops();
@@ -3804,12 +3804,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				editor.ui.tmpDisp16 = modEntry->samples[editor.currSample].loopLength;
-				modEntry->samples[editor.currSample].loopLengthDisp = &editor.ui.tmpDisp16;
-				editor.ui.numPtr16 = &editor.ui.tmpDisp16;
-				editor.ui.numLen = 4;
-				editor.ui.numBits = 16;
-				editor.ui.editTextPos = 3688; // (y * 40) + x
+				ui.tmpDisp16 = modEntry->samples[editor.currSample].loopLength;
+				modEntry->samples[editor.currSample].loopLengthDisp = &ui.tmpDisp16;
+				ui.numPtr16 = &ui.tmpDisp16;
+				ui.numLen = 4;
+				ui.numBits = 16;
+				ui.editTextPos = 3688; // (y * 40) + x
 				getNumLine(TEXT_EDIT_HEX, PTB_SREPLENS);
 			}
 		}
@@ -3817,16 +3817,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EDITOP:
 		{
-			if (editor.ui.editOpScreenShown)
+			if (ui.editOpScreenShown)
 			{
-				if (editor.ui.editOpScreen == 3)
-					editor.ui.editOpScreen = 0;
+				if (ui.editOpScreen == 3)
+					ui.editOpScreen = 0;
 				else
-					editor.ui.editOpScreen = (editor.ui.editOpScreen + 1) % 3;
+					ui.editOpScreen = (ui.editOpScreen + 1) % 3;
 			}
 			else
 			{
-				editor.ui.editOpScreenShown = true;
+				ui.editOpScreenShown = true;
 			}
 
 			renderEditOpScreen();
@@ -3835,60 +3835,60 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_DO_LOADMODULE:
 		{
-			editor.diskop.mode = DISKOP_MODE_MOD;
+			diskop.mode = DISKOP_MODE_MOD;
 			setPathFromDiskOpMode();
-			editor.diskop.scrollOffset = 0;
-			editor.diskop.cached = false;
-			editor.ui.updateDiskOpFileList = true;
-			editor.ui.updateLoadMode = true;
+			diskop.scrollOffset = 0;
+			diskop.cached = false;
+			ui.updateDiskOpFileList = true;
+			ui.updateLoadMode = true;
 		}
 		break;
 
 		case PTB_DO_LOADSAMPLE:
 		{
-			editor.diskop.mode = DISKOP_MODE_SMP;
+			diskop.mode = DISKOP_MODE_SMP;
 			setPathFromDiskOpMode();
-			editor.diskop.scrollOffset = 0;
-			editor.diskop.cached = false;
-			editor.ui.updateDiskOpFileList = true;
-			editor.ui.updateLoadMode = true;
+			diskop.scrollOffset = 0;
+			diskop.cached = false;
+			ui.updateDiskOpFileList = true;
+			ui.updateLoadMode = true;
 		}
 		break;
 
 		case PTB_LOADSAMPLE: // "LOAD" button next to sample name
 		{
-			editor.ui.posEdScreenShown = false;
-			editor.diskop.mode = DISKOP_MODE_SMP;
+			ui.posEdScreenShown = false;
+			diskop.mode = DISKOP_MODE_SMP;
 			setPathFromDiskOpMode();
-			editor.diskop.scrollOffset = 0;
-			editor.diskop.cached = false;
+			diskop.scrollOffset = 0;
+			diskop.cached = false;
 
-			if (!editor.ui.diskOpScreenShown)
+			if (!ui.diskOpScreenShown)
 			{
-				editor.ui.diskOpScreenShown = true;
+				ui.diskOpScreenShown = true;
 				renderDiskOpScreen();
 			}
 			else
 			{
-				editor.ui.updateDiskOpFileList = true;
-				editor.ui.updateLoadMode = true;
+				ui.updateDiskOpFileList = true;
+				ui.updateLoadMode = true;
 			}
 		}
 		break;
 
 		case PTB_DO_SAVESAMPLE:
 		{
-			if (editor.diskop.mode != DISKOP_MODE_SMP)
+			if (diskop.mode != DISKOP_MODE_SMP)
 			{
-				editor.diskop.mode = DISKOP_MODE_SMP;
+				diskop.mode = DISKOP_MODE_SMP;
 				setPathFromDiskOpMode();
-				editor.diskop.scrollOffset = 0;
-				editor.diskop.cached = false;
-				editor.ui.updateLoadMode = true;
+				diskop.scrollOffset = 0;
+				diskop.cached = false;
+				ui.updateLoadMode = true;
 			}
 
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_SAVE_SAMPLE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_SAVE_SAMPLE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("SAVE SAMPLE ?", NO_CARRY);
 			renderAskDialog();
@@ -3897,8 +3897,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_MOD2WAV:
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_MOD2WAV;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_MOD2WAV;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("RENDER WAV FILE?", NO_CARRY);
 			renderAskDialog();
@@ -3907,8 +3907,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SA_RESAMPLENOTE:
 		{
-			editor.ui.changingSmpResample = true;
-			editor.ui.updateResampleNote = true;
+			ui.changingSmpResample = true;
+			ui.updateResampleNote = true;
 			setStatusMessage("SELECT NOTE", NO_CARRY);
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 		}
@@ -3916,8 +3916,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SA_RESAMPLE:
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_RESAMPLE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_RESAMPLE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("RESAMPLE?", NO_CARRY);
 			renderAskDialog();
@@ -3926,7 +3926,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SA_SAMPLEAREA:
 		{
-			if (editor.ui.sampleMarkingPos == -1)
+			if (ui.sampleMarkingPos == -1)
 			{
 				samplerSamplePressed(MOUSE_BUTTON_NOT_HELD);
 				return true;
@@ -3937,7 +3937,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_SA_ZOOMBARAREA:
 		{
 			mouse.lastGUIButton = button;
-			if (!editor.ui.forceSampleDrag)
+			if (!ui.forceSampleDrag)
 			{
 				samplerBarPressed(MOUSE_BUTTON_NOT_HELD);
 				return true;
@@ -3963,14 +3963,14 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SA_VOLUME:
 		{
-			editor.ui.samplerVolBoxShown = true;
+			ui.samplerVolBoxShown = true;
 			renderSamplerVolBox();
 		}
 		break;
 
 		case PTB_SA_FILTERS:
 		{
-			editor.ui.samplerFiltersBoxShown = true;
+			ui.samplerFiltersBoxShown = true;
 			renderSamplerFiltersBox();
 			fillSampleFilterUndoBuffer();
 		}
@@ -3985,39 +3985,39 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_DO_REFRESH:
 		{
-			editor.diskop.scrollOffset = 0;
-			editor.diskop.cached = false;
-			editor.ui.updateDiskOpFileList = true;
+			diskop.scrollOffset = 0;
+			diskop.cached = false;
+			ui.updateDiskOpFileList = true;
 		}
 		break;
 
 		// TODO: Find a PowerPacker packer and enable this
-		// case PTB_DO_PACKMOD: editor.diskop.modPackFlg ^= 1; break;
+		// case PTB_DO_PACKMOD: diskop.modPackFlg ^= 1; break;
 
 		case PTB_DO_SAMPLEFORMAT:
 		{
-			editor.diskop.smpSaveType = (editor.diskop.smpSaveType + 1) % 3;
-			editor.ui.updateSaveFormatText = true;
+			diskop.smpSaveType = (diskop.smpSaveType + 1) % 3;
+			ui.updateSaveFormatText = true;
 		}
 		break;
 
 		case PTB_DO_MODARROW:
 		{
-			editor.diskop.mode = DISKOP_MODE_MOD;
-			editor.diskop.scrollOffset = 0;
-			editor.diskop.cached = false;
-			editor.ui.updateDiskOpFileList = true;
-			editor.ui.updateLoadMode = true;
+			diskop.mode = DISKOP_MODE_MOD;
+			diskop.scrollOffset = 0;
+			diskop.cached = false;
+			ui.updateDiskOpFileList = true;
+			ui.updateLoadMode = true;
 		}
 		break;
 
 		case PTB_DO_SAMPLEARROW:
 		{
-			editor.diskop.mode = DISKOP_MODE_SMP;
-			editor.diskop.scrollOffset = 0;
-			editor.diskop.cached = false;
-			editor.ui.updateDiskOpFileList = true;
-			editor.ui.updateLoadMode = true;
+			diskop.mode = DISKOP_MODE_SMP;
+			diskop.scrollOffset = 0;
+			diskop.cached = false;
+			ui.updateDiskOpFileList = true;
+			ui.updateLoadMode = true;
 		}
 		break;
 
@@ -4037,12 +4037,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 				updateWindowTitle(MOD_IS_MODIFIED);
 
-				editor.ui.updateSongSize = true;
-				editor.ui.updateSongLength = true;
-				editor.ui.updateSongPattern = true;
+				ui.updateSongSize = true;
+				ui.updateSongLength = true;
+				ui.updateSongPattern = true;
 
-				if (editor.ui.posEdScreenShown)
-					editor.ui.updatePosEd = true;
+				if (ui.posEdScreenShown)
+					ui.updatePosEd = true;
 			}
 		}
 		break;
@@ -4061,29 +4061,29 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 				updateWindowTitle(MOD_IS_MODIFIED);
 
-				editor.ui.updateSongSize = true;
-				editor.ui.updateSongLength = true;
-				editor.ui.updateSongPattern = true;
+				ui.updateSongSize = true;
+				ui.updateSongLength = true;
+				ui.updateSongPattern = true;
 
-				if (editor.ui.posEdScreenShown)
-					editor.ui.updatePosEd = true;
+				if (ui.posEdScreenShown)
+					ui.updatePosEd = true;
 			}
 		}
 		break;
 
 		case PTB_DO_SAVEMODULE:
 		{
-			if (editor.diskop.mode != DISKOP_MODE_MOD)
+			if (diskop.mode != DISKOP_MODE_MOD)
 			{
-				editor.diskop.mode = DISKOP_MODE_MOD;
+				diskop.mode = DISKOP_MODE_MOD;
 				setPathFromDiskOpMode();
-				editor.diskop.scrollOffset = 0;
-				editor.diskop.cached = false;
-				editor.ui.updateLoadMode = true;
+				diskop.scrollOffset = 0;
+				diskop.cached = false;
+				ui.updateLoadMode = true;
 			}
 
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_SAVE_MODULE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_SAVE_MODULE;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("SAVE MODULE ?", NO_CARRY);
 			renderAskDialog();
@@ -4095,15 +4095,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				memset(editor.currPath, 0, PATH_MAX + 1);
-				editor.ui.updateDiskOpPathText = true;
+				ui.updateDiskOpPathText = true;
 			}
 
-			editor.ui.showTextPtr = editor.currPath;
-			editor.ui.textEndPtr = &editor.currPath[PATH_MAX - 1];
-			editor.ui.textLength = 26;
-			editor.ui.editTextPos = 1043; // (y * 40) + x
-			editor.ui.dstOffset = &editor.textofs.diskOpPath;
-			editor.ui.dstOffsetEnd = false;
+			ui.showTextPtr = editor.currPath;
+			ui.textEndPtr = &editor.currPath[PATH_MAX - 1];
+			ui.textLength = 26;
+			ui.editTextPos = 1043; // (y * 40) + x
+			ui.dstOffset = &ui.diskOpPathTextOffset;
+			ui.dstOffsetEnd = false;
 			getTextLine(PTB_DO_DATAPATH);
 		}
 		break;
@@ -4113,17 +4113,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				memset(modEntry->head.moduleTitle, 0, sizeof (modEntry->head.moduleTitle));
-				editor.ui.updateSongName = true;
+				ui.updateSongName = true;
 				updateWindowTitle(MOD_IS_MODIFIED);
 			}
 			else
 			{
-				editor.ui.showTextPtr = modEntry->head.moduleTitle;
-				editor.ui.textEndPtr = modEntry->head.moduleTitle + 19;
-				editor.ui.textLength = 20;
-				editor.ui.editTextPos = 4133; // (y * 40) + x
-				editor.ui.dstOffset = NULL;
-				editor.ui.dstOffsetEnd = false;
+				ui.showTextPtr = modEntry->head.moduleTitle;
+				ui.textEndPtr = modEntry->head.moduleTitle + 19;
+				ui.textLength = 20;
+				ui.editTextPos = 4133; // (y * 40) + x
+				ui.dstOffset = NULL;
+				ui.dstOffsetEnd = false;
 				getTextLine(PTB_SONGNAME);
 			}
 		}
@@ -4134,17 +4134,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				memset(modEntry->samples[editor.currSample].text, 0, sizeof (modEntry->samples[editor.currSample].text));
-				editor.ui.updateCurrSampleName = true;
+				ui.updateCurrSampleName = true;
 				updateWindowTitle(MOD_IS_MODIFIED);
 			}
 			else
 			{
-				editor.ui.showTextPtr = modEntry->samples[editor.currSample].text;
-				editor.ui.textEndPtr = modEntry->samples[editor.currSample].text + 21;
-				editor.ui.textLength = 22;
-				editor.ui.editTextPos = 4573; // (y * 40) + x
-				editor.ui.dstOffset = NULL;
-				editor.ui.dstOffsetEnd = false;
+				ui.showTextPtr = modEntry->samples[editor.currSample].text;
+				ui.textEndPtr = modEntry->samples[editor.currSample].text + 21;
+				ui.textLength = 22;
+				ui.editTextPos = 4573; // (y * 40) + x
+				ui.dstOffset = NULL;
+				ui.dstOffsetEnd = false;
 				getTextLine(PTB_SAMPLENAME);
 			}
 		}
@@ -4152,9 +4152,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PAT2SMP_HI:
 		{
-			editor.ui.askScreenShown = false;
-			editor.ui.answerNo = false;
-			editor.ui.answerYes = true;
+			ui.askScreenShown = false;
+			ui.answerNo = false;
+			ui.answerYes = true;
 			editor.pat2SmpHQ = true;
 			handleAskYes();
 		}
@@ -4162,9 +4162,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PAT2SMP_LO:
 		{
-			editor.ui.askScreenShown = false;
-			editor.ui.answerNo = false;
-			editor.ui.answerYes = true;
+			ui.askScreenShown = false;
+			ui.answerNo = false;
+			ui.answerYes = true;
 			editor.pat2SmpHQ = false;
 			handleAskYes();
 		}
@@ -4172,9 +4172,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SUREY:
 		{
-			editor.ui.askScreenShown = false;
-			editor.ui.answerNo = false;
-			editor.ui.answerYes = true;
+			ui.askScreenShown = false;
+			ui.answerNo = false;
+			ui.answerYes = true;
 			handleAskYes();
 		}
 		break;
@@ -4182,37 +4182,37 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_PAT2SMP_ABORT:
 		case PTB_SUREN:
 		{
-			editor.ui.askScreenShown = false;
-			editor.ui.answerNo = true;
-			editor.ui.answerYes = false;
+			ui.askScreenShown = false;
+			ui.answerNo = true;
+			ui.answerYes = false;
 			handleAskNo();
 		}
 		break;
 
 		case PTB_VISUALS:
 		{
-			if (editor.ui.aboutScreenShown)
+			if (ui.aboutScreenShown)
 			{
-				editor.ui.aboutScreenShown = false;
+				ui.aboutScreenShown = false;
 			}
 			else if (!mouse.rightButtonPressed)
 			{
-				editor.ui.visualizerMode = (editor.ui.visualizerMode + 1) % 2;
-				if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
+				ui.visualizerMode = (ui.visualizerMode + 1) % 2;
+				if (ui.visualizerMode == VISUAL_SPECTRUM)
 					memset((int8_t *)editor.spectrumVolumes, 0, sizeof (editor.spectrumVolumes));
 			}
 
-			if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE)
+			if (ui.visualizerMode == VISUAL_QUADRASCOPE)
 				renderQuadrascopeBg();
-			else if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
+			else if (ui.visualizerMode == VISUAL_SPECTRUM)
 				renderSpectrumAnalyzerBg();
 		}
 		break;
 
 		case PTB_QUIT:
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_QUIT;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_QUIT;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("REALLY QUIT ?", NO_CARRY);
 			renderAskDialog();
@@ -4308,15 +4308,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_DISKOP:
 		{
 			editor.blockMarkFlag = false;
-			editor.ui.diskOpScreenShown = true;
+			ui.diskOpScreenShown = true;
 			renderDiskOpScreen();
 		}
 		break;
 
 		case PTB_DO_EXIT:
 		{
-			editor.ui.aboutScreenShown = false;
-			editor.ui.diskOpScreenShown = false;
+			ui.aboutScreenShown = false;
+			ui.diskOpScreenShown = false;
 			editor.blockMarkFlag = false;
 			pointerSetPreviousMode();
 			setPrevStatusMessage();
@@ -4326,37 +4326,37 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_DO_SCROLLUP:
 		{
-			if (editor.diskop.scrollOffset > 0)
+			if (diskop.scrollOffset > 0)
 			{
-				editor.diskop.scrollOffset--;
-				editor.ui.updateDiskOpFileList = true;
+				diskop.scrollOffset--;
+				ui.updateDiskOpFileList = true;
 			}
 		}
 		break;
 
 		case PTB_DO_SCROLLTOP:
 		{
-			editor.diskop.scrollOffset = 0;
-			editor.ui.updateDiskOpFileList = true;
+			diskop.scrollOffset = 0;
+			ui.updateDiskOpFileList = true;
 		}
 		break;
 
 		case PTB_DO_SCROLLDOWN:
 		{
-			if (editor.diskop.numEntries > DISKOP_LINES && editor.diskop.scrollOffset < editor.diskop.numEntries-DISKOP_LINES)
+			if (diskop.numEntries > DISKOP_LINES && diskop.scrollOffset < diskop.numEntries-DISKOP_LINES)
 			{
-				editor.diskop.scrollOffset++;
-				editor.ui.updateDiskOpFileList = true;
+				diskop.scrollOffset++;
+				ui.updateDiskOpFileList = true;
 			}
 		}
 		break;
 
 		case PTB_DO_SCROLLBOT:
 		{
-			if (editor.diskop.numEntries > DISKOP_LINES)
+			if (diskop.numEntries > DISKOP_LINES)
 			{
-				editor.diskop.scrollOffset = editor.diskop.numEntries - DISKOP_LINES;
-				editor.ui.updateDiskOpFileList = true;
+				diskop.scrollOffset = diskop.numEntries - DISKOP_LINES;
+				ui.updateDiskOpFileList = true;
 			}
 		}
 		break;
@@ -4403,7 +4403,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EDIT:
 		{
-			if (!editor.ui.samplerScreenShown)
+			if (!ui.samplerScreenShown)
 			{
 				editor.playMode = PLAY_MODE_NORMAL;
 				modStop();
@@ -4416,7 +4416,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_RECORD:
 		{
-			if (!editor.ui.samplerScreenShown)
+			if (!ui.samplerScreenShown)
 			{
 				editor.playMode = PLAY_MODE_PATTERN;
 
@@ -4434,7 +4434,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CLEAR:
 		{
-			editor.ui.clearScreenShown = true;
+			ui.clearScreenShown = true;
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("PLEASE SELECT", NO_CARRY);
 			renderClearScreen();
@@ -4443,7 +4443,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CLEARSONG:
 		{
-			editor.ui.clearScreenShown = false;
+			ui.clearScreenShown = false;
 			removeClearScreen();
 			editor.playMode = PLAY_MODE_NORMAL;
 			modStop();
@@ -4456,7 +4456,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CLEARSAMPLES:
 		{
-			editor.ui.clearScreenShown = false;
+			ui.clearScreenShown = false;
 			removeClearScreen();
 			editor.playMode = PLAY_MODE_NORMAL;
 			modStop();
@@ -4469,7 +4469,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CLEARALL:
 		{
-			editor.ui.clearScreenShown = false;
+			ui.clearScreenShown = false;
 			removeClearScreen();
 			editor.playMode = PLAY_MODE_NORMAL;
 			modStop();
@@ -4482,7 +4482,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_CLEARCANCEL:
 		{
-			editor.ui.clearScreenShown = false;
+			ui.clearScreenShown = false;
 			removeClearScreen();
 			setPrevStatusMessage();
 			pointerSetPreviousMode();
@@ -4498,7 +4498,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				editor.sampleZero = true;
-				editor.ui.updateCurrSampleNum = true;
+				ui.updateCurrSampleNum = true;
 			}
 			else
 			{
@@ -4512,7 +4512,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (mouse.rightButtonPressed)
 			{
 				editor.sampleZero = true;
-				editor.ui.updateCurrSampleNum = true;
+				ui.updateCurrSampleNum = true;
 			}
 			else
 			{
@@ -4824,7 +4824,7 @@ static void handleRepeatedGUIButtons(void)
 				if (editor.sampleFrom < 0x1F)
 				{
 					editor.sampleFrom++;
-					editor.ui.updateFromText = true;
+					ui.updateFromText = true;
 				}
 			}
 		}
@@ -4838,7 +4838,7 @@ static void handleRepeatedGUIButtons(void)
 				if (editor.sampleFrom > 0x00)
 				{
 					editor.sampleFrom--;
-					editor.ui.updateFromText = true;
+					ui.updateFromText = true;
 				}
 			}
 		}
@@ -4852,7 +4852,7 @@ static void handleRepeatedGUIButtons(void)
 				if (editor.sampleTo < 0x1F)
 				{
 					editor.sampleTo++;
-					editor.ui.updateToText = true;
+					ui.updateToText = true;
 				}
 			}
 		}
@@ -4866,7 +4866,7 @@ static void handleRepeatedGUIButtons(void)
 				if (editor.sampleTo > 0x00)
 				{
 					editor.sampleTo--;
-					editor.ui.updateToText = true;
+					ui.updateToText = true;
 				}
 			}
 		}
@@ -4880,7 +4880,7 @@ static void handleRepeatedGUIButtons(void)
 				if (!mouse.rightButtonPressed)
 					sampleUpButton();
 				else
-					editor.ui.updateCurrSampleNum = true;
+					ui.updateCurrSampleNum = true;
 			}
 		}
 		break;
@@ -4893,7 +4893,7 @@ static void handleRepeatedGUIButtons(void)
 				if (!mouse.rightButtonPressed)
 					sampleDownButton();
 				else
-					editor.ui.updateCurrSampleNum = true;
+					ui.updateCurrSampleNum = true;
 			}
 		}
 		break;
@@ -5106,14 +5106,14 @@ static void handleRepeatedGUIButtons(void)
 			{
 				mouse.repeatCounter = 0;
 
-				editor.diskop.scrollOffset--;
+				diskop.scrollOffset--;
 				if (mouse.rightButtonPressed)
-					editor.diskop.scrollOffset -= 3;
+					diskop.scrollOffset -= 3;
 
-				if (editor.diskop.scrollOffset < 0)
-					editor.diskop.scrollOffset = 0;
+				if (diskop.scrollOffset < 0)
+					diskop.scrollOffset = 0;
 
-				editor.ui.updateDiskOpFileList = true;
+				ui.updateDiskOpFileList = true;
 			}
 		}
 		break;
@@ -5124,16 +5124,16 @@ static void handleRepeatedGUIButtons(void)
 			{
 				mouse.repeatCounter = 0;
 
-				if (editor.diskop.numEntries > DISKOP_LINES)
+				if (diskop.numEntries > DISKOP_LINES)
 				{
-					editor.diskop.scrollOffset++;
+					diskop.scrollOffset++;
 					if (mouse.rightButtonPressed)
-						editor.diskop.scrollOffset += 3;
+						diskop.scrollOffset += 3;
 
-					if (editor.diskop.scrollOffset > editor.diskop.numEntries-DISKOP_LINES)
-						editor.diskop.scrollOffset = editor.diskop.numEntries-DISKOP_LINES;
+					if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
+						diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
 
-					editor.ui.updateDiskOpFileList = true;
+					ui.updateDiskOpFileList = true;
 				}
 			}
 		}
@@ -5144,7 +5144,7 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 4)
 			{
 				mouse.repeatCounter = 0;
-				if (!editor.ui.forceSampleDrag)
+				if (!ui.forceSampleDrag)
 					samplerBarPressed(MOUSE_BUTTON_NOT_HELD);
 			}
 		}

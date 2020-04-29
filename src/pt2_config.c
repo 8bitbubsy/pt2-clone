@@ -27,6 +27,8 @@
 static char oldCwd[PATH_MAX];
 #endif
 
+config_t config; // globalized
+
 static bool loadProTrackerDotIni(FILE *f);
 static FILE *openPTDotConfig(void);
 static bool loadPTDotConfig(FILE *f);

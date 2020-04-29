@@ -16,6 +16,7 @@
 #include "pt2_sampler.h"
 #include "pt2_palette.h"
 #include "pt2_tables.h"
+#include "pt2_structs.h"
 
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
@@ -27,7 +28,7 @@ static SDL_Thread *scopeThread;
 scopeChannel_t scope[AMIGA_VOICES]; // global
 scopeChannelExt_t scopeExt[AMIGA_VOICES]; // global
 
-int32_t getSampleReadPos(uint8_t ch, uint8_t smpNum)
+int32_t getSampleReadPos(int32_t ch, uint8_t smpNum)
 {
 	const int8_t *data;
 	int32_t pos;
@@ -58,7 +59,7 @@ int32_t getSampleReadPos(uint8_t ch, uint8_t smpNum)
 	return -1;
 }
 
-void setScopeDelta(uint8_t ch, uint32_t delta)
+void setScopeDelta(int32_t ch, uint32_t delta)
 {
 	scope[ch].delta = delta;
 }
@@ -197,7 +198,7 @@ static void updateRealVuMeters(void)
 
 			smpPeak = ((smpPeak * 48) + (1 << 12)) >> 13; // rounded
 			if (smpPeak > editor.realVuMeterVolumes[i])
-				editor.realVuMeterVolumes[i] = smpPeak;
+				editor.realVuMeterVolumes[i] = (int8_t)smpPeak;
 		}
 	}
 }
@@ -212,7 +213,7 @@ void drawScopes(void)
 	scopeChannelExt_t *se;
 
 	scopesReading = true;
-	if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE)
+	if (ui.visualizerMode == VISUAL_QUADRASCOPE)
 	{
 		// --- QUADRASCOPE ---
 
@@ -402,7 +403,7 @@ bool initScopes(void)
 	return true;
 }
 
-void stopScope(uint8_t ch)
+void stopScope(int32_t ch)
 {
 	while (scopesReading);
 	memset(&scopeExt[ch], 0, sizeof (scopeChannelExt_t));

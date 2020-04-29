@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "pt2_header.h"
 #include "pt2_unicode.h"
+#include "pt2_structs.h"
 
 void showSongUnsavedAskBox(int8_t askScreenType);
 void loadModFromArg(char *arg);

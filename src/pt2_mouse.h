@@ -262,7 +262,7 @@ void setMsgPointer(void);
 void setErrPointer(void);
 void pointerSetMode(uint8_t pointerMode, bool carry);
 void pointerSetPreviousMode(void);
-bool setSystemCursor(SDL_Cursor *cursor);
+bool setSystemCursor(SDL_Cursor *cur);
 void freeMouseCursors(void);
 bool createMouseCursors(void);
 

@@ -19,6 +19,7 @@
 #include "pt2_header.h"
 #include "pt2_tables.h"
 #include "pt2_palette.h"
+#include "pt2_structs.h"
 
 // used for Windows usleep() implementation
 #ifdef _WIN32
@@ -198,6 +199,6 @@ void recalcChordLength(void)
 		}
 	}
 
-	if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 3)
-		editor.ui.updateLengthText = true;
+	if (ui.editOpScreenShown && ui.editOpScreen == 3)
+		ui.updateLengthText = true;
 }

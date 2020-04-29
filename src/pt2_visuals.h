@@ -74,5 +74,5 @@ void updateCursorPos(void);
 void renderVuMeters(void);
 void setupSprites(void);
 void freeSprites(void);
-void setSpritePos(uint8_t sprite, uint16_t x, uint16_t y);
-void hideSprite(uint8_t sprite);
+void setSpritePos(int32_t sprite, int32_t x, int32_t y);
+void hideSprite(int32_t sprite);

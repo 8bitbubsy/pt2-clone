@@ -6,6 +6,7 @@
 #include "pt2_tables.h"
 #include "pt2_palette.h"
 #include "pt2_visuals.h"
+#include "pt2_structs.h"
 
 void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 {
@@ -647,8 +648,8 @@ void printFiveHexBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, 
 
 void setPrevStatusMessage(void)
 {
-	strcpy(editor.ui.statusMessage, editor.ui.prevStatusMessage);
-	editor.ui.updateStatusText = true;
+	strcpy(ui.statusMessage, ui.prevStatusMessage);
+	ui.updateStatusText = true;
 }
 
 void setStatusMessage(const char *msg, bool carry)
@@ -656,10 +657,10 @@ void setStatusMessage(const char *msg, bool carry)
 	assert(msg != NULL);
 
 	if (carry)
-		strcpy(editor.ui.prevStatusMessage, msg);
+		strcpy(ui.prevStatusMessage, msg);
 
-	strcpy(editor.ui.statusMessage, msg);
-	editor.ui.updateStatusText = true;
+	strcpy(ui.statusMessage, msg);
+	ui.updateStatusText = true;
 }
 
 void displayMsg(const char *msg)

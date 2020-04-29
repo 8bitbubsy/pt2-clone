@@ -105,7 +105,7 @@ static bool listEntry(fileEntry_t *f)
 	if (!UNICHAR_STRNICMP(f->nameU, ".", 1))
 		return false; // skip ".name" entries
 
-	if (f->isDir || editor.diskop.mode == DISKOP_MODE_SMP)
+	if (f->isDir || diskop.mode == DISKOP_MODE_SMP)
 		return true; // list all entries
 
 	if (entryName >= 4)
@@ -298,31 +298,31 @@ static void findClose(void)
 
 void diskOpShowSelectText(void)
 {
-	if (!editor.ui.diskOpScreenShown || editor.ui.pointerMode == POINTER_MODE_MSG1 || editor.errorMsgActive)
+	if (!ui.diskOpScreenShown || ui.pointerMode == POINTER_MODE_MSG1 || editor.errorMsgActive)
 		return;
 
-	if (editor.diskop.mode == DISKOP_MODE_MOD)
+	if (diskop.mode == DISKOP_MODE_MOD)
 		setStatusMessage("SELECT MODULE", NO_CARRY);
 	else
 		setStatusMessage("SELECT SAMPLE", NO_CARRY);
 }
 
-void handleEntryJumping(char jumpToChar) // SHIFT+character
+void handleEntryJumping(SDL_Keycode jumpToChar) // SHIFT+character
 {
 	int32_t i;
 
 	if (diskOpEntry != NULL)
 	{
-		for (i = 0; i < editor.diskop.numEntries; i++)
+		for (i = 0; i < diskop.numEntries; i++)
 		{
 			if (jumpToChar == diskOpEntry[i].firstAnsiChar)
 			{
 				// fix visual overrun
-				if (editor.diskop.numEntries > DISKOP_LINES && i > editor.diskop.numEntries-DISKOP_LINES)
-					i = editor.diskop.numEntries - DISKOP_LINES;
+				if (diskop.numEntries > DISKOP_LINES && i > diskop.numEntries-DISKOP_LINES)
+					i = diskop.numEntries - DISKOP_LINES;
 
-				editor.diskop.scrollOffset = i;
-				editor.ui.updateDiskOpFileList = true;
+				diskop.scrollOffset = i;
+				ui.updateDiskOpFileList = true;
 				return;
 			}
 		}
@@ -338,7 +338,7 @@ void handleEntryJumping(char jumpToChar) // SHIFT+character
 
 bool diskOpEntryIsEmpty(int32_t fileIndex)
 {
-	if (editor.diskop.scrollOffset+fileIndex >= editor.diskop.numEntries)
+	if (diskop.scrollOffset+fileIndex >= diskop.numEntries)
 		return true;
 
 	return false;
@@ -349,7 +349,7 @@ bool diskOpEntryIsDir(int32_t fileIndex)
 	if (diskOpEntry != NULL)
 	{
 		if (!diskOpEntryIsEmpty(fileIndex))
-			return diskOpEntry[editor.diskop.scrollOffset+fileIndex].isDir;
+			return diskOpEntry[diskop.scrollOffset+fileIndex].isDir;
 	}
 
 	return false; // couldn't look up entry
@@ -361,7 +361,7 @@ char *diskOpGetAnsiEntry(int32_t fileIndex)
 
 	if (diskOpEntry != NULL && !diskOpEntryIsEmpty(fileIndex))
 	{
-		filenameU = diskOpEntry[editor.diskop.scrollOffset+fileIndex].nameU;
+		filenameU = diskOpEntry[diskop.scrollOffset+fileIndex].nameU;
 		if (filenameU != NULL)
 		{
 			unicharToAnsi(fileNameBuffer, filenameU, PATH_MAX);
@@ -375,7 +375,7 @@ char *diskOpGetAnsiEntry(int32_t fileIndex)
 UNICHAR *diskOpGetUnicodeEntry(int32_t fileIndex)
 {
 	if (diskOpEntry != NULL && !diskOpEntryIsEmpty(fileIndex))
-		return diskOpEntry[editor.diskop.scrollOffset+fileIndex].nameU;
+		return diskOpEntry[diskop.scrollOffset+fileIndex].nameU;
 
 	return NULL;
 }
@@ -386,13 +386,13 @@ static void setVisualPathToCwd(void)
 	memset(editor.currPathU, 0, (PATH_MAX + 2) * sizeof (UNICHAR));
 	UNICHAR_GETCWD(editor.currPathU, PATH_MAX);
 
-	if (editor.diskop.mode == DISKOP_MODE_MOD)
+	if (diskop.mode == DISKOP_MODE_MOD)
 		UNICHAR_STRCPY(editor.modulesPathU, editor.currPathU);
 	else
 		UNICHAR_STRCPY(editor.samplesPathU, editor.currPathU);
 
 	unicharToAnsi(editor.currPath, editor.currPathU, PATH_MAX);
-	editor.ui.updateDiskOpPathText = true;
+	ui.updateDiskOpPathText = true;
 }
 
 bool changePathToHome(void)
@@ -420,7 +420,7 @@ bool changePathToHome(void)
 
 void setPathFromDiskOpMode(void)
 {
-	UNICHAR_CHDIR((editor.diskop.mode == DISKOP_MODE_MOD) ? editor.modulesPathU : editor.samplesPathU);
+	UNICHAR_CHDIR((diskop.mode == DISKOP_MODE_MOD) ? editor.modulesPathU : editor.samplesPathU);
 	setVisualPathToCwd();
 }
 
@@ -431,12 +431,12 @@ bool diskOpSetPath(UNICHAR *path, bool cache)
 		setVisualPathToCwd();
 
 		if (cache)
-			editor.diskop.cached = false;
+			diskop.cached = false;
 
-		if (editor.ui.diskOpScreenShown)
-			editor.ui.updateDiskOpFileList = true;
+		if (ui.diskOpScreenShown)
+			ui.updateDiskOpFileList = true;
 
-		editor.diskop.scrollOffset = 0;
+		diskop.scrollOffset = 0;
 		return true;
 	}
 	else
@@ -518,7 +518,7 @@ void freeDiskOpEntryMem(void)
 {
 	if (diskOpEntry != NULL)
 	{
-		for (int32_t i = 0; i < editor.diskop.numEntries; i++)
+		for (int32_t i = 0; i < diskop.numEntries; i++)
 		{
 			if (diskOpEntry[i].nameU != NULL)
 				free(diskOpEntry[i].nameU);
@@ -528,14 +528,14 @@ void freeDiskOpEntryMem(void)
 		diskOpEntry = NULL;
 	}
 
-	editor.diskop.numEntries = 0;
+	diskop.numEntries = 0;
 }
 
 static bool swapEntries(int32_t a, int32_t b)
 {
 	fileEntry_t tmpBuffer;
 
-	if (a >= editor.diskop.numEntries || b >= editor.diskop.numEntries)
+	if (a >= diskop.numEntries || b >= diskop.numEntries)
 		return false;
 
 	tmpBuffer = diskOpEntry[a];
@@ -586,13 +586,13 @@ static void sortEntries(void)
 	char *p1, *p2;
 	uint32_t offset, limit, i;
 
-	if (editor.diskop.numEntries < 2)
+	if (diskop.numEntries < 2)
 		return; // no need to sort
 
-	offset = editor.diskop.numEntries / 2;
+	offset = diskop.numEntries / 2;
 	while (offset > 0)
 	{
-		limit = editor.diskop.numEntries - offset;
+		limit = diskop.numEntries - offset;
 		do
 		{
 			didSwap = false;
@@ -636,7 +636,7 @@ static bool diskOpFillBuffer(void)
 	uint8_t lastFindFileFlag;
 	fileEntry_t tmpBuffer, *newPtr;
 
-	editor.diskop.scrollOffset = 0;
+	diskop.scrollOffset = 0;
 
 	// do we have a path set?
 	if (editor.currPathU[0] == '\0')
@@ -650,7 +650,7 @@ static bool diskOpFillBuffer(void)
 	lastFindFileFlag = findFirst(&tmpBuffer);
 	if (lastFindFileFlag != LFF_DONE && lastFindFileFlag != LFF_SKIP)
 	{
-		diskOpEntry = (fileEntry_t *)malloc(sizeof (fileEntry_t) * (editor.diskop.numEntries + 1));
+		diskOpEntry = (fileEntry_t *)malloc(sizeof (fileEntry_t) * (diskop.numEntries + 1));
 		if (diskOpEntry == NULL)
 		{
 			findClose();
@@ -659,8 +659,8 @@ static bool diskOpFillBuffer(void)
 			return false;
 		}
 
-		memcpy(&diskOpEntry[editor.diskop.numEntries], &tmpBuffer, sizeof (fileEntry_t));
-		editor.diskop.numEntries++;
+		memcpy(&diskOpEntry[diskop.numEntries], &tmpBuffer, sizeof (fileEntry_t));
+		diskop.numEntries++;
 	}
 
 	// read remaining files
@@ -669,7 +669,7 @@ static bool diskOpFillBuffer(void)
 		lastFindFileFlag = findNext(&tmpBuffer);
 		if (lastFindFileFlag != LFF_DONE && lastFindFileFlag != LFF_SKIP)
 		{
-			newPtr = (fileEntry_t *)realloc(diskOpEntry, sizeof (fileEntry_t) * (editor.diskop.numEntries + 1));
+			newPtr = (fileEntry_t *)realloc(diskOpEntry, sizeof (fileEntry_t) * (diskop.numEntries + 1));
 			if (newPtr == NULL)
 			{
 				findClose();
@@ -679,14 +679,14 @@ static bool diskOpFillBuffer(void)
 			}
 			diskOpEntry = newPtr;
 
-			memcpy(&diskOpEntry[editor.diskop.numEntries], &tmpBuffer, sizeof (fileEntry_t));
-			editor.diskop.numEntries++;
+			memcpy(&diskOpEntry[diskop.numEntries], &tmpBuffer, sizeof (fileEntry_t));
+			diskop.numEntries++;
 		}
 	}
 
 	findClose();
 
-	if (editor.diskop.numEntries > 0)
+	if (diskop.numEntries > 0)
 	{
 		sortEntries();
 	}
@@ -695,7 +695,7 @@ static bool diskOpFillBuffer(void)
 		// access denied or out of memory - create parent directory link
 		diskOpEntry = bufferCreateEmptyDir();
 		if (diskOpEntry != NULL)
-			editor.diskop.numEntries = 1;
+			diskop.numEntries = 1;
 		else
 			statusOutOfMemory();
 	}
@@ -707,11 +707,11 @@ static int32_t SDLCALL diskOpFillThreadFunc(void *ptr)
 {
 	(void)ptr;
 
-	editor.diskop.isFilling = true;
+	diskop.isFilling = true;
 	diskOpFillBuffer();
-	editor.diskop.isFilling = false;
+	diskop.isFilling = false;
 
-	editor.ui.updateDiskOpFileList = true;
+	ui.updateDiskOpFileList = true;
 	return true;
 }
 
@@ -798,17 +798,17 @@ void diskOpRenderFileList(void)
 
 	diskOpShowSelectText();
 
-	if (editor.diskop.forceStopReading)
+	if (diskop.forceStopReading)
 		return;
 
 	// if needed, update the file list and add entries
-	if (!editor.diskop.cached)
+	if (!diskop.cached)
 	{
-		editor.diskop.fillThread = SDL_CreateThread(diskOpFillThreadFunc, NULL, NULL);
-		if (editor.diskop.fillThread != NULL)
-			SDL_DetachThread(editor.diskop.fillThread);
+		diskop.fillThread = SDL_CreateThread(diskOpFillThreadFunc, NULL, NULL);
+		if (diskop.fillThread != NULL)
+			SDL_DetachThread(diskop.fillThread);
 
-		editor.diskop.cached = true;
+		diskop.cached = true;
 		return;
 	}
 
@@ -822,16 +822,16 @@ void diskOpRenderFileList(void)
 		dstPtr += SCREEN_W;
 	}
 
-	if (editor.diskop.isFilling || diskOpEntry == NULL)
+	if (diskop.isFilling || diskOpEntry == NULL)
 		return;
 
 	// list entries
 	for (i = 0; i < DISKOP_LINES; i++)
 	{
-		if (editor.diskop.scrollOffset+i >= editor.diskop.numEntries)
+		if (diskop.scrollOffset+i >= diskop.numEntries)
 			break;
 
-		entry = &diskOpEntry[editor.diskop.scrollOffset+i];
+		entry = &diskOpEntry[diskop.scrollOffset+i];
 		entryName = diskOpGetAnsiEntry(i);
 		entryLength = (int32_t)strlen(entryName);
 
@@ -876,7 +876,7 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 		filePath = diskOpGetUnicodeEntry(fileEntryRow);
 		if (filePath != NULL)
 		{
-			if (editor.diskop.mode == DISKOP_MODE_MOD)
+			if (diskop.mode == DISKOP_MODE_MOD)
 			{
 				if (songModifiedCheck && modEntry->modified)
 				{
@@ -901,7 +901,7 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 					statusAllRight();
 
 					if (config.autoCloseDiskOp)
-						editor.ui.diskOpScreenShown = false;
+						ui.diskOpScreenShown = false;
 
 					if (config.rememberPlayMode)
 					{
@@ -943,7 +943,7 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 					setErrPointer();
 				}
 			}
-			else if (editor.diskop.mode == DISKOP_MODE_SMP)
+			else if (diskop.mode == DISKOP_MODE_SMP)
 			{
 				loadSample(filePath, diskOpGetAnsiEntry(fileEntryRow));
 			}

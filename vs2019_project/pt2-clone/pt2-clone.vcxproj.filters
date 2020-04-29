@@ -72,6 +72,9 @@
     <ClInclude Include="..\..\src\pt2_pat2smp.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_structs.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -150,6 +153,7 @@
     </ClCompile>
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_pat2smp.c" />
+    <ClCompile Include="..\..\src\pt2_structs.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

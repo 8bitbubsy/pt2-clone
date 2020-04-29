@@ -17,6 +17,8 @@
 #include "pt2_blep.h"
 #include "pt2_mouse.h"
 #include "pt2_scopes.h"
+#include "pt2_sampler.h"
+#include "pt2_structs.h"
 
 #define CENTER_LINE_COLOR 0x303030
 #define MARK_COLOR_1 0x666666 /* inverted background */
@@ -32,6 +34,8 @@ typedef struct sampleMixer_t
 	uint32_t posFrac, delta;
 } sampleMixer_t;
 
+sampler_t sampler; // globalized
+
 static int32_t samOffsetScaled, lastDrawX, lastDrawY;
 static uint32_t waveInvertTable[8];
 
@@ -42,9 +46,6 @@ static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
 	   0, -25, -49, -71, -91,-106,-118,-126,
 	-127,-126,-118,-106, -91, -71, -49, -25
 };
-
-void setLoopSprites(void);
-void fixSampleBeep(moduleSample_t *s);
 
 void upSample(void)
 {
@@ -78,7 +79,7 @@ void upSample(void)
 	fixSampleBeep(s);
 	updateCurrSample();
 
-	editor.ui.updateSongSize = true;
+	ui.updateSongSize = true;
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
 
@@ -102,7 +103,7 @@ void downSample(void)
 		ptr8_2[i<<1] = ptr8_2[i];
 	}
 
-	s->length = newLength;
+	s->length = (uint16_t)newLength;
 
 	if (s->loopLength > 2)
 	{
@@ -122,7 +123,7 @@ void downSample(void)
 	fixSampleBeep(s);
 	updateCurrSample();
 
-	editor.ui.updateSongSize = true;
+	ui.updateSongSize = true;
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
 
@@ -142,10 +143,10 @@ void createSampleMarkTable(void)
 
 static void updateSamOffset(void)
 {
-	if (editor.sampler.samDisplay == 0)
+	if (sampler.samDisplay == 0)
 		samOffsetScaled = 0;
 	else
-		samOffsetScaled = (editor.sampler.samOffset * SAMPLE_AREA_WIDTH) / editor.sampler.samDisplay; // truncate here
+		samOffsetScaled = (sampler.samOffset * SAMPLE_AREA_WIDTH) / sampler.samDisplay; // truncate here
 }
 
 void fixSampleBeep(moduleSample_t *s)
@@ -168,8 +169,8 @@ void updateSamplePos(void)
 		if (editor.samplePos > s->length)
 			editor.samplePos = s->length;
 
-		if (editor.ui.editOpScreenShown && editor.ui.editOpScreen == 2)
-			editor.ui.updatePosText = true;
+		if (ui.editOpScreenShown && ui.editOpScreen == 2)
+			ui.updatePosText = true;
 	}
 }
 
@@ -185,9 +186,9 @@ void fillSampleFilterUndoBuffer(void)
 	}
 }
 
-static void sampleLine(int16_t line_x1, int16_t line_x2, int16_t line_y1, int16_t line_y2)
+static void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_y2)
 {
-	int16_t d, x, y, ax, ay, sx, sy, dx, dy;
+	int32_t d, x, y, ax, ay, sx, sy, dx, dy;
 	uint32_t color = 0x01000000 | video.palette[PAL_QADSCP];
 
 	assert(line_x1 >= 0 || line_x2 >= 0 || line_x1 < SCREEN_W || line_x2 < SCREEN_W);
@@ -253,21 +254,21 @@ static void setDragBar(void)
 	int32_t pos;
 	uint32_t *dstPtr, pixel, bgPixel;
 
-	if (editor.sampler.samLength > 0 && editor.sampler.samDisplay != editor.sampler.samLength)
+	if (sampler.samLength > 0 && sampler.samDisplay != sampler.samLength)
 	{
-		int32_t roundingBias = (uint32_t)editor.sampler.samLength / 2;
+		int32_t roundingBias = sampler.samLength >> 1;
 
 		// update drag bar coordinates
-		pos = ((editor.sampler.samOffset * 311) + roundingBias) / editor.sampler.samLength;
-		editor.sampler.dragStart = pos + 4;
-		editor.sampler.dragStart = CLAMP(editor.sampler.dragStart, 4, 315);
+		pos = ((sampler.samOffset * 311) + roundingBias) / sampler.samLength;
+		sampler.dragStart = (uint16_t)(pos + 4);
+		sampler.dragStart = CLAMP(sampler.dragStart, 4, 315);
 
-		pos = (((editor.sampler.samDisplay + editor.sampler.samOffset) * 311) + roundingBias) / editor.sampler.samLength;
-		editor.sampler.dragEnd = pos + 5;
-		editor.sampler.dragEnd = CLAMP(editor.sampler.dragEnd, 5, 316);
+		pos = (((sampler.samDisplay + sampler.samOffset) * 311) + roundingBias) / sampler.samLength;
+		sampler.dragEnd = (uint16_t)(pos + 5);
+		sampler.dragEnd = CLAMP(sampler.dragEnd, 5, 316);
 
-		if (editor.sampler.dragStart > editor.sampler.dragEnd-1)
-			editor.sampler.dragStart = editor.sampler.dragEnd-1;
+		if (sampler.dragStart > sampler.dragEnd-1)
+			sampler.dragStart = sampler.dragEnd-1;
 
 		// draw drag bar
 
@@ -279,7 +280,7 @@ static void setDragBar(void)
 		{
 			for (int32_t x = 4; x < 316; x++)
 			{
-				if (x >= editor.sampler.dragStart && x <= editor.sampler.dragEnd)
+				if (x >= sampler.dragStart && x <= sampler.dragEnd)
 					dstPtr[x] = pixel; // drag bar
 				else
 					dstPtr[x] = bgPixel; // background
@@ -309,10 +310,10 @@ static int8_t getScaledSample(int32_t index)
 {
 	const int8_t *ptr8;
 
-	if (editor.sampler.samLength <= 0 || index < 0 || index > editor.sampler.samLength)
+	if (sampler.samLength <= 0 || index < 0 || index > sampler.samLength)
 		return 0;
 
-	ptr8 = editor.sampler.samStart;
+	ptr8 = sampler.samStart;
 	if (ptr8 == NULL)
 		return 0;
 
@@ -321,12 +322,12 @@ static int8_t getScaledSample(int32_t index)
 
 int32_t smpPos2Scr(int32_t pos) // sample pos -> screen x pos
 {
-	if (editor.sampler.samDisplay == 0)
+	if (sampler.samDisplay == 0)
 		return 0;
 
-	uint32_t roundingBias = (uint32_t)editor.sampler.samDisplay >> 1;
+	uint32_t roundingBias = (uint32_t)sampler.samDisplay >> 1;
 
-	pos = (((uint32_t)pos * SAMPLE_AREA_WIDTH) + roundingBias) / (uint32_t)editor.sampler.samDisplay; // rounded
+	pos = (((uint32_t)pos * SAMPLE_AREA_WIDTH) + roundingBias) / (uint32_t)sampler.samDisplay; // rounded
 	pos -= samOffsetScaled;
 
 	return pos;
@@ -334,17 +335,17 @@ int32_t smpPos2Scr(int32_t pos) // sample pos -> screen x pos
 
 int32_t scr2SmpPos(int32_t x) // screen x pos -> sample pos
 {
-	if (editor.sampler.samDisplay == 0)
+	if (sampler.samDisplay == 0)
 		return 0;
 
 	if (x < 0)
 		x = 0;
 
 	x += samOffsetScaled;
-	x = (uint32_t)(x * editor.sampler.samDisplay) / SAMPLE_AREA_WIDTH; // truncate here
+	x = (uint32_t)(x * sampler.samDisplay) / SAMPLE_AREA_WIDTH; // truncate here
 
-	if (x > editor.sampler.samLength)
-		x = editor.sampler.samLength;
+	if (x > sampler.samLength)
+		x = sampler.samLength;
 
 	return x;
 }
@@ -399,11 +400,11 @@ static void renderSampleData(void)
 	}
 
 	// render sample data
-	if (editor.sampler.samDisplay >= 0 && editor.sampler.samDisplay <= MAX_SAMPLE_LEN)
+	if (sampler.samDisplay >= 0 && sampler.samDisplay <= MAX_SAMPLE_LEN)
 	{
 		y1 = SAMPLE_AREA_Y_CENTER - getScaledSample(scr2SmpPos(0));
 
-		if (editor.sampler.samDisplay <= SAMPLE_AREA_WIDTH)
+		if (sampler.samDisplay <= SAMPLE_AREA_WIDTH)
 		{
 			// 1:1 or zoomed in
 			for (x = 1; x < SAMPLE_AREA_WIDTH; x++)
@@ -427,8 +428,8 @@ static void renderSampleData(void)
 				smpNum = scr2SmpPos(x+1) - smpIdx;
 
 				// prevent look-up overflow (yes, this can happen near the end of the sample)
-				if (smpIdx+smpNum > editor.sampler.samLength)
-					smpNum = editor.sampler.samLength - smpNum;
+				if (smpIdx+smpNum > sampler.samLength)
+					smpNum = sampler.samLength - smpNum;
 
 				if (smpNum < 1)
 					smpNum = 1;
@@ -450,10 +451,10 @@ static void renderSampleData(void)
 	}
 
 	// render "sample display" text
-	if (editor.sampler.samStart == editor.sampler.blankSample)
+	if (sampler.samStart == sampler.blankSample)
 		printFiveDecimalsBg(272, 214, 0, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	else
-		printFiveDecimalsBg(272, 214, editor.sampler.samDisplay, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		printFiveDecimalsBg(272, 214, sampler.samDisplay, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 	setDragBar();
 	setLoopSprites();
@@ -470,7 +471,7 @@ void invertRange(void)
 	start = smpPos2Scr(editor.markStartOfs);
 	end = smpPos2Scr(editor.markEndOfs);
 
-	if (editor.sampler.samDisplay < editor.sampler.samLength && (start >= SAMPLE_AREA_WIDTH || end < 0))
+	if (sampler.samDisplay < sampler.samLength && (start >= SAMPLE_AREA_WIDTH || end < 0))
 		return; // range is outside of view
 
 	start = CLAMP(start, 0, SAMPLE_AREA_WIDTH-1);
@@ -492,21 +493,21 @@ void invertRange(void)
 
 void displaySample(void)
 {
-	if (!editor.ui.samplerScreenShown)
+	if (!ui.samplerScreenShown)
 		return;
 
 	renderSampleData();
 	if (editor.markStartOfs != -1)
 		invertRange();
 
-	editor.ui.update9xxPos = true;
+	ui.update9xxPos = true;
 }
 
 void redrawSample(void)
 {
 	moduleSample_t *s;
 
-	if (!editor.ui.samplerScreenShown)
+	if (!ui.samplerScreenShown)
 		return;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
@@ -514,33 +515,33 @@ void redrawSample(void)
 	{
 		editor.markStartOfs = -1;
 
-		editor.sampler.samOffset = 0;
+		sampler.samOffset = 0;
 		updateSamOffset();
 
 		s = &modEntry->samples[editor.currSample];
 		if (s->length > 0)
 		{
-			editor.sampler.samStart = &modEntry->sampleData[s->offset];
-			editor.sampler.samDisplay = s->length;
-			editor.sampler.samLength = s->length;
+			sampler.samStart = &modEntry->sampleData[s->offset];
+			sampler.samDisplay = s->length;
+			sampler.samLength = s->length;
 		}
 		else
 		{
 			// "blank sample" template
-			editor.sampler.samStart = editor.sampler.blankSample;
-			editor.sampler.samLength = SAMPLE_AREA_WIDTH;
-			editor.sampler.samDisplay = SAMPLE_AREA_WIDTH;
+			sampler.samStart = sampler.blankSample;
+			sampler.samLength = SAMPLE_AREA_WIDTH;
+			sampler.samDisplay = SAMPLE_AREA_WIDTH;
 		}
 
 		renderSampleData();
 		updateSamplePos();
 
-		editor.ui.update9xxPos = true;
-		editor.ui.lastSampleOffset = 0x900;
+		ui.update9xxPos = true;
+		ui.lastSampleOffset = 0x900;
 
 		// for quadrascope
-		editor.sampler.samDrawStart = s->offset;
-		editor.sampler.samDrawEnd = s->offset + s->length;
+		sampler.samDrawStart = s->offset;
+		sampler.samDrawEnd = s->offset + s->length;
 	}
 }
 
@@ -758,11 +759,11 @@ void redoSampleData(int8_t sample)
 	updateCurrSample();
 
 	// this routine can be called while the sampler toolboxes are open, so redraw them
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 	{
-		if (editor.ui.samplerVolBoxShown)
+		if (ui.samplerVolBoxShown)
 			renderSamplerVolBox();
-		else if (editor.ui.samplerFiltersBoxShown)
+		else if (ui.samplerFiltersBoxShown)
 			renderSamplerFiltersBox();
 	}
 }
@@ -797,10 +798,10 @@ void fillSampleRedoBuffer(int8_t sample)
 
 bool allocSamplerVars(void)
 {
-	editor.sampler.copyBuf = (int8_t *)malloc(MAX_SAMPLE_LEN);
-	editor.sampler.blankSample = (int8_t *)calloc(MAX_SAMPLE_LEN, 1);
+	sampler.copyBuf = (int8_t *)malloc(MAX_SAMPLE_LEN);
+	sampler.blankSample = (int8_t *)calloc(MAX_SAMPLE_LEN, 1);
 
-	if (editor.sampler.copyBuf == NULL || editor.sampler.blankSample == NULL)
+	if (sampler.copyBuf == NULL || sampler.blankSample == NULL)
 		return false;
 
 	return true;
@@ -808,16 +809,16 @@ bool allocSamplerVars(void)
 
 void deAllocSamplerVars(void)
 {
-	if (editor.sampler.copyBuf != NULL)
+	if (sampler.copyBuf != NULL)
 	{
-		free(editor.sampler.copyBuf);
-		editor.sampler.copyBuf = NULL;
+		free(sampler.copyBuf);
+		sampler.copyBuf = NULL;
 	}
 
-	if (editor.sampler.blankSample != NULL)
+	if (sampler.blankSample != NULL)
 	{
-		free(editor.sampler.blankSample);
-		editor.sampler.blankSample = NULL;
+		free(sampler.blankSample);
+		sampler.blankSample = NULL;
 	}
 
 	for (uint8_t i = 0; i < MOD_SAMPLES; i++)
@@ -973,10 +974,10 @@ void mixChordSample(void)
 	if (editor.note4 == editor.note2) editor.note4 = 36;
 	if (editor.note3 == editor.note2) editor.note3 = 36;
 
-	editor.ui.updateNote1Text = true;
-	editor.ui.updateNote2Text = true;
-	editor.ui.updateNote3Text = true;
-	editor.ui.updateNote4Text = true;
+	ui.updateNote1Text = true;
+	ui.updateNote2Text = true;
+	ui.updateNote3Text = true;
+	ui.updateNote4Text = true;
 
 	// setup some variables
 
@@ -1222,7 +1223,7 @@ void samplerResample(void)
 		memset(&writeData[writePos], 0, MAX_SAMPLE_LEN - writeLength);
 
 	// update sample attributes
-	s->length = writeLength;
+	s->length = (uint16_t)writeLength;
 	s->fineTune = 0;
 
 	// scale loop points (and deactivate if overflowing)
@@ -1327,26 +1328,24 @@ void doMix(void)
 	}
 
 	turnOffVoices();
-	if (mixLength <= MAX_SAMPLE_LEN)
+
+	for (i = 0; i < mixLength; i++)
 	{
-		for (i = 0; i < mixLength; i++)
-		{
-			tmp16 = (i < s2->length) ? (fromPtr1[i] + fromPtr2[i]) : fromPtr1[i];
-			if (editor.halfClipFlag == 0)
-				tmp16 >>= 1;
+		tmp16 = (i < s2->length) ? (fromPtr1[i] + fromPtr2[i]) : fromPtr1[i];
+		if (editor.halfClipFlag == 0)
+			tmp16 >>= 1;
 
-			CLAMP8(tmp16);
-			mixPtr[i] = (int8_t)tmp16;
-		}
-
-		memcpy(&modEntry->sampleData[s3->offset], mixPtr, mixLength);
-		if (mixLength < MAX_SAMPLE_LEN)
-			memset(&modEntry->sampleData[s3->offset + mixLength], 0, MAX_SAMPLE_LEN - mixLength);
+		CLAMP8(tmp16);
+		mixPtr[i] = (int8_t)tmp16;
 	}
+
+	memcpy(&modEntry->sampleData[s3->offset], mixPtr, mixLength);
+	if (mixLength < MAX_SAMPLE_LEN)
+		memset(&modEntry->sampleData[s3->offset + mixLength], 0, MAX_SAMPLE_LEN - mixLength);
 
 	free(mixPtr);
 
-	s3->length = mixLength;
+	s3->length = (uint16_t)mixLength;
 	s3->volume = 64;
 	s3->fineTune = 0;
 	s3->loopStart = 0;
@@ -1361,7 +1360,7 @@ void doMix(void)
 }
 
 // this is actually treble increase
-void boostSample(int8_t sample, bool ignoreMark)
+void boostSample(int32_t sample, bool ignoreMark)
 {
 	int8_t *smpDat;
 	int16_t tmp16_0, tmp16_1, tmp16_2;
@@ -1417,7 +1416,7 @@ void boostSample(int8_t sample, bool ignoreMark)
 }
 
 // this is actually treble decrease
-void filterSample(int8_t sample, bool ignoreMark)
+void filterSample(int32_t sample, bool ignoreMark)
 {
 	int8_t *smpDat;
 	int16_t tmp16;
@@ -1478,7 +1477,7 @@ void toggleTuningTone(void)
 	{
 		// turn tuning tone on
 
-		editor.tuningChan = (editor.cursor.channel + 1) & 3;
+		editor.tuningChan = (cursor.channel + 1) & 3;
 
 		if (editor.tuningNote > 35)
 			editor.tuningNote = 35;
@@ -1519,11 +1518,11 @@ void sampleMarkerToBeg(void)
 		invertRange();
 		if (keyb.shiftPressed && editor.markStartOfs != -1)
 		{
-			editor.markStartOfs = editor.sampler.samOffset;
+			editor.markStartOfs = sampler.samOffset;
 		}
 		else
 		{
-			editor.markStartOfs = editor.sampler.samOffset;
+			editor.markStartOfs = sampler.samOffset;
 			editor.markEndOfs = editor.markStartOfs;
 		}
 		invertRange();
@@ -1550,7 +1549,7 @@ void sampleMarkerToCenter(void)
 	}
 	else
 	{
-		middlePos = editor.sampler.samOffset + ((editor.sampler.samDisplay + 1) / 2);
+		middlePos = sampler.samOffset + ((sampler.samDisplay + 1) / 2);
 
 		invertRange();
 		if (keyb.shiftPressed && editor.markStartOfs != -1)
@@ -1631,15 +1630,15 @@ void samplerSamCopy(void)
 		return;
 	}
 
-	editor.sampler.copyBufSize = editor.markEndOfs - editor.markStartOfs;
+	sampler.copyBufSize = editor.markEndOfs - editor.markStartOfs;
 
-	if ((int32_t)(editor.markStartOfs + editor.sampler.copyBufSize) > MAX_SAMPLE_LEN)
+	if ((int32_t)(editor.markStartOfs + sampler.copyBufSize) > MAX_SAMPLE_LEN)
 	{
 		displayErrorMsg("COPY ERROR !");
 		return;
 	}
 
-	memcpy(editor.sampler.copyBuf, &modEntry->sampleData[s->offset+editor.markStartOfs], editor.sampler.copyBufSize);
+	memcpy(sampler.copyBuf, &modEntry->sampleData[s->offset+editor.markStartOfs], sampler.copyBufSize);
 }
 
 void samplerSamDelete(uint8_t cut)
@@ -1684,9 +1683,9 @@ void samplerSamDelete(uint8_t cut)
 		invertRange();
 		editor.markStartOfs = -1;
 
-		editor.sampler.samStart = editor.sampler.blankSample;
-		editor.sampler.samDisplay = SAMPLE_AREA_WIDTH;
-		editor.sampler.samLength = SAMPLE_AREA_WIDTH;
+		sampler.samStart = sampler.blankSample;
+		sampler.samDisplay = SAMPLE_AREA_WIDTH;
+		sampler.samLength = SAMPLE_AREA_WIDTH;
 
 		s->length = 0;
 		s->loopStart = 0;
@@ -1733,25 +1732,25 @@ void samplerSamDelete(uint8_t cut)
 
 	free(tmpBuf);
 
-	editor.sampler.samLength = copyLength;
-	if (editor.sampler.samOffset+editor.sampler.samDisplay >= editor.sampler.samLength)
+	sampler.samLength = copyLength;
+	if (sampler.samOffset+sampler.samDisplay >= sampler.samLength)
 	{
-		if (editor.sampler.samDisplay < editor.sampler.samLength)
+		if (sampler.samDisplay < sampler.samLength)
 		{
-			if (editor.sampler.samLength-editor.sampler.samDisplay < 0)
+			if (sampler.samLength-sampler.samDisplay < 0)
 			{
-				editor.sampler.samOffset = 0;
-				editor.sampler.samDisplay = editor.sampler.samLength;
+				sampler.samOffset = 0;
+				sampler.samDisplay = sampler.samLength;
 			}
 			else
 			{
-				editor.sampler.samOffset = editor.sampler.samLength - editor.sampler.samDisplay;
+				sampler.samOffset = sampler.samLength - sampler.samDisplay;
 			}
 		}
 		else
 		{
-			editor.sampler.samOffset = 0;
-			editor.sampler.samDisplay = editor.sampler.samLength;
+			sampler.samOffset = 0;
+			sampler.samDisplay = sampler.samLength;
 		}
 
 		updateSamOffset();
@@ -1791,15 +1790,15 @@ void samplerSamDelete(uint8_t cut)
 
 	s->length = copyLength & 0xFFFE;
 
-	if (editor.sampler.samDisplay <= 2)
+	if (sampler.samDisplay <= 2)
 	{
-		editor.sampler.samStart = editor.sampler.blankSample;
-		editor.sampler.samLength = SAMPLE_AREA_WIDTH;
-		editor.sampler.samDisplay = SAMPLE_AREA_WIDTH;
+		sampler.samStart = sampler.blankSample;
+		sampler.samLength = SAMPLE_AREA_WIDTH;
+		sampler.samDisplay = SAMPLE_AREA_WIDTH;
 	}
 
 	invertRange();
-	if (editor.sampler.samDisplay == 0)
+	if (sampler.samDisplay == 0)
 	{
 		editor.markStartOfs = -1; // clear marking
 	}
@@ -1812,16 +1811,16 @@ void samplerSamDelete(uint8_t cut)
 		invertRange();
 	}
 
-	editor.samplePos = editor.markStartOfs;
+	editor.samplePos = (uint16_t)editor.markStartOfs;
 	fixSampleBeep(s);
 	updateSamplePos();
 	recalcChordLength();
 	displaySample();
 
-	editor.ui.updateCurrSampleLength = true;
-	editor.ui.updateCurrSampleRepeat = true;
-	editor.ui.updateCurrSampleReplen = true;
-	editor.ui.updateSongSize = true;
+	ui.updateCurrSampleLength = true;
+	ui.updateCurrSampleRepeat = true;
+	ui.updateCurrSampleReplen = true;
+	ui.updateSongSize = true;
 
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
@@ -1836,7 +1835,7 @@ void samplerSamPaste(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	if (editor.sampler.copyBuf == NULL || editor.sampler.copyBufSize == 0)
+	if (sampler.copyBuf == NULL || sampler.copyBufSize == 0)
 	{
 		displayErrorMsg("BUFFER IS EMPTY");
 		return;
@@ -1853,7 +1852,7 @@ void samplerSamPaste(void)
 	if (s->length == 0)
 		markStart = 0;
 
-	if (s->length+editor.sampler.copyBufSize > MAX_SAMPLE_LEN)
+	if (s->length+sampler.copyBufSize > MAX_SAMPLE_LEN)
 	{
 		displayErrorMsg("NOT ENOUGH ROOM");
 		return;
@@ -1868,7 +1867,7 @@ void samplerSamPaste(void)
 
 	readPos = 0;
 	turnOffVoices();
-	wasZooming = (editor.sampler.samDisplay != editor.sampler.samLength);
+	wasZooming = (sampler.samDisplay != sampler.samLength);
 
 	// copy start part
 	if (markStart > 0)
@@ -1878,22 +1877,22 @@ void samplerSamPaste(void)
 	}
 
 	// copy buffer
-	memcpy(&tmpBuf[readPos], editor.sampler.copyBuf, editor.sampler.copyBufSize);
+	memcpy(&tmpBuf[readPos], sampler.copyBuf, sampler.copyBufSize);
 
 	// copy end part
 	if (markStart >= 0)
 	{
-		readPos += editor.sampler.copyBufSize;
+		readPos += sampler.copyBufSize;
 
 		if (s->length-markStart > 0)
 			memcpy(&tmpBuf[readPos], &modEntry->sampleData[s->offset+markStart], s->length - markStart);
 	}
 
-	s->length = (s->length + editor.sampler.copyBufSize) & 0xFFFFFFFE;
-	if (s->length > MAX_SAMPLE_LEN)
-		s->length = MAX_SAMPLE_LEN;
+	int32_t newLength = (s->length + sampler.copyBufSize) & 0xFFFFFFFE;
+	if (newLength > MAX_SAMPLE_LEN)
+		newLength = MAX_SAMPLE_LEN;
 
-	editor.sampler.samLength = s->length;
+	sampler.samLength = (uint16_t)newLength;
 
 	if (s->loopLength > 2) // loop enabled?
 	{
@@ -1902,11 +1901,20 @@ void samplerSamPaste(void)
 			if (markStart < s->loopStart+s->loopLength)
 			{
 				// we pasted data inside the loop, increase loop length
-				s->loopLength += editor.sampler.copyBufSize & 0xFFFFFFFE;
-				if (s->loopStart+s->loopLength > s->length)
+
+				if (s->loopLength+sampler.copyBufSize > MAX_SAMPLE_LEN)
 				{
 					s->loopStart = 0;
 					s->loopLength = 2;
+				}
+				else
+				{
+					s->loopLength = (uint16_t)(s->loopLength + sampler.copyBufSize) & 0xFFFE;
+					if (s->loopStart+s->loopLength > s->length)
+					{
+						s->loopStart = 0;
+						s->loopLength = 2;
+					}
 				}
 			}
 
@@ -1915,11 +1923,19 @@ void samplerSamPaste(void)
 		else
 		{
 			// we pasted data before the loop, adjust loop start point
-			s->loopStart = (s->loopStart + editor.sampler.copyBufSize) & 0xFFFFFFFE;
-			if (s->loopStart+s->loopLength > s->length)
+			if (s->loopStart+sampler.copyBufSize > MAX_SAMPLE_LEN)
 			{
 				s->loopStart = 0;
 				s->loopLength = 2;
+			}
+			else
+			{
+				s->loopStart = (uint16_t)(s->loopStart + sampler.copyBufSize) & 0xFFFE;
+				if (s->loopStart+s->loopLength > s->length)
+				{
+					s->loopStart = 0;
+					s->loopLength = 2;
+				}
 			}
 		}
 	}
@@ -1942,8 +1958,8 @@ void samplerSamPaste(void)
 	else
 		redrawSample();
 
-	editor.ui.updateCurrSampleLength = true;
-	editor.ui.updateSongSize = true;
+	ui.updateCurrSampleLength = true;
+	ui.updateSongSize = true;
 
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
@@ -1974,7 +1990,7 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	else
 	{
 		ch->n_start = &modEntry->sampleData[s->offset + startOffset];
-		ch->n_length = (endOffset - startOffset) / 2;
+		ch->n_length = (uint16_t)((uint32_t)(endOffset - startOffset) >> 1);
 		ch->n_loopstart = &modEntry->sampleData[s->offset];
 		ch->n_replen = 1;
 	}
@@ -2009,15 +2025,15 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 
 void samplerPlayWaveform(void)
 {
-	playCurrSample(editor.cursor.channel, 0, 0, true);
+	playCurrSample(cursor.channel, 0, 0, true);
 }
 
 void samplerPlayDisplay(void)
 {
-	int32_t start = editor.sampler.samOffset;
-	int32_t end = editor.sampler.samOffset + editor.sampler.samDisplay;
+	int32_t start = sampler.samOffset;
+	int32_t end = sampler.samOffset + sampler.samDisplay;
 
-	playCurrSample(editor.cursor.channel, start, end, false);
+	playCurrSample(cursor.channel, start, end, false);
 }
 
 void samplerPlayRange(void)
@@ -2034,14 +2050,14 @@ void samplerPlayRange(void)
 		return;
 	}
 
-	playCurrSample(editor.cursor.channel, editor.markStartOfs, editor.markEndOfs, false);
+	playCurrSample(cursor.channel, editor.markStartOfs, editor.markEndOfs, false);
 }
 
 void setLoopSprites(void)
 {
 	moduleSample_t *s;
 
-	if (!editor.ui.samplerScreenShown)
+	if (!ui.samplerScreenShown)
 	{
 		hideSprite(SPRITE_LOOP_PIN_LEFT);
 		hideSprite(SPRITE_LOOP_PIN_RIGHT);
@@ -2053,25 +2069,32 @@ void setLoopSprites(void)
 	s = &modEntry->samples[editor.currSample];
 	if (s->loopStart+s->loopLength > 2)
 	{
-		if (editor.sampler.samDisplay > 0)
+		if (sampler.samDisplay > 0)
 		{
-			editor.sampler.loopStartPos = smpPos2Scr(s->loopStart);
-			if (editor.sampler.loopStartPos >= 0 && editor.sampler.loopStartPos <= SAMPLE_AREA_WIDTH)
-				setSpritePos(SPRITE_LOOP_PIN_LEFT, editor.sampler.loopStartPos, 138);
+			sampler.loopStartPos = (int16_t)smpPos2Scr(s->loopStart);
+			if (sampler.loopStartPos >= 0 && sampler.loopStartPos <= SAMPLE_AREA_WIDTH)
+				setSpritePos(SPRITE_LOOP_PIN_LEFT, sampler.loopStartPos, 138);
 			else
 				hideSprite(SPRITE_LOOP_PIN_LEFT);
 
-			editor.sampler.loopEndPos = smpPos2Scr(s->loopStart + s->loopLength);
-			if (editor.sampler.loopEndPos >= 0 && editor.sampler.loopEndPos <= SAMPLE_AREA_WIDTH)
-				setSpritePos(SPRITE_LOOP_PIN_RIGHT, editor.sampler.loopEndPos + 3, 138);
+			sampler.loopEndPos = (int16_t)smpPos2Scr(s->loopStart + s->loopLength);
+
+			/* nasty kludge for where the right loop pin would sometimes disappear
+			** when zoomed in and scrolled all the way to the right.
+			*/
+			if (sampler.loopEndPos == SAMPLE_AREA_WIDTH+1)
+				sampler.loopEndPos = SAMPLE_AREA_WIDTH;
+
+			if (sampler.loopEndPos >= 0 && sampler.loopEndPos <= SAMPLE_AREA_WIDTH)
+				setSpritePos(SPRITE_LOOP_PIN_RIGHT, sampler.loopEndPos + 3, 138);
 			else
 				hideSprite(SPRITE_LOOP_PIN_RIGHT);
 		}
 	}
 	else
 	{
-		editor.sampler.loopStartPos = 0;
-		editor.sampler.loopEndPos = 0;
+		sampler.loopStartPos = 0;
+		sampler.loopEndPos = 0;
 
 		hideSprite(SPRITE_LOOP_PIN_LEFT);
 		hideSprite(SPRITE_LOOP_PIN_RIGHT);
@@ -2082,27 +2105,27 @@ void setLoopSprites(void)
 
 void samplerShowAll(void)
 {
-	if (editor.sampler.samDisplay == editor.sampler.samLength)
+	if (sampler.samDisplay == sampler.samLength)
 		return; // don't attempt to show all if already showing all! }
 
-	editor.sampler.samOffset = 0;
-	editor.sampler.samDisplay = editor.sampler.samLength;
+	sampler.samOffset = 0;
+	sampler.samDisplay = sampler.samLength;
 
 	updateSamOffset();
 	displaySample();
 }
 
-static void samplerZoomIn(int32_t step, int16_t x)
+static void samplerZoomIn(int32_t step, int32_t x)
 {
 	int32_t tmpDisplay, tmpOffset;
 
-	if (modEntry->samples[editor.currSample].length == 0 || editor.sampler.samDisplay <= 2)
+	if (modEntry->samples[editor.currSample].length == 0 || sampler.samDisplay <= 2)
 		return;
 
 	if (step < 1)
 		step = 1;
 
-	tmpDisplay = editor.sampler.samDisplay - (step * 2);
+	tmpDisplay = sampler.samDisplay - (step << 1);
 	if (tmpDisplay < 2)
 		tmpDisplay = 2;
 
@@ -2110,35 +2133,35 @@ static void samplerZoomIn(int32_t step, int16_t x)
 
 	step += (((x - (SCREEN_W / 2)) * step) + roundingBias) / (SCREEN_W / 2);
 
-	tmpOffset = editor.sampler.samOffset + step;
+	tmpOffset = sampler.samOffset + step;
 	if (tmpOffset < 0)
 		tmpOffset = 0;
 
-	if (tmpOffset+tmpDisplay > editor.sampler.samLength)
-		tmpOffset = editor.sampler.samLength-tmpDisplay;
+	if (tmpOffset+tmpDisplay > sampler.samLength)
+		tmpOffset = sampler.samLength-tmpDisplay;
 
-	editor.sampler.samOffset = tmpOffset;
-	editor.sampler.samDisplay = tmpDisplay;
+	sampler.samOffset = tmpOffset;
+	sampler.samDisplay = tmpDisplay;
 
 	updateSamOffset();
 	displaySample();
 }
 
-static void samplerZoomOut(int32_t step, int16_t x)
+static void samplerZoomOut(int32_t step, int32_t x)
 {
 	int32_t tmpDisplay, tmpOffset;
 
-	if (modEntry->samples[editor.currSample].length == 0 || editor.sampler.samDisplay == editor.sampler.samLength)
+	if (modEntry->samples[editor.currSample].length == 0 || sampler.samDisplay == sampler.samLength)
 		return;
 
 	if (step < 1)
 		step = 1;
 
-	tmpDisplay = editor.sampler.samDisplay + (step * 2);
-	if (tmpDisplay > editor.sampler.samLength)
+	tmpDisplay = sampler.samDisplay + (step << 1);
+	if (tmpDisplay > sampler.samLength)
 	{
 		tmpOffset  = 0;
-		tmpDisplay = editor.sampler.samLength;
+		tmpDisplay = sampler.samLength;
 	}
 	else
 	{
@@ -2146,16 +2169,16 @@ static void samplerZoomOut(int32_t step, int16_t x)
 
 		step += (((x - (SCREEN_W / 2)) * step) + roundingBias) / (SCREEN_W / 2);
 
-		tmpOffset = editor.sampler.samOffset - step;
+		tmpOffset = sampler.samOffset - step;
 		if (tmpOffset < 0)
 			tmpOffset = 0;
 
-		if (tmpOffset+tmpDisplay > editor.sampler.samLength)
-			tmpOffset = editor.sampler.samLength-tmpDisplay;
+		if (tmpOffset+tmpDisplay > sampler.samLength)
+			tmpOffset = sampler.samLength-tmpDisplay;
 	}
 
-	editor.sampler.samOffset = tmpOffset;
-	editor.sampler.samDisplay = tmpDisplay;
+	sampler.samOffset = tmpOffset;
+	sampler.samDisplay = tmpDisplay;
 
 	updateSamOffset();
 	displaySample();
@@ -2163,17 +2186,17 @@ static void samplerZoomOut(int32_t step, int16_t x)
 
 void samplerZoomInMouseWheel(void)
 {
-	samplerZoomIn((editor.sampler.samDisplay + 5) / 10, mouse.x);
+	samplerZoomIn((sampler.samDisplay + 5) / 10, mouse.x);
 }
 
 void samplerZoomOutMouseWheel(void)
 {
-	samplerZoomOut((editor.sampler.samDisplay + 5) / 10, mouse.x);
+	samplerZoomOut((sampler.samDisplay + 5) / 10, mouse.x);
 }
 
 void samplerZoomOut2x(void)
 {
-	samplerZoomOut((editor.sampler.samDisplay + 1) / 2, SCREEN_W / 2);
+	samplerZoomOut((sampler.samDisplay + 1) / 2, SCREEN_W / 2);
 }
 
 void samplerRangeAll(void)
@@ -2191,8 +2214,8 @@ void samplerRangeAll(void)
 	else
 	{
 		invertRange();
-		editor.markStartOfs = editor.sampler.samOffset;
-		editor.markEndOfs = editor.sampler.samOffset + editor.sampler.samDisplay;
+		editor.markStartOfs = sampler.samOffset;
+		editor.markEndOfs = sampler.samOffset + sampler.samDisplay;
 		invertRange();
 	}
 }
@@ -2222,11 +2245,11 @@ void samplerShowRange(void)
 		return;
 	}
 
-	editor.sampler.samDisplay = editor.markEndOfs - editor.markStartOfs;
-	editor.sampler.samOffset = editor.markStartOfs;
+	sampler.samDisplay = editor.markEndOfs - editor.markStartOfs;
+	sampler.samOffset = editor.markStartOfs;
 
-	if (editor.sampler.samDisplay+editor.sampler.samOffset > editor.sampler.samLength)
-		editor.sampler.samOffset = editor.sampler.samLength-editor.sampler.samDisplay;
+	if (sampler.samDisplay+sampler.samOffset > sampler.samLength)
+		sampler.samOffset = sampler.samLength-sampler.samDisplay;
 
 	updateSamOffset();
 
@@ -2244,27 +2267,27 @@ void volBoxBarPressed(bool mouseButtonHeld)
 	{
 		if (mouse.x >= 72 && mouse.x <= 173)
 		{
-			if (mouse.y >= 154 && mouse.y <= 174) editor.ui.forceVolDrag = 1;
-			if (mouse.y >= 165 && mouse.y <= 175) editor.ui.forceVolDrag = 2;
+			if (mouse.y >= 154 && mouse.y <= 174) ui.forceVolDrag = 1;
+			if (mouse.y >= 165 && mouse.y <= 175) ui.forceVolDrag = 2;
 		}
 	}
 	else
 	{
-		if (editor.sampler.lastMouseX != mouse.x)
+		if (sampler.lastMouseX != mouse.x)
 		{
-			editor.sampler.lastMouseX = mouse.x;
-			mouseX = CLAMP(editor.sampler.lastMouseX - 107, 0, 60);
+			sampler.lastMouseX = mouse.x;
+			mouseX = CLAMP(sampler.lastMouseX - 107, 0, 60);
 
-			if (editor.ui.forceVolDrag == 1)
+			if (ui.forceVolDrag == 1)
 			{
 				editor.vol1 = (int16_t)(((mouseX * 200) + (60/2)) / 60); // rounded
-				editor.ui.updateVolFromText = true;
+				ui.updateVolFromText = true;
 				showVolFromSlider();
 			}
-			else if (editor.ui.forceVolDrag == 2)
+			else if (ui.forceVolDrag == 2)
 			{
 				editor.vol2 = (int16_t)(((mouseX * 200) + (60/2)) / 60); // rounded
-				editor.ui.updateVolToText = true;
+				ui.updateVolToText = true;
 				showVolToSlider();
 			}
 		}
@@ -2279,39 +2302,39 @@ void samplerBarPressed(bool mouseButtonHeld)
 	{
 		if (mouse.x >= 4 && mouse.x <= 315)
 		{
-			if (mouse.x < editor.sampler.dragStart)
+			if (mouse.x < sampler.dragStart)
 			{
-				tmp32 = editor.sampler.samOffset - editor.sampler.samDisplay;
+				tmp32 = sampler.samOffset - sampler.samDisplay;
 				if (tmp32 < 0)
 					tmp32 = 0;
 
-				if (tmp32 == editor.sampler.samOffset)
+				if (tmp32 == sampler.samOffset)
 					return;
 
-				editor.sampler.samOffset = tmp32;
+				sampler.samOffset = tmp32;
 
 				updateSamOffset();
 				displaySample();
 				return;
 			}
 
-			if (mouse.x > editor.sampler.dragEnd)
+			if (mouse.x > sampler.dragEnd)
 			{
-				tmp32 = editor.sampler.samOffset + editor.sampler.samDisplay;
-				if (tmp32+editor.sampler.samDisplay <= editor.sampler.samLength)
+				tmp32 = sampler.samOffset + sampler.samDisplay;
+				if (tmp32+sampler.samDisplay <= sampler.samLength)
 				{
-					if (tmp32 == editor.sampler.samOffset)
+					if (tmp32 == sampler.samOffset)
 						return;
 
-					editor.sampler.samOffset = tmp32;
+					sampler.samOffset = tmp32;
 				}
 				else
 				{
-					tmp32 = editor.sampler.samLength - editor.sampler.samDisplay;
-					if (tmp32 == editor.sampler.samOffset)
+					tmp32 = sampler.samLength - sampler.samDisplay;
+					if (tmp32 == sampler.samOffset)
 						return;
 
-					editor.sampler.samOffset = tmp32;
+					sampler.samOffset = tmp32;
 				}
 
 				updateSamOffset();
@@ -2319,35 +2342,35 @@ void samplerBarPressed(bool mouseButtonHeld)
 				return;
 			}
 
-			editor.sampler.lastSamPos = mouse.x;
-			editor.sampler.saveMouseX = editor.sampler.lastSamPos - editor.sampler.dragStart;
+			sampler.lastSamPos = mouse.x;
+			sampler.saveMouseX = sampler.lastSamPos - sampler.dragStart;
 
-			editor.ui.forceSampleDrag = true;
+			ui.forceSampleDrag = true;
 		}
 	}
 
-	if (mouse.x != editor.sampler.lastSamPos)
+	if (mouse.x != sampler.lastSamPos)
 	{
-		editor.sampler.lastSamPos = mouse.x;
+		sampler.lastSamPos = mouse.x;
 
-		tmp32 = editor.sampler.lastSamPos - editor.sampler.saveMouseX - 4;
+		tmp32 = sampler.lastSamPos - sampler.saveMouseX - 4;
 		tmp32 = CLAMP(tmp32, 0, SAMPLE_AREA_WIDTH);
 
-		tmp32 = ((tmp32 * editor.sampler.samLength) + (311/2)) / 311; // rounded
-		if (tmp32+editor.sampler.samDisplay <= editor.sampler.samLength)
+		tmp32 = ((tmp32 * sampler.samLength) + (311/2)) / 311; // rounded
+		if (tmp32+sampler.samDisplay <= sampler.samLength)
 		{
-			if (tmp32 == editor.sampler.samOffset)
+			if (tmp32 == sampler.samOffset)
 				return;
 
-			editor.sampler.samOffset = tmp32;
+			sampler.samOffset = tmp32;
 		}
 		else
 		{
-			tmp32 = editor.sampler.samLength - editor.sampler.samDisplay;
-			if (tmp32 == editor.sampler.samOffset)
+			tmp32 = sampler.samLength - sampler.samDisplay;
+			if (tmp32 == sampler.samOffset)
 				return;
 
-			editor.sampler.samOffset = tmp32;
+			sampler.samOffset = tmp32;
 		}
 
 		updateSamOffset();
@@ -2400,26 +2423,26 @@ void samplerEditSample(bool mouseButtonHeld)
 		lastDrawX = scr2SmpPos(mx);
 		lastDrawY = mouseYToSampleY(my);
 
-		editor.ui.forceSampleEdit = true;
+		ui.forceSampleEdit = true;
 		updateWindowTitle(MOD_IS_MODIFIED);
 	}
-	else if (mx == editor.sampler.lastMouseX && my == editor.sampler.lastMouseY)
+	else if (mx == sampler.lastMouseX && my == sampler.lastMouseY)
 	{
 		return; // don't continue if we didn't move the mouse
 	}
 
-	if (mx != editor.sampler.lastMouseX)
+	if (mx != sampler.lastMouseX)
 		p = scr2SmpPos(mx);
 	else
 		p = lastDrawX;
 
-	if (!keyb.shiftPressed && my != editor.sampler.lastMouseY)
+	if (!keyb.shiftPressed && my != sampler.lastMouseY)
 		vl = mouseYToSampleY(my);
 	else
 		vl = lastDrawY;
 
-	editor.sampler.lastMouseX = mx;
-	editor.sampler.lastMouseY = my;
+	sampler.lastMouseX = mx;
+	sampler.lastMouseY = my;
 
 	r = p;
 	rvl = vl;
@@ -2494,20 +2517,20 @@ void samplerSamplePressed(bool mouseButtonHeld)
 	{
 		if (mouse.y < 142)
 		{
-			if (mouse.x >= editor.sampler.loopStartPos && mouse.x <= editor.sampler.loopStartPos+3)
+			if (mouse.x >= sampler.loopStartPos && mouse.x <= sampler.loopStartPos+3)
 			{
-				editor.ui.leftLoopPinMoving = true;
-				editor.ui.rightLoopPinMoving = false;
-				editor.ui.sampleMarkingPos = 1;
-				editor.sampler.lastMouseX = mouse.x;
+				ui.leftLoopPinMoving = true;
+				ui.rightLoopPinMoving = false;
+				ui.sampleMarkingPos = 1;
+				sampler.lastMouseX = mouse.x;
 				return;
 			}
-			else if (mouse.x >= editor.sampler.loopEndPos+3 && mouse.x <= editor.sampler.loopEndPos+6)
+			else if (mouse.x >= sampler.loopEndPos+3 && mouse.x <= sampler.loopEndPos+6)
 			{
-				editor.ui.rightLoopPinMoving = true;
-				editor.ui.leftLoopPinMoving = false;
-				editor.ui.sampleMarkingPos = 1;
-				editor.sampler.lastMouseX = mouse.x;
+				ui.rightLoopPinMoving = true;
+				ui.leftLoopPinMoving = false;
+				ui.sampleMarkingPos = 1;
+				sampler.lastMouseX = mouse.x;
 				return;
 			}
 		}
@@ -2517,11 +2540,11 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	s = &modEntry->samples[editor.currSample];
 
-	if (editor.ui.leftLoopPinMoving)
+	if (ui.leftLoopPinMoving)
 	{
-		if (editor.sampler.lastMouseX != mouseX)
+		if (sampler.lastMouseX != mouseX)
 		{
-			editor.sampler.lastMouseX = mouseX;
+			sampler.lastMouseX = mouseX;
 
 			tmpPos = (scr2SmpPos(mouseX - 1) - s->loopStart) & 0xFFFFFFFE;
 			if (tmpPos > MAX_SAMPLE_LEN)
@@ -2534,16 +2557,16 @@ void samplerSamplePressed(bool mouseButtonHeld)
 			}
 			else
 			{
-				s->loopStart = s->loopStart + tmpPos;
+				s->loopStart = (uint16_t)(s->loopStart + tmpPos);
 
 				if (s->loopLength-tmpPos > 2)
-					s->loopLength -= tmpPos;
+					s->loopLength -= (uint16_t)tmpPos;
 				else
 					s->loopLength = 2;
 			}
 
-			editor.ui.updateCurrSampleRepeat = true;
-			editor.ui.updateCurrSampleReplen = true;
+			ui.updateCurrSampleRepeat = true;
+			ui.updateCurrSampleReplen = true;
 
 			setLoopSprites();
 			mixerUpdateLoops();
@@ -2553,21 +2576,21 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		return;
 	}
 
-	if (editor.ui.rightLoopPinMoving)
+	if (ui.rightLoopPinMoving)
 	{
-		if (editor.sampler.lastMouseX != mouseX)
+		if (sampler.lastMouseX != mouseX)
 		{
-			editor.sampler.lastMouseX = mouseX;
+			sampler.lastMouseX = mouseX;
 
 			s = &modEntry->samples[editor.currSample];
 
 			tmpPos = (scr2SmpPos(mouseX - 4) - s->loopStart) & 0xFFFFFFFE;
 			tmpPos = CLAMP(tmpPos, 2, MAX_SAMPLE_LEN);
 
-			s->loopLength = tmpPos;
+			s->loopLength = (uint16_t)tmpPos;
 
-			editor.ui.updateCurrSampleRepeat = true;
-			editor.ui.updateCurrSampleReplen = true;
+			ui.updateCurrSampleRepeat = true;
+			ui.updateCurrSampleReplen = true;
 
 			setLoopSprites();
 			mixerUpdateLoops();
@@ -2582,8 +2605,8 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		if (mouseX < 3 || mouseX >= SCREEN_W)
 			return;
 
-		editor.ui.sampleMarkingPos = (int16_t)mouseX;
-		editor.sampler.lastSamPos = editor.ui.sampleMarkingPos;
+		ui.sampleMarkingPos = (int16_t)mouseX;
+		sampler.lastSamPos = ui.sampleMarkingPos;
 
 		invertRange();
 		if (s->length == 0)
@@ -2592,8 +2615,8 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		}
 		else
 		{
-			editor.markStartOfs = scr2SmpPos(editor.ui.sampleMarkingPos - 3);
-			editor.markEndOfs = scr2SmpPos(editor.ui.sampleMarkingPos - 3);
+			editor.markStartOfs = scr2SmpPos(ui.sampleMarkingPos - 3);
+			editor.markEndOfs = scr2SmpPos(ui.sampleMarkingPos - 3);
 
 			if (editor.markEndOfs > s->length)
 				editor.markEndOfs = s->length;
@@ -2621,9 +2644,9 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	mouseX = CLAMP(mouseX, 3, SCREEN_W);
 
-	if (mouseX != editor.sampler.lastSamPos)
+	if (mouseX != sampler.lastSamPos)
 	{
-		editor.sampler.lastSamPos = (uint16_t)mouseX;
+		sampler.lastSamPos = (uint16_t)mouseX;
 
 		invertRange();
 		if (s->length == 0)
@@ -2632,15 +2655,15 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		}
 		else
 		{
-			if (editor.sampler.lastSamPos > editor.ui.sampleMarkingPos)
+			if (sampler.lastSamPos > ui.sampleMarkingPos)
 			{
-				editor.markStartOfs = scr2SmpPos(editor.ui.sampleMarkingPos - 3);
-				editor.markEndOfs = scr2SmpPos(editor.sampler.lastSamPos - 3);
+				editor.markStartOfs = scr2SmpPos(ui.sampleMarkingPos - 3);
+				editor.markEndOfs = scr2SmpPos(sampler.lastSamPos - 3);
 			}
 			else
 			{
-				editor.markStartOfs = scr2SmpPos(editor.sampler.lastSamPos - 3);
-				editor.markEndOfs = scr2SmpPos(editor.ui.sampleMarkingPos - 3);
+				editor.markStartOfs = scr2SmpPos(sampler.lastSamPos - 3);
+				editor.markEndOfs = scr2SmpPos(ui.sampleMarkingPos - 3);
 			}
 
 			if (editor.markEndOfs > s->length)
@@ -2682,8 +2705,8 @@ void samplerLoopToggle(void)
 	{
 		// disable loop
 
-		editor.sampler.tmpLoopStart = s->loopStart;
-		editor.sampler.tmpLoopLength = s->loopLength;
+		sampler.tmpLoopStart = s->loopStart;
+		sampler.tmpLoopLength = s->loopLength;
 
 		s->loopStart = 0;
 		s->loopLength = 2;
@@ -2692,15 +2715,15 @@ void samplerLoopToggle(void)
 	{
 		// enable loop
 
-		if (editor.sampler.tmpLoopStart == 0 && editor.sampler.tmpLoopLength == 0)
+		if (sampler.tmpLoopStart == 0 && sampler.tmpLoopLength == 0)
 		{
 			s->loopStart = 0;
 			s->loopLength = s->length;
 		}
 		else
 		{
-			s->loopStart = editor.sampler.tmpLoopStart;
-			s->loopLength = editor.sampler.tmpLoopLength;
+			s->loopStart = (uint16_t)sampler.tmpLoopStart;
+			s->loopLength = (uint16_t)sampler.tmpLoopLength;
 
 			if (s->loopStart+s->loopLength > s->length)
 			{
@@ -2710,8 +2733,8 @@ void samplerLoopToggle(void)
 		}
 	}
 
-	editor.ui.updateCurrSampleRepeat = true;
-	editor.ui.updateCurrSampleReplen = true;
+	ui.updateCurrSampleRepeat = true;
+	ui.updateCurrSampleReplen = true;
 
 	displaySample();
 	mixerUpdateLoops();
@@ -2721,39 +2744,39 @@ void samplerLoopToggle(void)
 
 void exitFromSam(void)
 {
-	editor.ui.samplerScreenShown = false;
+	ui.samplerScreenShown = false;
 	memcpy(&video.frameBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
 
 	updateCursorPos();
 	setLoopSprites();
 
-	editor.ui.updateStatusText = true;
-	editor.ui.updateSongSize = true;
-	editor.ui.updateSongTiming = true;
-	editor.ui.updateSongBPM = true;
-	editor.ui.updateCurrPattText = true;
-	editor.ui.updatePatternData = true;
+	ui.updateStatusText = true;
+	ui.updateSongSize = true;
+	ui.updateSongTiming = true;
+	ui.updateSongBPM = true;
+	ui.updateCurrPattText = true;
+	ui.updatePatternData = true;
 
 	editor.markStartOfs = -1;
 }
 
 void samplerScreen(void)
 {
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 	{
 		exitFromSam();
 		return;
 	}
 
-	editor.ui.samplerScreenShown = true;
+	ui.samplerScreenShown = true;
 	memcpy(&video.frameBuffer[(121 * SCREEN_W)], samplerScreenBMP, 320 * 134 * sizeof (int32_t));
 	hideSprite(SPRITE_PATTERN_CURSOR);
 
-	editor.ui.updateStatusText = true;
-	editor.ui.updateSongSize = true;
-	editor.ui.updateSongTiming = true;
-	editor.ui.updateResampleNote = true;
-	editor.ui.update9xxPos = true;
+	ui.updateStatusText = true;
+	ui.updateSongSize = true;
+	ui.updateSongTiming = true;
+	ui.updateResampleNote = true;
+	ui.update9xxPos = true;
 
 	redrawSample();
 }
@@ -2764,7 +2787,7 @@ void drawSamplerLine(void)
 	int32_t pos;
 
 	hideSprite(SPRITE_SAMPLING_POS_LINE);
-	if (!editor.ui.samplerScreenShown || editor.ui.samplerVolBoxShown || editor.ui.samplerFiltersBoxShown)
+	if (!ui.samplerScreenShown || ui.samplerVolBoxShown || ui.samplerFiltersBoxShown)
 		return;
 
 	for (i = 0; i < AMIGA_VOICES; i++)

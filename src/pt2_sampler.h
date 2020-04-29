@@ -2,6 +2,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "pt2_structs.h"
+
+typedef struct sampler_t
+{
+	const int8_t *samStart;
+	int8_t *blankSample, *copyBuf;
+	int16_t loopStartPos, loopEndPos;
+	uint16_t dragStart, dragEnd;
+	int32_t samPointWidth, samOffset, samDisplay, samLength, saveMouseX, lastSamPos;
+	int32_t lastMouseX, lastMouseY, tmpLoopStart, tmpLoopLength;
+	uint32_t copyBufSize, samDrawStart, samDrawEnd;
+} sampler_t;
+
+extern sampler_t sampler; // pt2_sampler.c
 
 void downSample(void);
 void upSample(void);
@@ -15,8 +29,8 @@ void samplerRemoveDcOffset(void);
 void mixChordSample(void);
 void samplerResample(void);
 void doMix(void);
-void boostSample(int8_t sample, bool ignoreMark);
-void filterSample(int8_t sample, bool ignoreMark);
+void boostSample(int32_t sample, bool ignoreMark);
+void filterSample(int32_t sample, bool ignoreMark);
 void toggleTuningTone(void);
 void samplerSamDelete(uint8_t cut);
 void samplerSamPaste(void);

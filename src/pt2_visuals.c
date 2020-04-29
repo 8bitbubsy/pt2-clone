@@ -159,32 +159,32 @@ void resetAllScreens(void)
 {
 	editor.mixFlag = false;
 	editor.swapChannelFlag = false;
-	editor.ui.clearScreenShown = false;
-	editor.ui.changingChordNote = false;
-	editor.ui.changingSmpResample = false;
-	editor.ui.pat2SmpDialogShown = false;
-	editor.ui.disablePosEd = false;
-	editor.ui.disableVisualizer = false;
+	ui.clearScreenShown = false;
+	ui.changingChordNote = false;
+	ui.changingSmpResample = false;
+	ui.pat2SmpDialogShown = false;
+	ui.disablePosEd = false;
+	ui.disableVisualizer = false;
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 	{
-		editor.ui.samplerVolBoxShown = false;
-		editor.ui.samplerFiltersBoxShown = false;
+		ui.samplerVolBoxShown = false;
+		ui.samplerFiltersBoxShown = false;
 
 		displaySample();
 	}
 
-	if (editor.ui.editTextFlag)
+	if (ui.editTextFlag)
 		exitGetTextLine(EDIT_TEXT_NO_UPDATE);
 }
 
 void removeAskDialog(void)
 {
-	if (!editor.ui.askScreenShown && !editor.isWAVRendering)
+	if (!ui.askScreenShown && !editor.isWAVRendering)
 		displayMainScreen();
 
-	editor.ui.disablePosEd = false;
-	editor.ui.disableVisualizer = false;
+	ui.disablePosEd = false;
+	ui.disableVisualizer = false;
 }
 
 void renderAskDialog(void)
@@ -192,12 +192,12 @@ void renderAskDialog(void)
 	const uint32_t *srcPtr;
 	uint32_t *dstPtr;
 
-	editor.ui.disablePosEd = true;
-	editor.ui.disableVisualizer = true;
+	ui.disablePosEd = true;
+	ui.disableVisualizer = true;
 
 	// render ask dialog
 
-	srcPtr = editor.ui.pat2SmpDialogShown ? pat2SmpDialogBMP : yesNoDialogBMP;
+	srcPtr = ui.pat2SmpDialogShown ? pat2SmpDialogBMP : yesNoDialogBMP;
 	dstPtr = &video.frameBuffer[(51 * SCREEN_W) + 160];
 
 	for (uint32_t y = 0; y < 39; y++)
@@ -214,8 +214,8 @@ void renderBigAskDialog(void)
 	const uint32_t *srcPtr;
 	uint32_t *dstPtr;
 
-	editor.ui.disablePosEd = true;
-	editor.ui.disableVisualizer = true;
+	ui.disablePosEd = true;
+	ui.disableVisualizer = true;
 
 	// render custom big ask dialog
 
@@ -233,8 +233,8 @@ void renderBigAskDialog(void)
 
 void showDownsampleAskDialog(void)
 {
-	editor.ui.askScreenShown = true;
-	editor.ui.askScreenType = ASK_LOAD_DOWNSAMPLE;
+	ui.askScreenShown = true;
+	ui.askScreenType = ASK_LOAD_DOWNSAMPLE;
 	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	setStatusMessage("PLEASE SELECT", NO_CARRY);
 	renderBigAskDialog();
@@ -250,7 +250,7 @@ static void fillFromVuMetersBgBuffer(void)
 	const uint32_t *srcPtr;
 	uint32_t *dstPtr;
 
-	if (editor.ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
+	if (ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
 		return;
 
 	srcPtr = vuMetersBg;
@@ -276,7 +276,7 @@ void fillToVuMetersBgBuffer(void)
 	const uint32_t *srcPtr;
 	uint32_t *dstPtr;
 
-	if (editor.ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
+	if (ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
 		return;
 
 	srcPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
@@ -302,7 +302,7 @@ void renderVuMeters(void)
 	const uint32_t *srcPtr;
 	uint32_t h, *dstPtr;
 
-	if (editor.ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
+	if (ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
 		return;
 
 	fillToVuMetersBgBuffer();
@@ -336,33 +336,33 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 {
 	moduleSample_t *currSample;
 
-	if (editor.ui.diskOpScreenShown)
+	if (ui.diskOpScreenShown)
 		return;
 
 	currSample = &modEntry->samples[editor.currSample];
 
-	if (editor.ui.updateSongPos)
+	if (ui.updateSongPos)
 	{
-		editor.ui.updateSongPos = false;
+		ui.updateSongPos = false;
 		printThreeDecimalsBg(72, 3, *editor.currPosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateSongPattern)
+	if (ui.updateSongPattern)
 	{
-		editor.ui.updateSongPattern = false;
+		ui.updateSongPattern = false;
 		printTwoDecimalsBg(80, 14, *editor.currPatternDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateSongLength)
+	if (ui.updateSongLength)
 	{
-		editor.ui.updateSongLength = false;
+		ui.updateSongLength = false;
 		if (!editor.isWAVRendering)
 			printThreeDecimalsBg(72, 25, *editor.currLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateCurrSampleFineTune)
+	if (ui.updateCurrSampleFineTune)
 	{
-		editor.ui.updateCurrSampleFineTune = false;
+		ui.updateCurrSampleFineTune = false;
 
 		if (!editor.isWAVRendering)
 		{
@@ -384,9 +384,9 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 		}
 	}
 
-	if (editor.ui.updateCurrSampleNum)
+	if (ui.updateCurrSampleNum)
 	{
-		editor.ui.updateCurrSampleNum = false;
+		ui.updateCurrSampleNum = false;
 		if (!editor.isWAVRendering)
 		{
 			printTwoHexBg(80, 47,
@@ -394,29 +394,29 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 		}
 	}
 
-	if (editor.ui.updateCurrSampleVolume)
+	if (ui.updateCurrSampleVolume)
 	{
-		editor.ui.updateCurrSampleVolume = false;
+		ui.updateCurrSampleVolume = false;
 		if (!editor.isWAVRendering)
 			printTwoHexBg(80, 58, *currSample->volumeDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateCurrSampleLength)
+	if (ui.updateCurrSampleLength)
 	{
-		editor.ui.updateCurrSampleLength = false;
+		ui.updateCurrSampleLength = false;
 		if (!editor.isWAVRendering)
 			printFourHexBg(64, 69, *currSample->lengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateCurrSampleRepeat)
+	if (ui.updateCurrSampleRepeat)
 	{
-		editor.ui.updateCurrSampleRepeat = false;
+		ui.updateCurrSampleRepeat = false;
 		printFourHexBg(64, 80, *currSample->loopStartDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateCurrSampleReplen)
+	if (ui.updateCurrSampleReplen)
 	{
-		editor.ui.updateCurrSampleReplen = false;
+		ui.updateCurrSampleReplen = false;
 		printFourHexBg(64, 91, *currSample->loopLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 }
@@ -427,16 +427,16 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	int32_t secs, MI_TimeM, MI_TimeS, x, i;
 	moduleSample_t *currSample;
 
-	if (editor.ui.updateStatusText)
+	if (ui.updateStatusText)
 	{
-		editor.ui.updateStatusText = false;
+		ui.updateStatusText = false;
 
 		// clear background
 		textOutBg(88, 127, "                 ", video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
 
 		// render status text
-		if (!editor.errorMsgActive && editor.blockMarkFlag && !editor.ui.askScreenShown
-			&& !editor.ui.clearScreenShown && !editor.swapChannelFlag)
+		if (!editor.errorMsgActive && editor.blockMarkFlag && !ui.askScreenShown
+			&& !ui.clearScreenShown && !editor.swapChannelFlag)
 		{
 			textOut(88, 127, "MARK BLOCK", video.palette[PAL_GENTXT]);
 			charOut(192, 127, '-', video.palette[PAL_GENTXT]);
@@ -455,27 +455,27 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		}
 		else
 		{
-			textOut(88, 127, editor.ui.statusMessage, video.palette[PAL_GENTXT]);
+			textOut(88, 127, ui.statusMessage, video.palette[PAL_GENTXT]);
 		}
 	}
 
-	if (editor.ui.updateSongBPM)
+	if (ui.updateSongBPM)
 	{
-		editor.ui.updateSongBPM = false;
-		if (!editor.ui.samplerScreenShown)
+		ui.updateSongBPM = false;
+		if (!ui.samplerScreenShown)
 			printThreeDecimalsBg(32, 123, modEntry->currBPM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateCurrPattText)
+	if (ui.updateCurrPattText)
 	{
-		editor.ui.updateCurrPattText = false;
-		if (!editor.ui.samplerScreenShown)
+		ui.updateCurrPattText = false;
+		if (!ui.samplerScreenShown)
 			printTwoDecimalsBg(8, 127, *editor.currEditPatternDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateTrackerFlags)
+	if (ui.updateTrackerFlags)
 	{
-		editor.ui.updateTrackerFlags = false;
+		ui.updateTrackerFlags = false;
 
 		charOutBg(1, 113, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		charOutBg(8, 113, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -537,9 +537,9 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		printTwoDecimalsBg(296, 102, 59, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateSongName)
+	if (ui.updateSongName)
 	{
-		editor.ui.updateSongName = false;
+		ui.updateSongName = false;
 		for (x = 0; x < 20; x++)
 		{
 			tempChar = modEntry->head.moduleTitle[x];
@@ -550,9 +550,9 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		}
 	}
 
-	if (editor.ui.updateCurrSampleName)
+	if (ui.updateCurrSampleName)
 	{
-		editor.ui.updateCurrSampleName = false;
+		ui.updateCurrSampleName = false;
 		currSample = &modEntry->samples[editor.currSample];
 
 		for (x = 0; x < 22; x++)
@@ -565,9 +565,9 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		}
 	}
 
-	if (editor.ui.updateSongSize)
+	if (ui.updateSongSize)
 	{
-		editor.ui.updateSongSize = false;
+		ui.updateSongSize = false;
 
 		// clear background
 		textOutBg(264, 123, "      ", video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
@@ -596,17 +596,17 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		}
 	}
 
-	if (editor.ui.updateSongTiming)
+	if (ui.updateSongTiming)
 	{
-		editor.ui.updateSongTiming = false;
+		ui.updateSongTiming = false;
 		textOutBg(288, 130, (editor.timingMode == TEMPO_MODE_CIA) ? "CIA" : "VBL", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 }
 
 void updateCursorPos(void)
 {
-	if (!editor.ui.samplerScreenShown)
-		setSpritePos(SPRITE_PATTERN_CURSOR, cursorPosTable[editor.cursor.pos], 188);
+	if (!ui.samplerScreenShown)
+		setSpritePos(SPRITE_PATTERN_CURSOR, cursorPosTable[cursor.pos], 188);
 }
 
 void updateSampler(void)
@@ -614,7 +614,7 @@ void updateSampler(void)
 	int32_t tmpSampleOffset;
 	moduleSample_t *s;
 
-	if (!editor.ui.samplerScreenShown)
+	if (!ui.samplerScreenShown)
 		return;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
@@ -623,32 +623,32 @@ void updateSampler(void)
 	// update 9xx offset
 	if (mouse.y >= 138 && mouse.y <= 201 && mouse.x >= 3 && mouse.x <= 316)
 	{
-		if (!editor.ui.samplerVolBoxShown && !editor.ui.samplerFiltersBoxShown && s->length > 0)
+		if (!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown && s->length > 0)
 		{
 			tmpSampleOffset = (scr2SmpPos(mouse.x-3) + (1 << 7)) >> 8; // rounded
 			tmpSampleOffset = 0x900 + CLAMP(tmpSampleOffset, 0x00, 0xFF);
 
-			if (tmpSampleOffset != editor.ui.lastSampleOffset)
+			if (tmpSampleOffset != ui.lastSampleOffset)
 			{
-				editor.ui.lastSampleOffset = tmpSampleOffset;
-				editor.ui.update9xxPos = true;
+				ui.lastSampleOffset = (uint16_t)tmpSampleOffset;
+				ui.update9xxPos = true;
 			}
 		}
 	}
 
 	// display 9xx offset
-	if (editor.ui.update9xxPos)
+	if (ui.update9xxPos)
 	{
-		editor.ui.update9xxPos = false;
-		printThreeHexBg(288, 247, editor.ui.lastSampleOffset, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		ui.update9xxPos = false;
+		printThreeHexBg(288, 247, ui.lastSampleOffset, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateResampleNote)
+	if (ui.updateResampleNote)
 	{
-		editor.ui.updateResampleNote = false;
+		ui.updateResampleNote = false;
 
 		// show resample note
-		if (editor.ui.changingSmpResample)
+		if (ui.changingSmpResample)
 		{
 			textOutBg(288, 236, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
@@ -661,37 +661,37 @@ void updateSampler(void)
 		}
 	}
 
-	if (editor.ui.samplerVolBoxShown)
+	if (ui.samplerVolBoxShown)
 	{
-		if (editor.ui.updateVolFromText)
+		if (ui.updateVolFromText)
 		{
-			editor.ui.updateVolFromText = false;
+			ui.updateVolFromText = false;
 			printThreeDecimalsBg(176, 157, *editor.vol1Disp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateVolToText)
+		if (ui.updateVolToText)
 		{
-			editor.ui.updateVolToText = false;
+			ui.updateVolToText = false;
 			printThreeDecimalsBg(176, 168, *editor.vol2Disp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
-	else if (editor.ui.samplerFiltersBoxShown)
+	else if (ui.samplerFiltersBoxShown)
 	{
-		if (editor.ui.updateLPText)
+		if (ui.updateLPText)
 		{
-			editor.ui.updateLPText = false;
+			ui.updateLPText = false;
 			printFourDecimalsBg(168, 157, *editor.lpCutOffDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateHPText)
+		if (ui.updateHPText)
 		{
-			editor.ui.updateHPText = false;
+			ui.updateHPText = false;
 			printFourDecimalsBg(168, 168, *editor.hpCutOffDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateNormFlag)
+		if (ui.updateNormFlag)
 		{
-			editor.ui.updateNormFlag = false;
+			ui.updateNormFlag = false;
 
 			if (editor.normalizeFiltersFlag)
 				textOutBg(208, 179, "YES", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -765,8 +765,8 @@ void renderSamplerVolBox(void)
 		dstPtr += SCREEN_W;
 	}
 
-	editor.ui.updateVolFromText = true;
-	editor.ui.updateVolToText = true;
+	ui.updateVolFromText = true;
+	ui.updateVolToText = true;
 	showVolFromSlider();
 	showVolToSlider();
 
@@ -799,9 +799,9 @@ void renderSamplerFiltersBox(void)
 	textOut(200, 157, "HZ", video.palette[PAL_GENTXT]);
 	textOut(200, 168, "HZ", video.palette[PAL_GENTXT]);
 
-	editor.ui.updateLPText = true;
-	editor.ui.updateHPText = true;
-	editor.ui.updateNormFlag = true;
+	ui.updateLPText = true;
+	ui.updateHPText = true;
+	ui.updateNormFlag = true;
 
 	// hide loop sprites
 	hideSprite(SPRITE_LOOP_PIN_LEFT);
@@ -817,32 +817,32 @@ void renderDiskOpScreen(void)
 {
 	memcpy(video.frameBuffer, diskOpScreenBMP, (99 * 320) * sizeof (int32_t));
 
-	editor.ui.updateDiskOpPathText = true;
-	editor.ui.updatePackText = true;
-	editor.ui.updateSaveFormatText = true;
-	editor.ui.updateLoadMode = true;
-	editor.ui.updateDiskOpFileList = true;
+	ui.updateDiskOpPathText = true;
+	ui.updatePackText = true;
+	ui.updateSaveFormatText = true;
+	ui.updateLoadMode = true;
+	ui.updateDiskOpFileList = true;
 }
 
 void updateDiskOp(void)
 {
 	char tmpChar;
 
-	if (!editor.ui.diskOpScreenShown || editor.ui.posEdScreenShown)
+	if (!ui.diskOpScreenShown || ui.posEdScreenShown)
 		return;
 
-	if (editor.ui.updateDiskOpFileList)
+	if (ui.updateDiskOpFileList)
 	{
-		editor.ui.updateDiskOpFileList = false;
+		ui.updateDiskOpFileList = false;
 		diskOpRenderFileList();
 	}
 
-	if (editor.ui.updateLoadMode)
+	if (ui.updateLoadMode)
 	{
-		editor.ui.updateLoadMode = false;
+		ui.updateLoadMode = false;
 
 		// draw load mode arrow
-		if (editor.diskop.mode == 0)
+		if (diskop.mode == 0)
 		{
 			charOutBg(147,14, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]); // clear other box
 			charOutBg(147, 3, 0x3, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -854,28 +854,28 @@ void updateDiskOp(void)
 		}
 	}
 
-	if (editor.ui.updatePackText)
+	if (ui.updatePackText)
 	{
-		editor.ui.updatePackText = false;
-		textOutBg(120, 3, editor.diskop.modPackFlg ? "ON " : "OFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		ui.updatePackText = false;
+		textOutBg(120, 3, diskop.modPackFlg ? "ON " : "OFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateSaveFormatText)
+	if (ui.updateSaveFormatText)
 	{
-		editor.ui.updateSaveFormatText = false;
-		     if (editor.diskop.smpSaveType == DISKOP_SMP_WAV) textOutBg(120, 14, "WAV", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		else if (editor.diskop.smpSaveType == DISKOP_SMP_IFF) textOutBg(120, 14, "IFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		else if (editor.diskop.smpSaveType == DISKOP_SMP_RAW) textOutBg(120, 14, "RAW", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		ui.updateSaveFormatText = false;
+		     if (diskop.smpSaveType == DISKOP_SMP_WAV) textOutBg(120, 14, "WAV", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else if (diskop.smpSaveType == DISKOP_SMP_IFF) textOutBg(120, 14, "IFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else if (diskop.smpSaveType == DISKOP_SMP_RAW) textOutBg(120, 14, "RAW", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
-	if (editor.ui.updateDiskOpPathText)
+	if (ui.updateDiskOpPathText)
 	{
-		editor.ui.updateDiskOpPathText = false;
+		ui.updateDiskOpPathText = false;
 
 		// print disk op. path
 		for (uint32_t i = 0; i < 26; i++)
 		{
-			tmpChar = editor.currPath[editor.textofs.diskOpPath+i];
+			tmpChar = editor.currPath[ui.diskOpPathTextOffset+i];
 			if (tmpChar == '\0')
 				tmpChar = '_';
 
@@ -890,12 +890,12 @@ void updatePosEd(void)
 	int32_t x, y, y2;
 	uint32_t *dstPtr, bgPixel;
 
-	if (!editor.ui.posEdScreenShown || !editor.ui.updatePosEd)
+	if (!ui.posEdScreenShown || !ui.updatePosEd)
 		return;
 
-	editor.ui.updatePosEd = false;
+	ui.updatePosEd = false;
 
-	if (!editor.ui.disablePosEd)
+	if (!ui.disablePosEd)
 	{
 		bgPixel = video.palette[PAL_BACKGRD];
 
@@ -950,7 +950,7 @@ void updatePosEd(void)
 		}
 
 		// kludge to fix bottom part of text edit marker in pos ed
-		if (editor.ui.editTextFlag && editor.ui.editObject == PTB_PE_PATT)
+		if (ui.editTextFlag && ui.editObject == PTB_PE_PATT)
 			renderTextEditMarker();
 	}
 }
@@ -977,7 +977,7 @@ void renderMuteButtons(void)
 	const uint32_t *srcPtr;
 	uint32_t *dstPtr, srcPitch;
 
-	if (editor.ui.diskOpScreenShown || editor.ui.posEdScreenShown)
+	if (ui.diskOpScreenShown || ui.posEdScreenShown)
 		return;
 
 	dstPtr = &video.frameBuffer[(3 * SCREEN_W) + 310];
@@ -1012,8 +1012,8 @@ void renderClearScreen(void)
 	const uint32_t *srcPtr;
 	uint32_t *dstPtr;
 
-	editor.ui.disablePosEd = true;
-	editor.ui.disableVisualizer = true;
+	ui.disablePosEd = true;
+	ui.disableVisualizer = true;
 
 	srcPtr = clearDialogBMP;
 	dstPtr = &video.frameBuffer[(51 * SCREEN_W) + 160];
@@ -1031,41 +1031,41 @@ void removeClearScreen(void)
 {
 	displayMainScreen();
 
-	editor.ui.disablePosEd = false;
-	editor.ui.disableVisualizer = false;
+	ui.disablePosEd = false;
+	ui.disableVisualizer = false;
 }
 
 void updateCurrSample(void)
 {
-	editor.ui.updateCurrSampleName = true;
-	editor.ui.updateSongSize = true;
+	ui.updateCurrSampleName = true;
+	ui.updateSongSize = true;
 
-	if (!editor.ui.diskOpScreenShown)
+	if (!ui.diskOpScreenShown)
 	{
-		editor.ui.updateCurrSampleFineTune = true;
-		editor.ui.updateCurrSampleNum = true;
-		editor.ui.updateCurrSampleVolume = true;
-		editor.ui.updateCurrSampleLength = true;
-		editor.ui.updateCurrSampleRepeat = true;
-		editor.ui.updateCurrSampleReplen = true;
+		ui.updateCurrSampleFineTune = true;
+		ui.updateCurrSampleNum = true;
+		ui.updateCurrSampleVolume = true;
+		ui.updateCurrSampleLength = true;
+		ui.updateCurrSampleRepeat = true;
+		ui.updateCurrSampleReplen = true;
 	}
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 		redrawSample();
 
 	updateSamplePos();
 	recalcChordLength();
 
-	editor.sampler.tmpLoopStart = 0;
-	editor.sampler.tmpLoopLength = 0;
+	sampler.tmpLoopStart = 0;
+	sampler.tmpLoopLength = 0;
 }
 
 void updatePatternData(void)
 {
-	if (editor.ui.updatePatternData)
+	if (ui.updatePatternData)
 	{
-		editor.ui.updatePatternData = false;
-		if (!editor.ui.samplerScreenShown)
+		ui.updatePatternData = false;
+		if (!ui.samplerScreenShown)
 			redrawPattern();
 	}
 }
@@ -1074,12 +1074,12 @@ void removeTextEditMarker(void)
 {
 	uint32_t *dstPtr, pixel;
 
-	if (!editor.ui.editTextFlag)
+	if (!ui.editTextFlag)
 		return;
 
-	dstPtr = &video.frameBuffer[((editor.ui.lineCurY - 1) * SCREEN_W) + (editor.ui.lineCurX - 4)];
+	dstPtr = &video.frameBuffer[((ui.lineCurY - 1) * SCREEN_W) + (ui.lineCurX - 4)];
 
-	if (editor.ui.editObject == PTB_PE_PATT)
+	if (ui.editObject == PTB_PE_PATT)
 	{
 		// position editor text editing
 
@@ -1089,7 +1089,7 @@ void removeTextEditMarker(void)
 
 		// no need to clear the second row of pixels
 
-		editor.ui.updatePosEd = true;
+		ui.updatePosEd = true;
 	}
 	else
 	{
@@ -1110,10 +1110,10 @@ void renderTextEditMarker(void)
 {
 	uint32_t *dstPtr, pixel;
 
-	if (!editor.ui.editTextFlag)
+	if (!ui.editTextFlag)
 		return;
 
-	dstPtr = &video.frameBuffer[((editor.ui.lineCurY - 1) * SCREEN_W) + (editor.ui.lineCurX - 4)];
+	dstPtr = &video.frameBuffer[((ui.lineCurY - 1) * SCREEN_W) + (ui.lineCurX - 4)];
 	pixel = video.palette[PAL_TEXTMARK];
 
 	for (uint32_t y = 0; y < 2; y++)
@@ -1141,25 +1141,25 @@ void handleLastGUIObjectDown(void)
 {
 	bool testMouseButtonRelease = false;
 
-	if (editor.ui.sampleMarkingPos >= 0)
+	if (ui.sampleMarkingPos >= 0)
 	{
 		samplerSamplePressed(MOUSE_BUTTON_HELD);
 		testMouseButtonRelease = true;
 	}
 
-	if (editor.ui.forceSampleDrag)
+	if (ui.forceSampleDrag)
 	{
 		samplerBarPressed(MOUSE_BUTTON_HELD);
 		testMouseButtonRelease = true;
 	}
 
-	if (editor.ui.forceSampleEdit)
+	if (ui.forceSampleEdit)
 	{
 		samplerEditSample(MOUSE_BUTTON_HELD);
 		testMouseButtonRelease = true;
 	}
 
-	if (editor.ui.forceVolDrag)
+	if (ui.forceVolDrag)
 	{
 		volBoxBarPressed(MOUSE_BUTTON_HELD);
 		testMouseButtonRelease = true;
@@ -1187,15 +1187,15 @@ void updateVisualizer(void)
 	int32_t tmpVol;
 	uint32_t *dstPtr, pixel;
 
-	if (editor.ui.disableVisualizer || editor.ui.diskOpScreenShown ||
-		editor.ui.posEdScreenShown  || editor.ui.editOpScreenShown ||
-		editor.ui.aboutScreenShown  || editor.ui.askScreenShown    ||
+	if (ui.disableVisualizer || ui.diskOpScreenShown ||
+		ui.posEdScreenShown  || ui.editOpScreenShown ||
+		ui.aboutScreenShown  || ui.askScreenShown    ||
 		editor.isWAVRendering)
 	{
 		return;
 	}
 
-	if (editor.ui.visualizerMode == VISUAL_SPECTRUM)
+	if (ui.visualizerMode == VISUAL_SPECTRUM)
 	{
 		// spectrum analyzer
 
@@ -1272,7 +1272,7 @@ void renderAboutScreen(void)
 	const uint32_t *srcPtr;
 	uint32_t verStringX, *dstPtr;
 
-	if (!editor.ui.aboutScreenShown || editor.ui.diskOpScreenShown || editor.ui.posEdScreenShown || editor.ui.editOpScreenShown)
+	if (!ui.aboutScreenShown || ui.diskOpScreenShown || ui.posEdScreenShown || ui.editOpScreenShown)
 		return;
 
 	srcPtr = aboutScreenBMP;
@@ -1300,7 +1300,7 @@ void renderEditOpMode(void)
 
 	// select what character box to render
 
-	switch (editor.ui.editOpScreen)
+	switch (ui.editOpScreen)
 	{
 		default:
 		case 0:
@@ -1343,7 +1343,7 @@ void renderEditOpScreen(void)
 	uint32_t *dstPtr;
 
 	// select which background to render
-	switch (editor.ui.editOpScreen)
+	switch (ui.editOpScreen)
 	{
 		default:
 		case 0: srcPtr = editOpScreen1BMP; break;
@@ -1365,40 +1365,40 @@ void renderEditOpScreen(void)
 	renderEditOpMode();
 
 	// render text and content
-	if (editor.ui.editOpScreen == 0)
+	if (ui.editOpScreen == 0)
 	{
 		textOut(128, 47, "  TRACK      PATTERN  ", video.palette[PAL_GENTXT]);
 	}
-	else if (editor.ui.editOpScreen == 1)
+	else if (ui.editOpScreen == 1)
 	{
 		textOut(128, 47, "  RECORD     SAMPLES  ", video.palette[PAL_GENTXT]);
 
-		editor.ui.updateRecordText = true;
-		editor.ui.updateQuantizeText = true;
-		editor.ui.updateMetro1Text = true;
-		editor.ui.updateMetro2Text = true;
-		editor.ui.updateFromText = true;
-		editor.ui.updateKeysText = true;
-		editor.ui.updateToText = true;
+		ui.updateRecordText = true;
+		ui.updateQuantizeText = true;
+		ui.updateMetro1Text = true;
+		ui.updateMetro2Text = true;
+		ui.updateFromText = true;
+		ui.updateKeysText = true;
+		ui.updateToText = true;
 	}
-	else if (editor.ui.editOpScreen == 2)
+	else if (ui.editOpScreen == 2)
 	{
 		textOut(128, 47, "    SAMPLE EDITOR     ", video.palette[PAL_GENTXT]);
 		charOut(272, 91, '%', video.palette[PAL_GENTXT]); // for Volume text
 
-		editor.ui.updatePosText = true;
-		editor.ui.updateModText = true;
-		editor.ui.updateVolText = true;
+		ui.updatePosText = true;
+		ui.updateModText = true;
+		ui.updateVolText = true;
 	}
-	else if (editor.ui.editOpScreen == 3)
+	else if (ui.editOpScreen == 3)
 	{
 		textOut(128, 47, " SAMPLE CHORD EDITOR  ", video.palette[PAL_GENTXT]);
 
-		editor.ui.updateLengthText = true;
-		editor.ui.updateNote1Text = true;
-		editor.ui.updateNote2Text = true;
-		editor.ui.updateNote3Text = true;
-		editor.ui.updateNote4Text = true;
+		ui.updateLengthText = true;
+		ui.updateNote1Text = true;
+		ui.updateNote2Text = true;
+		ui.updateNote3Text = true;
+		ui.updateNote4Text = true;
 	}
 }
 
@@ -1424,16 +1424,16 @@ void updateMOD2WAVDialog(void)
 	int32_t barLength, percent;
 	uint32_t *dstPtr, bgPixel, pixel;
 
-	if (!editor.ui.updateMod2WavDialog)
+	if (!ui.updateMod2WavDialog)
 		return;
 
-	editor.ui.updateMod2WavDialog = false;
+	ui.updateMod2WavDialog = false;
 
 	if (editor.isWAVRendering)
 	{
-		if (editor.ui.mod2WavFinished)
+		if (ui.mod2WavFinished)
 		{
-			editor.ui.mod2WavFinished = false;
+			ui.mod2WavFinished = false;
 
 			resetSong();
 			pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
@@ -1493,58 +1493,58 @@ void updateMOD2WAVDialog(void)
 
 void updateEditOp(void)
 {
-	if (!editor.ui.editOpScreenShown || editor.ui.posEdScreenShown || editor.ui.diskOpScreenShown)
+	if (!ui.editOpScreenShown || ui.posEdScreenShown || ui.diskOpScreenShown)
 		return;
 
-	if (editor.ui.editOpScreen == 1)
+	if (ui.editOpScreen == 1)
 	{
-		if (editor.ui.updateRecordText)
+		if (ui.updateRecordText)
 		{
-			editor.ui.updateRecordText = false;
+			ui.updateRecordText = false;
 			textOutBg(176, 58, (editor.recordMode == RECORD_PATT) ? "PATT" : "SONG", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateQuantizeText)
+		if (ui.updateQuantizeText)
 		{
-			editor.ui.updateQuantizeText = false;
+			ui.updateQuantizeText = false;
 			printTwoDecimalsBg(192, 69, *editor.quantizeValueDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateMetro1Text)
+		if (ui.updateMetro1Text)
 		{
-			editor.ui.updateMetro1Text = false;
+			ui.updateMetro1Text = false;
 			printTwoDecimalsBg(168, 80, *editor.metroSpeedDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateMetro2Text)
+		if (ui.updateMetro2Text)
 		{
-			editor.ui.updateMetro2Text = false;
+			ui.updateMetro2Text = false;
 			printTwoDecimalsBg(192, 80, *editor.metroChannelDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateFromText)
+		if (ui.updateFromText)
 		{
-			editor.ui.updateFromText = false;
+			ui.updateFromText = false;
 			printTwoHexBg(264, 80, *editor.sampleFromDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateKeysText)
+		if (ui.updateKeysText)
 		{
-			editor.ui.updateKeysText = false;
+			ui.updateKeysText = false;
 			textOutBg(160, 91, editor.multiFlag ? "MULTI " : "SINGLE", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateToText)
+		if (ui.updateToText)
 		{
-			editor.ui.updateToText = false;
+			ui.updateToText = false;
 			printTwoHexBg(264, 91, *editor.sampleToDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
-	else if (editor.ui.editOpScreen == 2)
+	else if (ui.editOpScreen == 2)
 	{
-		if (editor.ui.updateMixText)
+		if (ui.updateMixText)
 		{
-			editor.ui.updateMixText = false;
+			ui.updateMixText = false;
 			if (editor.mixFlag)
 			{
 				textOutBg(128, 47, editor.mixText, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -1556,15 +1556,15 @@ void updateEditOp(void)
 			}
 		}
 
-		if (editor.ui.updatePosText)
+		if (ui.updatePosText)
 		{
-			editor.ui.updatePosText = false;
+			ui.updatePosText = false;
 			printFourHexBg(248, 58, *editor.samplePosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateModText)
+		if (ui.updateModText)
 		{
-			editor.ui.updateModText = false;
+			ui.updateModText = false;
 			printThreeDecimalsBg(256, 69,
 				(editor.modulateSpeed < 0) ? (0 - editor.modulateSpeed) : editor.modulateSpeed,
 				video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -1575,17 +1575,17 @@ void updateEditOp(void)
 				charOutBg(248, 69, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateVolText)
+		if (ui.updateVolText)
 		{
-			editor.ui.updateVolText = false;
+			ui.updateVolText = false;
 			printThreeDecimalsBg(248, 91, *editor.sampleVolDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
-	else if (editor.ui.editOpScreen == 3)
+	else if (ui.editOpScreen == 3)
 	{
-		if (editor.ui.updateLengthText)
+		if (ui.updateLengthText)
 		{
-			editor.ui.updateLengthText = false;
+			ui.updateLengthText = false;
 
 			// clear background
 			textOutBg(168, 91, "    ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -1602,9 +1602,9 @@ void updateEditOp(void)
 			}
 		}
 
-		if (editor.ui.updateNote1Text)
+		if (ui.updateNote1Text)
 		{
-			editor.ui.updateNote1Text = false;
+			ui.updateNote1Text = false;
 			if (editor.note1 > 35)
 				textOutBg(256, 58, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1612,9 +1612,9 @@ void updateEditOp(void)
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateNote2Text)
+		if (ui.updateNote2Text)
 		{
-			editor.ui.updateNote2Text = false;
+			ui.updateNote2Text = false;
 			if (editor.note2 > 35)
 				textOutBg(256, 69, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1622,9 +1622,9 @@ void updateEditOp(void)
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (editor.ui.updateNote3Text)
+		if (ui.updateNote3Text)
 		{
-			editor.ui.updateNote3Text = false;
+			ui.updateNote3Text = false;
 			if (editor.note3 > 35)
 				textOutBg(256, 80, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1632,9 +1632,9 @@ void updateEditOp(void)
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 			
-		if (editor.ui.updateNote4Text)
+		if (ui.updateNote4Text)
 		{
-			editor.ui.updateNote4Text = false;
+			ui.updateNote4Text = false;
 			if (editor.note4 > 35)
 				textOutBg(256, 91, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1648,50 +1648,50 @@ void displayMainScreen(void)
 {
 	editor.blockMarkFlag = false;
 
-	editor.ui.updateSongName = true;
-	editor.ui.updateSongSize = true;
-	editor.ui.updateSongTiming = true;
-	editor.ui.updateTrackerFlags = true;
-	editor.ui.updateStatusText = true;
+	ui.updateSongName = true;
+	ui.updateSongSize = true;
+	ui.updateSongTiming = true;
+	ui.updateTrackerFlags = true;
+	ui.updateStatusText = true;
 
-	editor.ui.updateCurrSampleName = true;
+	ui.updateCurrSampleName = true;
 
-	if (!editor.ui.diskOpScreenShown)
+	if (!ui.diskOpScreenShown)
 	{
-		editor.ui.updateCurrSampleFineTune = true;
-		editor.ui.updateCurrSampleNum = true;
-		editor.ui.updateCurrSampleVolume = true;
-		editor.ui.updateCurrSampleLength = true;
-		editor.ui.updateCurrSampleRepeat = true;
-		editor.ui.updateCurrSampleReplen = true;
+		ui.updateCurrSampleFineTune = true;
+		ui.updateCurrSampleNum = true;
+		ui.updateCurrSampleVolume = true;
+		ui.updateCurrSampleLength = true;
+		ui.updateCurrSampleRepeat = true;
+		ui.updateCurrSampleReplen = true;
 	}
 
-	if (editor.ui.samplerScreenShown)
+	if (ui.samplerScreenShown)
 	{
-		if (!editor.ui.diskOpScreenShown)
+		if (!ui.diskOpScreenShown)
 			memcpy(video.frameBuffer, trackerFrameBMP, 320 * 121 * sizeof (int32_t));
 	}
 	else
 	{
-		if (!editor.ui.diskOpScreenShown)
+		if (!ui.diskOpScreenShown)
 			memcpy(video.frameBuffer, trackerFrameBMP, 320 * 255 * sizeof (int32_t));
 		else
 			memcpy(&video.frameBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
 
-		editor.ui.updateSongBPM = true;
-		editor.ui.updateCurrPattText = true;
-		editor.ui.updatePatternData  = true;
+		ui.updateSongBPM = true;
+		ui.updateCurrPattText = true;
+		ui.updatePatternData  = true;
 	}
 
-	if (editor.ui.diskOpScreenShown)
+	if (ui.diskOpScreenShown)
 	{
 		renderDiskOpScreen();
 	}
 	else
 	{
-		editor.ui.updateSongPos = true;
-		editor.ui.updateSongPattern = true;
-		editor.ui.updateSongLength = true;
+		ui.updateSongPos = true;
+		ui.updateSongPattern = true;
+		ui.updateSongLength = true;
 
 		// zeroes (can't integrate zeroes in the graphics, the palette entry is above the 2-bit range)
 		charOut(64,  3, '0', video.palette[PAL_GENTXT]);
@@ -1704,27 +1704,27 @@ void displayMainScreen(void)
 			textOut(64, 58, "00", video.palette[PAL_GENTXT]);
 		}
 
-		if (editor.ui.posEdScreenShown)
+		if (ui.posEdScreenShown)
 		{
 			renderPosEdScreen();
-			editor.ui.updatePosEd = true;
+			ui.updatePosEd = true;
 		}
 		else
 		{
-			if (editor.ui.editOpScreenShown)
+			if (ui.editOpScreenShown)
 			{
 				renderEditOpScreen();
 			}
 			else
 			{
-				if (editor.ui.aboutScreenShown)
+				if (ui.aboutScreenShown)
 				{
 					renderAboutScreen();
 				}
 				else
 				{
-					     if (editor.ui.visualizerMode == VISUAL_QUADRASCOPE) renderQuadrascopeBg();
-					else if (editor.ui.visualizerMode == VISUAL_SPECTRUM) renderSpectrumAnalyzerBg();
+					     if (ui.visualizerMode == VISUAL_QUADRASCOPE) renderQuadrascopeBg();
+					else if (ui.visualizerMode == VISUAL_SPECTRUM) renderSpectrumAnalyzerBg();
 				}
 			}
 
@@ -1744,9 +1744,9 @@ static void restoreStatusAndMousePointer(void)
 
 void handleAskNo(void)
 {
-	editor.ui.pat2SmpDialogShown = false;
+	ui.pat2SmpDialogShown = false;
 
-	switch (editor.ui.askScreenType)
+	switch (ui.askScreenType)
 	{
 		case ASK_SAVEMOD_OVERWRITE:
 		{
@@ -1790,7 +1790,7 @@ void handleAskYes(void)
 	uint32_t i;
 	moduleSample_t *s;
 
-	switch (editor.ui.askScreenType)
+	switch (ui.askScreenType)
 	{
 		case ASK_DISCARD_SONG:
 		{
@@ -1854,7 +1854,7 @@ void handleAskYes(void)
 			for (i = 0; i < MOD_SAMPLES; i++)
 				boostSample(i, true);
 
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				redrawSample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -1868,7 +1868,7 @@ void handleAskYes(void)
 			for (i = 0; i < MOD_SAMPLES; i++)
 				filterSample(i, true);
 
-			if (editor.ui.samplerScreenShown)
+			if (ui.samplerScreenShown)
 				redrawSample();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -1908,7 +1908,7 @@ void handleAskYes(void)
 			editor.samplePos = 0;
 			updateCurrSample();
 
-			editor.ui.updateSongSize = true;
+			ui.updateSongSize = true;
 			updateWindowTitle(MOD_IS_MODIFIED);
 		}
 		break;
@@ -1979,7 +1979,7 @@ void handleAskYes(void)
 		case ASK_QUIT:
 		{
 			restoreStatusAndMousePointer();
-			editor.ui.throwExit = true;
+			ui.throwExit = true;
 		}
 		break;
 
@@ -2341,17 +2341,17 @@ void setupSprites(void)
 
 void freeSprites(void)
 {
-	for (uint8_t i = 0; i < SPRITE_NUM; i++)
+	for (int32_t i = 0; i < SPRITE_NUM; i++)
 		free(sprites[i].refreshBuffer);
 }
 
-void setSpritePos(uint8_t sprite, uint16_t x, uint16_t y)
+void setSpritePos(int32_t sprite, int32_t x, int32_t y)
 {
-	sprites[sprite].newX = x;
-	sprites[sprite].newY = y;
+	sprites[sprite].newX = (int16_t)x;
+	sprites[sprite].newY = (int16_t)y;
 }
 
-void hideSprite(uint8_t sprite)
+void hideSprite(int32_t sprite)
 {
 	sprites[sprite].newX = SCREEN_W;
 }
@@ -2555,9 +2555,10 @@ void flipFrame(void)
 void updateSpectrumAnalyzer(int8_t vol, int16_t period)
 {
 	const uint8_t maxHeight = SPECTRUM_BAR_HEIGHT + 1; // +1 because of audio latency - allows full height to be seen
-	int32_t scaledVol, scaledNote;
+	int8_t scaledVol;
+	int32_t scaledNote;
 
-	if (editor.ui.visualizerMode != VISUAL_SPECTRUM || vol <= 0)
+	if (ui.visualizerMode != VISUAL_SPECTRUM || vol <= 0)
 		return;
 
 	scaledVol = (vol * 24600L) >> 16; // scaledVol = (vol << 8) / 682

@@ -17,6 +17,6 @@ void keyUpHandler(SDL_Scancode scancode, SDL_Keycode keycode);
 void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode);
 void handleTextEditInputChar(char textChar);
 
-#ifdef _WIN32
+#if defined _WIN32 && !defined _DEBUG
 LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lParam);
 #endif

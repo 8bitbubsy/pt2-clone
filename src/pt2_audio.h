@@ -1,6 +1,3 @@
-/* The "LED" filter and BLEP routines were coded by aciddose.
-** Low-pass filter is based on https://bel.fi/alankila/modguide/interpolate.txt */
-
 #pragma once
 
 #include <stdint.h>
@@ -14,6 +11,17 @@ typedef struct rcFilter_t
 	double buffer[2];
 	double c, c2, g, cg;
 } rcFilter_t;
+
+typedef struct audio_t
+{
+	volatile bool locked;
+	bool forceMixerOff;
+	uint16_t bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32], bpmTabMod2Wav[256-32];
+	uint32_t outputRate, audioBufferSize;
+	double dPeriodToDeltaDiv;
+} audio_t;
+
+extern audio_t audio; // pt2_audio.c
 
 void resetCachedMixerPeriod(void);
 void resetAudioDithering(void);
@@ -31,16 +39,16 @@ void setLEDFilter(bool state);
 void toggleLEDFilter(void);
 void toggleAmigaPanMode(void);
 void toggleA500Filters(void);
-void paulaStopDMA(uint8_t ch);
-void paulaStartDMA(uint8_t ch);
-void paulaSetPeriod(uint8_t ch, uint16_t period);
-void paulaSetVolume(uint8_t ch, uint16_t vol);
-void paulaSetLength(uint8_t ch, uint16_t len);
-void paulaSetData(uint8_t ch, const int8_t *src);
+void paulaStopDMA(int32_t ch);
+void paulaStartDMA(int32_t ch);
+void paulaSetPeriod(int32_t ch, uint16_t period);
+void paulaSetVolume(int32_t ch, uint16_t vol);
+void paulaSetLength(int32_t ch, uint16_t len);
+void paulaSetData(int32_t ch, const int8_t *src);
 void lockAudio(void);
 void unlockAudio(void);
 void mixerUpdateLoops(void);
-void mixerKillVoice(uint8_t ch);
+void mixerKillVoice(int32_t ch);
 void turnOffVoices(void);
 void mixerCalcVoicePans(uint8_t stereoSeparation);
 void mixerSetSamplesPerTick(uint32_t val);

@@ -1,10 +1,10 @@
-// This BLEP implementation was coded by aciddose/adejr
+// these BLEP routines were coded by aciddose
 
 #pragma once
 
 #include <stdint.h>
 
-/* aciddose/adejr:
+/* aciddose:
 ** information on blep variables
 **
 ** ZC = zero crossings, the number of ripples in the impulse

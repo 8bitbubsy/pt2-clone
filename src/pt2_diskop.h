@@ -2,8 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_unicode.h"
-
+#include "pt2_header.h"
 enum
 {
 	DISKOP_NO_CACHE = 0,
@@ -15,7 +14,7 @@ enum
 void diskOpShowSelectText(void);
 void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck);
 void diskOpLoadFile2(void);
-void handleEntryJumping(char jumpToChar);
+void handleEntryJumping(SDL_Keycode jumpToChar);
 bool diskOpEntryIsEmpty(int32_t fileIndex);
 bool diskOpEntryIsDir(int32_t fileIndex);
 char *diskOpGetAnsiEntry(int32_t fileIndex);

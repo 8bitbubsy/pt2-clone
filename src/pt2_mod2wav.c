@@ -13,6 +13,7 @@
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
 #include "pt2_mod2wav.h"
+#include "pt2_structs.h"
 
 #define TICKS_PER_RENDER_CHUNK 32
 
@@ -75,7 +76,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 			if (++loopCounter >= 8)
 			{
 				loopCounter = 0;
-				editor.ui.updateMod2WavDialog = true;
+				ui.updateMod2WavDialog = true;
 			}
 		}
 
@@ -112,8 +113,8 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
 	fclose(f);
 
-	editor.ui.mod2WavFinished = true;
-	editor.ui.updateMod2WavDialog = true;
+	ui.mod2WavFinished = true;
+	ui.updateMod2WavDialog = true;
 
 	return true;
 }
@@ -127,8 +128,8 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 	{
 		if (stat(fileName, &statBuffer) == 0)
 		{
-			editor.ui.askScreenShown = true;
-			editor.ui.askScreenType = ASK_MOD2WAV_OVERWRITE;
+			ui.askScreenShown = true;
+			ui.askScreenType = ASK_MOD2WAV_OVERWRITE;
 
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("OVERWRITE FILE?", NO_CARRY);
@@ -139,11 +140,11 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 		}
 	}
 
-	if (editor.ui.askScreenShown)
+	if (ui.askScreenShown)
 	{
-		editor.ui.askScreenShown = false;
-		editor.ui.answerNo = false;
-		editor.ui.answerYes = false;
+		ui.askScreenShown = false;
+		ui.answerNo = false;
+		ui.answerYes = false;
 	}
 
 	fOut = fopen(fileName, "wb");
@@ -171,7 +172,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 	pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 	setStatusMessage("RENDERING MOD...", NO_CARRY);
 
-	editor.ui.disableVisualizer = true;
+	ui.disableVisualizer = true;
 	editor.isWAVRendering = true;
 	renderMOD2WAVDialog();
 
@@ -188,7 +189,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 	{
 		free(mod2WavBuffer);
 
-		editor.ui.disableVisualizer = false;
+		ui.disableVisualizer = false;
 		editor.isWAVRendering = false;
 
 		displayErrorMsg("THREAD ERROR");
