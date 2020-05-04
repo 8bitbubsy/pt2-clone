@@ -20,11 +20,13 @@ enum
 
 void statusAllRight(void);
 void statusOutOfMemory(void);
+void statusSampleIsEmpty(void);
+void statusNotSampleZero(void);
+
 void setupPerfFreq(void);
 void setupWaitVBL(void);
 void waitVBL(void);
 void resetAllScreens(void);
-void freeBMPs(void);
 void handleAskNo(void);
 void handleAskYes(void);
 bool setupVideo(void);
@@ -38,8 +40,7 @@ void updateEditOp(void);
 void updateDiskOp(void);
 void toggleFullScreen(void);
 void videoClose(void);
-bool unpackBMPs(void);
-void createBitmaps(void);
+
 void displayMainScreen(void);
 void renderAskDialog(void);
 void renderBigAskDialog(void);

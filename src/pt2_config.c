@@ -13,13 +13,12 @@
 #include <unistd.h>
 #include <limits.h>
 #endif
-#include "pt2_helpers.h"
 #include "pt2_header.h"
+#include "pt2_helpers.h"
 #include "pt2_config.h"
 #include "pt2_tables.h"
 #include "pt2_audio.h"
 #include "pt2_diskop.h"
-#include "pt2_config.h"
 #include "pt2_textout.h"
 #include "pt2_sampler.h"
 

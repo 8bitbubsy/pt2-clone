@@ -273,6 +273,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\pt2_audio.h" />
     <ClInclude Include="..\..\src\pt2_blep.h" />
+    <ClInclude Include="..\..\src\pt2_bmp.h" />
     <ClInclude Include="..\..\src\pt2_config.h" />
     <ClInclude Include="..\..\src\pt2_diskop.h" />
     <ClInclude Include="..\..\src\pt2_edit.h" />
@@ -280,13 +281,15 @@
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
     <ClInclude Include="..\..\src\pt2_mod2wav.h" />
-    <ClInclude Include="..\..\src\pt2_modloader.h" />
+    <ClInclude Include="..\..\src\pt2_module_loader.h" />
+    <ClInclude Include="..\..\src\pt2_module_saver.h" />
     <ClInclude Include="..\..\src\pt2_mouse.h" />
     <ClInclude Include="..\..\src\pt2_palette.h" />
     <ClInclude Include="..\..\src\pt2_pat2smp.h" />
-    <ClInclude Include="..\..\src\pt2_patternviewer.h" />
-    <ClInclude Include="..\..\src\pt2_sampleloader.h" />
+    <ClInclude Include="..\..\src\pt2_pattern_viewer.h" />
+    <ClInclude Include="..\..\src\pt2_sample_loader.h" />
     <ClInclude Include="..\..\src\pt2_sampler.h" />
+    <ClInclude Include="..\..\src\pt2_sample_saver.h" />
     <ClInclude Include="..\..\src\pt2_scopes.h" />
     <ClInclude Include="..\..\src\pt2_structs.h" />
     <ClInclude Include="..\..\src\pt2_tables.h" />
@@ -317,6 +320,7 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <ClCompile Include="..\..\src\pt2_blep.c" />
+    <ClCompile Include="..\..\src\pt2_bmp.c" />
     <ClCompile Include="..\..\src\pt2_config.c" />
     <ClCompile Include="..\..\src\pt2_diskop.c" />
     <ClCompile Include="..\..\src\pt2_edit.c" />
@@ -324,14 +328,16 @@
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
-    <ClCompile Include="..\..\src\pt2_modloader.c" />
-    <ClCompile Include="..\..\src\pt2_modplayer.c" />
+    <ClCompile Include="..\..\src\pt2_module_loader.c" />
+    <ClCompile Include="..\..\src\pt2_replayer.c" />
+    <ClCompile Include="..\..\src\pt2_module_saver.c" />
     <ClCompile Include="..\..\src\pt2_mouse.c" />
     <ClCompile Include="..\..\src\pt2_palette.c" />
     <ClCompile Include="..\..\src\pt2_pat2smp.c" />
-    <ClCompile Include="..\..\src\pt2_patternviewer.c" />
-    <ClCompile Include="..\..\src\pt2_sampleloader.c" />
+    <ClCompile Include="..\..\src\pt2_pattern_viewer.c" />
+    <ClCompile Include="..\..\src\pt2_sample_loader.c" />
     <ClCompile Include="..\..\src\pt2_sampler.c" />
+    <ClCompile Include="..\..\src\pt2_sample_saver.c" />
     <ClCompile Include="..\..\src\pt2_scopes.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
     <ClCompile Include="..\..\src\pt2_tables.c" />

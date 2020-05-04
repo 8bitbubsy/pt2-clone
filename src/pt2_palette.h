@@ -11,7 +11,6 @@ enum
 	PAL_PATCURSOR = 5,
 	PAL_GENTXT = 6,
 	PAL_PATTXT = 7,
-	// -----------------------------
 	PAL_SAMPLLINE = 8,
 	PAL_LOOPPIN = 9,
 	PAL_TEXTMARK = 10,

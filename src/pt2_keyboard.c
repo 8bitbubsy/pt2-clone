@@ -23,9 +23,11 @@
 #include "pt2_audio.h"
 #include "pt2_keyboard.h"
 #include "pt2_tables.h"
-#include "pt2_modloader.h"
+#include "pt2_module_loader.h"
+#include "pt2_module_saver.h"
 #include "pt2_mouse.h"
 #include "pt2_unicode.h"
+#include "pt2_config.h"
 
 #if defined _WIN32 && !defined _DEBUG
 extern bool windowsKeyIsDown;
@@ -52,9 +54,7 @@ void gotoNextMulti(void)
 
 void readKeyModifiers(void)
 {
-	uint32_t modState;
-
-	modState = SDL_GetModState();
+	const SDL_Keymod modState = SDL_GetModState();
 
 	keyb.leftCtrlPressed = (modState & KMOD_LCTRL)  ? true : false;
 	keyb.leftAltPressed = (modState & KMOD_LALT) ? true : false;
@@ -64,100 +64,75 @@ void readKeyModifiers(void)
 	keyb.leftCommandPressed = (modState & KMOD_LGUI) ? true : false;
 #endif
 
-#if defined _WIN32 && !defined _DEBUG // Windows: handled in lowLevelKeyboardProc
+#if defined _WIN32 && !defined _DEBUG
+	keyb.leftAmigaPressed = windowsKeyIsDown; // Windows: handled in lowLevelKeyboardProc
+#else
 	keyb.leftAmigaPressed = (modState & KMOD_LGUI) ? true : false;
 #endif
 }
 
 #if defined _WIN32 && !defined _DEBUG
-/* For taking control over windows key and numlock on keyboard if app has focus.
+/* For taking control over windows key if the program has focus.
 ** Warning: Don't do this in debug mode, it will completely ruin the keyboard input
-** latency when the debugger is breaking.
+** latency (in the OS in general) when the debugger is breaking.
 */
 LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lParam)
 {
-	bool bEatKeystroke;
-	KBDLLHOOKSTRUCT *p;
 	SDL_Event inputEvent;
+	SDL_Window *window = video.window;
 
-	if (nCode < 0 || nCode != HC_ACTION) // do not process message
+	if (window == NULL || nCode < 0 || nCode != HC_ACTION) // do not process message
 		return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
 
-	bEatKeystroke = false;
-	p = (KBDLLHOOKSTRUCT *)lParam;
-
+	KBDLLHOOKSTRUCT *p = (KBDLLHOOKSTRUCT *)lParam;
 	switch (wParam)
 	{
 		case WM_KEYUP:
 		case WM_KEYDOWN:
 		{
-			bEatKeystroke = (SDL_GetWindowFlags(video.window) & SDL_WINDOW_INPUT_FOCUS) && (p->vkCode == VK_LWIN || p->vkCode == VK_NUMLOCK);
+			const bool windowHasFocus = SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS;
 
-			if (bEatKeystroke)
+			const bool bEatKeystroke = windowHasFocus && p->vkCode == VK_LWIN;
+			if (!bEatKeystroke)
+				return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+
+			memset(&inputEvent, 0, sizeof (SDL_Event));
+
+			const bool keyDown = (wParam == WM_KEYDOWN);
+			if (keyDown)
 			{
-				if (wParam == WM_KEYDOWN)
-				{
-					if (p->vkCode == VK_NUMLOCK)
-					{
-						memset(&inputEvent, 0, sizeof (SDL_Event));
-						inputEvent.type = SDL_KEYDOWN;
-						inputEvent.key.type = SDL_KEYDOWN;
-						inputEvent.key.state = 1;
-						inputEvent.key.keysym.scancode = (SDL_Scancode)69;
-						inputEvent.key.keysym.mod = KMOD_NUM;
-						inputEvent.key.keysym.scancode = SDL_SCANCODE_NUMLOCKCLEAR;
+				if (windowsKeyIsDown)
+					break; // Windows-key is already down (XXX: Do we need this check?)
 
-						SDL_PushEvent(&inputEvent);
-					}
-					else if (!windowsKeyIsDown)
-					{
-						windowsKeyIsDown = true;
-						keyb.leftAmigaPressed = true;
+				inputEvent.type = SDL_KEYDOWN;
+				inputEvent.key.type = SDL_KEYDOWN;
+				inputEvent.key.state = SDL_PRESSED;
 
-						memset(&inputEvent, 0, sizeof (SDL_Event));
-						inputEvent.type = SDL_KEYDOWN;
-						inputEvent.key.type = SDL_KEYDOWN;
-						inputEvent.key.state = 1;
-						inputEvent.key.keysym.scancode = (SDL_Scancode)91;
-						inputEvent.key.keysym.scancode = SDL_SCANCODE_LGUI;
-
-						SDL_PushEvent(&inputEvent);
-					}
-				}
-				else if (wParam == WM_KEYUP)
-				{
-					if (p->vkCode == VK_NUMLOCK)
-					{
-						memset(&inputEvent, 0, sizeof (SDL_Event));
-						inputEvent.type = SDL_KEYUP;
-						inputEvent.key.type = SDL_KEYUP;
-						inputEvent.key.keysym.scancode = (SDL_Scancode)69;
-						inputEvent.key.keysym.scancode = SDL_SCANCODE_NUMLOCKCLEAR;
-
-						SDL_PushEvent(&inputEvent);
-					}
-					else
-					{
-						windowsKeyIsDown = false;
-						keyb.leftAmigaPressed = false;
-
-						memset(&inputEvent, 0, sizeof (SDL_Event));
-						inputEvent.type = SDL_KEYUP;
-						inputEvent.key.type = SDL_KEYUP;
-						inputEvent.key.keysym.scancode = (SDL_Scancode)91;
-						inputEvent.key.keysym.scancode = SDL_SCANCODE_LGUI;
-
-						SDL_PushEvent(&inputEvent);
-					}
-				}
+				windowsKeyIsDown = true;
 			}
-			break;
+			else
+			{
+				inputEvent.type = SDL_KEYUP;
+				inputEvent.key.type = SDL_KEYUP;
+				inputEvent.key.state = SDL_RELEASED;
+
+				windowsKeyIsDown = false;
+			}
+
+			inputEvent.key.keysym.sym = SDLK_LGUI;
+			inputEvent.key.keysym.scancode = SDL_SCANCODE_LGUI;
+			inputEvent.key.keysym.mod = SDL_GetModState();
+			inputEvent.key.timestamp = SDL_GetTicks();
+			inputEvent.key.windowID = SDL_GetWindowID(window);
+
+			SDL_PushEvent(&inputEvent);
 		}
+		break;
 
 		default: break;
 	}
 
-	return bEatKeystroke ? true : CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+	return true;
 }
 #endif
 
@@ -489,7 +464,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (keyb.leftAltPressed)
 			{
 				if (handleSpecialKeys(scancode) && editor.currMode != MODE_RECORD)
-					modSetPos(DONT_SET_ORDER, (modEntry->currRow + editor.editMoveAdd) & 0x3F);
+					modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
 			}
 			else
 			{
@@ -523,7 +498,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (!ui.askScreenShown)
 			{
 				editor.playMode = PLAY_MODE_NORMAL;
-				modPlay(DONT_SET_PATTERN, modEntry->currOrder, DONT_SET_ROW);
+				modPlay(DONT_SET_PATTERN, song->currOrder, DONT_SET_ROW);
 				editor.currMode = MODE_PLAY;
 				pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 				statusAllRight();
@@ -541,7 +516,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (!ui.askScreenShown)
 			{
 				editor.playMode = PLAY_MODE_PATTERN;
-				modPlay(modEntry->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
+				modPlay(song->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
 				editor.currMode = MODE_PLAY;
 				pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 				statusAllRight();
@@ -555,7 +530,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (!ui.samplerScreenShown && !ui.askScreenShown)
 			{
 				editor.playMode = PLAY_MODE_PATTERN;
-				modPlay(modEntry->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
+				modPlay(song->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
 				editor.currMode = MODE_RECORD;
 				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
 				statusAllRight();
@@ -614,10 +589,10 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (modEntry->currOrder > 0)
+				if (song->currOrder > 0)
 				{
-					if (modEntry->currOrder-(POSED_LIST_SIZE-1) > 0)
-						modSetPos(modEntry->currOrder-(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currOrder-(POSED_LIST_SIZE-1) > 0)
+						modSetPos(song->currOrder-(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
 						modSetPos(0, DONT_SET_ROW);
 				}
@@ -634,12 +609,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			{
 				if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 				{
-					if (modEntry->currRow == 63)
-						modSetPos(DONT_SET_ORDER, modEntry->currRow - 15);
-					else if (modEntry->currRow == 15)
+					if (song->currRow == 63)
+						modSetPos(DONT_SET_ORDER, song->currRow - 15);
+					else if (song->currRow == 15)
 						modSetPos(DONT_SET_ORDER, 0); // 15-16 would turn into -1, which is "DON'T SET ROW" flag
 					else
-						modSetPos(DONT_SET_ORDER, modEntry->currRow - 16);
+						modSetPos(DONT_SET_ORDER, song->currRow - 16);
 				}
 			}
 
@@ -655,12 +630,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (modEntry->currOrder != modEntry->head.orderCount-1)
+				if (song->currOrder != song->header.numOrders-1)
 				{
-					if (modEntry->currOrder+(POSED_LIST_SIZE-1) <= modEntry->head.orderCount-1)
-						modSetPos(modEntry->currOrder+(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currOrder+(POSED_LIST_SIZE-1) <= song->header.numOrders-1)
+						modSetPos(song->currOrder+(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
-						modSetPos(modEntry->head.orderCount - 1, DONT_SET_ROW);
+						modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
 				}
 			}
 			else if (ui.diskOpScreenShown)
@@ -677,7 +652,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else
 			{
 				if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
-					modSetPos(DONT_SET_ORDER, modEntry->currRow + 16);
+					modSetPos(DONT_SET_ORDER, song->currRow + 16);
 			}
 
 			if (!keyb.repeatKey)
@@ -692,7 +667,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (modEntry->currOrder > 0)
+				if (song->currOrder > 0)
 					modSetPos(0, DONT_SET_ROW);
 			}
 			else if (ui.diskOpScreenShown)
@@ -715,7 +690,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				modSetPos(modEntry->head.orderCount - 1, DONT_SET_ROW);
+				modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
 			}
 			else if (ui.diskOpScreenShown)
 			{
@@ -749,7 +724,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				editor.timingMode ^= 1;
 				if (editor.timingMode == TEMPO_MODE_VBLANK)
 				{
-					editor.oldTempo = modEntry->currBPM;
+					editor.oldTempo = song->currBPM;
 					modSetTempo(125);
 				}
 				else
@@ -787,17 +762,17 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					saveUndo();
 					if (keyb.leftAltPressed && !keyb.leftCtrlPressed)
 					{
-						if (modEntry->currRow < 63)
+						if (song->currRow < 63)
 						{
 							for (i = 0; i < AMIGA_VOICES; i++)
 							{
-								for (j = 62; j >= modEntry->currRow; j--)
+								for (j = 62; j >= song->currRow; j--)
 								{
-									noteSrc = &modEntry->patterns[modEntry->currPattern][(j * AMIGA_VOICES) + i];
-									modEntry->patterns[modEntry->currPattern][((j + 1) * AMIGA_VOICES) + i] = *noteSrc;
+									noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+									song->patterns[song->currPattern][((j + 1) * AMIGA_VOICES) + i] = *noteSrc;
 								}
 
-								noteDst = &modEntry->patterns[modEntry->currPattern][((j + 1) * AMIGA_VOICES) + i];
+								noteDst = &song->patterns[song->currPattern][((j + 1) * AMIGA_VOICES) + i];
 
 								noteDst->period = 0;
 								noteDst->sample = 0;
@@ -805,7 +780,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 								noteDst->param = 0;
 							}
 
-							modEntry->currRow++;
+							song->currRow++;
 
 							updateWindowTitle(MOD_IS_MODIFIED);
 							ui.updatePatternData = true;
@@ -813,12 +788,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					}
 					else
 					{
-						if (modEntry->currRow < 63)
+						if (song->currRow < 63)
 						{
-							for (i = 62; i >= modEntry->currRow; i--)
+							for (i = 62; i >= song->currRow; i--)
 							{
-								noteSrc = &modEntry->patterns[modEntry->currPattern][((i + 0) * AMIGA_VOICES) + cursor.channel];
-								noteDst = &modEntry->patterns[modEntry->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
+								noteSrc = &song->patterns[song->currPattern][((i + 0) * AMIGA_VOICES) + cursor.channel];
+								noteDst = &song->patterns[song->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
 
 								if (keyb.leftCtrlPressed)
 								{
@@ -831,7 +806,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 								}
 							}
 
-							noteDst = &modEntry->patterns[modEntry->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
+							noteDst = &song->patterns[song->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
 
 							if (!keyb.leftCtrlPressed)
 							{
@@ -842,7 +817,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 							noteDst->command = 0;
 							noteDst->param = 0;
 
-							modEntry->currRow++;
+							song->currRow++;
 
 							updateWindowTitle(MOD_IS_MODIFIED);
 							ui.updatePatternData = true;
@@ -855,7 +830,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					editor.stepPlayBackwards = false;
 
 					doStopIt(true);
-					playPattern(modEntry->currRow);
+					playPattern(song->currRow);
 				}
 			}
 		}
@@ -910,7 +885,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					noteDst = editor.trackBuffer;
 					for (i = 0; i < MOD_ROWS; i++)
 					{
-						noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 						*noteDst++ = *noteSrc;
 
 						noteSrc->period = 0;
@@ -927,10 +902,10 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					// cut pattern and put in buffer
 					saveUndo();
 
-					memcpy(editor.patternBuffer, modEntry->patterns[modEntry->currPattern],
+					memcpy(editor.patternBuffer, song->patterns[song->currPattern],
 						sizeof (note_t) * (AMIGA_VOICES * MOD_ROWS));
 
-					memset(modEntry->patterns[modEntry->currPattern], 0,
+					memset(song->patterns[song->currPattern], 0,
 						sizeof (note_t) * (AMIGA_VOICES * MOD_ROWS));
 
 					updateWindowTitle(MOD_IS_MODIFIED);
@@ -944,7 +919,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					noteDst = editor.cmdsBuffer;
 					for (i = 0; i < MOD_ROWS; i++)
 					{
-						noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 						*noteDst++ = *noteSrc;
 
 						noteSrc->command = 0;
@@ -972,13 +947,13 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 					noteDst = editor.trackBuffer;
 					for (i = 0; i < MOD_ROWS; i++)
-						*noteDst++ = modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						*noteDst++ = song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 				}
 				else if (keyb.leftAltPressed)
 				{
 					// copy pattern to buffer
 
-					memcpy(editor.patternBuffer, modEntry->patterns[modEntry->currPattern],
+					memcpy(editor.patternBuffer, song->patterns[song->currPattern],
 						sizeof (note_t) * (AMIGA_VOICES * MOD_ROWS));
 				}
 				else if (keyb.leftCtrlPressed)
@@ -988,7 +963,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					noteDst = editor.cmdsBuffer;
 					for (i = 0; i < MOD_ROWS; i++)
 					{
-						noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 						noteDst->command = noteSrc->command;
 						noteDst->param = noteSrc->param;
 
@@ -1014,7 +989,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 					noteSrc = editor.trackBuffer;
 					for (i = 0; i < MOD_ROWS; i++)
-						modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel] = *noteSrc++;
+						song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel] = *noteSrc++;
 
 					updateWindowTitle(MOD_IS_MODIFIED);
 					ui.updatePatternData = true;
@@ -1024,7 +999,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					// paste pattern buffer to pattern
 					saveUndo();
 
-					memcpy(modEntry->patterns[modEntry->currPattern],
+					memcpy(song->patterns[song->currPattern],
 						editor.patternBuffer, sizeof (note_t) * (AMIGA_VOICES * MOD_ROWS));
 
 					updateWindowTitle(MOD_IS_MODIFIED);
@@ -1038,7 +1013,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					noteSrc = editor.cmdsBuffer;
 					for (i = 0; i < MOD_ROWS; i++)
 					{
-						noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						noteDst = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 						noteDst->command = noteSrc->command;
 						noteDst->param = noteSrc->param;
 
@@ -1056,7 +1031,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.shiftPressed)
 			{
-				editor.f6Pos = modEntry->currRow;
+				editor.f6Pos = song->currRow;
 				displayMsg("POSITION SET");
 			}
 			else
@@ -1064,7 +1039,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (keyb.leftAltPressed)
 				{
 					editor.playMode = PLAY_MODE_PATTERN;
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f6Pos);
+					modPlay(song->currPattern, DONT_SET_ORDER, editor.f6Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1075,7 +1050,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					if (!ui.samplerScreenShown)
 					{
 						editor.playMode = PLAY_MODE_PATTERN;
-						modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f6Pos);
+						modPlay(song->currPattern, DONT_SET_ORDER, editor.f6Pos);
 
 						editor.currMode = MODE_RECORD;
 						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
@@ -1085,7 +1060,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, modEntry->currOrder, editor.f6Pos);
+					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f6Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1103,7 +1078,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.shiftPressed)
 			{
-				editor.f7Pos = modEntry->currRow;
+				editor.f7Pos = song->currRow;
 				displayMsg("POSITION SET");
 			}
 			else
@@ -1111,7 +1086,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (keyb.leftAltPressed)
 				{
 					editor.playMode = PLAY_MODE_PATTERN;
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f7Pos);
+					modPlay(song->currPattern, DONT_SET_ORDER, editor.f7Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1122,7 +1097,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					if (!ui.samplerScreenShown)
 					{
 						editor.playMode = PLAY_MODE_PATTERN;
-						modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f7Pos);
+						modPlay(song->currPattern, DONT_SET_ORDER, editor.f7Pos);
 
 						editor.currMode = MODE_RECORD;
 						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
@@ -1132,7 +1107,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, modEntry->currOrder, editor.f7Pos);
+					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f7Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1150,7 +1125,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.shiftPressed)
 			{
-				editor.f8Pos = modEntry->currRow;
+				editor.f8Pos = song->currRow;
 				displayMsg("POSITION SET");
 			}
 			else
@@ -1158,7 +1133,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (keyb.leftAltPressed)
 				{
 					editor.playMode = PLAY_MODE_PATTERN;
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f8Pos);
+					modPlay(song->currPattern, DONT_SET_ORDER, editor.f8Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1169,7 +1144,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					if (!ui.samplerScreenShown)
 					{
 						editor.playMode = PLAY_MODE_PATTERN;
-						modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f8Pos);
+						modPlay(song->currPattern, DONT_SET_ORDER, editor.f8Pos);
 
 						editor.currMode = MODE_RECORD;
 						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
@@ -1179,7 +1154,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, modEntry->currOrder, editor.f8Pos);
+					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f8Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1197,7 +1172,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.shiftPressed)
 			{
-				editor.f9Pos = modEntry->currRow;
+				editor.f9Pos = song->currRow;
 				displayMsg("POSITION SET");
 			}
 			else
@@ -1205,7 +1180,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (keyb.leftAltPressed)
 				{
 					editor.playMode = PLAY_MODE_PATTERN;
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f9Pos);
+					modPlay(song->currPattern, DONT_SET_ORDER, editor.f9Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1216,7 +1191,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					if (!ui.samplerScreenShown)
 					{
 						editor.playMode = PLAY_MODE_PATTERN;
-						modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f9Pos);
+						modPlay(song->currPattern, DONT_SET_ORDER, editor.f9Pos);
 
 						editor.currMode = MODE_RECORD;
 						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
@@ -1226,7 +1201,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, modEntry->currOrder, editor.f9Pos);
+					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f9Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1244,7 +1219,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.shiftPressed)
 			{
-				editor.f10Pos = modEntry->currRow;
+				editor.f10Pos = song->currRow;
 				displayMsg("POSITION SET");
 			}
 			else
@@ -1252,7 +1227,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (keyb.leftAltPressed)
 				{
 					editor.playMode = PLAY_MODE_PATTERN;
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f10Pos);
+					modPlay(song->currPattern, DONT_SET_ORDER, editor.f10Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1263,7 +1238,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					if (!ui.samplerScreenShown)
 					{
 						editor.playMode = PLAY_MODE_PATTERN;
-						modPlay(modEntry->currPattern, DONT_SET_ORDER, editor.f10Pos);
+						modPlay(song->currPattern, DONT_SET_ORDER, editor.f10Pos);
 
 						editor.currMode = MODE_RECORD;
 						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
@@ -1273,7 +1248,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, modEntry->currOrder, editor.f10Pos);
+					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f10Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1316,7 +1291,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[9] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1341,7 +1316,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[0] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1370,7 +1345,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[1] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1399,7 +1374,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[2] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1428,7 +1403,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[3] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1453,7 +1428,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[4] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1474,7 +1449,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[5] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1495,7 +1470,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[6] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1516,7 +1491,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[7] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1537,7 +1512,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				noteSrc = &modEntry->patterns[modEntry->currPattern][(modEntry->currRow * AMIGA_VOICES) + cursor.channel];
+				noteSrc = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
 				editor.effectMacros[8] = (noteSrc->command << 8) | noteSrc->param;
 				displayMsg("COMMAND STORED!");
 			}
@@ -1550,7 +1525,17 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 		case SDL_SCANCODE_KP_0:
 		{
-			editor.sampleZero = true;
+			if (editor.hiLowInstr >= 0x10)
+			{
+				editor.sampleZero = false;
+				editor.currSample = 0x10-1;
+			}
+			else
+			{
+				editor.sampleZero = true;
+				editor.currSample = 0x00;
+			}
+
 			updateCurrSample();
 		}
 		break;
@@ -1558,7 +1543,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_1:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 12;
+			editor.currSample = editor.hiLowInstr + 12;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1577,7 +1562,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_2:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 13;
+			editor.currSample = editor.hiLowInstr + 13;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1596,7 +1581,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_3:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 14;
+			editor.currSample = editor.hiLowInstr + 14;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1615,7 +1600,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_4:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 8;
+			editor.currSample = editor.hiLowInstr + 8;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1634,7 +1619,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_5:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 9;
+			editor.currSample = editor.hiLowInstr + 9;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1653,7 +1638,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_6:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 10;
+			editor.currSample = editor.hiLowInstr + 10;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1672,7 +1657,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_7:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 4;
+			editor.currSample = editor.hiLowInstr + 4;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1691,7 +1676,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_8:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 5;
+			editor.currSample = editor.hiLowInstr + 5;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1710,7 +1695,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_9:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 6;
+			editor.currSample = editor.hiLowInstr + 6;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1737,23 +1722,23 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else
 			{
-				editor.sampleZero = false;
+				editor.hiLowInstr ^= 0x10;
 
-				editor.currSample++;
-				if (editor.currSample >= 0x10)
+				if (editor.sampleZero)
 				{
-					editor.keypadSampleOffset = 0x00;
-
-					editor.currSample -= 0x10;
-					if (editor.currSample < 0x01)
-						editor.currSample = 0x01;
+					editor.currSample = 15;
+					editor.sampleZero = false;
 				}
 				else
 				{
-					editor.currSample += 0x10;
-					editor.keypadSampleOffset = 0x10;
+					editor.currSample ^= 0x10;
 				}
-				editor.currSample--;
+
+				if (editor.currSample == 31) // kludge if sample was 15 (0010 in UI) before key press
+				{
+					editor.currSample = 15;
+					editor.sampleZero ^= 1;
+				}
 
 				updateCurrSample();
 				if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1776,9 +1761,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 			// the Amiga numpad has one more key, so we need to use this key for two sample numbers...
 			if (editor.keypadToggle8CFlag)
-				editor.currSample = editor.keypadSampleOffset + (0x0C - 1);
+				editor.currSample = editor.hiLowInstr + (0x0C - 1);
 			else
-				editor.currSample = editor.keypadSampleOffset + (0x08 - 1);
+				editor.currSample = editor.hiLowInstr + (0x08 - 1);
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1791,7 +1776,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_MINUS:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 3;
+			editor.currSample = editor.hiLowInstr + 3;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1810,7 +1795,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_MULTIPLY:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 2;
+			editor.currSample = editor.hiLowInstr + 2;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1829,7 +1814,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_KP_DIVIDE:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 1;
+			editor.currSample = editor.hiLowInstr + 1;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1848,7 +1833,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		case SDL_SCANCODE_NUMLOCKCLEAR:
 		{
 			editor.sampleZero = false;
-			editor.currSample = editor.keypadSampleOffset + 0;
+			editor.currSample = editor.hiLowInstr + 0;
 
 			updateCurrSample();
 			if (keyb.leftAltPressed && editor.pNoteFlag > 0)
@@ -1903,12 +1888,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (ui.posEdScreenShown)
 			{
-				if (modEntry->currOrder != modEntry->head.orderCount-1)
+				if (song->currOrder != song->header.numOrders-1)
 				{
-					if (++modEntry->currOrder > modEntry->head.orderCount-1)
-						modEntry->currOrder = modEntry->head.orderCount-1;
+					if (++song->currOrder > song->header.numOrders-1)
+						song->currOrder = song->header.numOrders-1;
 
-					modSetPos(modEntry->currOrder, DONT_SET_ROW);
+					modSetPos(song->currOrder, DONT_SET_ROW);
 					ui.updatePosEd = true;
 				}
 
@@ -1921,7 +1906,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else if (!ui.samplerScreenShown)
 			{
 				if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
-					modSetPos(DONT_SET_ORDER, (modEntry->currRow + 1) & 0x3F);
+					modSetPos(DONT_SET_ORDER, (song->currRow + 1) & 0x3F);
 
 				keyb.repeatKey = true;
 			}
@@ -1952,9 +1937,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (ui.posEdScreenShown)
 			{
-				if (modEntry->currOrder > 0)
+				if (song->currOrder > 0)
 				{
-					modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+					modSetPos(song->currOrder - 1, DONT_SET_ROW);
 					ui.updatePosEd = true;
 				}
 
@@ -1967,7 +1952,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else if (!ui.samplerScreenShown)
 			{
 				if ((editor.currMode != MODE_PLAY) && (editor.currMode != MODE_RECORD))
-					modSetPos(DONT_SET_ORDER, (modEntry->currRow - 1) & 0x3F);
+					modSetPos(DONT_SET_ORDER, (song->currRow - 1) & 0x3F);
 
 				keyb.repeatKey = true;
 			}
@@ -1990,9 +1975,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				if (modEntry->currOrder > 0)
+				if (song->currOrder > 0)
 				{
-					modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+					modSetPos(song->currOrder - 1, DONT_SET_ROW);
 					if (editor.repeatKeyFlag)
 					{
 						keyb.delayKey = true;
@@ -2033,9 +2018,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				if (modEntry->currOrder < 126)
+				if (song->currOrder < 126)
 				{
-					modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
+					modSetPos(song->currOrder + 1, DONT_SET_ROW);
 					if (editor.repeatKeyFlag)
 					{
 						keyb.delayKey = true;
@@ -2115,18 +2100,18 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else
 				{
 					editor.blockMarkFlag = true;
-					editor.blockFromPos = modEntry->currRow;
-					editor.blockToPos = modEntry->currRow;
+					editor.blockFromPos = song->currRow;
+					editor.blockToPos = song->currRow;
 				}
 
 				ui.updateStatusText = true;
 			}
 			else if (keyb.leftAltPressed)
 			{
-				s = &modEntry->samples[editor.currSample];
+				s = &song->samples[editor.currSample];
 				if (s->length == 0)
 				{
-					displayErrorMsg("SAMPLE IS EMPTY");
+					statusSampleIsEmpty();
 					break;
 				}
 
@@ -2166,7 +2151,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				editor.blockBufferFlag = true;
 
 				for (i = 0; i < MOD_ROWS; i++)
-					editor.blockBuffer[i] = modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					editor.blockBuffer[i] = song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 				if (editor.blockFromPos > editor.blockToPos)
 				{
@@ -2258,16 +2243,16 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			{
 				saveUndo();
 
-				j = modEntry->currRow + 1;
+				j = song->currRow + 1;
 				while (j < MOD_ROWS)
 				{
 					for (i = 62; i >= j; i--)
 					{
-						noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-						modEntry->patterns[modEntry->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel] = *noteSrc;
+						noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						song->patterns[song->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel] = *noteSrc;
 					}
 
-					noteDst = &modEntry->patterns[modEntry->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
+					noteDst = &song->patterns[song->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
 					noteDst->period = 0;
 					noteDst->sample = 0;
 					noteDst->command = 0;
@@ -2310,10 +2295,10 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.leftAltPressed)
 			{
-				s = &modEntry->samples[editor.currSample];
+				s = &song->samples[editor.currSample];
 				if (s->length == 0)
 				{
-					displayErrorMsg("SAMPLE IS EMPTY");
+					statusSampleIsEmpty();
 					break;
 				}
 
@@ -2385,14 +2370,14 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					return;
 				}
 
-				if (modEntry->currRow < 63)
+				if (song->currRow < 63)
 				{
 					for (i = 0; i <= editor.buffToPos-editor.buffFromPos; i++)
 					{
-						for (j = 62; j >= modEntry->currRow; j--)
+						for (j = 62; j >= song->currRow; j--)
 						{
-							noteSrc = &modEntry->patterns[modEntry->currPattern][(j * AMIGA_VOICES) + cursor.channel];
-							modEntry->patterns[modEntry->currPattern][((j + 1) * AMIGA_VOICES) + cursor.channel] = *noteSrc;
+							noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + cursor.channel];
+							song->patterns[song->currPattern][((j + 1) * AMIGA_VOICES) + cursor.channel] = *noteSrc;
 						}
 					}
 				}
@@ -2400,18 +2385,18 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				saveUndo();
 				for (i = 0; i <= editor.buffToPos-editor.buffFromPos; i++)
 				{
-					if (modEntry->currRow+i > 63)
+					if (song->currRow+i > 63)
 						break;
 
-					modEntry->patterns[modEntry->currPattern][((modEntry->currRow + i) * AMIGA_VOICES) + cursor.channel]
+					song->patterns[song->currPattern][((song->currRow + i) * AMIGA_VOICES) + cursor.channel]
 						= editor.blockBuffer[editor.buffFromPos + i];
 				}
 
 				if (!keyb.shiftPressed)
 				{
-					modEntry->currRow += i & 0xFF;
-					if (modEntry->currRow > 63)
-						modEntry->currRow = 0;
+					song->currRow += i & 0xFF;
+					if (song->currRow > 63)
+						song->currRow = 0;
 				}
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -2442,8 +2427,8 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				saveUndo();
 
 				i = editor.buffFromPos;
-				j = modEntry->currRow;
-				patt = modEntry->patterns[modEntry->currPattern];
+				j = song->currRow;
+				patt = song->patterns[song->currPattern];
 				while (true)
 				{
 					noteDst = &patt[(j * AMIGA_VOICES) + cursor.channel];
@@ -2467,9 +2452,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 				if (!keyb.shiftPressed)
 				{
-					modEntry->currRow += (editor.buffToPos-editor.buffFromPos) + 1;
-					if (modEntry->currRow > 63)
-						modEntry->currRow = 0;
+					song->currRow += (editor.buffToPos-editor.buffFromPos) + 1;
+					if (song->currRow > 63)
+						song->currRow = 0;
 				}
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -2488,7 +2473,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			{
 				for (i = 0; i < MOD_ROWS; i++)
 				{
-					noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 					if (noteSrc->sample == editor.currSample+1)
 					{
 						noteSrc->period = 0;
@@ -2505,13 +2490,13 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			{
 				saveUndo();
 
-				i = modEntry->currRow;
+				i = song->currRow;
 				if (keyb.shiftPressed)
 				{
 					// kill to start
 					while (i >= 0)
 					{
-						noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						noteDst = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 						noteDst->period = 0;
 						noteDst->sample = 0;
 						noteDst->command = 0;
@@ -2525,7 +2510,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					// kill to end
 					while (i < MOD_ROWS)
 					{
-						noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+						noteDst = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 						noteDst->period = 0;
 						noteDst->sample = 0;
 						noteDst->command = 0;
@@ -2593,7 +2578,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (keyb.leftCtrlPressed)
 			{
 				editor.blockMarkFlag = true;
-				modEntry->currRow = editor.blockToPos;
+				song->currRow = editor.blockToPos;
 			}
 			else
 			{
@@ -2610,17 +2595,17 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 				saveUndo();
 
-				j = modEntry->currRow + 1;
+				j = song->currRow + 1;
 				while (j < MOD_ROWS)
 				{
 					for (i = j; i < MOD_ROWS-1; i++)
 					{
-						noteSrc = &modEntry->patterns[modEntry->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
-						modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel] = *noteSrc;
+						noteSrc = &song->patterns[song->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
+						song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel] = *noteSrc;
 					}
 
 					// clear newly made row on very bottom
-					noteDst = &modEntry->patterns[modEntry->currPattern][(63 * AMIGA_VOICES) + cursor.channel];
+					noteDst = &song->patterns[song->currPattern][(63 * AMIGA_VOICES) + cursor.channel];
 					noteDst->period = 0;
 					noteDst->sample = 0;
 					noteDst->command = 0;
@@ -2652,8 +2637,8 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				saveUndo();
 
 				i = editor.buffFromPos;
-				j = modEntry->currRow;
-				patt = modEntry->patterns[modEntry->currPattern];
+				j = song->currRow;
+				patt = song->patterns[song->currPattern];
 				while (true)
 				{
 					noteDst = &patt[(j * AMIGA_VOICES) + cursor.channel];
@@ -2668,9 +2653,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 				if (!keyb.shiftPressed)
 				{
-					modEntry->currRow += (editor.buffToPos-editor.buffFromPos) + 1;
-					if (modEntry->currRow > 63)
-						modEntry->currRow = 0;
+					song->currRow += (editor.buffToPos-editor.buffFromPos) + 1;
+					if (song->currRow > 63)
+						song->currRow = 0;
 				}
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -2869,8 +2854,8 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				saveUndo();
 
 				i = editor.buffFromPos;
-				j = modEntry->currRow;
-				patt = modEntry->patterns[modEntry->currPattern];
+				j = song->currRow;
+				patt = song->patterns[song->currPattern];
 				while (true)
 				{
 					noteDst = &patt[(j * AMIGA_VOICES) + cursor.channel];
@@ -2894,9 +2879,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 				if (!keyb.shiftPressed)
 				{
-					modEntry->currRow += (editor.buffToPos-editor.buffFromPos) + 1;
-					if (modEntry->currRow > 63)
-						modEntry->currRow = 0;
+					song->currRow += (editor.buffToPos-editor.buffFromPos) + 1;
+					if (song->currRow > 63)
+						song->currRow = 0;
 				}
 
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -2934,7 +2919,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				editor.blockBufferFlag = true;
 
 				for (i = 0; i < MOD_ROWS; i++)
-					editor.blockBuffer[i] = modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					editor.blockBuffer[i] = song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 				if (editor.blockFromPos > editor.blockToPos)
 				{
@@ -2949,7 +2934,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 				for (i = editor.buffFromPos; i <= editor.buffToPos; i++)
 				{
-					noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					noteDst = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 					noteDst->period = 0;
 					noteDst->sample = 0;
 					noteDst->command = 0;
@@ -3002,8 +2987,8 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 				while (blockFrom < blockTo)
 				{
-					noteDst = &modEntry->patterns[modEntry->currPattern][(blockFrom * AMIGA_VOICES) + cursor.channel];
-					noteSrc = &modEntry->patterns[modEntry->currPattern][(blockTo * AMIGA_VOICES) + cursor.channel];
+					noteDst = &song->patterns[song->currPattern][(blockFrom * AMIGA_VOICES) + cursor.channel];
+					noteSrc = &song->patterns[song->currPattern][(blockTo * AMIGA_VOICES) + cursor.channel];
 
 					noteTmp = *noteDst;
 					*noteDst = *noteSrc;
@@ -3056,7 +3041,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 					for (i = 0; i < AMIGA_VOICES; i++)
 					{
-						ch = &modEntry->channels[i];
+						ch = &song->channels[i];
 						ch->n_wavecontrol = 0;
 						ch->n_glissfunk = 0;
 						ch->n_finetune = 0;
@@ -3167,8 +3152,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 				if (ui.posEdScreenShown)
 				{
-					if (modEntry->currOrder-(POSED_LIST_SIZE-1) > 0)
-						modSetPos(modEntry->currOrder-(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currOrder-(POSED_LIST_SIZE-1) > 0)
+						modSetPos(song->currOrder-(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
 						modSetPos(0, DONT_SET_ROW);
 				}
@@ -3185,12 +3170,12 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				}
 				else if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 				{
-					if (modEntry->currRow == 63)
-						modSetPos(DONT_SET_ORDER, modEntry->currRow - 15);
-					else if (modEntry->currRow == 15)
+					if (song->currRow == 63)
+						modSetPos(DONT_SET_ORDER, song->currRow - 15);
+					else if (song->currRow == 15)
 						modSetPos(DONT_SET_ORDER, 0); // 15-16 would turn into -1, which is "DON'T SET ROW" flag
 					else
-						modSetPos(DONT_SET_ORDER, modEntry->currRow - 16);
+						modSetPos(DONT_SET_ORDER, song->currRow - 16);
 				}
 			}
 		}
@@ -3204,10 +3189,10 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 				if (ui.posEdScreenShown)
 				{
-					if (modEntry->currOrder+(POSED_LIST_SIZE-1) <= modEntry->head.orderCount-1)
-						modSetPos(modEntry->currOrder+(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currOrder+(POSED_LIST_SIZE-1) <= song->header.numOrders-1)
+						modSetPos(song->currOrder+(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
-						modSetPos(modEntry->head.orderCount - 1, DONT_SET_ROW);
+						modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
 				}
 				else if (ui.diskOpScreenShown)
 				{
@@ -3222,7 +3207,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				}
 				else if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 				{
-					modSetPos(DONT_SET_ORDER, modEntry->currRow + 16);
+					modSetPos(DONT_SET_ORDER, song->currRow + 16);
 				}
 			}
 		}
@@ -3253,8 +3238,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= 6)
 					{
 						keyb.repeatCounter = 0;
-						if (modEntry->currOrder > 0)
-							modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+						if (song->currOrder > 0)
+							modSetPos(song->currOrder - 1, DONT_SET_ROW);
 					}
 				}
 				else if (keyb.leftAltPressed)
@@ -3303,8 +3288,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= 6)
 					{
 						keyb.repeatCounter = 0;
-						if (modEntry->currOrder < 126)
-							modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
+						if (song->currOrder < 126)
+							modSetPos(song->currOrder + 1, DONT_SET_ROW);
 					}
 				}
 				else if (keyb.leftAltPressed)
@@ -3351,9 +3336,9 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				if (keyb.repeatCounter >= 3)
 				{
 					keyb.repeatCounter = 0;
-					if (modEntry->currOrder > 0)
+					if (song->currOrder > 0)
 					{
-						modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+						modSetPos(song->currOrder - 1, DONT_SET_ROW);
 						ui.updatePosEd = true;
 					}
 				}
@@ -3371,7 +3356,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= repeatNum)
 					{
 						keyb.repeatCounter = 0;
-						modSetPos(DONT_SET_ORDER, (modEntry->currRow - 1) & 0x3F);
+						modSetPos(DONT_SET_ORDER, (song->currRow - 1) & 0x3F);
 					}
 				}
 			}
@@ -3405,12 +3390,12 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				{
 					keyb.repeatCounter = 0;
 
-					if (modEntry->currOrder != modEntry->head.orderCount-1)
+					if (song->currOrder != song->header.numOrders-1)
 					{
-						if (++modEntry->currOrder > modEntry->head.orderCount-1)
-							modEntry->currOrder = modEntry->head.orderCount-1;
+						if (++song->currOrder > song->header.numOrders-1)
+							song->currOrder = song->header.numOrders-1;
 
-						modSetPos(modEntry->currOrder, DONT_SET_ROW);
+						modSetPos(song->currOrder, DONT_SET_ROW);
 						ui.updatePosEd = true;
 					}
 				}
@@ -3428,7 +3413,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= repeatNum)
 					{
 						keyb.repeatCounter = 0;
-						modSetPos(DONT_SET_ORDER, (modEntry->currRow + 1) & 0x3F);
+						modSetPos(DONT_SET_ORDER, (song->currRow + 1) & 0x3F);
 					}
 				}
 			}
@@ -3692,10 +3677,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			{
 				for (i = 0; i < MOD_ROWS; i++)
 				{
-					noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = modEntry->patterns[modEntry->currPattern][i * AMIGA_VOICES];
+					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					noteTmp = song->patterns[song->currPattern][i * AMIGA_VOICES];
 
-					modEntry->patterns[modEntry->currPattern][i * AMIGA_VOICES] = *noteSrc;
+					song->patterns[song->currPattern][i * AMIGA_VOICES] = *noteSrc;
 					*noteSrc = noteTmp;
 				}
 
@@ -3710,10 +3695,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			{
 				for (i = 0; i < MOD_ROWS; i++)
 				{
-					noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + 1];
+					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + 1];
 
-					modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + 1] = *noteSrc;
+					song->patterns[song->currPattern][(i * AMIGA_VOICES) + 1] = *noteSrc;
 					*noteSrc = noteTmp;
 				}
 
@@ -3728,10 +3713,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			{
 				for (i = 0; i < MOD_ROWS; i++)
 				{
-					noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + 2];
+					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + 2];
 
-					modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + 2] = *noteSrc;
+					song->patterns[song->currPattern][(i * AMIGA_VOICES) + 2] = *noteSrc;
 					*noteSrc = noteTmp;
 				}
 
@@ -3746,10 +3731,10 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			{
 				for (i = 0; i < MOD_ROWS; i++)
 				{
-					noteSrc = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + 3];
+					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+					noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + 3];
 
-					modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + 3] = *noteSrc;
+					song->patterns[song->currPattern][(i * AMIGA_VOICES) + 3] = *noteSrc;
 					*noteSrc = noteTmp;
 				}
 
@@ -4227,36 +4212,36 @@ bool handleTextEditMode(SDL_Scancode scancode)
 					saveUndo();
 					if (keyb.leftAltPressed && !keyb.leftCtrlPressed)
 					{
-						if (modEntry->currRow > 0)
+						if (song->currRow > 0)
 						{
 							for (i = 0; i < AMIGA_VOICES; i++)
 							{
-								for (j = (modEntry->currRow - 1); j < MOD_ROWS; j++)
+								for (j = (song->currRow - 1); j < MOD_ROWS; j++)
 								{
-									noteSrc = &modEntry->patterns[modEntry->currPattern][((j + 1) * AMIGA_VOICES) + i];
-									modEntry->patterns[modEntry->currPattern][(j * AMIGA_VOICES) + i] = *noteSrc;
+									noteSrc = &song->patterns[song->currPattern][((j + 1) * AMIGA_VOICES) + i];
+									song->patterns[song->currPattern][(j * AMIGA_VOICES) + i] = *noteSrc;
 								}
 
 								// clear newly made row on very bottom
-								noteDst = &modEntry->patterns[modEntry->currPattern][(63 * AMIGA_VOICES) + i];
+								noteDst = &song->patterns[song->currPattern][(63 * AMIGA_VOICES) + i];
 								noteDst->period = 0;
 								noteDst->sample = 0;
 								noteDst->command = 0;
 								noteDst->param = 0;
 							}
 
-							modEntry->currRow--;
+							song->currRow--;
 							ui.updatePatternData = true;
 						}
 					}
 					else
 					{
-						if (modEntry->currRow > 0)
+						if (song->currRow > 0)
 						{
-							for (i = modEntry->currRow-1; i < MOD_ROWS-1; i++)
+							for (i = song->currRow-1; i < MOD_ROWS-1; i++)
 							{
-								noteSrc = &modEntry->patterns[modEntry->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
-								noteDst = &modEntry->patterns[modEntry->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+								noteSrc = &song->patterns[song->currPattern][((i + 1) * AMIGA_VOICES) + cursor.channel];
+								noteDst = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
 
 								if (keyb.leftCtrlPressed)
 								{
@@ -4270,13 +4255,13 @@ bool handleTextEditMode(SDL_Scancode scancode)
 							}
 
 							// clear newly made row on very bottom
-							noteDst = &modEntry->patterns[modEntry->currPattern][(63 * AMIGA_VOICES) + cursor.channel];
+							noteDst = &song->patterns[song->currPattern][(63 * AMIGA_VOICES) + cursor.channel];
 							noteDst->period = 0;
 							noteDst->sample = 0;
 							noteDst->command = 0;
 							noteDst->param = 0;
 
-							modEntry->currRow--;
+							song->currRow--;
 							ui.updatePatternData = true;
 						}
 					}
@@ -4287,7 +4272,7 @@ bool handleTextEditMode(SDL_Scancode scancode)
 					editor.stepPlayBackwards = true;
 
 					doStopIt(true);
-					playPattern((modEntry->currRow - 1) & 0x3F);
+					playPattern((song->currRow - 1) & 0x3F);
 				}
 			}
 		}

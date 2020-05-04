@@ -32,6 +32,13 @@ typedef struct samplerChunk_t
 	uint32_t dwSMPTEFormat, dwSMPTEOffset, cSampleLoops, cbSamplerData;
 	sampleLoop_t loop;
 } samplerChunk_t;
+
+typedef struct mptExtraChunk_t
+{
+	uint32_t chunkID, chunkSize, flags;
+	uint16_t defaultPan, defaultVolume, globalVolume, reserved;
+	uint8_t vibratoType, vibratoSweep, vibratoDepth, vibratoRate;
+} mptExtraChunk_t;
 // -----------------------------------------
 
 typedef struct note_t
@@ -42,8 +49,8 @@ typedef struct note_t
 
 typedef struct moduleHeader_t
 {
-	char moduleTitle[20 + 1];
-	uint16_t order[MOD_ORDERS], orderCount;
+	char name[20 + 1];
+	uint16_t order[MOD_ORDERS], numOrders;
 	uint16_t initialTempo; // used for STK/UST modules after module is loaded
 } moduleHeader_t;
 
@@ -71,14 +78,25 @@ typedef struct moduleChannel_t
 
 typedef struct module_t
 {
-	int8_t *sampleData, currRow, modified, row;
-	uint8_t currSpeed, moduleLoaded;
-	uint16_t currOrder, currPattern, currBPM;
-	uint32_t rowsCounter, rowsInTotal;
-	moduleHeader_t head;
+	bool loaded, modified;
+	int8_t *sampleData;
+
+	volatile uint8_t tick, speed;
+
+	int8_t row; // used for different things, so must not be internal to replayer
+
+	moduleHeader_t header;
 	moduleSample_t samples[MOD_SAMPLES];
 	moduleChannel_t channels[AMIGA_VOICES];
 	note_t *patterns[MAX_PATTERNS];
+
+	// for pattern viewer
+	int8_t currRow;
+	uint8_t currSpeed;
+	uint16_t currOrder, currPattern, currBPM;
+
+	// for MOD2WAV progress bar
+	uint32_t rowsCounter, rowsInTotal;
 } module_t;
 
 typedef struct keyb_t
@@ -125,7 +143,6 @@ typedef struct editor_t
 	volatile int8_t vuMeterVolumes[AMIGA_VOICES], spectrumVolumes[SPECTRUM_BAR_NUM];
 	volatile int8_t *sampleFromDisp, *sampleToDisp, *currSampleDisp, realVuMeterVolumes[AMIGA_VOICES];
 	volatile bool songPlaying, programRunning, isWAVRendering, isSMPRendering, smpRenderingDone;
-	volatile uint8_t modTick, modSpeed;
 	volatile uint16_t *quantizeValueDisp, *metroSpeedDisp, *metroChannelDisp, *sampleVolDisp;
 	volatile uint16_t *vol1Disp, *vol2Disp, *currEditPatternDisp, *currPosDisp, *currPatternDisp;
 	volatile uint16_t *currPosEdPattDisp, *currLengthDisp, *lpCutOffDisp, *hpCutOffDisp;
@@ -144,7 +161,7 @@ typedef struct editor_t
 
 	int8_t smpRedoFinetunes[MOD_SAMPLES], smpRedoVolumes[MOD_SAMPLES], multiModeNext[4], trackPattFlag;
 	int8_t *smpRedoBuffer[MOD_SAMPLES], *tempSample, currSample, recordMode, sampleFrom, sampleTo, autoInsSlot;
-	int8_t keypadSampleOffset, note1, note2, note3, note4, oldNote1, oldNote2, oldNote3, oldNote4;
+	int8_t hiLowInstr, note1, note2, note3, note4, oldNote1, oldNote2, oldNote3, oldNote4;
 	uint8_t playMode, currMode, tuningChan, tuningVol, errorMsgCounter, buffFromPos, buffToPos;
 	uint8_t blockFromPos, blockToPos, timingMode, f6Pos, f7Pos, f8Pos, f9Pos, f10Pos, keyOctave, pNoteFlag;
 	uint8_t tuningNote, resampleNote, initialTempo, initialSpeed, editMoveAdd;
@@ -240,4 +257,4 @@ extern diskop_t diskop;
 extern cursor_t cursor;
 extern ui_t ui;
 
-extern module_t *modEntry; // pt_main.c
+extern module_t *song; // pt_main.c

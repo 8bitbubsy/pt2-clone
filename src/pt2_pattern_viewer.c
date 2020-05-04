@@ -5,6 +5,7 @@
 #include "pt2_tables.h"
 #include "pt2_textout.h"
 #include "pt2_structs.h"
+#include "pt2_config.h"
 
 #define MIDDLE_ROW 7
 #define VISIBLE_ROWS 15
@@ -54,8 +55,8 @@ static void drawPatternNormal(void)
 	else
 		noteNames = (const char **)noteNames1;
 
-	patt = modEntry->patterns[modEntry->currPattern];
-	row = modEntry->currRow - MIDDLE_ROW;
+	patt = song->patterns[song->currPattern];
+	row = song->currRow - MIDDLE_ROW;
 	y = 140;
 
 	for (int32_t i = 0; i < VISIBLE_ROWS; i++, y += 7, row++)
@@ -139,8 +140,8 @@ static void drawPatternDotted(void)
 	else
 		noteNames = (const char **)noteNames3;
 
-	patt = modEntry->patterns[modEntry->currPattern];
-	row = modEntry->currRow - MIDDLE_ROW;
+	patt = song->patterns[song->currPattern];
+	row = song->currRow - MIDDLE_ROW;
 	y = 140; 
 
 	for (int32_t i = 0; i < VISIBLE_ROWS; i++, y += 7, row++)

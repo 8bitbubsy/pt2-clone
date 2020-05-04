@@ -20,6 +20,7 @@
 #include "pt2_tables.h"
 #include "pt2_palette.h"
 #include "pt2_structs.h"
+#include "pt2_config.h"
 
 // used for Windows usleep() implementation
 #ifdef _WIN32
@@ -120,25 +121,25 @@ void updateWindowTitle(bool modified)
 	char titleTemp[128];
 
 	if (modified)
-		modEntry->modified = true;
+		song->modified = true;
 	else
-		modEntry->modified = false;
+		song->modified = false;
 
-	if (modEntry->head.moduleTitle[0] != '\0')
+	if (song->header.name[0] != '\0')
 	{
 		if (modified)
 		{
 			if (config.modDot)
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\" (unsaved)", PROG_VER_STR, modEntry->head.moduleTitle);
+				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\" (unsaved)", PROG_VER_STR, song->header.name);
 			else
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\" (unsaved)", PROG_VER_STR, modEntry->head.moduleTitle);
+				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\" (unsaved)", PROG_VER_STR, song->header.name);
 		}
 		else
 		{
 			if (config.modDot)
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\"", PROG_VER_STR, modEntry->head.moduleTitle);
+				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\"", PROG_VER_STR, song->header.name);
 			else
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\"", PROG_VER_STR, modEntry->head.moduleTitle);
+				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\"", PROG_VER_STR, song->header.name);
 		}
 	}
 	else
@@ -168,7 +169,7 @@ void recalcChordLength(void)
 	int32_t len;
 	moduleSample_t *s;
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	if (editor.chordLengthMin)
 	{

@@ -7,6 +7,7 @@
 #include "pt2_palette.h"
 #include "pt2_visuals.h"
 #include "pt2_structs.h"
+#include "pt2_bmp.h"
 
 void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 {
@@ -29,38 +30,6 @@ void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 
 		srcPtr += 127*FONT_CHAR_W;
 		dstPtr += SCREEN_W;
-	}
-}
-
-void charOut2(uint32_t xPos, uint32_t yPos, char ch)
-{
-	const uint8_t *srcPtr;
-	uint32_t *dstPtr1, *dstPtr2;
-
-	if (ch == '\0' || ch == ' ')
-		return;
-
-	srcPtr = &fontBMP[(ch & 0x7F) << 3];
-	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
-	dstPtr2 = dstPtr1 + (SCREEN_W+1);
-
-	const uint32_t color1 = video.palette[PAL_BORDER];
-	const uint32_t color2 = video.palette[PAL_GENBKG2];
-
-	for (int32_t y = 0; y < FONT_CHAR_H; y++)
-	{
-		for (int32_t x = 0; x < FONT_CHAR_W; x++)
-		{
-			if (srcPtr[x])
-			{
-				dstPtr2[x] = color2;
-				dstPtr1[x] = color1;
-			}
-		}
-
-		srcPtr += 127*FONT_CHAR_W;
-		dstPtr1 += SCREEN_W;
-		dstPtr2 += SCREEN_W;
 	}
 }
 
@@ -155,18 +124,6 @@ void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 	while (*text != '\0')
 	{
 		charOut(x, yPos, *text++, color);
-		x += FONT_CHAR_W;
-	}
-}
-
-void textOut2(uint32_t xPos, uint32_t yPos, const char *text)
-{
-	assert(text != NULL);
-
-	uint32_t x = xPos;
-	while (*text != '\0')
-	{
-		charOut2(x, yPos, *text++);
 		x += FONT_CHAR_W;
 	}
 }

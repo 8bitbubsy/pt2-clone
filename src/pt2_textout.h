@@ -4,12 +4,10 @@
 #include <stdbool.h>
 
 void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color);
-void charOut2(uint32_t xPos, uint32_t yPos, char ch);
 void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t bgColor);
 void charOutBig(uint32_t xPos, uint32_t yPos, char ch, uint32_t color);
 void charOutBigBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t bgColor);
 void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color);
-void textOut2(uint32_t xPos, uint32_t yPos, const char *text);
 void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color);
 void textOutBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor, uint32_t bgColor);
 void textOutBig(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color);

@@ -4,6 +4,5 @@
 #include <stdbool.h>
 #include "pt2_unicode.h"
 
-void extLoadWAVOrAIFFSampleCallback(bool downSample);
-bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename);
+void extLoadWAVOrAIFFSampleCallback(bool downsample);
 bool loadSample(UNICHAR *fileName, char *entryName);

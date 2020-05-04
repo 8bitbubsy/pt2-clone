@@ -17,6 +17,7 @@
 #include "pt2_palette.h"
 #include "pt2_tables.h"
 #include "pt2_structs.h"
+#include "pt2_config.h"
 
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
@@ -43,13 +44,13 @@ int32_t getSampleReadPos(int32_t ch, uint8_t smpNum)
 
 	if (scopeExt[ch].active && pos >= 2)
 	{
-		s = &modEntry->samples[smpNum];
+		s = &song->samples[smpNum];
 
 		/* Get real sampling position regardless of where the scope data points to
 		** sc->data changes during loop, offset and so on, so this has to be done
 		** (sadly, because it's really hackish).
 		*/
-		pos = (int32_t)(&data[pos] - &modEntry->sampleData[s->offset]);
+		pos = (int32_t)(&data[pos] - &song->sampleData[s->offset]);
 		if (pos >= s->length)
 			return -1;
 
@@ -149,7 +150,7 @@ static void updateRealVuMeters(void)
 		if (samplesToScan > 512) // don't waste cycles on reading a ton of samples
 			samplesToScan = 512;
 
-		volume = modEntry->channels[i].n_volume;
+		volume = song->channels[i].n_volume;
 
 		if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)
 		{
@@ -227,7 +228,7 @@ void drawScopes(void)
 			tmpScope = *sc;
 			didSwapData = se->didSwapData;
 
-			volume = -modEntry->channels[i].n_volume; // invert volume
+			volume = -song->channels[i].n_volume; // invert volume
 
 			// render scope
 			if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)

@@ -1,15 +1,6 @@
-#include <SDL2/SDL.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "pt2_mouse.h"
-
-uint32_t *aboutScreenBMP   = NULL, *clearDialogBMP     = NULL;
-uint32_t *diskOpScreenBMP  = NULL, *editOpModeCharsBMP = NULL, *mod2wavBMP         = NULL;
-uint32_t *editOpScreen1BMP = NULL, *editOpScreen2BMP   = NULL, *samplerVolumeBMP   = NULL;
-uint32_t *editOpScreen3BMP = NULL, *editOpScreen4BMP   = NULL, *spectrumVisualsBMP = NULL;
-uint32_t *muteButtonsBMP   = NULL, *posEdBMP           = NULL, *samplerFiltersBMP  = NULL;
-uint32_t *samplerScreenBMP = NULL, *pat2SmpDialogBMP   = NULL, *trackerFrameBMP    = NULL;
-uint32_t *yesNoDialogBMP   = NULL, *bigYesNoDialogBMP  = NULL;
 
 const char hexTable[16] =
 {

@@ -3,6 +3,7 @@
 
 void setDefaultPalette(void)
 {
+	// default ProTracker palette
 	video.palette[PAL_BACKGRD] = 0x000000;
 	video.palette[PAL_BORDER] = 0xBBBBBB;
 	video.palette[PAL_GENBKG] = 0x888888;
@@ -17,5 +18,6 @@ void setDefaultPalette(void)
 	video.palette[PAL_MOUSE_1] = 0x444444;
 	video.palette[PAL_MOUSE_2] = 0x777777;
 	video.palette[PAL_MOUSE_3] = 0xAAAAAA;
+
 	video.palette[PAL_COLORKEY] = 0xC0FFEE;
 }

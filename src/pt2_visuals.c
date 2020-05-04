@@ -26,17 +26,20 @@
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
 #include "pt2_tables.h"
-#include "pt2_modloader.h"
-#include "pt2_sampleloader.h"
-#include "pt2_patternviewer.h"
+#include "pt2_module_loader.h"
+#include "pt2_module_saver.h"
+#include "pt2_sample_loader.h"
+#include "pt2_sample_saver.h"
+#include "pt2_pattern_viewer.h"
 #include "pt2_sampler.h"
 #include "pt2_diskop.h"
 #include "pt2_visuals.h"
-#include "pt2_helpers.h"
 #include "pt2_scopes.h"
 #include "pt2_edit.h"
 #include "pt2_pat2smp.h"
 #include "pt2_mod2wav.h"
+#include "pt2_config.h"
+#include "pt2_bmp.h"
 
 typedef struct sprite_t
 {
@@ -75,6 +78,20 @@ void statusAllRight(void)
 void statusOutOfMemory(void)
 {
 	displayErrorMsg("OUT OF MEMORY !!!");
+}
+
+void statusSampleIsEmpty(void)
+{
+	displayErrorMsg("SAMPLE IS EMPTY");
+}
+
+void statusNotSampleZero(void)
+{
+	/* This rather confusing error message actually means that
+	** you can't load a sample to sample slot #0 (which isn't a
+	** real sample slot).
+	*/
+	displayErrorMsg("NOT SAMPLE 0 !");
 }
 
 void setupPerfFreq(void)
@@ -339,7 +356,7 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	if (ui.diskOpScreenShown)
 		return;
 
-	currSample = &modEntry->samples[editor.currSample];
+	currSample = &song->samples[editor.currSample];
 
 	if (ui.updateSongPos)
 	{
@@ -441,7 +458,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 			textOut(88, 127, "MARK BLOCK", video.palette[PAL_GENTXT]);
 			charOut(192, 127, '-', video.palette[PAL_GENTXT]);
 
-			editor.blockToPos = modEntry->currRow;
+			editor.blockToPos = song->currRow;
 			if (editor.blockFromPos >= editor.blockToPos)
 			{
 				printTwoDecimals(176, 127, editor.blockToPos, video.palette[PAL_GENTXT]);
@@ -463,7 +480,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	{
 		ui.updateSongBPM = false;
 		if (!ui.samplerScreenShown)
-			printThreeDecimalsBg(32, 123, modEntry->currBPM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			printThreeDecimalsBg(32, 123, song->currBPM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (ui.updateCurrPattText)
@@ -542,7 +559,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		ui.updateSongName = false;
 		for (x = 0; x < 20; x++)
 		{
-			tempChar = modEntry->head.moduleTitle[x];
+			tempChar = song->header.name[x];
 			if (tempChar == '\0')
 				tempChar = '_';
 
@@ -553,7 +570,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	if (ui.updateCurrSampleName)
 	{
 		ui.updateCurrSampleName = false;
-		currSample = &modEntry->samples[editor.currSample];
+		currSample = &song->samples[editor.currSample];
 
 		for (x = 0; x < 22; x++)
 		{
@@ -575,13 +592,13 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		// calculate module length
 		uint32_t totalSampleDataSize = 0;
 		for (i = 0; i < MOD_SAMPLES; i++)
-			totalSampleDataSize += modEntry->samples[i].length;
+			totalSampleDataSize += song->samples[i].length;
 
 		uint32_t totalPatterns = 0;
 		for (i = 0; i < MOD_ORDERS; i++)
 		{
-			if (modEntry->head.order[i] > totalPatterns)
-				totalPatterns = modEntry->head.order[i];
+			if (song->header.order[i] > totalPatterns)
+				totalPatterns = song->header.order[i];
 		}
 
 		uint32_t moduleSize = 2108 + (totalPatterns * 1024) + totalSampleDataSize;
@@ -618,7 +635,7 @@ void updateSampler(void)
 		return;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	// update 9xx offset
 	if (mouse.y >= 138 && mouse.y <= 201 && mouse.x >= 3 && mouse.x <= 316)
@@ -899,9 +916,9 @@ void updatePosEd(void)
 	{
 		bgPixel = video.palette[PAL_BACKGRD];
 
-		posEdPosition = modEntry->currOrder;
-		if (posEdPosition > modEntry->head.orderCount-1)
-			posEdPosition = modEntry->head.orderCount-1;
+		posEdPosition = song->currOrder;
+		if (posEdPosition > song->header.numOrders-1)
+			posEdPosition = song->header.numOrders-1;
 
 		// top five
 		for (y = 0; y < 5; y++)
@@ -909,7 +926,7 @@ void updatePosEd(void)
 			if (posEdPosition-(5-y) >= 0)
 			{
 				printThreeDecimalsBg(128, 23+(y*6), posEdPosition-(5-y), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-				printTwoDecimalsBg(160, 23+(y*6), modEntry->head.order[posEdPosition-(5-y)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+				printTwoDecimalsBg(160, 23+(y*6), song->header.order[posEdPosition-(5-y)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
 			}
 			else
 			{
@@ -931,10 +948,10 @@ void updatePosEd(void)
 		// bottom six
 		for (y = 0; y < 6; y++)
 		{
-			if (posEdPosition+y < modEntry->head.orderCount-1)
+			if (posEdPosition+y < song->header.numOrders-1)
 			{
 				printThreeDecimalsBg(128, 59+(y*6), posEdPosition+(y+1), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-				printTwoDecimalsBg(160, 59+(y*6), modEntry->head.order[posEdPosition+(y+1)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+				printTwoDecimalsBg(160, 59+(y*6), song->header.order[posEdPosition+(y+1)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
 			}
 			else
 			{
@@ -1449,14 +1466,14 @@ void updateMOD2WAVDialog(void)
 			}
 
 			editor.isWAVRendering = false;
-			modSetTempo(modEntry->currBPM); // update BPM with normal audio output rate
+			modSetTempo(song->currBPM); // update BPM with normal audio output rate
 			displayMainScreen();
 		}
 		else
 		{
 			// render progress bar
 
-			percent = (uint8_t)((modEntry->rowsCounter * 100) / modEntry->rowsInTotal);
+			percent = (uint8_t)((song->rowsCounter * 100) / song->rowsInTotal);
 			if (percent > 100)
 				percent = 100;
 
@@ -1591,7 +1608,7 @@ void updateEditOp(void)
 			textOutBg(168, 91, "    ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			charOut(198, 91,    ':', video.palette[PAL_GENBKG]);
 
-			if (modEntry->samples[editor.currSample].loopLength > 2 || modEntry->samples[editor.currSample].loopStart >= 2)
+			if (song->samples[editor.currSample].loopLength > 2 || song->samples[editor.currSample].loopStart >= 2)
 			{
 				textOut(168, 91, "LOOP", video.palette[PAL_GENTXT]);
 			}
@@ -1830,7 +1847,7 @@ void handleAskYes(void)
 			for (i = 0; i < MOD_SAMPLES; i++)
 			{
 				editor.currSample = (int8_t)i;
-				if (modEntry->samples[i].length > 2)
+				if (song->samples[i].length > 2)
 					saveSample(DONT_CHECK_IF_FILE_EXIST, GIVE_NEW_FILENAME);
 			}
 			editor.currSample = oldSample;
@@ -1893,8 +1910,14 @@ void handleAskYes(void)
 		{
 			restoreStatusAndMousePointer();
 
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
 			turnOffVoices();
-			s = &modEntry->samples[editor.currSample];
+			s = &song->samples[editor.currSample];
 
 			s->fineTune = 0;
 			s->volume = 0;
@@ -1903,7 +1926,7 @@ void handleAskYes(void)
 			s->loopLength = 2;
 
 			memset(s->text, 0, sizeof (s->text));
-			memset(&modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN)], 0, MAX_SAMPLE_LEN);
+			memset(&song->sampleData[(editor.currSample * MAX_SAMPLE_LEN)], 0, MAX_SAMPLE_LEN);
 
 			editor.samplePos = 0;
 			updateCurrSample();
@@ -1932,11 +1955,11 @@ void handleAskYes(void)
 		{
 			memset(fileName, 0, sizeof (fileName));
 
-			if (modEntry->head.moduleTitle[0] != '\0')
+			if (song->header.name[0] != '\0')
 			{
 				for (i = 0; i < 20; i++)
 				{
-					fileName[i] = (char)tolower(modEntry->head.moduleTitle[i]);
+					fileName[i] = (char)tolower(song->header.name[i]);
 					if (fileName[i] == '\0') break;
 					sanitizeFilenameChar(&fileName[i]);
 				}
@@ -1956,11 +1979,11 @@ void handleAskYes(void)
 		{
 			memset(fileName, 0, sizeof (fileName));
 
-			if (modEntry->head.moduleTitle[0] != '\0')
+			if (song->header.name[0] != '\0')
 			{
 				for (i = 0; i < 20; i++)
 				{
-					fileName[i] = (char)(tolower(modEntry->head.moduleTitle[i]));
+					fileName[i] = (char)(tolower(song->header.name[i]));
 					if (fileName[i] == '\0') break;
 					sanitizeFilenameChar(&fileName[i]);
 				}
@@ -2015,276 +2038,6 @@ void handleAskYes(void)
 	}
 
 	removeAskDialog();
-}
-
-void createBitmaps(void)
-{
-	uint8_t r8, g8, b8, r8_2, g8_2, b8_2;
-	uint16_t pixel12;
-	uint32_t i, j, x, y, pixel24;
-
-	pixel24 = video.palette[PAL_PATCURSOR];
-	for (y = 0; y < 14; y++)
-	{
-		// top two rows have a lighter color
-		if (y < 2)
-		{
-			r8 = R24(pixel24);
-			g8 = G24(pixel24);
-			b8 = B24(pixel24);
-
-			if (r8 <= 0xFF-0x33)
-				r8 += 0x33;
-			else
-				r8 = 0xFF;
-
-			if (g8 <= 0xFF-0x33)
-				g8 += 0x33;
-			else
-				g8 = 0xFF;
-
-			if (b8 <= 0xFF-0x33)
-				b8 += 0x33;
-			else
-				b8 = 0xFF;
-
-			for (x = 0; x < 11; x++)
-				patternCursorBMP[(y * 11) + x] = RGB24(r8, g8, b8);
-		}
-
-		// sides (same color)
-		if (y >= 2 && y <= 12)
-		{
-			patternCursorBMP[(y * 11) + 0] = pixel24;
-
-			for (x = 1; x < 10; x++)
-				patternCursorBMP[(y * 11) + x] = video.palette[PAL_COLORKEY];
-
-			patternCursorBMP[(y * 11) + 10] = pixel24;
-		}
-
-		// bottom two rows have a darker color
-		if (y > 11)
-		{
-			r8 = R24(pixel24);
-			g8 = G24(pixel24);
-			b8 = B24(pixel24);
-
-			if (r8 >= 0x33)
-				r8 -= 0x33;
-			else
-				r8 = 0x00;
-
-			if (g8 >= 0x33)
-				g8 -= 0x33;
-			else
-				g8 = 0x00;
-
-			if (b8 >= 0x33)
-				b8 -= 0x33;
-			else
-				b8 = 0x00;
-
-			for (x = 0; x < 11; x++)
-				patternCursorBMP[(y * 11) + x] = RGB24(r8, g8, b8);
-		}
-	}
-
-	// create spectrum analyzer bar graphics
-	for (i = 0; i < 36; i++)
-		spectrumAnaBMP[i] = RGB12_to_RGB24(analyzerColors[35-i]);
-
-	// create VU-Meter bar graphics
-	for (i = 0; i < 48; i++)
-	{
-		pixel12 = vuMeterColors[47-i];
-
-		r8_2 = r8 = R12_to_R24(pixel12);
-		g8_2 = g8 = G12_to_G24(pixel12);
-		b8_2 = b8 = B12_to_B24(pixel12);
-
-		// brighter pixels on the left side
-
-		if (r8_2 <= 0xFF-0x33)
-			r8_2 += 0x33;
-		else
-			r8_2 = 0xFF;
-
-		if (g8_2 <= 0xFF-0x33)
-			g8_2 += 0x33;
-		else
-			g8_2 = 0xFF;
-
-		if (b8_2 <= 0xFF-0x33)
-			b8_2 += 0x33;
-		else
-			b8_2 = 0xFF;
-
-		pixel24 = RGB24(r8_2, g8_2, b8_2);
-
-		vuMeterBMP[(i * 10) + 0] = pixel24;
-		vuMeterBMP[(i * 10) + 1] = pixel24;
-
-		// main pixels
-		for (j = 2; j < 8; j++)
-			vuMeterBMP[(i * 10) + j] = RGB24(r8, g8, b8);
-
-		// darker pixels on the right side
-		r8_2 = r8;
-		g8_2 = g8;
-		b8_2 = b8;
-
-		if (r8_2 >= 0x33)
-			r8_2 -= 0x33;
-		else
-			r8_2 = 0x00;
-
-		if (g8_2 >= 0x33)
-			g8_2 -= 0x33;
-		else
-			g8_2 = 0x00;
-
-		if (b8_2 >= 0x33)
-			b8_2 -= 0x33;
-		else
-			b8_2 = 0x00;
-
-		pixel24 = RGB24(r8_2, g8_2, b8_2);
-
-		vuMeterBMP[(i * 10) + 8] = pixel24;
-		vuMeterBMP[(i * 10) + 9] = pixel24;
-	}
-}
-
-void freeBMPs(void)
-{
-	if (trackerFrameBMP != NULL) free(trackerFrameBMP);
-	if (samplerScreenBMP != NULL) free(samplerScreenBMP);
-	if (samplerVolumeBMP != NULL) free(samplerVolumeBMP);
-	if (samplerFiltersBMP != NULL) free(samplerFiltersBMP);
-	if (clearDialogBMP != NULL) free(clearDialogBMP);
-	if (diskOpScreenBMP != NULL) free(diskOpScreenBMP);
-	if (mod2wavBMP != NULL) free(mod2wavBMP);
-	if (posEdBMP != NULL) free(posEdBMP);
-	if (spectrumVisualsBMP != NULL) free(spectrumVisualsBMP);
-	if (yesNoDialogBMP != NULL) free(yesNoDialogBMP);
-	if (bigYesNoDialogBMP != NULL) free(bigYesNoDialogBMP);
-	if (pat2SmpDialogBMP != NULL) free(pat2SmpDialogBMP);
-	if (editOpScreen1BMP != NULL) free(editOpScreen1BMP);
-	if (editOpScreen2BMP != NULL) free(editOpScreen2BMP);
-	if (editOpScreen3BMP != NULL) free(editOpScreen3BMP);
-	if (editOpScreen4BMP != NULL) free(editOpScreen4BMP);
-	if (aboutScreenBMP != NULL) free(aboutScreenBMP);
-	if (muteButtonsBMP != NULL) free(muteButtonsBMP);
-	if (editOpModeCharsBMP != NULL) free(editOpModeCharsBMP);
-}
-
-uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
-{
-	const uint8_t *packSrc;
-	uint8_t *tmpBuffer, *packDst, byteIn;
-	int16_t count;
-	uint32_t *dst, decodedLength, i;
-
-	// RLE decode
-	decodedLength = (src[0] << 24) | (src[1] << 16) | (src[2] << 8) | src[3];
-
-	// 2-bit to 8-bit conversion
-	dst = (uint32_t *)malloc((decodedLength * 4) * sizeof (int32_t));
-	if (dst == NULL)
-		return NULL;
-
-	tmpBuffer = (uint8_t *)malloc(decodedLength + 512); // some margin is needed, the packer is buggy
-	if (tmpBuffer == NULL)
-	{
-		free(dst);
-		return NULL;
-	}
-
-	packSrc = src + 4;
-	packDst = tmpBuffer;
-
-	i = packedLen - 4;
-	while (i > 0)
-	{
-		byteIn = *packSrc++;
-		if (byteIn == 0xCC) // compactor code
-		{
-			count  = *packSrc++;
-			byteIn = *packSrc++;
-
-			while (count-- >= 0)
-				*packDst++ = byteIn;
-
-			i -= 2;
-		}
-		else
-		{
-			*packDst++ = byteIn;
-		}
-
-		i--;
-	}
-
-	for (i = 0; i < decodedLength; i++)
-	{
-		byteIn = (tmpBuffer[i] & 0xC0) >> 6;
-		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 0] = video.palette[byteIn];
-
-		byteIn = (tmpBuffer[i] & 0x30) >> 4;
-		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 1] = video.palette[byteIn];
-
-		byteIn = (tmpBuffer[i] & 0x0C) >> 2;
-		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 2] = video.palette[byteIn];
-
-		byteIn = (tmpBuffer[i] & 0x03) >> 0;
-		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 3] = video.palette[byteIn];
-	}
-
-	free(tmpBuffer);
-	return dst;
-}
-
-bool unpackBMPs(void)
-{
-	trackerFrameBMP = unpackBMP(trackerFramePackedBMP, sizeof (trackerFramePackedBMP));
-	samplerScreenBMP = unpackBMP(samplerScreenPackedBMP, sizeof (samplerScreenPackedBMP));
-	samplerVolumeBMP = unpackBMP(samplerVolumePackedBMP, sizeof (samplerVolumePackedBMP));
-	samplerFiltersBMP = unpackBMP(samplerFiltersPackedBMP, sizeof (samplerFiltersPackedBMP));
-	clearDialogBMP = unpackBMP(clearDialogPackedBMP, sizeof (clearDialogPackedBMP));
-	diskOpScreenBMP = unpackBMP(diskOpScreenPackedBMP, sizeof (diskOpScreenPackedBMP));
-	mod2wavBMP = unpackBMP(mod2wavPackedBMP, sizeof (mod2wavPackedBMP));
-	posEdBMP = unpackBMP(posEdPackedBMP, sizeof (posEdPackedBMP));
-	spectrumVisualsBMP = unpackBMP(spectrumVisualsPackedBMP, sizeof (spectrumVisualsPackedBMP));
-	yesNoDialogBMP = unpackBMP(yesNoDialogPackedBMP, sizeof (yesNoDialogPackedBMP));
-	bigYesNoDialogBMP = unpackBMP(bigYesNoDialogPackedBMP, sizeof (bigYesNoDialogPackedBMP));
-	pat2SmpDialogBMP = unpackBMP(pat2SmpDialogPackedBMP, sizeof (pat2SmpDialogPackedBMP));
-	editOpScreen1BMP = unpackBMP(editOpScreen1PackedBMP, sizeof (editOpScreen1PackedBMP));
-	editOpScreen2BMP = unpackBMP(editOpScreen2PackedBMP, sizeof (editOpScreen2PackedBMP));
-	editOpScreen3BMP = unpackBMP(editOpScreen3PackedBMP, sizeof (editOpScreen3PackedBMP));
-	editOpScreen4BMP = unpackBMP(editOpScreen4PackedBMP, sizeof (editOpScreen4PackedBMP));
-	aboutScreenBMP = unpackBMP(aboutScreenPackedBMP, sizeof (aboutScreenPackedBMP));
-	muteButtonsBMP = unpackBMP(muteButtonsPackedBMP, sizeof (muteButtonsPackedBMP));
-	editOpModeCharsBMP = unpackBMP(editOpModeCharsPackedBMP, sizeof (editOpModeCharsPackedBMP));
-
-	if (trackerFrameBMP    == NULL || samplerScreenBMP   == NULL || samplerVolumeBMP  == NULL ||
-		clearDialogBMP     == NULL || diskOpScreenBMP    == NULL || mod2wavBMP        == NULL ||
-		posEdBMP           == NULL || spectrumVisualsBMP == NULL || yesNoDialogBMP    == NULL ||
-		editOpScreen1BMP   == NULL || editOpScreen2BMP   == NULL || editOpScreen3BMP  == NULL ||
-		editOpScreen4BMP   == NULL || aboutScreenBMP     == NULL || muteButtonsBMP    == NULL ||
-		editOpModeCharsBMP == NULL || samplerFiltersBMP  == NULL || yesNoDialogBMP    == NULL ||
-		bigYesNoDialogBMP  == NULL)
-	{
-		showErrorMsgBox("Out of memory!");
-		return false; // BMPs are free'd in cleanUp()
-	}
-
-	createBitmaps();
-	return true;
 }
 
 void videoClose(void)

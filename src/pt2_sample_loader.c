@@ -4,27 +4,20 @@
 #endif
 
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <ctype.h> // tolower()/toupper()
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <ctype.h> // tolower()
 #include "pt2_header.h"
 #include "pt2_textout.h"
 #include "pt2_mouse.h"
-#include "pt2_sampler.h"
+#include "pt2_structs.h"
+#include "pt2_sampler.h" // fixSampleBeep()
 #include "pt2_audio.h"
-#include "pt2_sampleloader.h"
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"
 #include "pt2_unicode.h"
+#include "pt2_config.h"
 
 #define DOWNSAMPLE_CUTOFF_FACTOR 4.0
 
@@ -215,7 +208,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 
 	wavSampleNameFound = false;
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	if (forceDownSampling == -1)
 	{
@@ -444,9 +437,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataU8[i] - 128;
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataU8[i] - 128;
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataU8);
@@ -505,9 +498,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataS16[i] >> 8;
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataS16[i] >> 8;
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS16);
@@ -566,9 +559,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS32);
@@ -627,9 +620,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS32);
@@ -693,11 +686,11 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			{
 				smp32 = (int32_t)fAudioDataFloat[i];
 				CLAMP8(smp32);
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)smp32;
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)smp32;
 			}
 			else
 			{
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 			}
 		}
 
@@ -762,11 +755,11 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			{
 				smp32 = (int32_t)dAudioDataDouble[i];
 				CLAMP8(smp32);
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)smp32;
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)smp32;
 			}
 			else
 			{
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 			}
 		}
 
@@ -835,7 +828,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (tempVol > 256)
 			tempVol = 256;
 
-		s->volume = (int8_t)(tempVol >> 2);
+		tempVol >>= 2; // 0..256 -> 0..64
+
+		s->volume = (int8_t)tempVol;
 	}
 	// ---------------------------
 
@@ -847,7 +842,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		for (i = 0; i < 21; i++)
 		{
 			if (i < inamLen)
-				s->text[i] = (char)toupper(fgetc(f));
+				s->text[i] = (char)tolower(fgetc(f));
 			else
 				s->text[i] = '\0';
 		}
@@ -866,7 +861,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	{
 		nameLen = (uint32_t)strlen(entryName);
 		for (i = 0; i < 21; i++)
-			s->text[i] = (i < nameLen) ? (char)toupper(entryName[i]) : '\0';
+			s->text[i] = (i < nameLen) ? (char)tolower(entryName[i]) : '\0';
 
 		s->text[21] = '\0';
 		s->text[22] = '\0';
@@ -900,7 +895,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 	FILE *f;
 	moduleSample_t *s;
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	vhdrPtr = 0; vhdrLen = 0;
 	bodyPtr = 0; bodyLen = 0;
@@ -978,7 +973,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 	if (bodyLen == 0)
 		bodyLen = filesize - bodyPtr;
 
-	if ((bodyPtr + bodyLen) > (uint32_t)filesize)
+	if (bodyPtr+bodyLen > (uint32_t)filesize)
 		bodyLen = filesize - bodyPtr;
 
 	fseek(f, vhdrPtr, SEEK_SET);
@@ -1078,17 +1073,17 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 		for (i = 0; i < sampleLength; i++)
 		{
 			sample16 = ptr16[i];
-			modEntry->sampleData[s->offset+i] = sample16 >> 8;
+			song->sampleData[s->offset+i] = sample16 >> 8;
 		}
 	}
 	else
 	{
 		fread(sampleData, 1, sampleLength, f);
-		memcpy(&modEntry->sampleData[s->offset], sampleData, sampleLength);
+		memcpy(&song->sampleData[s->offset], sampleData, sampleLength);
 	}
 
 	if (sampleLength < MAX_SAMPLE_LEN) // clear rest of sample data
-		memset(&modEntry->sampleData[s->offset + sampleLength], 0, MAX_SAMPLE_LEN - sampleLength);
+		memset(&song->sampleData[s->offset + sampleLength], 0, MAX_SAMPLE_LEN - sampleLength);
 
 	free(sampleData);
 
@@ -1130,7 +1125,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 			nameLen = 21;
 
 		for (i = 0; i < nameLen; i++)
-			s->text[i] = (char)toupper(tmpCharBuf[i]);
+			s->text[i] = (char)tolower(tmpCharBuf[i]);
 	}
 	else
 	{
@@ -1139,7 +1134,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 			nameLen = 21;
 
 		for (i = 0; i < nameLen; i++)
-			s->text[i] = (char)toupper(entryName[i]);
+			s->text[i] = (char)tolower(entryName[i]);
 	}
 
 	// remove .iff from end of sample name (if present)
@@ -1164,7 +1159,7 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 	FILE *f;
 	moduleSample_t *s;
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
@@ -1183,11 +1178,11 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 
 	turnOffVoices();
 
-	fread(&modEntry->sampleData[s->offset], 1, fileSize, f);
+	fread(&song->sampleData[s->offset], 1, fileSize, f);
 	fclose(f);
 
 	if (fileSize < MAX_SAMPLE_LEN)
-		memset(&modEntry->sampleData[s->offset + fileSize], 0, MAX_SAMPLE_LEN - fileSize);
+		memset(&song->sampleData[s->offset + fileSize], 0, MAX_SAMPLE_LEN - fileSize);
 
 	// set sample attributes
 	s->volume = 64;
@@ -1199,7 +1194,7 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 	// copy over sample name
 	nameLen = (uint32_t)strlen(entryName);
 	for (i = 0; i < 21; i++)
-		s->text[i] = (i < nameLen) ? (char)toupper(entryName[i]) : '\0';
+		s->text[i] = (i < nameLen) ? (char)tolower(entryName[i]) : '\0';
 
 	s->text[21] = '\0';
 	s->text[22] = '\0';
@@ -1259,7 +1254,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		strcpy(editor.entryNameTmp, entryName);
 	}
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	commPtr = 0; commLen = 0;
 	ssndPtr = 0; ssndLen = 0;
@@ -1455,9 +1450,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataS8[i];
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataS8[i];
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS8);
@@ -1520,9 +1515,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataS16[i] >> 8;
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = audioDataS16[i] >> 8;
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS16);
@@ -1589,9 +1584,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS32);
@@ -1654,9 +1649,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		for (i = 0; i < MAX_SAMPLE_LEN; i++)
 		{
 			if (i <= (sampleLength & 0xFFFFFFFE))
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = (int8_t)(audioDataS32[i] >> 24);
 			else
-				modEntry->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
+				song->sampleData[(editor.currSample * MAX_SAMPLE_LEN) + i] = 0; // clear rest of sample
 		}
 
 		free(audioDataS32);
@@ -1680,7 +1675,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	// copy over sample name
 	nameLen = (uint32_t)strlen(entryName);
 	for (i = 0; i < 21; i++)
-		s->text[i] = (i < nameLen) ? (char)toupper(entryName[i]) : '\0';
+		s->text[i] = (i < nameLen) ? (char)tolower(entryName[i]) : '\0';
 
 	s->text[21] = '\0';
 	s->text[22] = '\0';
@@ -1704,6 +1699,12 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 {
 	uint32_t fileSize, ID;
 	FILE *f;
+
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return false;
+	}
 
 	f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
@@ -1769,257 +1770,4 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 	fclose(f);
 
 	return loadRAWSample(fileName, entryName);
-}
-
-static void removeWavIffExt(char *text) // for sample saver
-{
-	uint32_t fileExtPos;
-	uint32_t filenameLength;
-	
-	filenameLength = (uint32_t)strlen(text);
-	if (filenameLength < 5)
-		return;
-
-	// remove .wav/.iff/from end of sample name (if present)
-	fileExtPos = filenameLength - 4;
-	if (fileExtPos > 0 && (!strncmp(&text[fileExtPos], ".wav", 4) || !strncmp(&text[fileExtPos], ".iff", 4)))
-		text[fileExtPos] = '\0';
-}
-
-bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
-{
-	char fileName[128], tmpBuffer[64];
-	uint8_t smp;
-	uint16_t j;
-	int32_t i;
-	uint32_t sampleSize, iffSize, iffSampleSize;
-	uint32_t loopStart, loopLen, tmp32;
-	FILE *f;
-	struct stat statBuffer;
-	moduleSample_t *s;
-	wavHeader_t wavHeader;
-	samplerChunk_t samplerChunk;
-
-	if (modEntry->samples[editor.currSample].length == 0)
-	{
-		displayErrorMsg("SAMPLE IS EMPTY");
-		return false;
-	}
-
-	memset(fileName, 0, sizeof (fileName));
-
-	if (*modEntry->samples[editor.currSample].text == '\0')
-	{
-		strcpy(fileName, "untitled");
-	}
-	else
-	{
-		for (i = 0; i < 22; i++)
-		{
-			tmpBuffer[i] = (char)tolower(modEntry->samples[editor.currSample].text[i]);
-			if (tmpBuffer[i] == '\0') break;
-			sanitizeFilenameChar(&tmpBuffer[i]);
-		}
-
-		strcpy(fileName, tmpBuffer);
-	}
-	
-	removeWavIffExt(fileName);
-
-	switch (diskop.smpSaveType)
-	{
-		case DISKOP_SMP_WAV: strcat(fileName, ".wav"); break;
-		case DISKOP_SMP_IFF: strcat(fileName, ".iff"); break;
-		case DISKOP_SMP_RAW: break;
-		default: return false; // make compiler happy
-	}
-
-	if (giveNewFreeFilename)
-	{
-		if (stat(fileName, &statBuffer) == 0)
-		{
-			for (j = 1; j <= 9999; j++) // This number should satisfy all! ;)
-			{
-				memset(fileName, 0, sizeof (fileName));
-
-				if (*modEntry->samples[editor.currSample].text == '\0')
-				{
-					sprintf(fileName, "untitled-%d", j);
-				}
-				else
-				{
-					for (i = 0; i < 22; i++)
-					{
-						tmpBuffer[i] = (char)tolower(modEntry->samples[editor.currSample].text[i]);
-						if (tmpBuffer[i] == '\0') break;
-						sanitizeFilenameChar(&tmpBuffer[i]);
-					}
-
-					removeWavIffExt(tmpBuffer);
-					sprintf(fileName, "%s-%d", tmpBuffer, j);
-				}
-
-				switch (diskop.smpSaveType)
-				{
-					default: case DISKOP_SMP_WAV: strcat(fileName, ".wav"); break;
-					         case DISKOP_SMP_IFF: strcat(fileName, ".iff"); break;
-					         case DISKOP_SMP_RAW: break;
-				}
-
-				if (stat(fileName, &statBuffer) != 0)
-					break;
-			}
-		}
-	}
-
-	if (checkIfFileExist && stat(fileName, &statBuffer) == 0)
-	{
-		ui.askScreenShown = true;
-		ui.askScreenType = ASK_SAVESMP_OVERWRITE;
-		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-		setStatusMessage("OVERWRITE FILE ?", NO_CARRY);
-		renderAskDialog();
-		return -1;
-	}
-
-	if (ui.askScreenShown)
-	{
-		ui.answerNo = false;
-		ui.answerYes = false;
-		ui.askScreenShown = false;
-	}
-
-	f = fopen(fileName, "wb");
-	if (f == NULL)
-	{
-		displayErrorMsg("FILE I/O ERROR !");
-		return false;
-	}
-
-	sampleSize = modEntry->samples[editor.currSample].length;
-
-	switch (diskop.smpSaveType)
-	{
-		default:
-		case DISKOP_SMP_WAV:
-		{
-			s = &modEntry->samples[editor.currSample];
-
-			wavHeader.format = 0x45564157; // "WAVE"
-			wavHeader.chunkID = 0x46464952; // "RIFF"
-			wavHeader.subchunk1ID = 0x20746D66; // "fmt "
-			wavHeader.subchunk2ID = 0x61746164; // "data"
-			wavHeader.subchunk1Size = 16;
-			wavHeader.subchunk2Size = sampleSize;
-			wavHeader.chunkSize = wavHeader.subchunk2Size + 36;
-			wavHeader.audioFormat = 1;
-			wavHeader.numChannels = 1;
-			wavHeader.bitsPerSample = 8;
-			wavHeader.sampleRate = 16574;
-			wavHeader.byteRate = wavHeader.sampleRate * wavHeader.numChannels * wavHeader.bitsPerSample / 8;
-			wavHeader.blockAlign = wavHeader.numChannels * wavHeader.bitsPerSample / 8;
-
-			if (s->loopLength > 2)
-			{
-				wavHeader.chunkSize += sizeof (samplerChunk_t);
-				memset(&samplerChunk, 0, sizeof (samplerChunk_t));
-				samplerChunk.chunkID = 0x6C706D73; // "smpl"
-				samplerChunk.chunkSize = 60;
-				samplerChunk.dwSamplePeriod = 1000000000 / 16574;
-				samplerChunk.dwMIDIUnityNote = 60; // 60 = C-4
-				samplerChunk.cSampleLoops = 1;
-				samplerChunk.loop.dwStart = (uint32_t)s->loopStart;
-				samplerChunk.loop.dwEnd = (uint32_t)((s->loopStart + s->loopLength) - 1);
-			}
-
-			fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
-
-			for (i = 0; i < (int32_t)sampleSize; i++)
-			{
-				smp = modEntry->sampleData[modEntry->samples[editor.currSample].offset + i] + 128;
-				fputc(smp, f);
-			}
-
-			if (sampleSize & 1)
-				fputc(0, f); // pad align byte
-
-			if (s->loopLength > 2)
-				fwrite(&samplerChunk, sizeof (samplerChunk), 1, f);
-		}
-		break;
-
-		case DISKOP_SMP_IFF:
-		{
-			// dwords are big-endian in IFF
-			loopStart = modEntry->samples[editor.currSample].loopStart  & 0xFFFFFFFE;
-			loopLen = modEntry->samples[editor.currSample].loopLength & 0xFFFFFFFE;
-
-			loopStart = SWAP32(loopStart);
-			loopLen = SWAP32(loopLen);
-			iffSize = SWAP32(sampleSize + 100);
-			iffSampleSize = SWAP32(sampleSize);
-
-			fputc(0x46, f);fputc(0x4F, f);fputc(0x52, f);fputc(0x4D, f); // "FORM"
-			fwrite(&iffSize, 4, 1, f);
-
-			fputc(0x38, f);fputc(0x53, f);fputc(0x56, f);fputc(0x58, f); // "8SVX"
-			fputc(0x56, f);fputc(0x48, f);fputc(0x44, f);fputc(0x52, f); // "VHDR"
-			fputc(0x00, f);fputc(0x00, f);fputc(0x00, f);fputc(0x14, f); // 0x00000014
-
-			if (modEntry->samples[editor.currSample].loopLength > 2)
-			{
-				fwrite(&loopStart, 4, 1, f);
-				fwrite(&loopLen, 4, 1, f);
-			}
-			else
-			{
-				fwrite(&iffSampleSize, 4, 1, f);
-				fputc(0x00, f);fputc(0x00, f);fputc(0x00, f);fputc(0x00, f); // 0x00000000
-			}
-
-			fputc(0x00, f);fputc(0x00, f);fputc(0x00, f);fputc(0x00, f); // 0x00000000
-
-			fputc(0x41, f);fputc(0x56, f); // 16726 (rate)
-			fputc(0x01, f);fputc(0x00, f); // numSamples and compression
-
-			tmp32 = modEntry->samples[editor.currSample].volume * 1024;
-			tmp32 = SWAP32(tmp32);
-			fwrite(&tmp32, 4, 1, f);
-
-			fputc(0x4E, f);fputc(0x41, f);fputc(0x4D, f);fputc(0x45, f); // "NAME"
-			fputc(0x00, f);fputc(0x00, f);fputc(0x00, f);fputc(0x16, f); // 0x00000016
-
-			for (i = 0; i < 22; i++)
-				fputc(tolower(modEntry->samples[editor.currSample].text[i]), f);
-
-			fputc(0x41, f);fputc(0x4E, f);fputc(0x4E, f);fputc(0x4F, f); // "ANNO"
-			fputc(0x00, f);fputc(0x00, f);fputc(0x00, f);fputc(0x15, f); // 0x00000012
-			fprintf(f, "ProTracker 2 clone");
-			fputc(0x00, f); // even padding
-
-			fputc(0x42, f);fputc(0x4F, f);fputc(0x44, f);fputc(0x59, f);    // "BODY"
-			fwrite(&iffSampleSize, 4, 1, f);
-			fwrite(modEntry->sampleData + modEntry->samples[editor.currSample].offset, 1, sampleSize, f);
-
-			// shouldn't happen, but in just case: safety even padding
-			if (sampleSize & 1)
-				fputc(0x00, f);
-		}
-		break;
-
-		case DISKOP_SMP_RAW:
-			fwrite(modEntry->sampleData + modEntry->samples[editor.currSample].offset, 1, sampleSize, f);
-		break;
-	}
-
-	fclose(f);
-
-	diskop.cached = false;
-	if (ui.diskOpScreenShown)
-		ui.updateDiskOpFileList = true;
-
-	displayMsg("SAMPLE SAVED !");
-	setMsgPointer();
-
-	return true;
 }

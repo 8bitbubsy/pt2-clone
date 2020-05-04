@@ -15,14 +15,16 @@
 #include "pt2_palette.h"
 #include "pt2_diskop.h"
 #include "pt2_sampler.h"
-#include "pt2_modloader.h"
+#include "pt2_module_loader.h"
 #include "pt2_edit.h"
-#include "pt2_sampleloader.h"
+#include "pt2_sample_loader.h"
 #include "pt2_visuals.h"
 #include "pt2_tables.h"
 #include "pt2_audio.h"
 #include "pt2_textout.h"
 #include "pt2_keyboard.h"
+#include "pt2_config.h"
+#include "pt2_bmp.h"
 
 /* TODO: Move irrelevant routines outta here! Disgusting design!
 ** Keep in mind that this was programmed in my early programming days...
@@ -574,8 +576,8 @@ void edPosUpButton(bool fast)
 		}
 	}
 
-	if (editor.samplePos > modEntry->samples[editor.currSample].length)
-		editor.samplePos = modEntry->samples[editor.currSample].length;
+	if (editor.samplePos > song->samples[editor.currSample].length)
+		editor.samplePos = song->samples[editor.currSample].length;
 
 	ui.updatePosText = true;
 }
@@ -712,12 +714,12 @@ void sampleDownButton(void)
 
 void sampleFineTuneUpButton(void)
 {
-	int8_t finetune = modEntry->samples[editor.currSample].fineTune & 0xF;
+	int8_t finetune = song->samples[editor.currSample].fineTune & 0xF;
 	if (finetune != 7)
-		modEntry->samples[editor.currSample].fineTune = (finetune + 1) & 0xF;
+		song->samples[editor.currSample].fineTune = (finetune + 1) & 0xF;
 
 	if (mouse.rightButtonPressed)
-		modEntry->samples[editor.currSample].fineTune = 0;
+		song->samples[editor.currSample].fineTune = 0;
 
 	recalcChordLength();
 	ui.updateCurrSampleFineTune = true;
@@ -725,12 +727,12 @@ void sampleFineTuneUpButton(void)
 
 void sampleFineTuneDownButton(void)
 {
-	int8_t finetune = modEntry->samples[editor.currSample].fineTune & 0xF;
+	int8_t finetune = song->samples[editor.currSample].fineTune & 0xF;
 	if (finetune != 8)
-		modEntry->samples[editor.currSample].fineTune = (finetune - 1) & 0xF;
+		song->samples[editor.currSample].fineTune = (finetune - 1) & 0xF;
 
 	if (mouse.rightButtonPressed)
-		modEntry->samples[editor.currSample].fineTune = 0;
+		song->samples[editor.currSample].fineTune = 0;
 
 	recalcChordLength();
 	ui.updateCurrSampleFineTune = true;
@@ -738,7 +740,7 @@ void sampleFineTuneDownButton(void)
 
 void sampleVolumeUpButton(void)
 {
-	int8_t val = modEntry->samples[editor.currSample].volume;
+	int8_t val = song->samples[editor.currSample].volume;
 
 	if (mouse.rightButtonPressed)
 		val += 16;
@@ -748,13 +750,13 @@ void sampleVolumeUpButton(void)
 	if (val > 64)
 		val = 64;
 
-	modEntry->samples[editor.currSample].volume = (uint8_t)val;
+	song->samples[editor.currSample].volume = (uint8_t)val;
 	ui.updateCurrSampleVolume = true;
 }
 
 void sampleVolumeDownButton(void)
 {
-	int8_t val = modEntry->samples[editor.currSample].volume;
+	int8_t val = song->samples[editor.currSample].volume;
 
 	if (mouse.rightButtonPressed)
 		val -= 16;
@@ -764,7 +766,7 @@ void sampleVolumeDownButton(void)
 	if (val < 0)
 		val = 0;
 
-	modEntry->samples[editor.currSample].volume = (uint8_t)val;
+	song->samples[editor.currSample].volume = (uint8_t)val;
 	ui.updateCurrSampleVolume = true;
 }
 
@@ -772,10 +774,10 @@ void sampleLengthUpButton(bool fast)
 {
 	int32_t val;
 
-	if (modEntry->samples[editor.currSample].length == MAX_SAMPLE_LEN)
+	if (song->samples[editor.currSample].length == MAX_SAMPLE_LEN)
 		return;
 
-	val = modEntry->samples[editor.currSample].length;
+	val = song->samples[editor.currSample].length;
 	if (mouse.rightButtonPressed)
 	{
 		if (fast)
@@ -794,7 +796,7 @@ void sampleLengthUpButton(bool fast)
 	if (val > MAX_SAMPLE_LEN)
 		val = MAX_SAMPLE_LEN;
 
-	modEntry->samples[editor.currSample].length = (uint16_t)val;
+	song->samples[editor.currSample].length = (uint16_t)val;
 	ui.updateCurrSampleLength = true;
 }
 
@@ -803,7 +805,7 @@ void sampleLengthDownButton(bool fast)
 	int32_t val;
 	moduleSample_t *s;
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->loopStart+s->loopLength > 2)
 	{
 		if (s->length == s->loopStart+s->loopLength)
@@ -815,7 +817,7 @@ void sampleLengthDownButton(bool fast)
 			return;
 	}
 
-	val = modEntry->samples[editor.currSample].length;
+	val = song->samples[editor.currSample].length;
 	if (mouse.rightButtonPressed)
 	{
 		if (fast)
@@ -849,13 +851,13 @@ void sampleRepeatUpButton(bool fast)
 {
 	int32_t val, loopLen, len;
 
-	val = modEntry->samples[editor.currSample].loopStart;
-	loopLen = modEntry->samples[editor.currSample].loopLength;
-	len = modEntry->samples[editor.currSample].length;
+	val = song->samples[editor.currSample].loopStart;
+	loopLen = song->samples[editor.currSample].loopLength;
+	len = song->samples[editor.currSample].length;
 
 	if (len == 0)
 	{
-		modEntry->samples[editor.currSample].loopStart = 0;
+		song->samples[editor.currSample].loopStart = 0;
 		return;
 	}
 
@@ -877,7 +879,7 @@ void sampleRepeatUpButton(bool fast)
 	if (val > len-loopLen)
 		val = len-loopLen;
 
-	modEntry->samples[editor.currSample].loopStart = (uint16_t)val;
+	song->samples[editor.currSample].loopStart = (uint16_t)val;
 	ui.updateCurrSampleRepeat = true;
 
 	mixerUpdateLoops();
@@ -893,12 +895,12 @@ void sampleRepeatDownButton(bool fast)
 {
 	int32_t val, len;
 
-	val = modEntry->samples[editor.currSample].loopStart;
-	len = modEntry->samples[editor.currSample].length;
+	val = song->samples[editor.currSample].loopStart;
+	len = song->samples[editor.currSample].length;
 
 	if (len == 0)
 	{
-		modEntry->samples[editor.currSample].loopStart = 0;
+		song->samples[editor.currSample].loopStart = 0;
 		return;
 	}
 
@@ -920,7 +922,7 @@ void sampleRepeatDownButton(bool fast)
 	if (val < 0)
 		val = 0;
 
-	modEntry->samples[editor.currSample].loopStart = (uint16_t)val;
+	song->samples[editor.currSample].loopStart = (uint16_t)val;
 	ui.updateCurrSampleRepeat = true;
 
 	mixerUpdateLoops();
@@ -936,13 +938,13 @@ void sampleRepeatLengthUpButton(bool fast)
 {
 	int32_t val, loopStart, len;
 
-	val = modEntry->samples[editor.currSample].loopLength;
-	loopStart = modEntry->samples[editor.currSample].loopStart;
-	len = modEntry->samples[editor.currSample].length;
+	val = song->samples[editor.currSample].loopLength;
+	loopStart = song->samples[editor.currSample].loopStart;
+	len = song->samples[editor.currSample].length;
 
 	if (len == 0)
 	{
-		modEntry->samples[editor.currSample].loopLength = 2;
+		song->samples[editor.currSample].loopLength = 2;
 		return;
 	}
 
@@ -964,7 +966,7 @@ void sampleRepeatLengthUpButton(bool fast)
 	if (val > len-loopStart)
 		val = len-loopStart;
 
-	modEntry->samples[editor.currSample].loopLength = (uint16_t)val;
+	song->samples[editor.currSample].loopLength = (uint16_t)val;
 	ui.updateCurrSampleReplen = true;
 
 	mixerUpdateLoops();
@@ -980,12 +982,12 @@ void sampleRepeatLengthDownButton(bool fast)
 {
 	int32_t val, len;
 
-	val = modEntry->samples[editor.currSample].loopLength;
-	len = modEntry->samples[editor.currSample].length;
+	val = song->samples[editor.currSample].loopLength;
+	len = song->samples[editor.currSample].length;
 
 	if (len == 0)
 	{
-		modEntry->samples[editor.currSample].loopLength = 2;
+		song->samples[editor.currSample].loopLength = 2;
 		return;
 	}
 
@@ -1007,7 +1009,7 @@ void sampleRepeatLengthDownButton(bool fast)
 	if (val < 2)
 		val = 2;
 
-	modEntry->samples[editor.currSample].loopLength = (uint16_t)val;
+	song->samples[editor.currSample].loopLength = (uint16_t)val;
 	ui.updateCurrSampleReplen = true;
 
 	mixerUpdateLoops();
@@ -1026,7 +1028,7 @@ void tempoUpButton(void)
 	if (editor.timingMode == TEMPO_MODE_VBLANK)
 		return;
 
-	val = modEntry->currBPM;
+	val = song->currBPM;
 	if (mouse.rightButtonPressed)
 		val += 10;
 	else
@@ -1035,8 +1037,8 @@ void tempoUpButton(void)
 	if (val > 255)
 		val = 255;
 
-	modEntry->currBPM = val;
-	modSetTempo(modEntry->currBPM);
+	song->currBPM = val;
+	modSetTempo(song->currBPM);
 	ui.updateSongBPM = true;
 }
 
@@ -1047,7 +1049,7 @@ void tempoDownButton(void)
 	if (editor.timingMode == TEMPO_MODE_VBLANK)
 		return;
 
-	val = modEntry->currBPM;
+	val = song->currBPM;
 	if (mouse.rightButtonPressed)
 		val -= 10;
 	else
@@ -1056,8 +1058,8 @@ void tempoDownButton(void)
 	if (val < 32)
 		val = 32;
 
-	modEntry->currBPM = val;
-	modSetTempo(modEntry->currBPM);
+	song->currBPM = val;
+	modSetTempo(song->currBPM);
 	ui.updateSongBPM = true;
 }
 
@@ -1065,7 +1067,7 @@ void songLengthUpButton(void)
 {
 	int16_t val;
 
-	val = modEntry->head.orderCount;
+	val = song->header.numOrders;
 	if (mouse.rightButtonPressed)
 		val += 10;
 	else
@@ -1074,19 +1076,19 @@ void songLengthUpButton(void)
 	if (val > 128)
 		val = 128;
 
-	modEntry->head.orderCount = (uint8_t)val;
+	song->header.numOrders = (uint8_t)val;
 
-	val = modEntry->currOrder;
-	if (val > modEntry->head.orderCount-1)
-		val = modEntry->head.orderCount-1;
+	val = song->currOrder;
+	if (val > song->header.numOrders-1)
+		val = song->header.numOrders-1;
 
-	editor.currPosEdPattDisp = &modEntry->head.order[val];
+	editor.currPosEdPattDisp = &song->header.order[val];
 	ui.updateSongLength = true;
 }
 
 void songLengthDownButton(void)
 {
-	int16_t val = modEntry->head.orderCount;
+	int16_t val = song->header.numOrders;
 
 	if (mouse.rightButtonPressed)
 		val -= 10;
@@ -1096,19 +1098,19 @@ void songLengthDownButton(void)
 	if (val < 1)
 		val = 1;
 
-	modEntry->head.orderCount = (uint8_t)val;
+	song->header.numOrders = (uint8_t)val;
 
-	val = modEntry->currOrder;
-	if (val > modEntry->head.orderCount-1)
-		val = modEntry->head.orderCount-1;
+	val = song->currOrder;
+	if (val > song->header.numOrders-1)
+		val = song->header.numOrders-1;
 
-	editor.currPosEdPattDisp = &modEntry->head.order[val];
+	editor.currPosEdPattDisp = &song->header.order[val];
 	ui.updateSongLength = true;
 }
 
 void patternUpButton(void)
 {
-	int16_t val = modEntry->head.order[modEntry->currOrder];
+	int16_t val = song->header.order[song->currOrder];
 
 	if (mouse.rightButtonPressed)
 		val += 10;
@@ -1118,7 +1120,7 @@ void patternUpButton(void)
 	if (val > MAX_PATTERNS-1)
 		val = MAX_PATTERNS-1;
 
-	modEntry->head.order[modEntry->currOrder] = (uint8_t)val;
+	song->header.order[song->currOrder] = (uint8_t)val;
 
 	if (ui.posEdScreenShown)
 		ui.updatePosEd = true;
@@ -1128,7 +1130,7 @@ void patternUpButton(void)
 
 void patternDownButton(void)
 {
-	int16_t val = modEntry->head.order[modEntry->currOrder];
+	int16_t val = song->header.order[song->currOrder];
 
 	if (mouse.rightButtonPressed)
 		val -= 10;
@@ -1138,7 +1140,7 @@ void patternDownButton(void)
 	if (val < 0)
 		val = 0;
 
-	modEntry->head.order[modEntry->currOrder] = (uint8_t)val;
+	song->header.order[song->currOrder] = (uint8_t)val;
 
 	if (ui.posEdScreenShown)
 		ui.updatePosEd = true;
@@ -1148,7 +1150,7 @@ void patternDownButton(void)
 
 void positionUpButton(void)
 {
-	int16_t val = modEntry->currOrder;
+	int16_t val = song->currOrder;
 
 	if (mouse.rightButtonPressed)
 		val += 10;
@@ -1163,7 +1165,7 @@ void positionUpButton(void)
 
 void positionDownButton(void)
 {
-	int16_t val = modEntry->currOrder;
+	int16_t val = song->currOrder;
 
 	if (mouse.rightButtonPressed)
 		val -= 10;
@@ -1321,14 +1323,20 @@ void handleSamplerVolumeBox(void)
 			// NORMALIZE
 			if (mouse.x >= 101 && mouse.x <= 143)
 			{
-				s = &modEntry->samples[editor.currSample];
-				if (s->length == 0)
+				if (editor.sampleZero)
 				{
-					displayErrorMsg("SAMPLE IS EMPTY");
+					statusNotSampleZero();
 					return;
 				}
 
-				sampleData = &modEntry->sampleData[s->offset];
+				s = &song->samples[editor.currSample];
+				if (s->length == 0)
+				{
+					statusSampleIsEmpty();
+					return;
+				}
+
+				sampleData = &song->sampleData[s->offset];
 				if (editor.markStartOfs != -1)
 				{
 					sampleData += editor.markStartOfs;
@@ -1424,10 +1432,16 @@ void handleSamplerVolumeBox(void)
 			// RAMP
 			else if (mouse.x >= 72 && mouse.x <= 100)
 			{
-				s = &modEntry->samples[editor.currSample];
+				if (editor.sampleZero)
+				{
+					statusNotSampleZero();
+					return;
+				}
+
+				s = &song->samples[editor.currSample];
 				if (s->length == 0)
 				{
-					displayErrorMsg("SAMPLE IS EMPTY");
+					statusSampleIsEmpty();
 					return;
 				}
 
@@ -1438,7 +1452,7 @@ void handleSamplerVolumeBox(void)
 					return;
 				}
 
-				sampleData = &modEntry->sampleData[s->offset];
+				sampleData = &song->sampleData[s->offset];
 				if (editor.markStartOfs != -1)
 				{
 					sampleData += editor.markStartOfs;
@@ -1674,14 +1688,20 @@ void handleSamplerFiltersBox(void)
 	// UNDO
 	if (mouse.x >= 65 && mouse.x <= 75 && mouse.y >= 154 && mouse.y <= 184)
 	{
-		s = &modEntry->samples[editor.currSample];
+		if (editor.sampleZero)
+		{
+			statusNotSampleZero();
+			return;
+		}
+
+		s = &song->samples[editor.currSample];
 		if (s->length == 0)
 		{
-			displayErrorMsg("SAMPLE IS EMPTY");
+			statusSampleIsEmpty();
 		}
 		else
 		{
-			memcpy(&modEntry->sampleData[s->offset], editor.tempSample, MAX_SAMPLE_LEN);
+			memcpy(&song->sampleData[s->offset], editor.tempSample, MAX_SAMPLE_LEN);
 			redrawSample();
 			updateWindowTitle(MOD_IS_MODIFIED);
 			renderSamplerFiltersBox();
@@ -2053,18 +2073,18 @@ void mouseWheelUpHandler(void)
 				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (ui.posEdScreenShown && modEntry->currOrder > 0)
+		else if (ui.posEdScreenShown && song->currOrder > 0)
 		{
-			modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+			modSetPos(song->currOrder - 1, DONT_SET_ROW);
 		}
 	}
 	else if (ui.samplerScreenShown)
 	{
 		samplerZoomInMouseWheel(); // lower part of screen
 	}
-	else if (!editor.songPlaying && modEntry->currRow > 0)
+	else if (!editor.songPlaying && song->currRow > 0)
 	{
-		modSetPos(DONT_SET_ORDER, modEntry->currRow - 1); // pattern data
+		modSetPos(DONT_SET_ORDER, song->currRow - 1); // pattern data
 	}
 }
 
@@ -2084,18 +2104,18 @@ void mouseWheelDownHandler(void)
 				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (ui.posEdScreenShown && modEntry->currOrder < modEntry->head.orderCount-1)
+		else if (ui.posEdScreenShown && song->currOrder < song->header.numOrders-1)
 		{
-			modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
+			modSetPos(song->currOrder + 1, DONT_SET_ROW);
 		}
 	}
 	else if (ui.samplerScreenShown)
 	{
 		samplerZoomOutMouseWheel(); // lower part of screen
 	}
-	else if (!editor.songPlaying && modEntry->currRow < MOD_ROWS)
+	else if (!editor.songPlaying && song->currRow < MOD_ROWS)
 	{
-		modSetPos(DONT_SET_ORDER, modEntry->currRow + 1); // pattern data
+		modSetPos(DONT_SET_ORDER, song->currRow + 1); // pattern data
 	}
 }
 
@@ -2371,7 +2391,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (editor.songPlaying)
 				sprintf(pat2SmpText, "ROW 00 TO SMP %02X?", editor.currSample + 1);
 			else
-				sprintf(pat2SmpText, "ROW %02d TO SMP %02X?", modEntry->currRow, editor.currSample + 1);
+				sprintf(pat2SmpText, "ROW %02d TO SMP %02X?", song->currRow, editor.currSample + 1);
 
 			setStatusMessage(pat2SmpText, NO_CARRY);
 			renderAskDialog();
@@ -2591,10 +2611,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				s = &modEntry->samples[editor.currSample];
+				if (editor.sampleZero)
+				{
+					statusNotSampleZero();
+					break;
+				}
+
+				s = &song->samples[editor.currSample];
 				if (s->length == 0)
 				{
-					displayErrorMsg("SAMPLE IS EMPTY");
+					statusSampleIsEmpty();
 					break;
 				}
 
@@ -2611,10 +2637,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 					return true;
 				}
 
-				memcpy(ptr8_1, &modEntry->sampleData[s->offset], MAX_SAMPLE_LEN);
+				memcpy(ptr8_1, &song->sampleData[s->offset], MAX_SAMPLE_LEN);
 
-				ptr8_2 = &modEntry->sampleData[s->offset+editor.samplePos];
-				ptr8_3 = &modEntry->sampleData[s->offset+s->length-1];
+				ptr8_2 = &song->sampleData[s->offset+editor.samplePos];
+				ptr8_3 = &song->sampleData[s->offset+s->length-1];
 				ptr8_4 = ptr8_1;
 
 				editor.modulateOffset = 0;
@@ -2637,12 +2663,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 					{
 						editor.modulatePos += editor.modulateSpeed;
 
-						modTmp = (editor.modulatePos / 4096) & 0xFF;
-						modDat = vibratoTable[modTmp & 0x1F] / 4;
+						modTmp = (editor.modulatePos >> 12) & 0xFF;
+						modDat = vibratoTable[modTmp & 0x1F] >> 2;
 						modPos = ((modTmp & 32) ? (editor.modulateOffset - modDat) : (editor.modulateOffset + modDat)) + 2048;
 
 						editor.modulateOffset = modPos;
-						modPos /= 2048;
+						modPos >>= 11;
 						modPos = CLAMP(modPos, 0, s->length - 1);
 						ptr8_1 = &ptr8_4[modPos];
 					}
@@ -2661,10 +2687,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_ECHO:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -2680,8 +2712,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			ptr8_1 = &modEntry->sampleData[s->offset+editor.samplePos];
-			ptr8_2 = &modEntry->sampleData[s->offset];
+			ptr8_1 = &song->sampleData[s->offset+editor.samplePos];
+			ptr8_2 = &song->sampleData[s->offset];
 			ptr8_3 = ptr8_2;
 
 			editor.modulateOffset = 0;
@@ -2702,12 +2734,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				{
 					editor.modulatePos += editor.modulateSpeed;
 
-					modTmp = (editor.modulatePos / 4096) & 0xFF;
-					modDat = vibratoTable[modTmp & 0x1F] / 4;
+					modTmp = (editor.modulatePos >> 12) & 0xFF;
+					modDat = vibratoTable[modTmp & 0x1F] >> 2;
 					modPos = ((modTmp & 32) ? (editor.modulateOffset - modDat) : (editor.modulateOffset + modDat)) + 2048;
 
 					editor.modulateOffset = modPos;
-					modPos /= 2048;
+					modPos >>= 11;
 					modPos = CLAMP(modPos, 0, s->length - 1);
 					ptr8_2 = &ptr8_3[modPos];
 				}
@@ -2756,10 +2788,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_BOOST: // this is actually treble increase
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -2773,10 +2811,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_FILTER: // this is actually treble decrease
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -2800,10 +2844,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_MOD:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -2813,7 +2863,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			ptr8_1 = &modEntry->sampleData[s->offset];
+			ptr8_1 = &song->sampleData[s->offset];
 
 			ptr8_3 = (int8_t *)malloc(MAX_SAMPLE_LEN);
 			if (ptr8_3 == NULL)
@@ -2835,13 +2885,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 				editor.modulatePos += editor.modulateSpeed;
 
-				modTmp = (editor.modulatePos / 4096) & 0xFF;
-				modDat = vibratoTable[modTmp & 0x1F] / 4;
+				modTmp = (editor.modulatePos >> 12) & 0xFF;
+				modDat = vibratoTable[modTmp & 0x1F] >> 2;
 				modPos = ((modTmp & 32) ? (editor.modulateOffset - modDat) : (editor.modulateOffset + modDat)) + 2048;
 
 				editor.modulateOffset = modPos;
 
-				modPos /= 2048;
+				modPos >>= 11;
 				modPos = CLAMP(modPos, 0, s->length - 1);
 				ptr8_2 = &ptr8_3[modPos];
 			}
@@ -2861,16 +2911,22 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_X_FADE:
 		{
-			s = &modEntry->samples[editor.currSample];
-
-			if (s->length == 0)
+			if (editor.sampleZero)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusNotSampleZero();
 				break;
 			}
 
-			ptr8_1 = &modEntry->sampleData[s->offset];
-			ptr8_2 = &modEntry->sampleData[s->offset+s->length-1];
+			s = &song->samples[editor.currSample];
+
+			if (s->length == 0)
+			{
+				statusSampleIsEmpty();
+				break;
+			}
+
+			ptr8_1 = &song->sampleData[s->offset];
+			ptr8_2 = &song->sampleData[s->offset+s->length-1];
 
 			do
 			{
@@ -2896,22 +2952,28 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_BACKWD:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
 			if (editor.markStartOfs != -1 && editor.markStartOfs != editor.markEndOfs && editor.markEndOfs != 0)
 			{
-				ptr8_1 = &modEntry->sampleData[s->offset+editor.markStartOfs];
-				ptr8_2 = &modEntry->sampleData[s->offset+editor.markEndOfs-1];
+				ptr8_1 = &song->sampleData[s->offset+editor.markStartOfs];
+				ptr8_2 = &song->sampleData[s->offset+editor.markEndOfs-1];
 			}
 			else
 			{
-				ptr8_1 = &modEntry->sampleData[s->offset];
-				ptr8_2 = &modEntry->sampleData[s->offset+s->length-1];
+				ptr8_1 = &song->sampleData[s->offset];
+				ptr8_2 = &song->sampleData[s->offset+s->length-1];
 			}
 
 			do
@@ -2932,10 +2994,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_CB:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -2953,8 +3021,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			turnOffVoices();
 
-			memcpy(&modEntry->sampleData[s->offset], &modEntry->sampleData[s->offset + editor.samplePos], MAX_SAMPLE_LEN - editor.samplePos);
-			memset(&modEntry->sampleData[s->offset + (MAX_SAMPLE_LEN - editor.samplePos)], 0, editor.samplePos);
+			memcpy(&song->sampleData[s->offset], &song->sampleData[s->offset + editor.samplePos], MAX_SAMPLE_LEN - editor.samplePos);
+			memset(&song->sampleData[s->offset + (MAX_SAMPLE_LEN - editor.samplePos)], 0, editor.samplePos);
 
 			if (editor.samplePos > s->loopStart)
 			{
@@ -2986,10 +3054,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		// fade up
 		case PTB_EO_FU:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -3001,7 +3075,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			double dSamplePosMul = 1.0 / editor.samplePos;
 
-			ptr8_1 = &modEntry->sampleData[s->offset];
+			ptr8_1 = &song->sampleData[s->offset];
 			for (j = 0; j < editor.samplePos; j++)
 			{
 				dSmp = ((*ptr8_1) * j) * dSamplePosMul;
@@ -3021,10 +3095,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		// fade down
 		case PTB_EO_FD:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -3040,13 +3120,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 			double dSampleMul = 1.0 / tmp32;
 
-			ptr8_1 = &modEntry->sampleData[s->offset+s->length-1];
+			ptr8_1 = &song->sampleData[s->offset+s->length-1];
+
+			int32_t idx = 0;
 			for (j = editor.samplePos; j < s->length; j++)
 			{
-				dSmp = ((*ptr8_1) * (j - editor.samplePos)) * dSampleMul;
+				dSmp = ((*ptr8_1) * idx) * dSampleMul;
 				smp32 = (int32_t)dSmp;
 				CLAMP8(smp32);
 				*ptr8_1-- = (int8_t)smp32;
+
+				idx++;
 			}
 
 			fixSampleBeep(s);
@@ -3059,10 +3143,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_UPSAMP:
 		{
-			s = &modEntry->samples[editor.currSample];
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -3076,10 +3160,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_DNSAMP:
 		{
-			s = &modEntry->samples[editor.currSample];
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
@@ -3112,21 +3196,27 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_VOL:
 		{
-			s = &modEntry->samples[editor.currSample];
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
+			s = &song->samples[editor.currSample];
 			if (s->length == 0)
 			{
-				displayErrorMsg("SAMPLE IS EMPTY");
+				statusSampleIsEmpty();
 				break;
 			}
 
 			if (editor.sampleVol != 100)
 			{
-				ptr8_1 = &modEntry->sampleData[modEntry->samples[editor.currSample].offset];
-				double dSampleMul = editor.sampleVol / 100.0;
+				ptr8_1 = &song->sampleData[s->offset];
+				int32_t sampleMul = (((1UL << 19) * editor.sampleVol) + 50) / 100;
 
 				for (j = 0; j < s->length; j++)
 				{
-					tmp16 = (int16_t)(ptr8_1[j] * dSampleMul);
+					tmp16 = (ptr8_1[j] * sampleMul) >> 19;
 					CLAMP8(tmp16);
 					ptr8_1[j] = (int8_t)tmp16;
 				}
@@ -3442,7 +3532,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_LENGTH:
 		{
-			if (modEntry->samples[editor.currSample].loopLength == 2 && modEntry->samples[editor.currSample].loopStart == 0)
+			if (song->samples[editor.currSample].loopLength == 2 && song->samples[editor.currSample].loopStart == 0)
 			{
 				editor.chordLengthMin = mouse.rightButtonPressed ? true : false;
 				recalcChordLength();
@@ -3497,11 +3587,11 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 			{
-				ui.tmpDisp16 = modEntry->currOrder;
-				if (ui.tmpDisp16 > modEntry->head.orderCount-1)
-					ui.tmpDisp16 = modEntry->head.orderCount-1;
+				ui.tmpDisp16 = song->currOrder;
+				if (ui.tmpDisp16 > song->header.numOrders-1)
+					ui.tmpDisp16 = song->header.numOrders-1;
 
-				ui.tmpDisp16 = modEntry->head.order[ui.tmpDisp16];
+				ui.tmpDisp16 = song->header.order[ui.tmpDisp16];
 				editor.currPosEdPattDisp = &ui.tmpDisp16;
 				ui.numPtr16 = &ui.tmpDisp16;
 				ui.numLen = 2;
@@ -3513,29 +3603,29 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PE_SCROLLTOP:
 		{
-			if (modEntry->currOrder != 0)
+			if (song->currOrder != 0)
 				modSetPos(0, DONT_SET_ROW);
 		}
 		break;
 
 		case PTB_PE_SCROLLUP:
 		{
-			if (modEntry->currOrder > 0)
-				modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+			if (song->currOrder > 0)
+				modSetPos(song->currOrder - 1, DONT_SET_ROW);
 		}
 		break;
 
 		case PTB_PE_SCROLLDOWN:
 		{
-			if (modEntry->currOrder < modEntry->head.orderCount-1)
-				modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
+			if (song->currOrder < song->header.numOrders-1)
+				modSetPos(song->currOrder + 1, DONT_SET_ROW);
 		}
 		break;
 
 		case PTB_PE_SCROLLBOT:
 		{
-			if (modEntry->currOrder != modEntry->head.orderCount-1)
-				modSetPos(modEntry->head.orderCount - 1, DONT_SET_ROW);
+			if (song->currOrder != song->header.numOrders-1)
+				modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
 		}
 		break;
 
@@ -3569,15 +3659,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				if (mouse.rightButtonPressed)
 				{
-					modEntry->currOrder = 0;
-					editor.currPatternDisp = &modEntry->head.order[modEntry->currOrder];
+					song->currOrder = 0;
+					editor.currPatternDisp = &song->header.order[song->currOrder];
 
 					if (ui.posEdScreenShown)
 						ui.updatePosEd = true;
 				}
 				else
 				{
-					ui.tmpDisp16 = modEntry->currOrder;
+					ui.tmpDisp16 = song->currOrder;
 					editor.currPosDisp = &ui.tmpDisp16;
 					ui.numPtr16 = &ui.tmpDisp16;
 					ui.numLen = 3;
@@ -3594,7 +3684,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				if (mouse.rightButtonPressed)
 				{
-					modEntry->head.order[modEntry->currOrder] = 0;
+					song->header.order[song->currOrder] = 0;
 
 					ui.updateSongSize = true;
 					updateWindowTitle(MOD_IS_MODIFIED);
@@ -3604,7 +3694,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				}
 				else
 				{
-					ui.tmpDisp16 = modEntry->head.order[modEntry->currOrder];
+					ui.tmpDisp16 = song->header.order[song->currOrder];
 					editor.currPatternDisp = &ui.tmpDisp16;
 					ui.numPtr16 = &ui.tmpDisp16;
 					ui.numLen = 2;
@@ -3621,13 +3711,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				if (mouse.rightButtonPressed)
 				{
-					modEntry->head.orderCount = 1;
+					song->header.numOrders = 1;
 
-					tmp16 = modEntry->currOrder;
-					if (tmp16 > modEntry->head.orderCount-1)
-						tmp16 = modEntry->head.orderCount-1;
+					tmp16 = song->currOrder;
+					if (tmp16 > song->header.numOrders-1)
+						tmp16 = song->header.numOrders-1;
 
-					editor.currPosEdPattDisp = &modEntry->head.order[tmp16];
+					editor.currPosEdPattDisp = &song->header.order[tmp16];
 
 					ui.updateSongSize = true;
 					updateWindowTitle(MOD_IS_MODIFIED);
@@ -3637,7 +3727,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				}
 				else
 				{
-					ui.tmpDisp16 = modEntry->head.orderCount;
+					ui.tmpDisp16 = song->header.numOrders;
 					editor.currLengthDisp = &ui.tmpDisp16;
 					ui.numPtr16 = &ui.tmpDisp16;
 					ui.numLen = 3;
@@ -3653,7 +3743,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (!ui.introScreenShown && (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT || editor.playMode != PLAY_MODE_NORMAL))
 			{
-				ui.tmpDisp16 = modEntry->currPattern;
+				ui.tmpDisp16 = song->currPattern;
 				editor.currEditPatternDisp = &ui.tmpDisp16;
 				ui.numPtr16 = &ui.tmpDisp16;
 				ui.numLen = 2;
@@ -3665,7 +3755,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SAMPLES:
 		{
-			editor.sampleZero = false;
+			if (editor.sampleZero)
+			{
+				editor.sampleZero = false;
+				ui.updateCurrSampleNum = true;
+			}
+
 			ui.tmpDisp8 = editor.currSample;
 			editor.currSampleDisp = &ui.tmpDisp8;
 			ui.numPtr8 = &ui.tmpDisp8;
@@ -3678,14 +3773,20 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SVOLUMES:
 		{
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
 			if (mouse.rightButtonPressed)
 			{
-				modEntry->samples[editor.currSample].volume = 0;
+				song->samples[editor.currSample].volume = 0;
 			}
 			else
 			{
-				ui.tmpDisp8 = modEntry->samples[editor.currSample].volume;
-				modEntry->samples[editor.currSample].volumeDisp = &ui.tmpDisp8;
+				ui.tmpDisp8 = song->samples[editor.currSample].volume;
+				song->samples[editor.currSample].volumeDisp = &ui.tmpDisp8;
 				ui.numPtr8 = &ui.tmpDisp8;
 				ui.numLen = 2;
 				ui.numBits = 8;
@@ -3697,9 +3798,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SLENGTHS:
 		{
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
 			if (mouse.rightButtonPressed)
 			{
-				s = &modEntry->samples[editor.currSample];
+				s = &song->samples[editor.currSample];
 
 				turnOffVoices();
 
@@ -3721,8 +3828,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.tmpDisp16 = modEntry->samples[editor.currSample].length;
-				modEntry->samples[editor.currSample].lengthDisp = &ui.tmpDisp16;
+				ui.tmpDisp16 = song->samples[editor.currSample].length;
+				song->samples[editor.currSample].lengthDisp = &ui.tmpDisp16;
 				ui.numPtr16 = &ui.tmpDisp16;
 				ui.numLen = 4;
 				ui.numBits = 16;
@@ -3734,9 +3841,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SREPEATS:
 		{
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
 			if (mouse.rightButtonPressed)
 			{
-				s = &modEntry->samples[editor.currSample];
+				s = &song->samples[editor.currSample];
 
 				s->loopStart = 0;
 				if (s->length >= s->loopLength)
@@ -3761,8 +3874,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.tmpDisp16 = modEntry->samples[editor.currSample].loopStart;
-				modEntry->samples[editor.currSample].loopStartDisp = &ui.tmpDisp16;
+				ui.tmpDisp16 = song->samples[editor.currSample].loopStart;
+				song->samples[editor.currSample].loopStartDisp = &ui.tmpDisp16;
 				ui.numPtr16 = &ui.tmpDisp16;
 				ui.numLen = 4;
 				ui.numBits = 16;
@@ -3774,9 +3887,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SREPLENS:
 		{
+			if (editor.sampleZero)
+			{
+				statusNotSampleZero();
+				break;
+			}
+
 			if (mouse.rightButtonPressed)
 			{
-				s = &modEntry->samples[editor.currSample];
+				s = &song->samples[editor.currSample];
 
 				s->loopLength = 0;
 				if (s->length >= s->loopStart)
@@ -3804,8 +3923,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.tmpDisp16 = modEntry->samples[editor.currSample].loopLength;
-				modEntry->samples[editor.currSample].loopLengthDisp = &ui.tmpDisp16;
+				ui.tmpDisp16 = song->samples[editor.currSample].loopLength;
+				song->samples[editor.currSample].loopLengthDisp = &ui.tmpDisp16;
 				ui.numPtr16 = &ui.tmpDisp16;
 				ui.numLen = 4;
 				ui.numBits = 16;
@@ -4025,15 +4144,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_POSINS:
 		{
-			if ((editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT) && modEntry->head.orderCount < 128)
+			if ((editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT) && song->header.numOrders < 128)
 			{
-				for (i = 0; i < 127-modEntry->currOrder; i++)
-					modEntry->head.order[127-i] = modEntry->head.order[(127-i)-1];
-				modEntry->head.order[modEntry->currOrder] = 0;
+				for (i = 0; i < 127-song->currOrder; i++)
+					song->header.order[127-i] = song->header.order[(127-i)-1];
+				song->header.order[song->currOrder] = 0;
 
-				modEntry->head.orderCount++;
-				if (modEntry->currOrder > modEntry->head.orderCount-1)
-					editor.currPosEdPattDisp = &modEntry->head.order[modEntry->head.orderCount-1];
+				song->header.numOrders++;
+				if (song->currOrder > song->header.numOrders-1)
+					editor.currPosEdPattDisp = &song->header.order[song->header.numOrders-1];
 
 				updateWindowTitle(MOD_IS_MODIFIED);
 
@@ -4049,15 +4168,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_POSDEL:
 		{
-			if ((editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT) && modEntry->head.orderCount > 1)
+			if ((editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT) && song->header.numOrders > 1)
 			{
-				for (i = 0; i < 128-modEntry->currOrder; i++)
-					modEntry->head.order[modEntry->currOrder+i] = modEntry->head.order[modEntry->currOrder+i+1];
-				modEntry->head.order[127] = 0;
+				for (i = 0; i < 128-song->currOrder; i++)
+					song->header.order[song->currOrder+i] = song->header.order[song->currOrder+i+1];
+				song->header.order[127] = 0;
 
-				modEntry->head.orderCount--;
-				if (modEntry->currOrder > modEntry->head.orderCount-1)
-					editor.currPosEdPattDisp = &modEntry->head.order[modEntry->head.orderCount-1];
+				song->header.numOrders--;
+				if (song->currOrder > song->header.numOrders-1)
+					editor.currPosEdPattDisp = &song->header.order[song->header.numOrders-1];
 
 				updateWindowTitle(MOD_IS_MODIFIED);
 
@@ -4112,14 +4231,14 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (mouse.rightButtonPressed)
 			{
-				memset(modEntry->head.moduleTitle, 0, sizeof (modEntry->head.moduleTitle));
+				memset(song->header.name, 0, sizeof (song->header.name));
 				ui.updateSongName = true;
 				updateWindowTitle(MOD_IS_MODIFIED);
 			}
 			else
 			{
-				ui.showTextPtr = modEntry->head.moduleTitle;
-				ui.textEndPtr = modEntry->head.moduleTitle + 19;
+				ui.showTextPtr = song->header.name;
+				ui.textEndPtr = song->header.name + 19;
 				ui.textLength = 20;
 				ui.editTextPos = 4133; // (y * 40) + x
 				ui.dstOffset = NULL;
@@ -4133,14 +4252,14 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (mouse.rightButtonPressed)
 			{
-				memset(modEntry->samples[editor.currSample].text, 0, sizeof (modEntry->samples[editor.currSample].text));
+				memset(song->samples[editor.currSample].text, 0, sizeof (song->samples[editor.currSample].text));
 				ui.updateCurrSampleName = true;
 				updateWindowTitle(MOD_IS_MODIFIED);
 			}
 			else
 			{
-				ui.showTextPtr = modEntry->samples[editor.currSample].text;
-				ui.textEndPtr = modEntry->samples[editor.currSample].text + 21;
+				ui.showTextPtr = song->samples[editor.currSample].text;
+				ui.textEndPtr = song->samples[editor.currSample].text + 21;
 				ui.textLength = 22;
 				ui.editTextPos = 4573; // (y * 40) + x
 				ui.dstOffset = NULL;
@@ -4376,9 +4495,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			editor.playMode = PLAY_MODE_NORMAL;
 
 			if (mouse.rightButtonPressed)
-				modPlay(DONT_SET_PATTERN, modEntry->currOrder, modEntry->currRow);
+				modPlay(DONT_SET_PATTERN, song->currOrder, song->currRow);
 			else
-				modPlay(DONT_SET_PATTERN, modEntry->currOrder, DONT_SET_ROW);
+				modPlay(DONT_SET_PATTERN, song->currOrder, DONT_SET_ROW);
 
 			editor.currMode = MODE_PLAY;
 			pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -4391,9 +4510,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			editor.playMode = PLAY_MODE_PATTERN;
 
 			if (mouse.rightButtonPressed)
-				modPlay(modEntry->currPattern, DONT_SET_ORDER, modEntry->currRow);
+				modPlay(song->currPattern, DONT_SET_ORDER, song->currRow);
 			else
-				modPlay(modEntry->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
+				modPlay(song->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
 
 			editor.currMode = MODE_PLAY;
 			pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -4421,9 +4540,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				editor.playMode = PLAY_MODE_PATTERN;
 
 				if (mouse.rightButtonPressed)
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, modEntry->currRow);
+					modPlay(song->currPattern, DONT_SET_ORDER, song->currRow);
 				else
-					modPlay(modEntry->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
+					modPlay(song->currPattern, DONT_SET_ORDER, DONT_SET_ROW);
 
 				editor.currMode = MODE_RECORD;
 				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
@@ -4523,7 +4642,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_FTUNEU:
 		{
-			if ((modEntry->samples[editor.currSample].fineTune & 0xF) != 7)
+			if (!editor.sampleZero && (song->samples[editor.currSample].fineTune & 0xF) != 7)
 			{
 				sampleFineTuneUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4533,18 +4652,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_FTUNED:
 		{
-			if ((modEntry->samples[editor.currSample].fineTune & 0xF) != 8)
+			if (!editor.sampleZero && (song->samples[editor.currSample].fineTune & 0xF) != 8)
 			{
 				sampleFineTuneDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
-
 			}
 		}
 		break;
 
 		case PTB_SVOLUMEU:
 		{
-			if (modEntry->samples[editor.currSample].volume < 64)
+			if (!editor.sampleZero && song->samples[editor.currSample].volume < 64)
 			{
 				sampleVolumeUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4554,7 +4672,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SVOLUMED:
 		{
-			if (modEntry->samples[editor.currSample].volume > 0)
+			if (!editor.sampleZero && song->samples[editor.currSample].volume > 0)
 			{
 				sampleVolumeDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4564,7 +4682,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SLENGTHU:
 		{
-			if (modEntry->samples[editor.currSample].length < MAX_SAMPLE_LEN)
+			if (!editor.sampleZero && song->samples[editor.currSample].length < MAX_SAMPLE_LEN)
 			{
 				sampleLengthUpButton(INCREMENT_SLOW);
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4574,7 +4692,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SLENGTHD:
 		{
-			if (modEntry->samples[editor.currSample].length > 0)
+			if (!editor.sampleZero && song->samples[editor.currSample].length > 0)
 			{
 				sampleLengthDownButton(INCREMENT_SLOW);
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4584,37 +4702,49 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SREPEATU:
 		{
-			oldVal = modEntry->samples[editor.currSample].loopStart;
-			sampleRepeatUpButton(INCREMENT_SLOW);
-			if (modEntry->samples[editor.currSample].loopStart != oldVal)
-				updateWindowTitle(MOD_IS_MODIFIED);
+			if (!editor.sampleZero)
+			{
+				oldVal = song->samples[editor.currSample].loopStart;
+				sampleRepeatUpButton(INCREMENT_SLOW);
+				if (song->samples[editor.currSample].loopStart != oldVal)
+					updateWindowTitle(MOD_IS_MODIFIED);
+			}
 		}
 		break;
 
 		case PTB_SREPEATD:
 		{
-			oldVal = modEntry->samples[editor.currSample].loopStart;
-			sampleRepeatDownButton(INCREMENT_SLOW);
-			if (modEntry->samples[editor.currSample].loopStart != oldVal)
-				updateWindowTitle(MOD_IS_MODIFIED);
+			if (!editor.sampleZero)
+			{
+				oldVal = song->samples[editor.currSample].loopStart;
+				sampleRepeatDownButton(INCREMENT_SLOW);
+				if (song->samples[editor.currSample].loopStart != oldVal)
+					updateWindowTitle(MOD_IS_MODIFIED);
+			}
 		}
 		break;
 
 		case PTB_SREPLENU:
 		{
-			oldVal = modEntry->samples[editor.currSample].loopLength;
-			sampleRepeatLengthUpButton(INCREMENT_SLOW);
-			if (modEntry->samples[editor.currSample].loopLength != oldVal)
-				updateWindowTitle(MOD_IS_MODIFIED);
+			if (!editor.sampleZero)
+			{
+				oldVal = song->samples[editor.currSample].loopLength;
+				sampleRepeatLengthUpButton(INCREMENT_SLOW);
+				if (song->samples[editor.currSample].loopLength != oldVal)
+					updateWindowTitle(MOD_IS_MODIFIED);
+			}
 		}
 		break;
 
 		case PTB_SREPLEND:
 		{
-			oldVal = modEntry->samples[editor.currSample].loopLength;
-			sampleRepeatLengthDownButton(INCREMENT_SLOW);
-			if (modEntry->samples[editor.currSample].loopLength != oldVal)
-				updateWindowTitle(MOD_IS_MODIFIED);
+			if (!editor.sampleZero)
+			{
+				oldVal = song->samples[editor.currSample].loopLength;
+				sampleRepeatLengthDownButton(INCREMENT_SLOW);
+				if (song->samples[editor.currSample].loopLength != oldVal)
+					updateWindowTitle(MOD_IS_MODIFIED);
+			}
 		}
 		break;
 
@@ -4623,7 +4753,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_LENGTHU:
 		{
-			if (modEntry->head.orderCount < 128)
+			if (song->header.numOrders < 128)
 			{
 				songLengthUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4633,7 +4763,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_LENGTHD:
 		{
-			if (modEntry->head.orderCount > 1)
+			if (song->header.numOrders > 1)
 			{
 				songLengthDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4643,7 +4773,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PATTERNU:
 		{
-			if (modEntry->head.order[modEntry->currOrder] < 99)
+			if (song->header.order[song->currOrder] < 99)
 			{
 				patternUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4653,7 +4783,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PATTERND:
 		{
-			if (modEntry->head.order[modEntry->currOrder] > 0)
+			if (song->header.order[song->currOrder] > 0)
 			{
 				patternDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -5083,8 +5213,8 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 2)
 			{
 				mouse.repeatCounter = 0;
-				if (modEntry->currOrder > 0)
-					modSetPos(modEntry->currOrder - 1, DONT_SET_ROW);
+				if (song->currOrder > 0)
+					modSetPos(song->currOrder - 1, DONT_SET_ROW);
 			}
 		}
 		break;
@@ -5094,8 +5224,8 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 2)
 			{
 				mouse.repeatCounter = 0;
-				if (modEntry->currOrder < modEntry->head.orderCount-1)
-					modSetPos(modEntry->currOrder + 1, DONT_SET_ROW);
+				if (song->currOrder < song->header.numOrders-1)
+					modSetPos(song->currOrder + 1, DONT_SET_ROW);
 			}
 		}
 		break;

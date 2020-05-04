@@ -6,7 +6,7 @@
 #include <assert.h>
 #ifdef _WIN32
 #define WIN32_MEAN_AND_LEAN
-#include <windows.h>
+#include <windows.h> // MAX_PATH
 #else
 #include <limits.h> // PATH_MAX
 #endif
@@ -14,18 +14,13 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.12"
+#define PROG_VER_STR "1.13"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
 #define PATH_MAX MAX_PATH
 #else
 #define DIR_DELIMITER '/'
-#endif
-
-#include "pt2_config.h" // this must be included after PATH_MAX definition
-
-#ifndef _WIN32
 #define _stricmp strcasecmp
 #define _strnicmp strncasecmp
 #endif
@@ -37,12 +32,14 @@
 #define SCREEN_H 255
 
 /* "60Hz" ranges everywhere from 59..61Hz depending on the monitor, so with
-** no vsync we will get stuttering because the rate is not perfect... */
+** no vsync we will get stuttering because the rate is not perfect...
+*/
 #define VBLANK_HZ 60
 
 /* Scopes are clocked at 64Hz instead of 60Hz to prevent +/- interference
 ** from monitors not being exactly 60Hz (and unstable non-vsync mode).
-** Sadly the scopes might midly flicker from this. */
+** Sadly the scopes might midly flicker from this.
+*/
 #define SCOPE_HZ 64
 
 #define AMIGA_PAL_VBLANK_HZ 50

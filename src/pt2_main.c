@@ -28,17 +28,19 @@
 #include "pt2_config.h"
 #include "pt2_visuals.h"
 #include "pt2_edit.h"
-#include "pt2_modloader.h"
-#include "pt2_sampleloader.h"
+#include "pt2_module_loader.h"
+#include "pt2_module_saver.h"
+#include "pt2_sample_loader.h"
 #include "pt2_unicode.h"
 #include "pt2_scopes.h"
 #include "pt2_audio.h"
+#include "pt2_bmp.h"
 
 #define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
                    "Try to mention what you did before the crash happened."
 
-module_t *modEntry = NULL; // globalized
+module_t *song = NULL; // globalized
 
 static bool backupMadeAfterCrash;
 
@@ -198,6 +200,7 @@ int main(int argc, char *argv[])
 
 #ifdef _WIN32
 
+	// Windows: the Win key has to be taken over to work like the Amiga key
 #ifndef _DEBUG
 	windowsKeyIsDown = false;
 	g_hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, lowLevelKeyboardProc, GetModuleHandle(NULL), 0);
@@ -244,8 +247,8 @@ int main(int argc, char *argv[])
 	setupSprites();
 	setupPerfFreq();
 
-	modEntry = createNewMod();
-	if (modEntry == NULL)
+	song = createNewMod();
+	if (song == NULL)
 	{
 		cleanUp();
 		SDL_Quit();
@@ -273,7 +276,7 @@ int main(int argc, char *argv[])
 		loadModFromArg(argv[1]);
 
 		// play song
-		if (modEntry->moduleLoaded)
+		if (song->loaded)
 		{
 			editor.playMode = PLAY_MODE_NORMAL;
 			modPlay(DONT_SET_PATTERN, 0, DONT_SET_ROW);
@@ -282,10 +285,9 @@ int main(int argc, char *argv[])
 			statusAllRight();
 		}
 	}
-	else
+	else if (!editor.configFound)
 	{
-		if (!editor.configFound)
-			displayErrorMsg("CONFIG NOT FOUND!");
+		displayErrorMsg("CONFIG NOT FOUND!");
 	}
 
 	displayMainScreen();
@@ -448,8 +450,6 @@ static bool initializeVars(void)
 
 	editor.repeatKeyFlag = (SDL_GetModState() & KMOD_CAPS) ? true : false;
 
-	modEntry = NULL;
-
 	strcpy(editor.mixText, "MIX 01+02 TO 03");
 
 	// allocate some memory
@@ -538,7 +538,7 @@ oom:
 
 static void handleSigTerm(void)
 {
-	if (modEntry->modified)
+	if (song->modified)
 	{
 		resetAllScreens();
 
@@ -862,8 +862,9 @@ static void exceptionHandler(int32_t signal)
 
 static void cleanUp(void) // never call this inside the main loop!
 {
-	audioClose();
+	modStop();
 	modFree();
+	audioClose();
 	deAllocSamplerVars();
 	freeDiskOpMem();
 	freeDiskOpEntryMem();

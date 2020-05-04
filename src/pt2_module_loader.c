@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <ctype.h> // tolower()
 #ifdef _WIN32
 #include <io.h>
 #else
@@ -24,9 +23,10 @@
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
 #include "pt2_unicode.h"
-#include "pt2_modloader.h"
-#include "pt2_sampleloader.h"
-#
+#include "pt2_module_loader.h"
+#include "pt2_sample_loader.h"
+#include "pt2_config.h"
+
 typedef struct mem_t
 {
 	bool _eof;
@@ -37,7 +37,6 @@ typedef struct mem_t
 static bool oldAutoPlay;
 static char oldFullPath[(PATH_MAX * 2) + 2];
 static uint32_t oldFullPathLen;
-static module_t *tempMod;
 
 static MEMFILE *mopen(const uint8_t *src, uint32_t length);
 static void mclose(MEMFILE **buf);
@@ -55,115 +54,6 @@ void showSongUnsavedAskBox(int8_t askScreenType)
 	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	setStatusMessage("SONG IS UNSAVED !", NO_CARRY);
 	renderAskDialog();
-}
-
-bool modSave(char *fileName)
-{
-	int16_t tempPatternCount;
-	int32_t i;
-	uint32_t tempLoopLength, tempLoopStart, j, k;
-	note_t tmp;
-	FILE *fmodule;
-
-	tempPatternCount = 0;
-
-	fmodule = fopen(fileName, "wb");
-	if (fmodule == NULL)
-	{
-		displayErrorMsg("FILE I/O ERROR !");
-		return false;
-	}
-
-	for (i = 0; i < 20; i++)
-		fputc(tolower(modEntry->head.moduleTitle[i]), fmodule);
-
-	for (i = 0; i < MOD_SAMPLES; i++)
-	{
-		for (j = 0; j < 22; j++)
-			fputc(tolower(modEntry->samples[i].text[j]), fmodule);
-
-		fputc(modEntry->samples[i].length >> 9, fmodule);
-		fputc(modEntry->samples[i].length >> 1, fmodule);
-		fputc(modEntry->samples[i].fineTune & 0x0F, fmodule);
-		fputc((modEntry->samples[i].volume > 64) ? 64 : modEntry->samples[i].volume, fmodule);
-
-		tempLoopLength = modEntry->samples[i].loopLength;
-		if (tempLoopLength < 2)
-			tempLoopLength = 2;
-
-		tempLoopStart = modEntry->samples[i].loopStart;
-		if (tempLoopLength == 2)
-			tempLoopStart = 0;
-
-		fputc(tempLoopStart >> 9, fmodule);
-		fputc(tempLoopStart >> 1, fmodule);
-		fputc(tempLoopLength >> 9, fmodule);
-		fputc(tempLoopLength >> 1, fmodule);
-	}
-
-	fputc(modEntry->head.orderCount & 0x00FF, fmodule);
-	fputc(0x7F, fmodule); // ProTracker puts 0x7F at this place (restart pos/BPM in other trackers)
-
-	for (i = 0; i < MOD_ORDERS; i++)
-		fputc(modEntry->head.order[i] & 0xFF, fmodule);
-
-	tempPatternCount = 0;
-	for (i = 0; i < MOD_ORDERS; i++)
-	{
-		if (tempPatternCount < modEntry->head.order[i])
-			tempPatternCount = modEntry->head.order[i];
-	}
-
-	if (++tempPatternCount > MAX_PATTERNS)
-		  tempPatternCount = MAX_PATTERNS;
-
-	fwrite((tempPatternCount <= 64) ? "M.K." : "M!K!", 1, 4, fmodule);
-
-	for (i = 0; i < tempPatternCount; i++)
-	{
-		for (j = 0; j < MOD_ROWS; j++)
-		{
-			for (k = 0; k < AMIGA_VOICES; k++)
-			{
-				tmp = modEntry->patterns[i][(j * AMIGA_VOICES) + k];
-
-				fputc((tmp.sample & 0xF0) | ((tmp.period >> 8) & 0x0F), fmodule);
-				fputc(tmp.period & 0xFF, fmodule);
-				fputc(((tmp.sample << 4) & 0xF0) | (tmp.command & 0x0F), fmodule);
-				fputc(tmp.param, fmodule);
-			}
-		}
-	}
-
-	for (i = 0; i < MOD_SAMPLES; i++)
-	{
-		// Amiga ProTracker stuck "BEEP" sample fix
-		if (modEntry->samples[i].length >= 2 && modEntry->samples[i].loopStart+modEntry->samples[i].loopLength == 2)
-		{
-			fputc(0, fmodule);
-			fputc(0, fmodule);
-
-			k = modEntry->samples[i].length;
-			for (j = 2; j < k; j++)
-				fputc(modEntry->sampleData[modEntry->samples[i].offset+j], fmodule);
-		}
-		else
-		{
-			fwrite(&modEntry->sampleData[MAX_SAMPLE_LEN * i], 1, modEntry->samples[i].length, fmodule);
-		}
-	}
-
-	fclose(fmodule);
-
-	displayMsg("MODULE SAVED !");
-	setMsgPointer();
-
-	diskop.cached = false;
-	if (ui.diskOpScreenShown)
-		ui.updateDiskOpFileList = true;
-
-	updateWindowTitle(MOD_NOT_MODIFIED);
-	return true;
 }
 
 #define IS_ID(s, b) !strncmp(s, b, 4)
@@ -371,20 +261,20 @@ module_t *modLoad(UNICHAR *fileName)
 		mightBeSTK = true;
 
 	mrewind(m);
-	mread(newMod->head.moduleTitle, 1, 20, m);
-	newMod->head.moduleTitle[20] = '\0';
+	mread(newMod->header.name, 1, 20, m);
+	newMod->header.name[20] = '\0';
 
 	// convert illegal song name characters to space
 	for (i = 0; i < 20; i++)
 	{
-		tmpChar = newMod->head.moduleTitle[i];
+		tmpChar = newMod->header.name[i];
 		if ((tmpChar < ' ' || tmpChar > '~') && tmpChar != '\0')
 			tmpChar = ' ';
 
-		newMod->head.moduleTitle[i] = (char)tolower(tmpChar);
+		newMod->header.name[i] = tmpChar;
 	}
 
-	fixZeroesInString(newMod->head.moduleTitle, 20);
+	fixZeroesInString(newMod->header.name, 20);
 
 	// read sample headers
 	s = newMod->samples;
@@ -413,7 +303,7 @@ module_t *modLoad(UNICHAR *fileName)
 				if ((tmpChar < ' ' || tmpChar > '~') && tmpChar != '\0')
 					tmpChar = ' ';
 
-				s->text[j] = (char)tolower(tmpChar);
+				s->text[j] = tmpChar;
 			}
 
 			fixZeroesInString(s->text, 22);
@@ -469,18 +359,18 @@ module_t *modLoad(UNICHAR *fileName)
 		}
 	}
 
-	newMod->head.orderCount = (uint8_t)mgetc(m);
+	newMod->header.numOrders = (uint8_t)mgetc(m);
 
-	if (modFormat == FORMAT_MK && newMod->head.orderCount == 129)
-		newMod->head.orderCount = 127; // fixes a specific copy of beatwave.mod
+	if (modFormat == FORMAT_MK && newMod->header.numOrders == 129)
+		newMod->header.numOrders = 127; // fixes a specific copy of beatwave.mod
 
-	if (newMod->head.orderCount > 129)
+	if (newMod->header.numOrders > 129)
 	{
 		displayErrorMsg("NOT A MOD FILE !");
 		goto modLoadError;
 	}
 
-	if (newMod->head.orderCount == 0)
+	if (newMod->header.numOrders == 0)
 	{
 		displayErrorMsg("NOT A MOD FILE !");
 		goto modLoadError;
@@ -493,7 +383,7 @@ module_t *modLoad(UNICHAR *fileName)
 		goto modLoadError;
 	}
 
-	newMod->head.initialTempo = 125;
+	newMod->header.initialTempo = 125;
 	if (mightBeSTK)
 	{
 		/* If we're still here at this point and the mightBeSTK flag is set,
@@ -505,7 +395,7 @@ module_t *modLoad(UNICHAR *fileName)
 			restartPos = 120;
 
 		// jjk55.mod by Jesper Kyd has a bogus STK tempo value that should be ignored
-		if (!strcmp("jjk55", newMod->head.moduleTitle))
+		if (!strcmp("jjk55", newMod->header.name))
 			restartPos = 120;
 
 		// the "restart pos" field in STK is the inital tempo (must be converted to BPM first)
@@ -519,7 +409,7 @@ module_t *modLoad(UNICHAR *fileName)
 			double dHz = (double)CIA_PAL_CLK / ciaPeriod;
 			int32_t BPM = (int32_t)((dHz * (125.0 / 50.0)) + 0.5);
 
-			newMod->head.initialTempo = (uint16_t)BPM;
+			newMod->header.initialTempo = (uint16_t)BPM;
 		}
 	}
 
@@ -527,9 +417,9 @@ module_t *modLoad(UNICHAR *fileName)
 	numPatterns = 0;
 	for (i = 0; i < MOD_ORDERS; i++)
 	{
-		newMod->head.order[i] = (int16_t)mgetc(m);
-		if (newMod->head.order[i] > numPatterns)
-			numPatterns = newMod->head.order[i];
+		newMod->header.order[i] = (int16_t)mgetc(m);
+		if (newMod->header.order[i] > numPatterns)
+			numPatterns = newMod->header.order[i];
 	}
 	numPatterns++;
 
@@ -797,121 +687,6 @@ modLoadError:
 	return NULL;
 }
 
-bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
-{
-	char fileName[128], tmpBuffer[64];
-	uint16_t i;
-	struct stat statBuffer;
-
-	memset(fileName, 0, sizeof (fileName));
-
-	if (config.modDot)
-	{
-		// extension.filename
-		if (*modEntry->head.moduleTitle == '\0')
-		{
-			strcat(fileName, "mod.untitled");
-		}
-		else
-		{
-			strcat(fileName, "mod.");
-			for (i = 4; i < 20+4; i++)
-			{
-				fileName[i] = (char)tolower(modEntry->head.moduleTitle[i-4]);
-				if (fileName[i] == '\0') break;
-				sanitizeFilenameChar(&fileName[i]);
-			}
-		}
-	}
-	else
-	{
-		// filename.extension
-		if (*modEntry->head.moduleTitle == '\0')
-		{
-			strcat(fileName, "untitled.mod");
-		}
-		else
-		{
-			for (i = 0; i < 20; i++)
-			{
-				fileName[i] = (char)tolower(modEntry->head.moduleTitle[i]);
-				if (fileName[i] == '\0') break;
-				sanitizeFilenameChar(&fileName[i]);
-			}
-			strcat(fileName, ".mod");
-		}
-	}
-
-	if (giveNewFreeFilename && stat(fileName, &statBuffer) == 0)
-	{
-		for (uint16_t j = 1; j <= 9999; j++)
-		{
-			memset(fileName, 0, sizeof (fileName));
-			if (config.modDot)
-			{
-				// extension.filename
-				if (*modEntry->head.moduleTitle == '\0')
-				{
-					sprintf(fileName, "mod.untitled-%d", j);
-				}
-				else
-				{
-					for (i = 0; i < 20; i++)
-					{
-						tmpBuffer[i] = (char)tolower(modEntry->head.moduleTitle[i]);
-						if (tmpBuffer[i] == '\0') break;
-						sanitizeFilenameChar(&tmpBuffer[i]);
-					}
-					sprintf(fileName, "mod.%s-%d", tmpBuffer, j);
-				}
-			}
-			else
-			{
-				// filename.extension
-				if (*modEntry->head.moduleTitle == '\0')
-				{
-					sprintf(fileName, "untitled-%d.mod", j);
-				}
-				else
-				{
-					for (i = 0; i < 20; i++)
-					{
-						tmpBuffer[i] = (char)tolower(modEntry->head.moduleTitle[i]);
-						if (tmpBuffer[i] == '\0') break;
-						sanitizeFilenameChar(&tmpBuffer[i]);
-					}
-					sprintf(fileName, "%s-%d.mod", tmpBuffer, j);
-				}
-			}
-
-			if (stat(fileName, &statBuffer) != 0)
-				break;
-		}
-	}
-
-	if (checkIfFileExist)
-	{
-		if (stat(fileName, &statBuffer) == 0)
-		{
-			ui.askScreenShown = true;
-			ui.askScreenType = ASK_SAVEMOD_OVERWRITE;
-			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			setStatusMessage("OVERWRITE FILE ?", NO_CARRY);
-			renderAskDialog();
-			return -1;
-		}
-	}
-
-	if (ui.askScreenShown)
-	{
-		ui.answerNo = false;
-		ui.answerYes = false;
-		ui.askScreenShown = false;
-	}
-
-	return modSave(fileName);
-}
-
 static MEMFILE *mopen(const uint8_t *src, uint32_t length)
 {
 	MEMFILE *b;
@@ -1136,10 +911,10 @@ void setupNewMod(void)
 	// setup GUI text pointers
 	for (i = 0; i < MOD_SAMPLES; i++)
 	{
-		modEntry->samples[i].volumeDisp = &modEntry->samples[i].volume;
-		modEntry->samples[i].lengthDisp = &modEntry->samples[i].length;
-		modEntry->samples[i].loopStartDisp = &modEntry->samples[i].loopStart;
-		modEntry->samples[i].loopLengthDisp = &modEntry->samples[i].loopLength;
+		song->samples[i].volumeDisp = &song->samples[i].volume;
+		song->samples[i].lengthDisp = &song->samples[i].length;
+		song->samples[i].loopStartDisp = &song->samples[i].loopStart;
+		song->samples[i].loopLengthDisp = &song->samples[i].loopLength;
 
 		fillSampleRedoBuffer(i);
 	}
@@ -1147,11 +922,11 @@ void setupNewMod(void)
 	modSetPos(0, 0);
 	modSetPattern(0); // set pattern to 00 instead of first order's pattern
 
-	editor.currEditPatternDisp = &modEntry->currPattern;
-	editor.currPosDisp = &modEntry->currOrder;
-	editor.currPatternDisp = &modEntry->head.order[0];
-	editor.currPosEdPattDisp = &modEntry->head.order[0];
-	editor.currLengthDisp = &modEntry->head.orderCount;
+	editor.currEditPatternDisp = &song->currPattern;
+	editor.currPosDisp = &song->currOrder;
+	editor.currPatternDisp = &song->header.order[0];
+	editor.currPosEdPattDisp = &song->header.order[0];
+	editor.currLengthDisp = &song->header.numOrders;
 
 	// calculate MOD size
 	ui.updateSongSize = true;
@@ -1167,7 +942,7 @@ void setupNewMod(void)
 	editor.modLoaded = true;
 	editor.blockMarkFlag = false;
 	editor.sampleZero = false;
-	editor.keypadSampleOffset = 0;
+	editor.hiLowInstr = 0;
 
 	setLEDFilter(false); // real PT doesn't do this, but that's insane
 
@@ -1176,7 +951,7 @@ void setupNewMod(void)
 	editor.timingMode = TEMPO_MODE_CIA;
 
 	modSetSpeed(6);
-	modSetTempo(modEntry->head.initialTempo); // 125 for normal MODs, custom value for certain STK/UST MODs
+	modSetTempo(song->header.initialTempo); // 125 for normal MODs, custom value for certain STK/UST MODs
 
 	updateCurrSample();
 	editor.samplePos = 0;
@@ -1206,14 +981,14 @@ void loadModFromArg(char *arg)
 	strcpy(filenameU, arg);
 #endif
 
-	tempMod = modLoad(filenameU);
-	if (tempMod != NULL)
+	module_t *tempSong = modLoad(filenameU);
+	if (tempSong != NULL)
 	{
-		modEntry->moduleLoaded = false;
+		song->loaded = false;
 		modFree();
-		modEntry = tempMod;
+		song = tempSong;
 		setupNewMod();
-		modEntry->moduleLoaded = true;
+		song->loaded = true;
 	}
 	else
 	{
@@ -1312,7 +1087,7 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 
 	if (isMod)
 	{
-		if (songModifiedCheck && modEntry->modified)
+		if (songModifiedCheck && song->modified)
 		{
 			free(ansiName);
 			free(fullPathU);
@@ -1332,8 +1107,8 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			return;
 		}
 
-		tempMod = modLoad(fullPathU);
-		if (tempMod != NULL)
+		module_t *tempSong = modLoad(fullPathU);
+		if (tempSong != NULL)
 		{
 			oldMode = editor.currMode;
 			oldPlayMode = editor.playMode;
@@ -1341,9 +1116,9 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			modStop();
 			modFree();
 
-			modEntry = tempMod;
+			song = tempSong;
 			setupNewMod();
-			modEntry->moduleLoaded = true;
+			song->loaded = true;
 
 			statusAllRight();
 
@@ -1426,7 +1201,7 @@ module_t *createNewMod(void)
 	if (newMod->sampleData == NULL)
 		goto oom;
 
-	newMod->head.orderCount = 1;
+	newMod->header.numOrders = 1;
 
 	for (i = 0; i < MOD_SAMPLES; i++)
 	{
@@ -1446,9 +1221,9 @@ module_t *createNewMod(void)
 	// setup GUI text pointers
 	editor.currEditPatternDisp = &newMod->currPattern;
 	editor.currPosDisp = &newMod->currOrder;
-	editor.currPatternDisp = &newMod->head.order[0];
-	editor.currPosEdPattDisp = &newMod->head.order[0];
-	editor.currLengthDisp = &newMod->head.orderCount;
+	editor.currPatternDisp = &newMod->header.order[0];
+	editor.currPosEdPattDisp = &newMod->header.order[0];
+	editor.currLengthDisp = &newMod->header.numOrders;
 
 	ui.updateSongSize = true;
 	return newMod;

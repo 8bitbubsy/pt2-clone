@@ -19,6 +19,8 @@
 #include "pt2_scopes.h"
 #include "pt2_sampler.h"
 #include "pt2_structs.h"
+#include "pt2_config.h"
+#include "pt2_bmp.h"
 
 #define CENTER_LINE_COLOR 0x303030
 #define MARK_COLOR_1 0x666666 /* inverted background */
@@ -49,7 +51,13 @@ static const int8_t tuneToneData[32] = // Tuning Tone (Sine Wave)
 
 void upSample(void)
 {
-	moduleSample_t *s = &modEntry->samples[editor.currSample];
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
+	moduleSample_t *s = &song->samples[editor.currSample];
 
 	uint32_t newLength = (s->length >> 1) & 0xFFFE;
 	if (newLength < 2)
@@ -58,7 +66,7 @@ void upSample(void)
 	turnOffVoices();
 
 	// upsample
-	int8_t *ptr8 = &modEntry->sampleData[s->offset];
+	int8_t *ptr8 = &song->sampleData[s->offset];
 	for (uint32_t i = 0; i < newLength; i++)
 		ptr8[i] = ptr8[i << 1];
 
@@ -85,7 +93,13 @@ void upSample(void)
 
 void downSample(void)
 {
-	moduleSample_t *s = &modEntry->samples[editor.currSample];
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
+	moduleSample_t *s = &song->samples[editor.currSample];
 
 	uint32_t newLength = s->length << 1;
 	if (newLength > MAX_SAMPLE_LEN)
@@ -95,7 +109,7 @@ void downSample(void)
 
 	// downsample
 
-	int8_t *ptr8 = &modEntry->sampleData[s->offset];
+	int8_t *ptr8 = &song->sampleData[s->offset];
 	int8_t *ptr8_2 = ptr8 - 1;
 	for (int32_t i = s->length-1; i > 0; i--)
 	{
@@ -153,8 +167,8 @@ void fixSampleBeep(moduleSample_t *s)
 {
 	if (s->length >= 2 && s->loopStart+s->loopLength <= 2)
 	{
-		modEntry->sampleData[s->offset+0] = 0;
-		modEntry->sampleData[s->offset+1] = 0;
+		song->sampleData[s->offset+0] = 0;
+		song->sampleData[s->offset+1] = 0;
 	}
 }
 
@@ -165,7 +179,7 @@ void updateSamplePos(void)
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
-		s = &modEntry->samples[editor.currSample];
+		s = &song->samples[editor.currSample];
 		if (editor.samplePos > s->length)
 			editor.samplePos = s->length;
 
@@ -181,8 +195,8 @@ void fillSampleFilterUndoBuffer(void)
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
-		s = &modEntry->samples[editor.currSample];
-		memcpy(editor.tempSample, &modEntry->sampleData[s->offset], s->length);
+		s = &song->samples[editor.currSample];
+		memcpy(editor.tempSample, &song->sampleData[s->offset], s->length);
 	}
 }
 
@@ -376,7 +390,7 @@ static void renderSampleData(void)
 	uint32_t *dstPtr, pixel;
 	moduleSample_t *s;
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	// clear sample data background
 
@@ -421,7 +435,7 @@ static void renderSampleData(void)
 			oldMin = y1;
 			oldMax = y1;
 
-			smpPtr = &modEntry->sampleData[s->offset];
+			smpPtr = &song->sampleData[s->offset];
 			for (x = 0; x < SAMPLE_AREA_WIDTH; x++)
 			{
 				smpIdx = scr2SmpPos(x);
@@ -518,10 +532,10 @@ void redrawSample(void)
 		sampler.samOffset = 0;
 		updateSamOffset();
 
-		s = &modEntry->samples[editor.currSample];
+		s = &song->samples[editor.currSample];
 		if (s->length > 0)
 		{
-			sampler.samStart = &modEntry->sampleData[s->offset];
+			sampler.samStart = &song->sampleData[s->offset];
 			sampler.samDisplay = s->length;
 			sampler.samLength = s->length;
 		}
@@ -554,16 +568,22 @@ void highPassSample(int32_t cutOff)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	if (cutOff == 0)
 	{
 		displayErrorMsg("CUTOFF CAN'T BE 0");
 		return;
 	}
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
@@ -609,7 +629,7 @@ void highPassSample(int32_t cutOff)
 
 	// copy over sample data to double buffer
 	for (i = 0; i < s->length; i++)
-		dSampleData[i] = modEntry->sampleData[s->offset+i];
+		dSampleData[i] = song->sampleData[s->offset+i];
 
 	clearRCFilterState(&filterHi);
 	if (to <= s->length)
@@ -625,7 +645,7 @@ void highPassSample(int32_t cutOff)
 	{
 		smp32 = (int32_t)dSampleData[i];
 		CLAMP8(smp32);
-		modEntry->sampleData[s->offset + i] = (int8_t)smp32;
+		song->sampleData[s->offset + i] = (int8_t)smp32;
 	}
 
 	free(dSampleData);
@@ -642,6 +662,12 @@ void lowPassSample(int32_t cutOff)
 	moduleSample_t *s;
 	rcFilter_t filterLo;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
 	if (cutOff == 0)
@@ -650,10 +676,10 @@ void lowPassSample(int32_t cutOff)
 		return;
 	}
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
@@ -699,7 +725,7 @@ void lowPassSample(int32_t cutOff)
 
 	// copy over sample data to double buffer
 	for (i = 0; i < s->length; i++)
-		dSampleData[i] = modEntry->sampleData[s->offset+i];
+		dSampleData[i] = song->sampleData[s->offset+i];
 
 	clearRCFilterState(&filterLo);
 	if (to <= s->length)
@@ -715,7 +741,7 @@ void lowPassSample(int32_t cutOff)
 	{
 		smp32 = (int32_t)dSampleData[i];
 		CLAMP8(smp32);
-		modEntry->sampleData[s->offset + i] = (int8_t)smp32;
+		song->sampleData[s->offset + i] = (int8_t)smp32;
 	}
 
 	free(dSampleData);
@@ -727,24 +753,30 @@ void lowPassSample(int32_t cutOff)
 
 void redoSampleData(int8_t sample)
 {
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	moduleSample_t *s;
 
 	assert(sample >= 0 && sample <= 30);
 
-	s = &modEntry->samples[sample];
+	s = &song->samples[sample];
 
 	turnOffVoices();
 
 	if (editor.smpRedoBuffer[sample] != NULL && editor.smpRedoLengths[sample] > 0)
 	{
-		memcpy(&modEntry->sampleData[s->offset], editor.smpRedoBuffer[sample], editor.smpRedoLengths[sample]);
+		memcpy(&song->sampleData[s->offset], editor.smpRedoBuffer[sample], editor.smpRedoLengths[sample]);
 
 		if (editor.smpRedoLengths[sample] < MAX_SAMPLE_LEN)
-			memset(&modEntry->sampleData[s->offset + editor.smpRedoLengths[sample]], 0, MAX_SAMPLE_LEN - editor.smpRedoLengths[sample]);
+			memset(&song->sampleData[s->offset + editor.smpRedoLengths[sample]], 0, MAX_SAMPLE_LEN - editor.smpRedoLengths[sample]);
 	}
 	else
 	{
-		memset(&modEntry->sampleData[s->offset], 0, MAX_SAMPLE_LEN);
+		memset(&song->sampleData[s->offset], 0, MAX_SAMPLE_LEN);
 	}
 
 	s->fineTune = editor.smpRedoFinetunes[sample];
@@ -774,7 +806,7 @@ void fillSampleRedoBuffer(int8_t sample)
 
 	assert(sample >= 0 && sample <= 30);
 
-	s = &modEntry->samples[sample];
+	s = &song->samples[sample];
 
 	if (editor.smpRedoBuffer[sample] != NULL)
 	{
@@ -792,7 +824,7 @@ void fillSampleRedoBuffer(int8_t sample)
 	{
 		editor.smpRedoBuffer[sample] = (int8_t *)malloc(s->length);
 		if (editor.smpRedoBuffer[sample] != NULL)
-			memcpy(editor.smpRedoBuffer[sample], &modEntry->sampleData[s->offset], s->length);
+			memcpy(editor.smpRedoBuffer[sample], &song->sampleData[s->offset], s->length);
 	}
 }
 
@@ -821,7 +853,7 @@ void deAllocSamplerVars(void)
 		sampler.blankSample = NULL;
 	}
 
-	for (uint8_t i = 0; i < MOD_SAMPLES; i++)
+	for (int32_t i = 0; i < MOD_SAMPLES; i++)
 	{
 		if (editor.smpRedoBuffer[i] != NULL)
 		{
@@ -837,16 +869,22 @@ void samplerRemoveDcOffset(void)
 	int32_t smp32, i, from, to, offset;
 	moduleSample_t *s;
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-
-	s = &modEntry->samples[editor.currSample];
-	if (s->length == 0)
+	if (editor.sampleZero)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusNotSampleZero();
 		return;
 	}
 
-	smpDat = &modEntry->sampleData[s->offset];
+	assert(editor.currSample >= 0 && editor.currSample <= 30);
+
+	s = &song->samples[editor.currSample];
+	if (s->length == 0)
+	{
+		statusSampleIsEmpty();
+		return;
+	}
+
+	smpDat = &song->sampleData[s->offset];
 
 	from = 0;
 	to = s->length;
@@ -921,6 +959,12 @@ void mixChordSample(void)
 	sampleMixer_t mixCh[4], *v;
 	moduleSample_t *s;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 	assert(editor.tuningNote <= 35);
 
@@ -930,9 +974,9 @@ void mixChordSample(void)
 		return;
 	}
 
-	if (modEntry->samples[editor.currSample].length == 0)
+	if (song->samples[editor.currSample].length == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
@@ -981,11 +1025,11 @@ void mixChordSample(void)
 
 	// setup some variables
 
-	smpLoopStart = modEntry->samples[editor.currSample].loopStart;
-	smpLoopLength = modEntry->samples[editor.currSample].loopLength;
+	smpLoopStart = song->samples[editor.currSample].loopStart;
+	smpLoopLength = song->samples[editor.currSample].loopLength;
 	smpLoopFlag = (smpLoopStart + smpLoopLength) > 2;
-	smpEnd = smpLoopFlag ? (smpLoopStart + smpLoopLength) : modEntry->samples[editor.currSample].length;
-	smpData = &modEntry->sampleData[modEntry->samples[editor.currSample].offset];
+	smpEnd = smpLoopFlag ? (smpLoopStart + smpLoopLength) : song->samples[editor.currSample].length;
+	smpData = &song->sampleData[song->samples[editor.currSample].offset];
 
 	if (editor.newOldFlag == 0)
 	{
@@ -993,7 +1037,7 @@ void mixChordSample(void)
 
 		for (i = 0; i < MOD_SAMPLES; i++)
 		{
-			if (modEntry->samples[i].length == 0)
+			if (song->samples[i].length == 0)
 				break;
 		}
 
@@ -1003,11 +1047,11 @@ void mixChordSample(void)
 			return;
 		}
 
-		smpFinetune = modEntry->samples[editor.currSample].fineTune;
-		smpVolume = modEntry->samples[editor.currSample].volume;
-		memcpy(smpText, modEntry->samples[editor.currSample].text, sizeof (smpText));
+		smpFinetune = song->samples[editor.currSample].fineTune;
+		smpVolume = song->samples[editor.currSample].volume;
+		memcpy(smpText, song->samples[editor.currSample].text, sizeof (smpText));
 
-		s = &modEntry->samples[i];
+		s = &song->samples[i];
 		s->fineTune = smpFinetune;
 		s->volume = smpVolume;
 
@@ -1017,7 +1061,7 @@ void mixChordSample(void)
 	else
 	{
 		// overwrite current sample
-		s = &modEntry->samples[editor.currSample];
+		s = &song->samples[editor.currSample];
 	}
 
 	mixData = (int32_t *)calloc(MAX_SAMPLE_LEN, sizeof (int32_t));
@@ -1121,10 +1165,10 @@ void mixChordSample(void)
 
 	// normalize gain and quantize to 8-bit
 	for (i = 0; i < s->length; i++)
-		modEntry->sampleData[s->offset + i] = (int8_t)(mixData[i] >> 24);
+		song->sampleData[s->offset + i] = (int8_t)(mixData[i] >> 24);
 
 	if (s->length < MAX_SAMPLE_LEN)
-		memset(&modEntry->sampleData[s->offset + s->length], 0, MAX_SAMPLE_LEN - s->length);
+		memset(&song->sampleData[s->offset + s->length], 0, MAX_SAMPLE_LEN - s->length);
 
 	// we're done
 
@@ -1146,20 +1190,26 @@ void samplerResample(void)
 	uint32_t posFrac, delta;
 	moduleSample_t *s;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 	assert(editor.tuningNote <= 35 && editor.resampleNote <= 35);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
 	// setup resampling variables
 	readPos = 0;
 	writePos = 0;
-	writeData = &modEntry->sampleData[s->offset];
+	writeData = &song->sampleData[s->offset];
 	refPeriod = periodTable[editor.tuningNote];
 	newPeriod = periodTable[(37 * (s->fineTune & 0xF)) + editor.resampleNote];
 	readLength = s->length;
@@ -1297,9 +1347,9 @@ void doMix(void)
 		return;
 	}
 
-	s1 = &modEntry->samples[--smpFrom1];
-	s2 = &modEntry->samples[--smpFrom2];
-	s3 = &modEntry->samples[--smpTo];
+	s1 = &song->samples[--smpFrom1];
+	s2 = &song->samples[--smpFrom2];
+	s3 = &song->samples[--smpTo];
 
 	if (s1->length == 0 || s2->length == 0)
 	{
@@ -1309,14 +1359,14 @@ void doMix(void)
 
 	if (s1->length > s2->length)
 	{
-		fromPtr1 = &modEntry->sampleData[s1->offset];
-		fromPtr2 = &modEntry->sampleData[s2->offset];
+		fromPtr1 = &song->sampleData[s1->offset];
+		fromPtr2 = &song->sampleData[s2->offset];
 		mixLength = s1->length;
 	}
 	else
 	{
-		fromPtr1 = &modEntry->sampleData[s2->offset];
-		fromPtr2 = &modEntry->sampleData[s1->offset];
+		fromPtr1 = &song->sampleData[s2->offset];
+		fromPtr2 = &song->sampleData[s1->offset];
 		mixLength = s2->length;
 	}
 
@@ -1339,9 +1389,9 @@ void doMix(void)
 		mixPtr[i] = (int8_t)tmp16;
 	}
 
-	memcpy(&modEntry->sampleData[s3->offset], mixPtr, mixLength);
+	memcpy(&song->sampleData[s3->offset], mixPtr, mixLength);
 	if (mixLength < MAX_SAMPLE_LEN)
-		memset(&modEntry->sampleData[s3->offset + mixLength], 0, MAX_SAMPLE_LEN - mixLength);
+		memset(&song->sampleData[s3->offset + mixLength], 0, MAX_SAMPLE_LEN - mixLength);
 
 	free(mixPtr);
 
@@ -1369,11 +1419,11 @@ void boostSample(int32_t sample, bool ignoreMark)
 
 	assert(sample >= 0 && sample <= 30);
 
-	s = &modEntry->samples[sample];
+	s = &song->samples[sample];
 	if (s->length == 0)
 		return; // don't display warning/show warning pointer, it is done elsewhere
 
-	smpDat = &modEntry->sampleData[s->offset];
+	smpDat = &song->sampleData[s->offset];
 
 	from = 0;
 	to = s->length;
@@ -1425,11 +1475,11 @@ void filterSample(int32_t sample, bool ignoreMark)
 
 	assert(sample >= 0 && sample <= 30);
 
-	s = &modEntry->samples[sample];
+	s = &song->samples[sample];
 	if (s->length == 0)
 		return; // don't display warning/show warning pointer, it is done elsewhere
 
-	smpDat = &modEntry->sampleData[s->offset];
+	smpDat = &song->sampleData[s->offset];
 
 	from = 1;
 	to = s->length;
@@ -1482,7 +1532,7 @@ void toggleTuningTone(void)
 		if (editor.tuningNote > 35)
 			editor.tuningNote = 35;
 
-		modEntry->channels[editor.tuningChan].n_volume = 64; // we need this for the scopes
+		song->channels[editor.tuningChan].n_volume = 64; // we need this for the scopes
 
 		paulaSetPeriod(editor.tuningChan, periodTable[editor.tuningNote]);
 		paulaSetVolume(editor.tuningChan, 64);
@@ -1506,7 +1556,7 @@ void sampleMarkerToBeg(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
 		invertRange();
@@ -1540,7 +1590,7 @@ void sampleMarkerToCenter(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
 		invertRange();
@@ -1578,7 +1628,7 @@ void sampleMarkerToEnd(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
 		invertRange();
@@ -1609,6 +1659,12 @@ void samplerSamCopy(void)
 {
 	moduleSample_t *s;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
 	if (editor.markStartOfs == -1)
@@ -1623,10 +1679,10 @@ void samplerSamCopy(void)
 		return;
 	}
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
@@ -1638,7 +1694,7 @@ void samplerSamCopy(void)
 		return;
 	}
 
-	memcpy(sampler.copyBuf, &modEntry->sampleData[s->offset+editor.markStartOfs], sampler.copyBufSize);
+	memcpy(sampler.copyBuf, &song->sampleData[s->offset+editor.markStartOfs], sampler.copyBufSize);
 }
 
 void samplerSamDelete(uint8_t cut)
@@ -1646,6 +1702,12 @@ void samplerSamDelete(uint8_t cut)
 	int8_t *tmpBuf;
 	int32_t val32, sampleLength, copyLength, markEnd, markStart;
 	moduleSample_t *s;
+
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
@@ -1664,12 +1726,12 @@ void samplerSamDelete(uint8_t cut)
 	if (cut)
 		samplerSamCopy();
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	sampleLength = s->length;
 	if (sampleLength == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
@@ -1678,7 +1740,7 @@ void samplerSamDelete(uint8_t cut)
 	// if whole sample is marked, wipe it
 	if (editor.markEndOfs-editor.markStartOfs >= sampleLength)
 	{
-		memset(&modEntry->sampleData[s->offset], 0, MAX_SAMPLE_LEN);
+		memset(&song->sampleData[s->offset], 0, MAX_SAMPLE_LEN);
 
 		invertRange();
 		editor.markStartOfs = -1;
@@ -1718,17 +1780,17 @@ void samplerSamDelete(uint8_t cut)
 	}
 
 	// copy start part
-	memcpy(tmpBuf, &modEntry->sampleData[s->offset], editor.markStartOfs);
+	memcpy(tmpBuf, &song->sampleData[s->offset], editor.markStartOfs);
 
 	// copy end part
 	if (sampleLength-markEnd > 0)
-		memcpy(&tmpBuf[editor.markStartOfs], &modEntry->sampleData[s->offset+markEnd], sampleLength - markEnd);
+		memcpy(&tmpBuf[editor.markStartOfs], &song->sampleData[s->offset+markEnd], sampleLength - markEnd);
 
 	// nuke sample data and copy over the result
-	memcpy(&modEntry->sampleData[s->offset], tmpBuf, copyLength);
+	memcpy(&song->sampleData[s->offset], tmpBuf, copyLength);
 
 	if (copyLength < MAX_SAMPLE_LEN)
-		memset(&modEntry->sampleData[s->offset+copyLength], 0, MAX_SAMPLE_LEN - copyLength);
+		memset(&song->sampleData[s->offset+copyLength], 0, MAX_SAMPLE_LEN - copyLength);
 
 	free(tmpBuf);
 
@@ -1833,6 +1895,12 @@ void samplerSamPaste(void)
 	uint32_t readPos;
 	moduleSample_t *s;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
 	if (sampler.copyBuf == NULL || sampler.copyBufSize == 0)
@@ -1841,7 +1909,7 @@ void samplerSamPaste(void)
 		return;
 	}
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length > 0 && editor.markStartOfs == -1)
 	{
 		displayErrorMsg("SET CURSOR POS");
@@ -1872,7 +1940,7 @@ void samplerSamPaste(void)
 	// copy start part
 	if (markStart > 0)
 	{
-		memcpy(&tmpBuf[readPos], &modEntry->sampleData[s->offset], markStart);
+		memcpy(&tmpBuf[readPos], &song->sampleData[s->offset], markStart);
 		readPos += markStart;
 	}
 
@@ -1885,7 +1953,7 @@ void samplerSamPaste(void)
 		readPos += sampler.copyBufSize;
 
 		if (s->length-markStart > 0)
-			memcpy(&tmpBuf[readPos], &modEntry->sampleData[s->offset+markStart], s->length - markStart);
+			memcpy(&tmpBuf[readPos], &song->sampleData[s->offset+markStart], s->length - markStart);
 	}
 
 	int32_t newLength = (s->length + sampler.copyBufSize) & 0xFFFFFFFE;
@@ -1940,9 +2008,9 @@ void samplerSamPaste(void)
 		}
 	}
 
-	memcpy(&modEntry->sampleData[s->offset], tmpBuf, s->length);
+	memcpy(&song->sampleData[s->offset], tmpBuf, s->length);
 	if (s->length < MAX_SAMPLE_LEN)
-		memset(&modEntry->sampleData[s->offset+s->length], 0, MAX_SAMPLE_LEN - s->length);
+		memset(&song->sampleData[s->offset+s->length], 0, MAX_SAMPLE_LEN - s->length);
 
 	free(tmpBuf);
 
@@ -1973,8 +2041,8 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	assert(chn < AMIGA_VOICES);
 	assert(editor.currPlayNote <= 35);
 
-	s = &modEntry->samples[editor.currSample];
-	ch = &modEntry->channels[chn];
+	s = &song->samples[editor.currSample];
+	ch = &song->channels[chn];
 
 	ch->n_samplenum = editor.currSample;
 	ch->n_volume = s->volume;
@@ -1982,16 +2050,16 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	
 	if (playWaveformFlag)
 	{
-		ch->n_start = &modEntry->sampleData[s->offset];
+		ch->n_start = &song->sampleData[s->offset];
 		ch->n_length = (s->loopStart > 0) ? (uint32_t)(s->loopStart + s->loopLength) / 2 : s->length / 2;
-		ch->n_loopstart = &modEntry->sampleData[s->offset + s->loopStart];
+		ch->n_loopstart = &song->sampleData[s->offset + s->loopStart];
 		ch->n_replen = s->loopLength / 2;
 	}
 	else
 	{
-		ch->n_start = &modEntry->sampleData[s->offset + startOffset];
+		ch->n_start = &song->sampleData[s->offset + startOffset];
 		ch->n_length = (uint16_t)((uint32_t)(endOffset - startOffset) >> 1);
-		ch->n_loopstart = &modEntry->sampleData[s->offset];
+		ch->n_loopstart = &song->sampleData[s->offset];
 		ch->n_replen = 1;
 	}
 
@@ -2066,7 +2134,7 @@ void setLoopSprites(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->loopStart+s->loopLength > 2)
 	{
 		if (sampler.samDisplay > 0)
@@ -2119,7 +2187,7 @@ static void samplerZoomIn(int32_t step, int32_t x)
 {
 	int32_t tmpDisplay, tmpOffset;
 
-	if (modEntry->samples[editor.currSample].length == 0 || sampler.samDisplay <= 2)
+	if (song->samples[editor.currSample].length == 0 || sampler.samDisplay <= 2)
 		return;
 
 	if (step < 1)
@@ -2151,7 +2219,7 @@ static void samplerZoomOut(int32_t step, int32_t x)
 {
 	int32_t tmpDisplay, tmpOffset;
 
-	if (modEntry->samples[editor.currSample].length == 0 || sampler.samDisplay == sampler.samLength)
+	if (song->samples[editor.currSample].length == 0 || sampler.samDisplay == sampler.samLength)
 		return;
 
 	if (step < 1)
@@ -2205,7 +2273,7 @@ void samplerRangeAll(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
 		invertRange();
@@ -2226,10 +2294,10 @@ void samplerShowRange(void)
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
-		displayErrorMsg("SAMPLE IS EMPTY");
+		statusSampleIsEmpty();
 		return;
 	}
 
@@ -2403,8 +2471,14 @@ void samplerEditSample(bool mouseButtonHeld)
 	int32_t mx, my, tmp32, p, vl, tvl, r, rl, rvl, start, end;
 	moduleSample_t *s;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	if (s->length == 0)
 	{
@@ -2461,7 +2535,7 @@ void samplerEditSample(bool mouseButtonHeld)
 		vl = tmp32;
 	}
 
-	ptr8 = &modEntry->sampleData[s->offset];
+	ptr8 = &song->sampleData[s->offset];
 
 	start = p;
 	if (start < 0)
@@ -2515,7 +2589,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	if (!mouseButtonHeld)
 	{
-		if (mouse.y < 142)
+		if (!editor.sampleZero && mouse.y < 142)
 		{
 			if (mouse.x >= sampler.loopStartPos && mouse.x <= sampler.loopStartPos+3)
 			{
@@ -2538,7 +2612,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	mouseX = CLAMP(mouse.x, 0, SCREEN_W+8); // allow some extra pixels outside of the screen
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 
 	if (ui.leftLoopPinMoving)
 	{
@@ -2582,7 +2656,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 		{
 			sampler.lastMouseX = mouseX;
 
-			s = &modEntry->samples[editor.currSample];
+			s = &song->samples[editor.currSample];
 
 			tmpPos = (scr2SmpPos(mouseX - 4) - s->loopStart) & 0xFFFFFFFE;
 			tmpPos = CLAMP(tmpPos, 2, MAX_SAMPLE_LEN);
@@ -2602,7 +2676,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	if (!mouseButtonHeld)
 	{
-		if (mouseX < 3 || mouseX >= SCREEN_W)
+		if (mouseX < 0 || mouseX >= SCREEN_W)
 			return;
 
 		ui.sampleMarkingPos = (int16_t)mouseX;
@@ -2693,9 +2767,15 @@ void samplerLoopToggle(void)
 {
 	moduleSample_t *s;
 
+	if (editor.sampleZero)
+	{
+		statusNotSampleZero();
+		return;
+	}
+
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
-	s = &modEntry->samples[editor.currSample];
+	s = &song->samples[editor.currSample];
 	if (s->length < 2)
 		return;
 
@@ -2792,7 +2872,7 @@ void drawSamplerLine(void)
 
 	for (i = 0; i < AMIGA_VOICES; i++)
 	{
-		if (modEntry->channels[i].n_samplenum == editor.currSample && !editor.muted[i])
+		if (song->channels[i].n_samplenum == editor.currSample && !editor.muted[i])
 		{
 			pos = getSampleReadPos(i, editor.currSample);
 			if (pos >= 0)

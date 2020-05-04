@@ -178,7 +178,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 
 	editor.abortMod2Wav = false;
 
-	modSetTempo(modEntry->currBPM); // update BPM with MOD2WAV audio output rate
+	modSetTempo(song->currBPM); // update BPM with MOD2WAV audio output rate
 
 	editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, NULL, fOut);
 	if (editor.mod2WavThread != NULL)
@@ -217,12 +217,12 @@ static void calcMod2WavTotalRows(void)
 	memset(n_pattpos, 0, sizeof (n_pattpos));
 	memset(n_loopcount, 0, sizeof (n_loopcount));
 
-	modEntry->rowsCounter = 0;
-	modEntry->rowsInTotal = 0;
+	song->rowsCounter = 0;
+	song->rowsInTotal = 0;
 
 	modRow = 0;
 	modOrder = 0;
-	modPattern = modEntry->head.order[0];
+	modPattern = song->header.order[0];
 	pBreakPosition = 0;
 	posJumpAssert = false;
 	pBreakFlag = false;
@@ -235,7 +235,7 @@ static void calcMod2WavTotalRows(void)
 
 		for (ch = 0; ch < AMIGA_VOICES; ch++)
 		{
-			note = &modEntry->patterns[modPattern][(modRow * AMIGA_VOICES) + ch];
+			note = &song->patterns[modPattern][(modRow * AMIGA_VOICES) + ch];
 			if (note->command == 0x0B) // Bxx - Position Jump
 			{
 				modOrder = note->param - 1;
@@ -284,7 +284,7 @@ static void calcMod2WavTotalRows(void)
 		}
 
 		modRow++;
-		modEntry->rowsInTotal++;
+		song->rowsInTotal++;
 
 		if (pBreakFlag)
 		{
@@ -300,14 +300,14 @@ static void calcMod2WavTotalRows(void)
 			posJumpAssert = false;
 
 			modOrder = (modOrder + 1) & 0x7F;
-			if (modOrder >= modEntry->head.orderCount)
+			if (modOrder >= song->header.numOrders)
 			{
 				modOrder = 0;
 				calcingRows = false;
 				break;
 			}
 
-			modPattern = modEntry->head.order[modOrder];
+			modPattern = song->header.order[modOrder];
 			if (modPattern > MAX_PATTERNS-1)
 				modPattern = MAX_PATTERNS-1;
 		}

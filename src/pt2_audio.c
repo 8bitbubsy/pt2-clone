@@ -319,10 +319,10 @@ void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 
 	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
-		ch = &modEntry->channels[i];
+		ch = &song->channels[i];
 		if (ch->n_samplenum == editor.currSample)
 		{
-			s = &modEntry->samples[editor.currSample];
+			s = &song->samples[editor.currSample];
 			paulaSetData(i, ch->n_start + s->loopStart);
 			paulaSetLength(i, s->loopLength >> 1);
 		}
@@ -473,13 +473,13 @@ void paulaSetData(int32_t ch, const int8_t *src)
 	moduleSample_t *s;
 	scopeChannelExt_t *se, tmp;
 
-	smp = modEntry->channels[ch].n_samplenum;
+	smp = song->channels[ch].n_samplenum;
 	assert(smp <= 30);
-	s = &modEntry->samples[smp];
+	s = &song->samples[smp];
 
 	// set voice data
 	if (src == NULL)
-		src = &modEntry->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
 
 	paula[ch].newData = src;
 
@@ -513,7 +513,7 @@ void paulaStartDMA(int32_t ch)
 
 	dat = v->newData;
 	if (dat == NULL)
-		dat = &modEntry->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
 
 	length = v->newLength;
 	if (length < 2)
@@ -533,7 +533,7 @@ void paulaStartDMA(int32_t ch)
 
 	dat = se->newData;
 	if (dat == NULL)
-		dat = &modEntry->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
 
 	s.length = length;
 	s.data = dat;
@@ -1138,7 +1138,7 @@ bool setupAudio(void)
 
 	uint32_t maxSamplesToMix;
 	if (MOD2WAV_FREQ > audio.outputRate)
-		 maxSamplesToMix = audio.bpmTabMod2Wav[32-32]; // BPM 32
+		maxSamplesToMix = audio.bpmTabMod2Wav[32-32]; // BPM 32
 	else
 		maxSamplesToMix = audio.bpmTab[32-32]; // BPM 32
 

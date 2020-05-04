@@ -11,6 +11,7 @@ enum
 
 #define DISKOP_LINES 10
 
+void addSampleFileExt(char *fileName);
 void diskOpShowSelectText(void);
 void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck);
 void diskOpLoadFile2(void);

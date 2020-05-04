@@ -33,19 +33,10 @@
     <ClInclude Include="..\..\src\pt2_keyboard.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\pt2_modloader.h">
-      <Filter>headers</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\pt2_mouse.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_palette.h">
-      <Filter>headers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\pt2_patternviewer.h">
-      <Filter>headers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\pt2_sampleloader.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_sampler.h">
@@ -75,6 +66,24 @@
     <ClInclude Include="..\..\src\pt2_structs.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_bmp.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sample_loader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sample_saver.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_module_loader.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_pattern_viewer.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_module_saver.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -85,12 +94,8 @@
     <ClCompile Include="..\..\src\pt2_helpers.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
-    <ClCompile Include="..\..\src\pt2_modloader.c" />
-    <ClCompile Include="..\..\src\pt2_modplayer.c" />
     <ClCompile Include="..\..\src\pt2_mouse.c" />
     <ClCompile Include="..\..\src\pt2_palette.c" />
-    <ClCompile Include="..\..\src\pt2_patternviewer.c" />
-    <ClCompile Include="..\..\src\pt2_sampleloader.c" />
     <ClCompile Include="..\..\src\pt2_sampler.c" />
     <ClCompile Include="..\..\src\pt2_scopes.c" />
     <ClCompile Include="..\..\src\pt2_tables.c" />
@@ -154,6 +159,13 @@
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_pat2smp.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
+    <ClCompile Include="..\..\src\pt2_bmp.c" />
+    <ClCompile Include="..\..\src\pt2_sample_saver.c" />
+    <ClCompile Include="..\..\src\pt2_sample_loader.c" />
+    <ClCompile Include="..\..\src\pt2_module_loader.c" />
+    <ClCompile Include="..\..\src\pt2_pattern_viewer.c" />
+    <ClCompile Include="..\..\src\pt2_module_saver.c" />
+    <ClCompile Include="..\..\src\pt2_replayer.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

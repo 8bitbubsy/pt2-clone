@@ -29,14 +29,14 @@
 #include "pt2_diskop.h"
 #include "pt2_tables.h"
 #include "pt2_palette.h"
-#include "pt2_modloader.h"
+#include "pt2_module_loader.h"
 #include "pt2_audio.h"
 #include "pt2_sampler.h"
 #include "pt2_config.h"
 #include "pt2_helpers.h"
 #include "pt2_keyboard.h"
 #include "pt2_visuals.h"
-#include "pt2_sampleloader.h"
+#include "pt2_sample_loader.h"
 
 typedef struct fileEntry_t
 {
@@ -67,6 +67,16 @@ static char fileNameBuffer[PATH_MAX + 1];
 static uint32_t oldFileEntryRow;
 static UNICHAR pathTmp[PATH_MAX + 2];
 static fileEntry_t *diskOpEntry;
+
+void addSampleFileExt(char *fileName)
+{
+	switch (diskop.smpSaveType)
+	{
+		case DISKOP_SMP_WAV: strcat(fileName, ".wav"); break;
+		case DISKOP_SMP_IFF: strcat(fileName, ".iff"); break;
+		default: case DISKOP_SMP_RAW: break;
+	}
+}
 
 static fileEntry_t *bufferCreateEmptyDir(void) // special case: creates a dir entry with a ".." directory
 {
@@ -861,7 +871,6 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 {
 	uint8_t oldMode, oldPlayMode;
 	UNICHAR *filePath;
-	module_t *tempMod;
 
 	// if we clicked on an empty space, return...
 	if (diskOpEntryIsEmpty(fileEntryRow))
@@ -878,15 +887,15 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 		{
 			if (diskop.mode == DISKOP_MODE_MOD)
 			{
-				if (songModifiedCheck && modEntry->modified)
+				if (songModifiedCheck && song->modified)
 				{
 					oldFileEntryRow = fileEntryRow;
 					showSongUnsavedAskBox(ASK_DISCARD_SONG);
 					return;
 				}
 
-				tempMod = modLoad(filePath);
-				if (tempMod != NULL)
+				module_t *newSong = modLoad(filePath);
+				if (newSong != NULL)
 				{
 					oldMode = editor.currMode;
 					oldPlayMode = editor.playMode;
@@ -894,9 +903,9 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 					modStop();
 					modFree();
 
-					modEntry = tempMod;
+					song = newSong;
 					setupNewMod();
-					modEntry->moduleLoaded = true;
+					song->loaded = true;
 
 					statusAllRight();
 
