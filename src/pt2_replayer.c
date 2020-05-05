@@ -1210,14 +1210,17 @@ void modStop(void)
 	editor.songPlaying = false;
 	turnOffVoices();
 
-	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+	if (song != NULL)
 	{
-		moduleChannel_t *c = &song->channels[i];
+		for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		{
+			moduleChannel_t *c = &song->channels[i];
 
-		c->n_wavecontrol = 0;
-		c->n_glissfunk = 0;
-		c->n_finetune = 0;
-		c->n_loopcount = 0;
+			c->n_wavecontrol = 0;
+			c->n_glissfunk = 0;
+			c->n_finetune = 0;
+			c->n_loopcount = 0;
+		}
 	}
 
 	pBreakFlag = false;

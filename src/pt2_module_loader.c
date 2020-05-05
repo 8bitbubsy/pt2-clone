@@ -981,12 +981,12 @@ void loadModFromArg(char *arg)
 	strcpy(filenameU, arg);
 #endif
 
-	module_t *tempSong = modLoad(filenameU);
-	if (tempSong != NULL)
+	module_t *newSong = modLoad(filenameU);
+	if (newSong != NULL)
 	{
 		song->loaded = false;
 		modFree();
-		song = tempSong;
+		song = newSong;
 		setupNewMod();
 		song->loaded = true;
 	}
@@ -1056,6 +1056,7 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 	fullPathU = (UNICHAR *)calloc(fullPathLen + 2, sizeof (UNICHAR));
 	if (fullPathU == NULL)
 	{
+		free(ansiName);
 		statusOutOfMemory();
 		return;
 	}
@@ -1107,8 +1108,8 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			return;
 		}
 
-		module_t *tempSong = modLoad(fullPathU);
-		if (tempSong != NULL)
+		module_t *newSong = modLoad(fullPathU);
+		if (newSong != NULL)
 		{
 			oldMode = editor.currMode;
 			oldPlayMode = editor.playMode;
@@ -1116,7 +1117,7 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			modStop();
 			modFree();
 
-			song = tempSong;
+			song = newSong;
 			setupNewMod();
 			song->loaded = true;
 
