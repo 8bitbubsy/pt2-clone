@@ -71,14 +71,17 @@ void doStopIt(bool resetPlayMode)
 		pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
 	}
 
-	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+	if (song != NULL)
 	{
-		moduleChannel_t *c = &song->channels[i];
+		for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		{
+			moduleChannel_t *c = &song->channels[i];
 
-		c->n_wavecontrol = 0;
-		c->n_glissfunk = 0;
-		c->n_finetune = 0;
-		c->n_loopcount = 0;
+			c->n_wavecontrol = 0;
+			c->n_glissfunk = 0;
+			c->n_finetune = 0;
+			c->n_loopcount = 0;
+		}
 	}
 }
 
@@ -129,7 +132,7 @@ static void updateFunk(moduleChannel_t *ch)
 
 		if (ch->n_loopstart != NULL && ch->n_wavestart != NULL) // non-PT2 bug fix
 		{
-			if (++ch->n_wavestart >= ch->n_loopstart+ch->n_replen)
+			if (++ch->n_wavestart >= ch->n_loopstart + (ch->n_replen << 1))
 				ch->n_wavestart = ch->n_loopstart;
 
 			*ch->n_wavestart = -1 - *ch->n_wavestart;
@@ -166,13 +169,9 @@ static void jumpLoop(moduleChannel_t *ch)
 	else
 	{
 		if (ch->n_loopcount == 0)
-		{
 			ch->n_loopcount = ch->n_cmd & 0xF;
-		}
 		else if (--ch->n_loopcount == 0)
-		{
 			return;
-		}
 
 		pBreakPosition = ch->n_pattpos;
 		pBreakFlag = true;
@@ -520,26 +519,25 @@ static void tonePortamento(moduleChannel_t *ch)
 	tonePortNoChange(ch);
 }
 
-static void vibratoNoChange(moduleChannel_t *ch)
+static void vibrato2(moduleChannel_t *ch)
 {
-	uint8_t vibratoTemp;
-	int16_t vibratoData;
+	uint16_t vibratoData;
 
-	vibratoTemp = (ch->n_vibratopos / 4) & 31;
-	vibratoData = ch->n_wavecontrol & 3;
+	const uint8_t vibratoPos = (ch->n_vibratopos >> 2) & 0x1F;
+	const uint8_t vibratoType = ch->n_wavecontrol & 3;
 
-	if (vibratoData == 0)
+	if (vibratoType == 0)
 	{
-		vibratoData = vibratoTable[vibratoTemp];
+		vibratoData = vibratoTable[vibratoPos];
 	}
 	else
 	{
-		if (vibratoData == 1)
+		if (vibratoType == 1)
 		{
-			if (ch->n_vibratopos < 0)
-				vibratoData = 255 - (vibratoTemp * 8);
+			if (ch->n_vibratopos < 128)
+				vibratoData = vibratoPos << 3;
 			else
-				vibratoData = vibratoTemp * 8;
+				vibratoData = 255 - (vibratoPos << 3);
 		}
 		else
 		{
@@ -547,30 +545,27 @@ static void vibratoNoChange(moduleChannel_t *ch)
 		}
 	}
 
-	vibratoData = (vibratoData * (ch->n_vibratocmd & 0xF)) / 128;
+	vibratoData = (vibratoData * (ch->n_vibratocmd & 0xF)) >> 7;
 
-	if (ch->n_vibratopos < 0)
-		vibratoData = ch->n_period - vibratoData;
-	else
+	if (ch->n_vibratopos < 128)
 		vibratoData = ch->n_period + vibratoData;
+	else
+		vibratoData = ch->n_period - vibratoData;
 
 	paulaSetPeriod(ch->n_chanindex, vibratoData);
 
-	ch->n_vibratopos += ((ch->n_vibratocmd >> 4) * 4);
+	ch->n_vibratopos += (ch->n_vibratocmd >> 2) & 0x3C;
 }
 
 static void vibrato(moduleChannel_t *ch)
 {
-	if ((ch->n_cmd & 0xFF) > 0)
-	{
-		if ((ch->n_cmd & 0x0F) > 0)
-			ch->n_vibratocmd = (ch->n_vibratocmd & 0xF0) | (ch->n_cmd & 0x0F);
+	if ((ch->n_cmd & 0x0F) > 0)
+		ch->n_vibratocmd = (ch->n_vibratocmd & 0xF0) | (ch->n_cmd & 0x0F);
 
-		if ((ch->n_cmd & 0xF0) > 0)
-			ch->n_vibratocmd = (ch->n_cmd & 0xF0) | (ch->n_vibratocmd & 0x0F);
-	}
+	if ((ch->n_cmd & 0xF0) > 0)
+		ch->n_vibratocmd = (ch->n_cmd & 0xF0) | (ch->n_vibratocmd & 0x0F);
 
-	vibratoNoChange(ch);
+	vibrato2(ch);
 }
 
 static void tonePlusVolSlide(moduleChannel_t *ch)
@@ -581,39 +576,35 @@ static void tonePlusVolSlide(moduleChannel_t *ch)
 
 static void vibratoPlusVolSlide(moduleChannel_t *ch)
 {
-	vibratoNoChange(ch);
+	vibrato2(ch);
 	volumeSlide(ch);
 }
 
 static void tremolo(moduleChannel_t *ch)
 {
-	int8_t tremoloTemp;
 	int16_t tremoloData;
 
-	if ((ch->n_cmd & 0xFF) > 0)
+	if ((ch->n_cmd & 0x0F) > 0)
+		ch->n_tremolocmd = (ch->n_tremolocmd & 0xF0) | (ch->n_cmd & 0x0F);
+
+	if ((ch->n_cmd & 0xF0) > 0)
+		ch->n_tremolocmd = (ch->n_cmd & 0xF0) | (ch->n_tremolocmd & 0x0F);
+
+	const uint8_t tremoloPos = (ch->n_tremolopos >> 2) & 0x1F;
+	const uint8_t tremoloType = (ch->n_wavecontrol >> 4) & 3;
+
+	if (tremoloType == 0)
 	{
-		if ((ch->n_cmd & 0x0F) > 0)
-			ch->n_tremolocmd = (ch->n_tremolocmd & 0xF0) | (ch->n_cmd & 0x0F);
-
-		if ((ch->n_cmd & 0xF0) > 0)
-			ch->n_tremolocmd = (ch->n_cmd & 0xF0) | (ch->n_tremolocmd & 0x0F);
-	}
-
-	tremoloTemp = (ch->n_tremolopos / 4) & 31;
-	tremoloData = (ch->n_wavecontrol >> 4) & 3;
-
-	if (!tremoloData)
-	{
-		tremoloData = vibratoTable[tremoloTemp];
+		tremoloData = vibratoTable[tremoloPos];
 	}
 	else
 	{
-		if (tremoloData == 1)
+		if (tremoloType == 1)
 		{
-			if (ch->n_vibratopos < 0) // PT bug, should've been n_tremolopos
-				tremoloData = 255 - (tremoloTemp * 8);
+			if (ch->n_vibratopos < 128) // PT bug, should've been ch->n_tremolopos
+				tremoloData = tremoloPos << 3;
 			else
-				tremoloData = tremoloTemp * 8;
+				tremoloData = 255 - (tremoloPos << 3);
 		}
 		else
 		{
@@ -621,39 +612,37 @@ static void tremolo(moduleChannel_t *ch)
 		}
 	}
 
-	tremoloData = (tremoloData * (ch->n_tremolocmd & 0xF)) / 64;
+	tremoloData = ((uint16_t)tremoloData * (ch->n_tremolocmd & 0xF)) >> 6;
 
-	if (ch->n_tremolopos < 0)
-	{
-		tremoloData = ch->n_volume - tremoloData;
-		if (tremoloData < 0)
-			tremoloData = 0;
-	}
-	else
+	if (ch->n_tremolopos < 128)
 	{
 		tremoloData = ch->n_volume + tremoloData;
 		if (tremoloData > 64)
 			tremoloData = 64;
 	}
+	else
+	{
+		tremoloData = ch->n_volume - tremoloData;
+		if (tremoloData < 0)
+			tremoloData = 0;
+	}
 
 	paulaSetVolume(ch->n_chanindex, tremoloData);
 
-	ch->n_tremolopos += (ch->n_tremolocmd >> 4) * 4;
+	ch->n_tremolopos += (ch->n_tremolocmd >> 2) & 0x3C;
 }
 
 static void sampleOffset(moduleChannel_t *ch)
 {
-	uint16_t newOffset;
-
 	if ((ch->n_cmd & 0xFF) > 0)
 		ch->n_sampleoffset = ch->n_cmd & 0xFF;
 
-	newOffset = ch->n_sampleoffset << 7;
+	uint16_t newOffset = ch->n_sampleoffset << 7;
 
-	if ((int16_t)newOffset < (int16_t)ch->n_length)
+	if ((int16_t)newOffset < ch->n_length)
 	{
 		ch->n_length -= newOffset;
-		ch->n_start += newOffset*2;
+		ch->n_start += newOffset << 1;
 	}
 	else
 	{
@@ -663,9 +652,7 @@ static void sampleOffset(moduleChannel_t *ch)
 
 static void E_Commands(moduleChannel_t *ch)
 {
-	uint8_t cmd;
-
-	cmd = (ch->n_cmd & 0xF0) >> 4;
+	const uint8_t cmd = (ch->n_cmd & 0xF0) >> 4;
 	switch (cmd)
 	{
 		case 0x0: filterOnOff(ch);       break;
@@ -725,15 +712,12 @@ static void checkMoreEffects(moduleChannel_t *ch)
 
 static void checkEffects(moduleChannel_t *ch)
 {
-	uint8_t effect;
-
 	if (editor.muted[ch->n_chanindex])
 		return;
 
 	updateFunk(ch);
 
-	effect = (ch->n_cmd & 0xF00) >> 8;
-
+	const uint8_t effect = (ch->n_cmd & 0xF00) >> 8;
 	if ((ch->n_cmd & 0xFFF) > 0)
 	{
 		switch (effect)
@@ -771,10 +755,9 @@ static void checkEffects(moduleChannel_t *ch)
 
 static void setPeriod(moduleChannel_t *ch)
 {
-	uint8_t i;
-	uint16_t note;
+	int32_t i;
 
-	note = ch->n_note & 0xFFF;
+	uint16_t note = ch->n_note & 0xFFF;
 	for (i = 0; i < 37; i++)
 	{
 		// periodTable[36] = 0, so i=36 is safe
@@ -782,7 +765,7 @@ static void setPeriod(moduleChannel_t *ch)
 			break;
 	}
 
-	// BUG: yes it's 'safe' if i=37 because of padding at the end of period table
+	// yes it's safe if i=37 because of zero-padding
 	ch->n_period = periodTable[(ch->n_finetune * 37) + i];
 
 	if ((ch->n_cmd & 0xFF0) != 0xED0) // no note delay
@@ -850,16 +833,17 @@ static void playVoice(moduleChannel_t *ch)
 		s = &song->samples[ch->n_samplenum];
 
 		ch->n_start = &song->sampleData[s->offset];
-		ch->n_finetune = s->fineTune;
+		ch->n_finetune = s->fineTune & 0xF;
 		ch->n_volume = s->volume;
-		ch->n_length = s->length / 2;
-		ch->n_replen = s->loopLength / 2;
+		ch->n_length = s->length >> 1;
+		ch->n_replen = s->loopLength >> 1;
 
-		if (s->loopStart > 0)
+		const uint16_t repeat = s->loopStart >> 1;
+		if (repeat > 0)
 		{
-			ch->n_loopstart = ch->n_start + s->loopStart;
+			ch->n_loopstart = ch->n_start + (repeat << 1);
 			ch->n_wavestart = ch->n_loopstart;
-			ch->n_length = (s->loopStart / 2) + ch->n_replen;
+			ch->n_length = repeat + ch->n_replen;
 		}
 		else
 		{

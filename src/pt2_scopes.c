@@ -21,112 +21,124 @@
 
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
-static volatile bool scopesReading;
+static volatile bool scopesUpdatingFlag, scopesDisplayingFlag;
 static uint32_t scopeTimeLen, scopeTimeLenFrac;
 static uint64_t timeNext64, timeNext64Frac;
 static SDL_Thread *scopeThread;
 
-scopeChannel_t scope[AMIGA_VOICES]; // global
-scopeChannelExt_t scopeExt[AMIGA_VOICES]; // global
+scope_t scope[AMIGA_VOICES]; // global
 
 int32_t getSampleReadPos(int32_t ch, uint8_t smpNum)
 {
 	const int8_t *data;
-	int32_t pos;
-	scopeChannel_t *sc;
+	volatile bool active;
+	volatile int32_t pos;
+	volatile scope_t *sc;
+
 	moduleSample_t *s;
 	
 	sc = &scope[ch];
 
 	// cache some stuff
+	active = sc->active;
 	data = sc->data;
 	pos = sc->pos;
 
-	if (scopeExt[ch].active && pos >= 2)
-	{
-		s = &song->samples[smpNum];
+	if (!active || data == NULL || pos <= 2) // pos 0..2 = sample loop area for non-looping samples
+		return -1;
 
-		/* Get real sampling position regardless of where the scope data points to
-		** sc->data changes during loop, offset and so on, so this has to be done
-		** (sadly, because it's really hackish).
-		*/
-		pos = (int32_t)(&data[pos] - &song->sampleData[s->offset]);
-		if (pos >= s->length)
-			return -1;
+	s = &song->samples[smpNum];
 
-		return pos;
-	}
+	// hackish way of getting real scope/sampling position
+	pos = (int32_t)(&data[pos] - &song->sampleData[s->offset]);
+	if (pos < 0 || pos >= s->length)
+		return -1;
 
-	return -1;
+	return pos;
 }
 
-void setScopeDelta(int32_t ch, uint32_t delta)
+void scopeTrigger(int32_t ch, int32_t length)
 {
-	scope[ch].delta = delta;
+	volatile scope_t *sc = &scope[ch];
+	scope_t tempState = *sc; // cache it
+
+	const int8_t *newData = tempState.newData;
+	if (newData == NULL)
+		newData = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+
+	if (length < 2)
+	{
+		sc->active = false;
+		return;
+	}
+
+	tempState.posFrac = 0;
+	tempState.pos = 0;
+	tempState.data = newData;
+	tempState.length = length;
+	tempState.active = true;
+
+	/* Update live scope now.
+	** In theory it -can- be written to in the middle of a cached read,
+	** then the read thread writes its own non-updated cached copy back and
+	** the trigger never happens. So far I have never seen it happen,
+	** so it's probably very rare. Yes, this is not good coding...
+	*/
+	*sc = tempState;
 }
 
 void updateScopes(void)
 {
-	scopeChannel_t *sc, tmp;
-	scopeChannelExt_t *se, tmpExt;
+	scope_t tempState;
 
 	if (editor.isWAVRendering)
 		return;
 
-	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+	volatile scope_t *sc = scope;
+
+	scopesUpdatingFlag = true;
+	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
 	{
-		sc = &scope[i];
-		se = &scopeExt[i];
+		tempState = *sc; // cache it
 
-		// cache these
-		tmp = *sc;
-		tmpExt = *se;
-
-		if (!tmpExt.active)
+		if (!tempState.active)
 			continue; // scope is not active
 
-		tmp.posFrac += tmp.delta;
-		tmp.pos += tmp.posFrac >> 16;
-		tmp.posFrac &= 0xFFFF;
+		tempState.posFrac += tempState.delta;
+		tempState.pos += tempState.posFrac >> SCOPE_FRAC_BITS;
+		tempState.posFrac &= SCOPE_FRAC_MASK;
 
-		if (tmp.pos >= tmp.length)
+		if (tempState.pos >= tempState.length)
 		{
 			// sample reached end, simulate Paula register update (sample swapping)
 
 			/* Wrap pos around one time with current length, then set new length
 			** and wrap around it (handles one-shot loops and sample swapping).
 			*/
-			tmp.pos -= tmp.length;
-			tmp.length = tmpExt.newLength;
+			tempState.pos -= tempState.length;
 
-			if (tmp.length > 0)
-				tmp.pos %= tmp.length;
+			tempState.length = tempState.newLength;
+			if (tempState.length > 0)
+				tempState.pos %= tempState.length;
 
-			tmp.data = tmpExt.newData;
-			tmp.loopFlag = tmpExt.newLoopFlag;
-			tmp.loopStart = tmpExt.newLoopStart;
-
-			se->didSwapData = true;
+			tempState.data = tempState.newData;
 		}
 
-		*sc = tmp; // update it
+		*sc = tempState; // update scope state
 	}
+	scopesUpdatingFlag = false;
 }
 
-/* This routine gets the average sample peak through the running scope voices.
-** This gives a much more smooth and stable result than getting the peak from
-** the mixer, and we don't care about including filters/BLEP in the peak calculation.
+/* This routine gets the average sample amplitude through the running scope voices.
+** This gives a somewhat more stable result than getting the peak from the mixer,
+** and we don't care about including filters/BLEP in the peak calculation.
 */
 static void updateRealVuMeters(void) 
 {
-	bool didSwapData;
-	int16_t volume;
-	int32_t i, x, readPos, samplesToScan, smpDat, smpPeak;
-	scopeChannel_t tmpScope, *sc;
-	scopeChannelExt_t *se;
+	scope_t tmpScope, *sc;
 
 	// sink VU-meters first
-	for (i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
 		editor.realVuMeterVolumes[i] -= 3;
 		if (editor.realVuMeterVolumes[i] < 0)
@@ -134,206 +146,157 @@ static void updateRealVuMeters(void)
 	}
 
 	// get peak sample data from running scope voices
-	for (i = 0; i < AMIGA_VOICES; i++)
+	sc = scope;
+	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
 	{
-		sc = &scope[i];
-		se = &scopeExt[i];
+		tmpScope = *sc; // cache it
 
-		// cache these two
-		tmpScope = *sc;
-		didSwapData = se->didSwapData;
+		if (!tmpScope.active || tmpScope.data == NULL || tmpScope.volume == 0 || tmpScope.length == 0)
+			continue;
 
-		samplesToScan = tmpScope.delta >> 16;
+		int32_t samplesToScan = tmpScope.delta >> SCOPE_FRAC_BITS; // amount of integer samples getting skipped every frame
 		if (samplesToScan <= 0)
 			continue;
 
-		if (samplesToScan > 512) // don't waste cycles on reading a ton of samples
+		// shouldn't happen (low period 113 -> samplesToScan=490), but let's not waste cycles if it does
+		if (samplesToScan > 512)
 			samplesToScan = 512;
 
-		volume = song->channels[i].n_volume;
+		int32_t pos = tmpScope.pos;
+		int32_t length = tmpScope.length;
+		const int8_t *data = tmpScope.data;
 
-		if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)
+		int32_t runningAmplitude = 0;
+		for (int32_t x = 0; x < samplesToScan; x++)
 		{
-			smpPeak = 0;
-			readPos = tmpScope.pos;
+			int16_t amplitude = 0;
+			if (data != NULL)
+				amplitude = data[pos] * tmpScope.volume;
 
-			if (tmpScope.loopFlag)
+			runningAmplitude += ABS(amplitude);
+
+			pos++;
+			if (pos >= length)
 			{
-				for (x = 0; x < samplesToScan; x += 2) // loop enabled
-				{
-					if (didSwapData)
-					{
-						if (readPos >= tmpScope.length)
-							readPos %= tmpScope.length; // s.data = loopStartPtr, wrap readPos to 0
-					}
-					else if (readPos >= tmpScope.length)
-					{
-						readPos = tmpScope.loopStart; // s.data = sampleStartPtr, wrap readPos to loop start
-					}
+				pos = 0;
 
-					smpDat = tmpScope.data[readPos] * volume;
-
-					smpDat = ABS(smpDat);
-					if (smpDat > smpPeak)
-						smpPeak = smpDat;
-
-					readPos += 2;
-				}
+				/* Read cycle done, temporarily update the display data/length variables
+				** before the scope thread does it.
+				*/
+				data = tmpScope.newData;
+				length = tmpScope.newLength;
 			}
-			else
-			{
-				for (x = 0; x < samplesToScan; x += 2) // no loop
-				{
-					if (readPos >= tmpScope.length)
-						break;
-
-					smpDat = tmpScope.data[readPos] * volume;
-
-					smpDat = ABS(smpDat);
-					if (smpDat > smpPeak)
-						smpPeak = smpDat;
-
-					readPos += 2;
-				}
-			}
-
-			smpPeak = ((smpPeak * 48) + (1 << 12)) >> 13; // rounded
-			if (smpPeak > editor.realVuMeterVolumes[i])
-				editor.realVuMeterVolumes[i] = (int8_t)smpPeak;
 		}
+
+		double dAvgAmplitude = runningAmplitude / (double)samplesToScan;
+
+		dAvgAmplitude *= (96.0 / (128.0 * 64.0)); // normalize
+
+		int32_t vuHeight = (int32_t)dAvgAmplitude;
+		if (vuHeight > 48) // max VU-meter height
+			vuHeight = 48;
+
+		if ((int8_t)vuHeight > editor.realVuMeterVolumes[i])
+			editor.realVuMeterVolumes[i] = (int8_t)vuHeight;
 	}
 }
 
 void drawScopes(void)
 {
-	bool didSwapData;
-	int16_t scopeData, volume;
-	int32_t i, x, y, readPos;
-	uint32_t *dstPtr, *scopePtr, scopePixel;
-	scopeChannel_t tmpScope, *sc;
-	scopeChannelExt_t *se;
+	int16_t scopeData;
+	int32_t i, x, y;
+	uint32_t *dstPtr, *scopeDrawPtr;
+	volatile scope_t *sc;
+	scope_t tmpScope;
 
-	scopesReading = true;
-	if (ui.visualizerMode == VISUAL_QUADRASCOPE)
+	scopeDrawPtr = &video.frameBuffer[(71 * SCREEN_W) + 128];
+
+	const uint32_t bgColor = video.palette[PAL_BACKGRD];
+	const uint32_t fgColor = video.palette[PAL_QADSCP];
+
+	sc = scope;
+
+	scopesDisplayingFlag = true;
+	for (i = 0; i < AMIGA_VOICES; i++, sc++)
 	{
-		// --- QUADRASCOPE ---
+		tmpScope = *sc; // cache it
 
-		scopePtr = &video.frameBuffer[(71 * SCREEN_W) + 128];
-		for (i = 0; i < AMIGA_VOICES; i++)
+		// render scope
+		if (tmpScope.active && tmpScope.data != NULL && tmpScope.volume != 0 && tmpScope.length > 0)
 		{
-			sc = &scope[i];
-			se = &scopeExt[i];
+			// scope is active
 
-			// cache these two
-			tmpScope = *sc;
-			didSwapData = se->didSwapData;
+			sc->emptyScopeDrawn = false;
 
-			volume = -song->channels[i].n_volume; // invert volume
-
-			// render scope
-			if (se->active && tmpScope.data != NULL && volume != 0 && tmpScope.length > 0)
+			// fill scope background
+			dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
+			for (y = 0; y < SCOPE_HEIGHT; y++)
 			{
-				// scope is active
+				for (x = 0; x < SCOPE_WIDTH; x++)
+					dstPtr[x] = bgColor;
 
-				se->emptyScopeDrawn = false;
+				dstPtr += SCREEN_W;
+			}
 
-				// draw scope background
+			// render scope data
 
+			int32_t pos = tmpScope.pos;
+			int32_t length = tmpScope.length;
+			const int16_t volume = -(tmpScope.volume << 7);
+			const int8_t *data = tmpScope.data;
+
+			for (x = 0; x < SCOPE_WIDTH; x++)
+			{
+				scopeData = 0;
+				if (data != NULL)
+					scopeData = (data[pos] * volume) >> 16;
+
+				scopeDrawPtr[(scopeData * SCREEN_W) + x] = fgColor;
+
+				pos++;
+				if (pos >= length)
+				{
+					pos = 0;
+
+					/* Read cycle done, temporarily update the display data/length variables
+					** before the scope thread does it.
+					*/
+					length = tmpScope.newLength;
+					data = tmpScope.newData;
+				}
+			}
+		}
+		else
+		{
+			// scope is inactive, draw empty scope once until it gets active again
+
+			if (!sc->emptyScopeDrawn)
+			{
+				// fill scope background
 				dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
-				scopePixel = video.palette[PAL_BACKGRD]; // this palette can change
-
 				for (y = 0; y < SCOPE_HEIGHT; y++)
 				{
 					for (x = 0; x < SCOPE_WIDTH; x++)
-						dstPtr[x] = scopePixel;
+						dstPtr[x] = bgColor;
 
 					dstPtr += SCREEN_W;
 				}
 
-				// render scope data
+				// draw scope line
+				for (x = 0; x < SCOPE_WIDTH; x++)
+					scopeDrawPtr[x] = fgColor;
 
-				scopePixel = video.palette[PAL_QADSCP];
-
-				readPos = tmpScope.pos;
-				if (tmpScope.loopFlag)
-				{
-					// loop enabled
-
-					for (x = 0; x < SCOPE_WIDTH; x++)
-					{
-						if (didSwapData)
-						{
-							if (readPos >= tmpScope.length)
-								readPos %= tmpScope.length; // s.data = loopStartPtr, wrap readPos to 0
-						}
-						else if (readPos >= tmpScope.length)
-						{
-							readPos = tmpScope.loopStart; // s.data = sampleStartPtr, wrap readPos to loop start
-						}
-
-						scopeData = (tmpScope.data[readPos++] * volume) >> 9; // (-128..127)*(-64..0) / 2^9 = -15..16
-						scopePtr[(scopeData * SCREEN_W) + x] = scopePixel;
-					}
-				}
-				else
-				{
-					// no loop
-
-					for (x = 0; x < SCOPE_WIDTH; x++)
-					{
-						if (readPos >= tmpScope.length)
-						{
-							scopePtr[x] = scopePixel; // end of data, draw center pixel
-						}
-						else
-						{
-							scopeData = (tmpScope.data[readPos++] * volume) >> 9; // (-128..127)*(-64..0) / 2^9 = -15..16
-							scopePtr[(scopeData * SCREEN_W) + x] = scopePixel;
-						}
-					}
-				}
+				sc->emptyScopeDrawn = true;
 			}
-			else
-			{
-				// scope is inactive, draw empty scope once until it gets active again
-
-				if (!se->emptyScopeDrawn)
-				{
-					// draw scope background
-
-					dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
-					scopePixel = video.palette[PAL_BACKGRD];
-
-					for (y = 0; y < SCOPE_HEIGHT; y++)
-					{
-						for (x = 0; x < SCOPE_WIDTH; x++)
-							dstPtr[x] = scopePixel;
-
-						dstPtr += SCREEN_W;
-					}
-
-					// draw line
-
-					scopePixel = video.palette[PAL_QADSCP];
-					for (x = 0; x < SCOPE_WIDTH; x++)
-						scopePtr[x] = scopePixel;
-
-					se->emptyScopeDrawn = true;
-				}
-			}
-
-			scopePtr += SCOPE_WIDTH+8;
 		}
+
+		scopeDrawPtr += SCOPE_WIDTH+8;
 	}
-	scopesReading = false;
+	scopesDisplayingFlag = false;
 }
 
 static int32_t SDLCALL scopeThreadFunc(void *ptr)
 {
-	int32_t time32;
-	uint32_t diff32;
-	uint64_t time64;
-
 	// this is needed for scope stability (confirmed)
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 
@@ -348,16 +311,19 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 		updateScopes();
 
-		time64 = SDL_GetPerformanceCounter();
+		uint64_t time64 = SDL_GetPerformanceCounter();
 		if (time64 < timeNext64)
 		{
-			assert(timeNext64-time64 <= 0xFFFFFFFFULL);
-			diff32 = (uint32_t)(timeNext64 - time64);
+			time64 = timeNext64 - time64;
+			if (time64 > UINT32_MAX)
+				time64 = UINT32_MAX;
+
+			const uint32_t diff32 = (uint32_t)time64;
 
 			// convert to microseconds and round to integer
-			time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
+			const int32_t time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
 
-			// delay until we have reached next tick
+			// delay until we have reached the next frame
 			if (time32 > 0)
 				usleep(time32);
 		}
@@ -406,18 +372,23 @@ bool initScopes(void)
 
 void stopScope(int32_t ch)
 {
-	while (scopesReading);
-	memset(&scopeExt[ch], 0, sizeof (scopeChannelExt_t));
+	// wait for scopes to finish updating
+	while (scopesUpdatingFlag);
 
-	while (scopesReading);
-	memset(&scope[ch], 0, sizeof (scopeChannel_t));
+	scope[ch].active = false;
 
-	scope[ch].length = scopeExt[ch].newLength = 2;
-	while (scopesReading); // final wait to make sure scopes are all inactive
+	// wait for scope displaying to be done (safety)
+	while (scopesDisplayingFlag);
 }
 
 void stopAllScopes(void)
 {
+	// wait for scopes to finish updating
+	while (scopesUpdatingFlag);
+
 	for (int32_t i = 0; i < AMIGA_VOICES; i++)
-		stopScope(i);
+		scope[i].active = false;
+
+	// wait for scope displaying to be done (safety)
+	while (scopesDisplayingFlag);
 }

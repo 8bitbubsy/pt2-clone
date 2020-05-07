@@ -314,15 +314,13 @@ void unlockAudio(void)
 
 void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 {
-	moduleChannel_t *ch;
-	moduleSample_t *s;
-
 	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
-		ch = &song->channels[i];
+		const moduleChannel_t *ch = &song->channels[i];
 		if (ch->n_samplenum == editor.currSample)
 		{
-			s = &song->samples[editor.currSample];
+			const moduleSample_t *s = &song->samples[editor.currSample];
+
 			paulaSetData(i, ch->n_start + s->loopStart);
 			paulaSetLength(i, s->loopLength >> 1);
 		}
@@ -406,7 +404,7 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 	if (period == 0)
 		realPeriod = 1+65535; // confirmed behavior on real Amiga
 	else if (period < 113)
-		realPeriod = 113; // confirmed behavior on real Amiga
+		realPeriod = 113; // close to what happens on real Amiga (and needed for BLEP synthesis)
 	else
 		realPeriod = period;
 
@@ -417,9 +415,6 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 
 		// this period is not cached, calculate mixer/scope deltas
 
-#if SCOPE_HZ != 64
-#error Scope Hz is not 64 (2^n), change rate calc. to use doubles+round in pt2_scope.c
-#endif
 		// during PAT2SMP or doing MOD2WAV, use different audio output rates
 		if (editor.isSMPRendering)
 			dPeriodToDeltaDiv = editor.pat2SmpHQ ? (PAULA_PAL_CLK / 28836.0) : (PAULA_PAL_CLK / 22168.0);
@@ -428,17 +423,19 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		else
 			dPeriodToDeltaDiv = audio.dPeriodToDeltaDiv;
 
+		const double dPeriodToScopeDeltaDiv = ((double)PAULA_PAL_CLK * SCOPE_FRAC_SCALE) / SCOPE_HZ;
+
 		// cache these
 		dOldVoiceDelta = dPeriodToDeltaDiv / realPeriod;
+		oldScopeDelta = (int32_t)((dPeriodToScopeDeltaDiv / realPeriod) + 0.5);
 		dOldVoiceDeltaMul = 1.0 / dOldVoiceDelta; // for BLEP synthesis
-		oldScopeDelta = (PAULA_PAL_CLK * (65536UL / SCOPE_HZ)) / realPeriod;
 	}
 
 	v->dDelta = dOldVoiceDelta;
-	v->dDeltaMul = dOldVoiceDeltaMul; // for BLEP synthesis
-	setScopeDelta(ch, oldScopeDelta);
+	scope[ch].delta = oldScopeDelta;
 
 	// for BLEP synthesis
+	v->dDeltaMul = dOldVoiceDeltaMul;
 	if (v->dLastDelta == 0.0) v->dLastDelta = v->dDelta;
 	if (v->dLastDeltaMul == 0.0) v->dLastDeltaMul = v->dDeltaMul;
 }
@@ -451,6 +448,7 @@ void paulaSetVolume(int32_t ch, uint16_t vol)
 		vol = 64; // confirmed behavior on real Amiga
 
 	paula[ch].dVolume = vol * (1.0 / 64.0);
+	scope[ch].volume = (uint8_t)vol;
 }
 
 void paulaSetLength(int32_t ch, uint16_t len)
@@ -463,40 +461,21 @@ void paulaSetLength(int32_t ch, uint16_t len)
 		*/
 	}
 
-	// our mixer works with bytes, not words. Multiply by two
-	scopeExt[ch].newLength = paula[ch].newLength = len << 1;
+	scope[ch].newLength = paula[ch].newLength = len << 1; // our mixer works with bytes, not words
 }
 
 void paulaSetData(int32_t ch, const int8_t *src)
 {
-	uint8_t smp;
-	moduleSample_t *s;
-	scopeChannelExt_t *se, tmp;
-
-	smp = song->channels[ch].n_samplenum;
-	assert(smp <= 30);
-	s = &song->samples[smp];
-
 	// set voice data
 	if (src == NULL)
 		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
 
-	paula[ch].newData = src;
-
-	// set external scope data
-	se = &scopeExt[ch];
-	tmp = *se; // cache it
-
-	tmp.newData = src;
-	tmp.newLoopFlag = (s->loopStart + s->loopLength) > 2;
-	tmp.newLoopStart = s->loopStart;
-
-	*se = tmp; // update it
+	scope[ch].newData = paula[ch].newData = src;
 }
 
 void paulaStopDMA(int32_t ch)
 {
-	scopeExt[ch].active = paula[ch].active = false;
+	scope[ch].active = paula[ch].active = false;
 }
 
 void paulaStartDMA(int32_t ch)
@@ -504,8 +483,6 @@ void paulaStartDMA(int32_t ch)
 	const int8_t *dat;
 	int32_t length;
 	paulaVoice_t *v;
-	scopeChannel_t s, *sc;
-	scopeChannelExt_t *se;
 
 	// trigger voice
 
@@ -525,30 +502,7 @@ void paulaStartDMA(int32_t ch)
 	v->length = length;
 	v->active = true;
 
-	// trigger scope
-
-	sc = &scope[ch];
-	se = &scopeExt[ch];
-	s = *sc; // cache it
-
-	dat = se->newData;
-	if (dat == NULL)
-		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
-
-	s.length = length;
-	s.data = dat;
-
-	s.pos = 0;
-	s.posFrac = 0;
-
-	// data/length is already set from replayer thread (important)
-	s.loopFlag = se->newLoopFlag;
-	s.loopStart = se->newLoopStart;
-
-	se->didSwapData = false;
-	se->active = true;
-
-	*sc = s; // update it
+	scopeTrigger(ch, length);
 }
 
 void toggleA500Filters(void)
@@ -1074,9 +1028,9 @@ static void calculateFilterCoeffs(void)
 	calcLEDFilterCoeffs(audio.outputRate, fc, fb, &filterLED);
 
 	// A500/A1200 one-pole 6db/oct static RC high-pass filter:
-	R = 1000.0 + 390.0;  // R324 (1K ohm resistor) + R325 (390 ohm resistor)
-	C = 2.2e-5;          // C334 (22uF capacitor) (+ C324 (0.33uF capacitor) if A500)
-	fc = 1.0 / (2.0 * M_PI * R * C); // ~5.20Hz
+	R = 1000.0 + 390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
+	C = 2.2e-5;         // C334 (22uF capacitor) (+ C324 (0.33uF capacitor) if A500)
+	fc = 1.0 / (2.0 * M_PI * R * C); // ~5.2Hz
 	calcRCFilterCoeffs(audio.outputRate, fc, &filterHi);
 }
 

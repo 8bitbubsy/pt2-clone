@@ -3,24 +3,25 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_header.h"
+#include "pt2_structs.h"
 
-typedef struct scopeChannel_t // internal scope state
+#define SCOPE_FRAC_BITS 16
+#define SCOPE_FRAC_SCALE (1UL << 16)
+#define SCOPE_FRAC_MASK (SCOPE_FRAC_SCALE-1)
+
+typedef struct scope_t
 {
 	const int8_t *data;
-	bool loopFlag;
-	int32_t length, pos, loopStart;
+	bool active, emptyScopeDrawn;
+	uint8_t volume;
+	int32_t length, pos;
 	uint32_t delta, posFrac;
-} scopeChannel_t;
 
-typedef struct scopeChannelExt // external scope state
-{
 	const int8_t *newData;
-	volatile bool active, didSwapData;
-	bool emptyScopeDrawn, newLoopFlag;
-	int32_t newLength, newLoopStart;
-} scopeChannelExt_t;
+	int32_t newLength;
+} scope_t;
 
-void setScopeDelta(int32_t ch, uint32_t delta);
+void scopeTrigger(int32_t ch, int32_t length);
 int32_t getSampleReadPos(int32_t ch, uint8_t smpNum);
 void updateScopes(void);
 void drawScopes(void);
@@ -28,5 +29,4 @@ bool initScopes(void);
 void stopScope(int32_t ch);
 void stopAllScopes(void);
 
-extern scopeChannel_t scope[AMIGA_VOICES];
-extern scopeChannelExt_t scopeExt[AMIGA_VOICES];
+extern scope_t scope[AMIGA_VOICES];

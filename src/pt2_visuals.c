@@ -128,20 +128,19 @@ void waitVBL(void)
 {
 	// this routine almost never delays if we have 60Hz vsync, but it's still needed in some occasions
 
-	int32_t time32;
-	uint32_t diff32;
-	uint64_t time64;
-
-	time64 = SDL_GetPerformanceCounter();
+	uint64_t time64 = SDL_GetPerformanceCounter();
 	if (time64 < timeNext64)
 	{
-		assert(timeNext64-time64 <= 0xFFFFFFFFULL);
-		diff32 = (uint32_t)(timeNext64 - time64);
+		time64 = timeNext64 - time64;
+		if (time64 > UINT32_MAX)
+			time64 = UINT32_MAX;
+
+		const uint32_t diff32 = (uint32_t)time64;
 
 		// convert to microseconds and round to integer
-		time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
+		const int32_t time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
 
-		// delay until we have reached next tick
+		// delay until we have reached the next frame
 		if (time32 > 0)
 			usleep(time32);
 	}
@@ -1262,8 +1261,8 @@ void renderQuadrascopeBg(void)
 		dstPtr += SCREEN_W;
 	}
 
-	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
-		scopeExt[i].emptyScopeDrawn = false;
+	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		scope[i].emptyScopeDrawn = false;
 }
 
 void renderSpectrumAnalyzerBg(void)

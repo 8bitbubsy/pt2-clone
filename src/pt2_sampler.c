@@ -1539,9 +1539,6 @@ void toggleTuningTone(void)
 		paulaSetData(editor.tuningChan, tuneToneData);
 		paulaSetLength(editor.tuningChan, sizeof (tuneToneData) / 2);
 		paulaStartDMA(editor.tuningChan);
-
-		// force loop flag on for scopes
-		scopeExt[editor.tuningChan].newLoopFlag = scope[editor.tuningChan].loopFlag = true;
 	}
 	else
 	{

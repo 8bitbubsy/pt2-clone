@@ -60,6 +60,7 @@ void readKeyModifiers(void)
 	keyb.leftAltPressed = (modState & KMOD_LALT) ? true : false;
 	keyb.shiftPressed = (modState & (KMOD_LSHIFT + KMOD_RSHIFT)) ? true : false;
 
+
 #ifdef __APPLE__
 	keyb.leftCommandPressed = (modState & KMOD_LGUI) ? true : false;
 #endif
@@ -84,6 +85,8 @@ LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lPara
 	if (window == NULL || nCode < 0 || nCode != HC_ACTION) // do not process message
 		return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
 
+	bool bEatKeystroke = false;
+
 	KBDLLHOOKSTRUCT *p = (KBDLLHOOKSTRUCT *)lParam;
 	switch (wParam)
 	{
@@ -92,9 +95,9 @@ LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lPara
 		{
 			const bool windowHasFocus = SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS;
 
-			const bool bEatKeystroke = windowHasFocus && p->vkCode == VK_LWIN;
+			bEatKeystroke = windowHasFocus && (p->vkCode == VK_LWIN || p->vkCode == VK_NUMLOCK);
 			if (!bEatKeystroke)
-				return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+				break;
 
 			memset(&inputEvent, 0, sizeof (SDL_Event));
 
@@ -107,7 +110,6 @@ LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lPara
 				inputEvent.type = SDL_KEYDOWN;
 				inputEvent.key.type = SDL_KEYDOWN;
 				inputEvent.key.state = SDL_PRESSED;
-
 				windowsKeyIsDown = true;
 			}
 			else
@@ -115,7 +117,6 @@ LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lPara
 				inputEvent.type = SDL_KEYUP;
 				inputEvent.key.type = SDL_KEYUP;
 				inputEvent.key.state = SDL_RELEASED;
-
 				windowsKeyIsDown = false;
 			}
 
@@ -132,7 +133,7 @@ LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lPara
 		default: break;
 	}
 
-	return true;
+	return bEatKeystroke ? 1 : CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
 }
 #endif
 

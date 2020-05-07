@@ -68,9 +68,10 @@ typedef struct moduleSample_t
 typedef struct moduleChannel_t
 {
 	int8_t *n_start, *n_wavestart, *n_loopstart, n_chanindex, n_volume;
-	int8_t n_toneportdirec, n_vibratopos, n_tremolopos, n_pattpos, n_loopcount;
+	int8_t n_toneportdirec, n_pattpos, n_loopcount;
 	uint8_t n_wavecontrol, n_glissfunk, n_sampleoffset, n_toneportspeed;
 	uint8_t n_vibratocmd, n_tremolocmd, n_finetune, n_funkoffset, n_samplenum;
+	uint8_t n_vibratopos, n_tremolopos;
 	int16_t n_period, n_note, n_wantedperiod;
 	uint16_t n_cmd, n_length, n_replen;
 	uint32_t n_scopedelta;
