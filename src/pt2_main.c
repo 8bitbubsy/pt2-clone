@@ -296,6 +296,9 @@ int main(int argc, char *argv[])
 
 	SDL_ShowWindow(video.window);
 
+	if (config.startInFullscreen)
+		toggleFullScreen();
+
 	changePathToHome(); // set path to home/user-dir now
 	diskOpSetInitPath(); // set path to custom path in config (if present)
 

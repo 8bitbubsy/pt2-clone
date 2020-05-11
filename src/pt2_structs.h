@@ -121,10 +121,10 @@ typedef struct mouse_t
 
 typedef struct video_t
 {
-	bool fullscreen, vsync60HzPresent, windowHidden;
+	bool fullscreen, vsync60HzPresent, windowHidden, useDesktopMouseCoords;
 	int32_t renderX, renderY, renderW, renderH, displayW, displayH;
 	int32_t xScale, yScale;
-	double dMouseXMul, dMouseYMul;
+	float fMouseXMul, fMouseYMul;
 	SDL_PixelFormat *pixelFormat;
 	uint32_t *frameBuffer, *frameBufferUnaligned;
 

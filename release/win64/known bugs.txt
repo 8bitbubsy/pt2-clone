@@ -1,4 +1,4 @@
-Windows (and probably Linux?):
+Windows (and possibly Linux?):
 - The num lock key (which is used to set the current sample to 1 or 17) will
   also toggle the num lock state, which means that some of the numpad keys
   work like arrow keys instead. This makes the drumpad function useless! I

@@ -2554,7 +2554,12 @@ bool setupVideo(void)
 
 	SDL_SetRenderDrawBlendMode(video.renderer, SDL_BLENDMODE_NONE);
 
-	SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "nearest");
+	if (config.pixelFilter == PIXELFILTER_LINEAR)
+		SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "linear");
+	else if (config.pixelFilter == PIXELFILTER_BEST)
+		SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "best");
+	else
+		SDL_SetHint("SDL_RENDER_SCALE_QUALITY", "nearest");
 
 	video.texture = SDL_CreateTexture(video.renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SCREEN_W, SCREEN_H);
 	if (video.texture == NULL)
@@ -2584,6 +2589,12 @@ bool setupVideo(void)
 		SDL_ShowCursor(SDL_TRUE);
 	else
 		SDL_ShowCursor(SDL_FALSE);
+
+	// Workaround: SDL_GetGlobalMouseState() doesn't work with KMSDRM
+	video.useDesktopMouseCoords = true;
+	const char *videoDriver = SDL_GetCurrentVideoDriver();
+	if (videoDriver != NULL && strcmp("KMSDRM", videoDriver) == 0)
+		video.useDesktopMouseCoords = false;
 
 	return true;
 }

@@ -62,6 +62,8 @@ void loadConfig(void)
 	config.vsyncOff = false;
 	config.hwMouse = true;
 	config.sampleLowpass = true;
+	config.startInFullscreen = false;
+	config.pixelFilter = PIXELFILTER_NEAREST;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -229,6 +231,21 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			     if (!_strnicmp(&configLine[16], "TRUE",  4)) config.autoCloseDiskOp = true;
 			else if (!_strnicmp(&configLine[16], "FALSE", 5)) config.autoCloseDiskOp = false;
+		}
+
+		// FULLSCREEN
+		else if (!_strnicmp(configLine, "FULLSCREEN=", 11))
+		{
+			     if (!_strnicmp(&configLine[11], "TRUE",  4)) config.startInFullscreen = true;
+			else if (!_strnicmp(&configLine[11], "FALSE", 5)) config.startInFullscreen = false;
+		}
+
+		// PIXELFILTER
+		else if (!_strnicmp(configLine, "PIXELFILTER=", 12))
+		{
+			     if (!_strnicmp(&configLine[12], "NEAREST", 7)) config.pixelFilter = PIXELFILTER_NEAREST;
+			else if (!_strnicmp(&configLine[12], "LINEAR", 6)) config.pixelFilter = PIXELFILTER_LINEAR;
+			else if (!_strnicmp(&configLine[12], "BEST", 4)) config.pixelFilter = PIXELFILTER_BEST;
 		}
 
 		// COMPOMODE
