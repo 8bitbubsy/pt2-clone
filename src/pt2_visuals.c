@@ -2518,9 +2518,10 @@ bool setupVideo(void)
 		}
 	}
 
+	uint32_t windowFlags = SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI;
+
 	video.window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED,
-		SDL_WINDOWPOS_CENTERED, screenW, screenH,
-		SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI);
+		SDL_WINDOWPOS_CENTERED, screenW, screenH, windowFlags);
 
 	if (video.window == NULL)
 	{
