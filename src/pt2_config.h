@@ -15,7 +15,7 @@ typedef struct config_t
 	char *defModulesDir, *defSamplesDir;
 	bool dottedCenterFlag, pattDots, a500LowPassFilter, compoMode, autoCloseDiskOp, hideDiskOpDates, hwMouse;
 	bool transDel, fullScreenStretch, vsyncOff, modDot, blankZeroFlag, realVuMeters, rememberPlayMode;
-	bool sampleLowpass, startInFullscreen;
+	bool sampleLowpass, startInFullscreen, integerScaling;
 	int8_t stereoSeparation, videoScaleFactor, accidental;
 	uint8_t pixelFilter;
 	uint16_t quantizeValue;

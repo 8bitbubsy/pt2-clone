@@ -2549,7 +2549,7 @@ bool setupVideo(void)
 	SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
 
 #if SDL_PATCHLEVEL >= 5
-	SDL_RenderSetIntegerScale(video.renderer, SDL_TRUE);
+	SDL_RenderSetIntegerScale(video.renderer, config.integerScaling ? SDL_TRUE : SDL_FALSE);
 #endif
 
 	SDL_SetRenderDrawBlendMode(video.renderer, SDL_BLENDMODE_NONE);

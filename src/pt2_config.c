@@ -64,6 +64,7 @@ void loadConfig(void)
 	config.sampleLowpass = true;
 	config.startInFullscreen = false;
 	config.pixelFilter = PIXELFILTER_NEAREST;
+	config.integerScaling = true;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -210,6 +211,13 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			     if (!_strnicmp(&configLine[9], "TRUE",  4)) config.vsyncOff = true;
 			else if (!_strnicmp(&configLine[9], "FALSE", 5)) config.vsyncOff = false;
+		}
+
+		// INTEGERSCALING
+		else if (!_strnicmp(configLine, "INTEGERSCALING=", 15))
+		{
+			     if (!_strnicmp(&configLine[15], "TRUE",  4)) config.integerScaling = true;
+			else if (!_strnicmp(&configLine[15], "FALSE", 5)) config.integerScaling = false;
 		}
 
 		// FULLSCREENSTRETCH
