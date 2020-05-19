@@ -1990,7 +1990,7 @@ void handleTextEditing(uint8_t mouseButton)
 			tmp32 = mouse.y - ui.lineCurY;
 			if (tmp32 <= 2 && tmp32 >= -9)
 			{
-				tmp32 = (uint32_t)((mouse.x - ui.lineCurX) + 4) >> 3;
+				tmp32 = (int32_t)((mouse.x - ui.lineCurX) + 4) >> 3;
 				while (tmp32 != 0) // 0 = pos we want
 				{
 					if (tmp32 > 0)
