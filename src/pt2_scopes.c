@@ -22,11 +22,18 @@
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
 static volatile bool scopesUpdatingFlag, scopesDisplayingFlag;
+static int32_t oldPeriod = -1;
 static uint32_t scopeTimeLen, scopeTimeLenFrac;
 static uint64_t timeNext64, timeNext64Frac;
+static float fOldScopeDelta;
 static SDL_Thread *scopeThread;
 
 scope_t scope[AMIGA_VOICES]; // global
+
+void resetCachedScopePeriod(void)
+{
+	oldPeriod = -1;
+}
 
 int32_t getSampleReadPos(int32_t ch, uint8_t smpNum)
 {
@@ -57,7 +64,63 @@ int32_t getSampleReadPos(int32_t ch, uint8_t smpNum)
 	return pos;
 }
 
-void scopeTrigger(int32_t ch, int32_t length)
+void scopeSetVolume(int32_t ch, uint16_t vol)
+{
+	vol &= 127; // confirmed behavior on real Amiga
+
+	if (vol > 64)
+		vol = 64; // confirmed behavior on real Amiga
+
+	scope[ch].volume = (uint8_t)vol;
+}
+
+void scopeSetPeriod(int32_t ch, uint16_t period)
+{
+	int32_t realPeriod;
+
+	if (period == 0)
+		realPeriod = 1+65535; // confirmed behavior on real Amiga
+	else if (period < 113)
+		realPeriod = 113; // close to what happens on real Amiga (and needed for BLEP synthesis)
+	else
+		realPeriod = period;
+
+	// if the new period was the same as the previous period, use cached deltas
+	if (realPeriod != oldPeriod)
+	{
+		oldPeriod = realPeriod;
+
+		// this period is not cached, calculate scope delta
+
+		const float fPeriodToScopeDeltaDiv = PAULA_PAL_CLK / (float)SCOPE_HZ;
+		fOldScopeDelta = fPeriodToScopeDeltaDiv / realPeriod;
+	}
+
+	scope[ch].fDelta = fOldScopeDelta;
+}
+
+void scopeSetData(int32_t ch, const int8_t *src)
+{
+	// set voice data
+	if (src == NULL)
+		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+
+	scope[ch].newData = src;
+}
+
+void scopeSetLength(int32_t ch, uint16_t len)
+{
+	if (len == 0)
+	{
+		len = 65535;
+		/* Confirmed behavior on real Amiga (also needed for safety).
+		** And yes, we have room for this, it will never overflow!
+		*/
+	}
+	scope[ch].newLength = len << 1;
+}
+
+void scopeTrigger(int32_t ch)
 {
 	volatile scope_t *sc = &scope[ch];
 	scope_t tempState = *sc; // cache it
@@ -66,16 +129,14 @@ void scopeTrigger(int32_t ch, int32_t length)
 	if (newData == NULL)
 		newData = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
 
-	if (length < 2)
-	{
-		sc->active = false;
-		return;
-	}
+	int32_t newLength = tempState.newLength;
+	if (newLength < 2)
+		newLength = 2;
 
-	tempState.posFrac = 0;
+	tempState.fPhase = 0.0f;
 	tempState.pos = 0;
 	tempState.data = newData;
-	tempState.length = length;
+	tempState.length = newLength;
 	tempState.active = true;
 
 	/* Update live scope now.
@@ -100,13 +161,14 @@ void updateScopes(void)
 	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
 	{
 		tempState = *sc; // cache it
-
 		if (!tempState.active)
 			continue; // scope is not active
 
-		tempState.posFrac += tempState.delta;
-		tempState.pos += tempState.posFrac >> SCOPE_FRAC_BITS;
-		tempState.posFrac &= SCOPE_FRAC_MASK;
+		tempState.fPhase += tempState.fDelta;
+
+		const int32_t wholeSamples = (int32_t)tempState.fPhase;
+		tempState.fPhase -= wholeSamples;
+		tempState.pos += wholeSamples;
 
 		if (tempState.pos >= tempState.length)
 		{
@@ -154,13 +216,9 @@ static void updateRealVuMeters(void)
 		if (!tmpScope.active || tmpScope.data == NULL || tmpScope.volume == 0 || tmpScope.length == 0)
 			continue;
 
-		int32_t samplesToScan = tmpScope.delta >> SCOPE_FRAC_BITS; // amount of integer samples getting skipped every frame
+		int32_t samplesToScan = (int32_t)tmpScope.fDelta; // amount of integer samples getting skipped every frame
 		if (samplesToScan <= 0)
 			continue;
-
-		// shouldn't happen (low period 113 -> samplesToScan=490), but let's not waste cycles if it does
-		if (samplesToScan > 512)
-			samplesToScan = 512;
 
 		int32_t pos = tmpScope.pos;
 		int32_t length = tmpScope.length;
@@ -169,14 +227,13 @@ static void updateRealVuMeters(void)
 		int32_t runningAmplitude = 0;
 		for (int32_t x = 0; x < samplesToScan; x++)
 		{
-			int16_t amplitude = 0;
+			int32_t amplitude = 0;
 			if (data != NULL)
 				amplitude = data[pos] * tmpScope.volume;
 
 			runningAmplitude += ABS(amplitude);
 
-			pos++;
-			if (pos >= length)
+			if (++pos >= length)
 			{
 				pos = 0;
 
@@ -188,11 +245,11 @@ static void updateRealVuMeters(void)
 			}
 		}
 
-		double dAvgAmplitude = runningAmplitude / (double)samplesToScan;
+		float fAvgAmplitude = runningAmplitude / (float)samplesToScan;
 
-		dAvgAmplitude *= (96.0 / (128.0 * 64.0)); // normalize
+		fAvgAmplitude *= 96.0f / (128.0f * 64.0f); // normalize
 
-		int32_t vuHeight = (int32_t)dAvgAmplitude;
+		int32_t vuHeight = (int32_t)(fAvgAmplitude + 0.5f); // rounded
 		if (vuHeight > 48) // max VU-meter height
 			vuHeight = 48;
 
@@ -204,14 +261,13 @@ static void updateRealVuMeters(void)
 void drawScopes(void)
 {
 	int16_t scopeData;
-	int32_t i, x, y;
-	uint32_t *dstPtr, *scopeDrawPtr;
+	int32_t i, x;
+	uint32_t *scopeDrawPtr;
 	volatile scope_t *sc;
 	scope_t tmpScope;
 
 	scopeDrawPtr = &video.frameBuffer[(71 * SCREEN_W) + 128];
 
-	const uint32_t bgColor = video.palette[PAL_BACKGRD];
 	const uint32_t fgColor = video.palette[PAL_QADSCP];
 
 	sc = scope;
@@ -229,14 +285,7 @@ void drawScopes(void)
 			sc->emptyScopeDrawn = false;
 
 			// fill scope background
-			dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
-			for (y = 0; y < SCOPE_HEIGHT; y++)
-			{
-				for (x = 0; x < SCOPE_WIDTH; x++)
-					dstPtr[x] = bgColor;
-
-				dstPtr += SCREEN_W;
-			}
+			fillRect(128 + (i * (SCOPE_WIDTH + 8)), 55, SCOPE_WIDTH, SCOPE_HEIGHT, video.palette[PAL_BACKGRD]);
 
 			// render scope data
 
@@ -273,14 +322,7 @@ void drawScopes(void)
 			if (!sc->emptyScopeDrawn)
 			{
 				// fill scope background
-				dstPtr = &video.frameBuffer[(55 * SCREEN_W) + (128 + (i * (SCOPE_WIDTH + 8)))];
-				for (y = 0; y < SCOPE_HEIGHT; y++)
-				{
-					for (x = 0; x < SCOPE_WIDTH; x++)
-						dstPtr[x] = bgColor;
-
-					dstPtr += SCREEN_W;
-				}
+				fillRect(128 + (i * (SCOPE_WIDTH + 8)), 55, SCOPE_WIDTH, SCOPE_HEIGHT, video.palette[PAL_BACKGRD]);
 
 				// draw scope line
 				for (x = 0; x < SCOPE_WIDTH; x++)

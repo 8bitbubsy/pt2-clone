@@ -35,6 +35,8 @@
 #include "pt2_scopes.h"
 #include "pt2_audio.h"
 #include "pt2_bmp.h"
+#include "pt2_sync.h"
+#include "pt2_sampling.h"
 
 #define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
@@ -85,6 +87,21 @@ static bool initializeVars(void);
 static void handleSigTerm(void);
 static void cleanUp(void);
 
+static void clearStructs(void)
+{
+	memset(&keyb,   0, sizeof (keyb));
+	memset(&mouse,  0, sizeof (mouse));
+	memset(&video,  0, sizeof (video));
+	memset(&editor, 0, sizeof (editor));
+	memset(&diskop, 0, sizeof (diskop));
+	memset(&cursor, 0, sizeof (cursor));
+	memset(&ui,     0, sizeof (ui));
+	memset(&config, 0, sizeof (config));
+	memset(&audio,  0, sizeof (audio));
+
+	audio.rescanAudioDevicesSupported = true;
+}
+
 int main(int argc, char *argv[])
 {
 #ifndef _WIN32
@@ -120,6 +137,8 @@ int main(int argc, char *argv[])
 	sigaction(SIGSEGV, &act, &oldAct);
 #endif
 #endif
+
+	clearStructs();
 
 	// on Windows and macOS, test what version SDL2.DLL is (against library version used in compilation)
 #if defined _WIN32 || defined __APPLE__
@@ -237,6 +256,8 @@ int main(int argc, char *argv[])
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
 
+	setupPerfFreq();
+
 	if (!setupAudio() || !unpackBMPs())
 	{
 		cleanUp();
@@ -245,7 +266,6 @@ int main(int argc, char *argv[])
 	}
 
 	setupSprites();
-	setupPerfFreq();
 
 	song = createNewMod();
 	if (song == NULL)
@@ -262,7 +282,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	modSetTempo(editor.initialTempo);
+	modSetTempo(editor.initialTempo, false);
 	modSetSpeed(editor.initialSpeed);
 
 	updateWindowTitle(MOD_NOT_MODIFIED);
@@ -307,6 +327,7 @@ int main(int argc, char *argv[])
 	setupWaitVBL();
 	while (editor.programRunning)
 	{
+		updateChannelSyncBuffer();
 		readMouseXY();
 		readKeyModifiers(); // set/clear CTRL/ALT/SHIFT/AMIGA key states
 		handleInput();
@@ -442,13 +463,6 @@ static void handleInput(void)
 
 static bool initializeVars(void)
 {
-	// clear common structs
-	memset(&keyb, 0, sizeof (keyb));
-	memset(&mouse, 0, sizeof (mouse));
-	memset(&video, 0, sizeof (video));
-	memset(&editor, 0, sizeof (editor));
-	memset(&config, 0, sizeof (config));
-
 	setDefaultPalette();
 
 	editor.repeatKeyFlag = (SDL_GetModState() & KMOD_CAPS) ? true : false;
@@ -473,6 +487,7 @@ static bool initializeVars(void)
 	turnOffVoices();
 
 	// set various non-zero values
+	
 	editor.vol1 = 100;
 	editor.vol2 = 100;
 	editor.note1 = 36;
@@ -640,6 +655,7 @@ static void disableWasapi(void)
 		if (audioDriver != NULL && strcmp("directsound", audioDriver) == 0)
 		{
 			SDL_setenv("SDL_AUDIODRIVER", "directsound", true);
+			audio.rescanAudioDevicesSupported = false;
 			break;
 		}
 	}
@@ -653,6 +669,7 @@ static void disableWasapi(void)
 			if (audioDriver != NULL && strcmp("winmm", audioDriver) == 0)
 			{
 				SDL_setenv("SDL_AUDIODRIVER", "winmm", true);
+				audio.rescanAudioDevicesSupported = false;
 				break;
 			}
 		}
@@ -874,6 +891,7 @@ static void cleanUp(void) // never call this inside the main loop!
 	freeBMPs();
 	videoClose();
 	freeSprites();
+	freeAudioDeviceList(); // pt2_sampling.c
 
 	if (config.defModulesDir != NULL) free(config.defModulesDir);
 	if (config.defSamplesDir != NULL) free(config.defSamplesDir);

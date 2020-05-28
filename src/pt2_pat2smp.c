@@ -48,7 +48,7 @@ void doPat2Smp(void)
 	editor.blockMarkFlag = false;
 	pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 	setStatusMessage("RENDERING...", NO_CARRY);
-	modSetTempo(song->currBPM);
+	modSetTempo(song->currBPM, true);
 	editor.pat2SmpPos = 0;
 
 	editor.smpRenderingDone = false;
@@ -81,11 +81,10 @@ void doPat2Smp(void)
 
 	free(editor.pat2SmpBuf);
 
-	memset(s->text, 0, sizeof (s->text));
 	if (editor.pat2SmpHQ)
 	{
-		strcpy(s->text, "pat2smp (a-3 tune:+5)");
-		s->fineTune = 5;
+		strcpy(s->text, "pat2smp (a-3 tune:+4)");
+		s->fineTune = 4;
 	}
 	else
 	{

@@ -44,9 +44,9 @@ void loadConfig(void)
 	// set default config values first
 	config.fullScreenStretch = false;
 	config.pattDots = false;
-	config.dottedCenterFlag = true;
+	config.waveformCenterLine = true;
 	config.a500LowPassFilter = false;
-	config.soundFrequency = 48000;
+	config.soundFrequency = 96000;
 	config.rememberPlayMode = false;
 	config.stereoSeparation = 20;
 	config.videoScaleFactor = 2;
@@ -65,6 +65,8 @@ void loadConfig(void)
 	config.startInFullscreen = false;
 	config.pixelFilter = PIXELFILTER_NEAREST;
 	config.integerScaling = true;
+	config.audioInputFrequency = 44100;
+	config.normalizeSampling = true;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -295,7 +297,10 @@ static bool loadProTrackerDotIni(FILE *f)
 		else if (!_strnicmp(configLine, "QUANTIZE=", 9))
 		{
 			if (configLine[9] != '\0')
-				config.quantizeValue = (int16_t)(CLAMP(atoi(&configLine[9]), 0, 63));
+			{
+				const int32_t num = atoi(&configLine[9]);
+				config.quantizeValue = (int16_t)(CLAMP(num, 0, 63));
+			}
 		}
 
 		// TRANSDEL
@@ -308,8 +313,8 @@ static bool loadProTrackerDotIni(FILE *f)
 		// DOTTEDCENTER
 		else if (!_strnicmp(configLine, "DOTTEDCENTER=", 13))
 		{
-			     if (!_strnicmp(&configLine[13], "TRUE",  4)) config.dottedCenterFlag = true;
-			else if (!_strnicmp(&configLine[13], "FALSE", 5)) config.dottedCenterFlag = false;
+			     if (!_strnicmp(&configLine[13], "TRUE",  4)) config.waveformCenterLine = true;
+			else if (!_strnicmp(&configLine[13], "FALSE", 5)) config.waveformCenterLine = false;
 		}
 
 		// MODDOT
@@ -384,25 +389,51 @@ static bool loadProTrackerDotIni(FILE *f)
 			else if (!_strnicmp(&configLine[19], "FALSE", 5)) config.a500LowPassFilter = false;
 		}
 
+		// SAMPLINGFREQ
+		else if (!_strnicmp(configLine, "SAMPLINGFREQ=", 13))
+		{
+			if (configLine[10] != '\0')
+			{
+				const int32_t num = atoi(&configLine[13]);
+				config.audioInputFrequency = CLAMP(num, 44100, 192000);
+			}
+		}
+
+		// NORMALIZESAMPLING
+		else if (!_strnicmp(configLine, "NORMALIZESAMPLING=", 18))
+		{
+			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.normalizeSampling = true;
+			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.normalizeSampling = false;
+		}
+
 		// FREQUENCY
 		else if (!_strnicmp(configLine, "FREQUENCY=", 10))
 		{
 			if (configLine[10] != '\0')
-				config.soundFrequency = (uint32_t)(CLAMP(atoi(&configLine[10]), 32000, 96000));
+			{
+				const int32_t num = atoi(&configLine[10]);
+				config.soundFrequency = CLAMP(num, 44100, 192000);
+			}
 		}
 
 		// BUFFERSIZE
 		else if (!_strnicmp(configLine, "BUFFERSIZE=", 11))
 		{
 			if (configLine[11] != '\0')
-				config.soundBufferSize = (uint32_t)(CLAMP(atoi(&configLine[11]), 128, 8192));
+			{
+				const int32_t num = atoi(&configLine[11]);
+				config.soundBufferSize = CLAMP(num, 128, 8192);
+			}
 		}
 
 		// STEREOSEPARATION
 		else if (!_strnicmp(configLine, "STEREOSEPARATION=", 17))
 		{
 			if (configLine[17] != '\0')
-				config.stereoSeparation = (int8_t)(CLAMP(atoi(&configLine[17]), 0, 100));
+			{
+				const int32_t num = atoi(&configLine[17]);
+				config.stereoSeparation = (int8_t)(CLAMP(num, 0, 100));
+			}
 		}
 
 		configLine = strtok(NULL, "\n");

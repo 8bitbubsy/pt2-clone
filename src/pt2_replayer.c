@@ -21,25 +21,13 @@
 #include "pt2_visuals.h"
 #include "pt2_textout.h"
 #include "pt2_scopes.h"
+#include "pt2_sync.h"
 
 static bool posJumpAssert, pBreakFlag, updateUIPositions, modHasBeenPlayed;
 static int8_t pBreakPosition, oldRow, modPattern;
 static uint8_t pattDelTime, setBPMFlag, lowMask = 0xFF, pattDelTime2, oldSpeed;
 static int16_t modOrder, oldPattern, oldOrder;
 static uint16_t modBPM, oldBPM;
-
-static const int8_t vuMeterHeights[65] =
-{
-	 0,  0,  1,  2,  2,  3,  4,  5,
-	 5,  6,  7,  8,  8,  9, 10, 11,
-	11, 12, 13, 14, 14, 15, 16, 17,
-	17, 18, 19, 20, 20, 21, 22, 23,
-	23, 24, 25, 26, 26, 27, 28, 29,
-	29, 30, 31, 32, 32, 33, 34, 35,
-	35, 36, 37, 38, 38, 39, 40, 41,
-	41, 42, 43, 44, 44, 45, 46, 47,
-	47
-};
 
 static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 {
@@ -59,6 +47,7 @@ void doStopIt(bool resetPlayMode)
 	editor.songPlaying = false;
 
 	resetCachedMixerPeriod();
+	resetCachedScopePeriod();
 
 	pattDelTime = 0;
 	pattDelTime2 = 0;
@@ -116,7 +105,11 @@ static void setVUMeterHeight(moduleChannel_t *ch)
 	if (vol > 64)
 		vol = 64;
 
-	editor.vuMeterVolumes[ch->n_chanindex] = vuMeterHeights[vol];
+	ch->syncVuVolume = vol;
+	ch->syncFlags |= UPDATE_VUMETER;
+
+	if (!editor.songPlaying)
+		editor.vuMeterVolumes[ch->n_chanindex] = vuMeterHeights[vol];
 }
 
 static void updateFunk(moduleChannel_t *ch)
@@ -213,7 +206,10 @@ static void doRetrg(moduleChannel_t *ch)
 	paulaSetData(ch->n_chanindex, ch->n_loopstart);
 	paulaSetLength(ch->n_chanindex, ch->n_replen);
 
-	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
+	ch->syncAnalyzerVolume = ch->n_volume;
+	ch->syncAnalyzerPeriod = ch->n_period;
+	ch->syncFlags |= UPDATE_ANALYZER;
+
 	setVUMeterHeight(ch);
 }
 
@@ -335,7 +331,7 @@ static void setSpeed(moduleChannel_t *ch)
 		editor.playMode = PLAY_MODE_NORMAL;
 		editor.currMode = MODE_IDLE;
 
-		pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
+		pointerResetThreadSafe(); // set gray mouse cursor
 	}
 }
 
@@ -401,7 +397,7 @@ static void portaDown(moduleChannel_t *ch)
 
 static void filterOnOff(moduleChannel_t *ch)
 {
-	setLEDFilter(!(ch->n_cmd & 1));
+	setLEDFilter(!(ch->n_cmd & 1), false);
 }
 
 static void finePortaUp(moduleChannel_t *ch)
@@ -788,7 +784,11 @@ static void setPeriod(moduleChannel_t *ch)
 		if (!editor.muted[ch->n_chanindex])
 		{
 			paulaStartDMA(ch->n_chanindex);
-			updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
+
+			ch->syncAnalyzerVolume = ch->n_volume;
+			ch->syncAnalyzerPeriod = ch->n_period;
+			ch->syncFlags |= UPDATE_ANALYZER;
+
 			setVUMeterHeight(ch);
 		}
 		else
@@ -987,7 +987,7 @@ bool intMusic(void)
 	// PT quirk: CIA refreshes its timer values on the next interrupt, so do the real tempo change here
 	if (setBPMFlag != 0)
 	{
-		modSetTempo(setBPMFlag);
+		modSetTempo(setBPMFlag, false);
 		setBPMFlag = 0;
 	}
 
@@ -1156,7 +1156,7 @@ void modSetPos(int16_t order, int16_t row)
 		ui.updateStatusText = true;
 }
 
-void modSetTempo(uint16_t bpm)
+void modSetTempo(uint16_t bpm, bool doLockAudio)
 {
 	uint32_t smpsPerTick;
 
@@ -1164,7 +1164,8 @@ void modSetTempo(uint16_t bpm)
 		return;
 
 	const bool audioWasntLocked = !audio.locked;
-	if (audioWasntLocked)
+
+	if (doLockAudio && audioWasntLocked)
 		lockAudio();
 
 	modBPM = bpm;
@@ -1185,7 +1186,14 @@ void modSetTempo(uint16_t bpm)
 
 	mixerSetSamplesPerTick(smpsPerTick);
 
-	if (audioWasntLocked)
+	// calculate tick time length for audio/video sync timestamp
+	const uint64_t tickTimeLen64 = audio.tickTimeLengthTab[bpm];
+	const uint32_t tickTimeLen = tickTimeLen64 >> 32;
+	const uint32_t tickTimeLenFrac = tickTimeLen64 & 0xFFFFFFFF;
+
+	setSyncTickTimeLen(tickTimeLen, tickTimeLenFrac);
+
+	if (doLockAudio && audioWasntLocked)
 		unlockAudio();
 }
 
@@ -1380,10 +1388,10 @@ void clearSong(void)
 	editor.currPatternDisp = &song->header.order[0];
 	editor.currPosEdPattDisp = &song->header.order[0];
 
-	modSetTempo(editor.initialTempo);
+	modSetTempo(editor.initialTempo, true);
 	modSetSpeed(editor.initialSpeed);
 
-	setLEDFilter(false); // real PT doesn't do this there, but that's insane
+	setLEDFilter(false, true); // real PT doesn't do this there, but that's insane
 	updateCurrSample();
 
 	ui.updateSongSize = true;
@@ -1486,7 +1494,7 @@ void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
 		song->currSpeed = 6;
 		song->currBPM = 125;
 		modSetSpeed(6);
-		modSetTempo(125);
+		modSetTempo(125, true);
 
 		modPlay(DONT_SET_PATTERN, 0, 0);
 	}
@@ -1526,7 +1534,7 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 	editor.currPosEdPattDisp = &song->header.order[song->currOrder];
 
 	modSetSpeed(oldSpeed);
-	modSetTempo(oldBPM);
+	modSetTempo(oldBPM, true);
 
 	doStopIt(true);
 

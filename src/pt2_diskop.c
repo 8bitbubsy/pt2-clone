@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
-#include <ctype.h> // tolower()
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
@@ -37,6 +36,7 @@
 #include "pt2_keyboard.h"
 #include "pt2_visuals.h"
 #include "pt2_sample_loader.h"
+#include "pt2_bmp.h"
 
 typedef struct fileEntry_t
 {
@@ -196,6 +196,9 @@ static int8_t findFirst(fileEntry_t *searchRec)
 	}
 #endif
 
+	if (searchRec->filesize < -1)
+		searchRec->filesize = -1;
+
 	if (!listEntry(searchRec))
 	{
 		// skip entry
@@ -273,6 +276,9 @@ static int8_t findNext(fileEntry_t *searchRec)
 	}
 #endif
 
+	if (searchRec->filesize < -1)
+		searchRec->filesize = -1;
+
 	if (!listEntry(searchRec))
 	{
 		// skip entry
@@ -319,11 +325,9 @@ void diskOpShowSelectText(void)
 
 void handleEntryJumping(SDL_Keycode jumpToChar) // SHIFT+character
 {
-	int32_t i;
-
 	if (diskOpEntry != NULL)
 	{
-		for (i = 0; i < diskop.numEntries; i++)
+		for (int32_t i = 0; i < diskop.numEntries; i++)
 		{
 			if (jumpToChar == diskOpEntry[i].firstAnsiChar)
 			{
@@ -599,7 +603,7 @@ static void sortEntries(void)
 	if (diskop.numEntries < 2)
 		return; // no need to sort
 
-	offset = diskop.numEntries / 2;
+	offset = diskop.numEntries >> 1;
 	while (offset > 0)
 	{
 		limit = diskop.numEntries - offset;
@@ -637,7 +641,7 @@ static void sortEntries(void)
 		}
 		while (didSwap);
 
-		offset /= 2;
+		offset >>= 1;
 	}
 }
 
@@ -788,9 +792,8 @@ void diskOpRenderFileList(void)
 {
 	char *entryName;
 	uint8_t maxFilenameChars, maxDirNameChars;
-	uint16_t textXStart, x, y;
-	int32_t i, entryLength;
-	uint32_t *dstPtr;
+	uint16_t x, y, textXStart;
+	int32_t entryLength;
 	fileEntry_t *entry;
 
 	if (config.hideDiskOpDates)
@@ -823,20 +826,13 @@ void diskOpRenderFileList(void)
 	}
 
 	// clear list
-	dstPtr = &video.frameBuffer[(35 * SCREEN_W) + 8];
-	for (y = 0; y < 59; y++)
-	{
-		for (x = 0; x < 295; x++)
-			dstPtr[x] = video.palette[PAL_BACKGRD];
-
-		dstPtr += SCREEN_W;
-	}
+	fillRect(8, 35, 295, 59, video.palette[PAL_BACKGRD]);
 
 	if (diskop.isFilling || diskOpEntry == NULL)
 		return;
 
 	// list entries
-	for (i = 0; i < DISKOP_LINES; i++)
+	for (int32_t i = 0; i < DISKOP_LINES; i++)
 	{
 		if (diskop.scrollOffset+i >= diskop.numEntries)
 			break;
@@ -963,4 +959,73 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 void diskOpLoadFile2(void)
 {
 	diskOpLoadFile(oldFileEntryRow, false);
+}
+
+void renderDiskOpScreen(void)
+{
+	blit32(0, 0, 320, 99, diskOpScreenBMP);
+
+	ui.updateDiskOpPathText = true;
+	ui.updatePackText = true;
+	ui.updateSaveFormatText = true;
+	ui.updateLoadMode = true;
+	ui.updateDiskOpFileList = true;
+}
+
+void updateDiskOp(void)
+{
+	char tmpChar;
+
+	if (!ui.diskOpScreenShown || ui.posEdScreenShown)
+		return;
+
+	if (ui.updateDiskOpFileList)
+	{
+		ui.updateDiskOpFileList = false;
+		diskOpRenderFileList();
+	}
+
+	if (ui.updateLoadMode)
+	{
+		ui.updateLoadMode = false;
+
+		// clear boxes
+		fillRect(147,  3, FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_GENBKG]);
+		fillRect(147, 14, FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_GENBKG]);
+
+		// draw load mode arrow
+		if (diskop.mode == 0)
+			charOut(147, 3, ARROW_RIGHT, video.palette[PAL_GENTXT]);
+		else
+			charOut(147,14, ARROW_RIGHT, video.palette[PAL_GENTXT]);
+	}
+
+	if (ui.updatePackText)
+	{
+		ui.updatePackText = false;
+		textOutBg(120, 3, diskop.modPackFlg ? "ON " : "OFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+	}
+
+	if (ui.updateSaveFormatText)
+	{
+		ui.updateSaveFormatText = false;
+		     if (diskop.smpSaveType == DISKOP_SMP_WAV) textOutBg(120, 14, "WAV", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else if (diskop.smpSaveType == DISKOP_SMP_IFF) textOutBg(120, 14, "IFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else if (diskop.smpSaveType == DISKOP_SMP_RAW) textOutBg(120, 14, "RAW", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+	}
+
+	if (ui.updateDiskOpPathText)
+	{
+		ui.updateDiskOpPathText = false;
+
+		// print disk op. path
+		for (int32_t i = 0; i < 26; i++)
+		{
+			tmpChar = editor.currPath[ui.diskOpPathTextOffset+i];
+			if (tmpChar == '\0')
+				tmpChar = '_';
+
+			charOutBg(24 + (i * FONT_CHAR_W), 25, tmpChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		}
+	}
 }

@@ -17,7 +17,8 @@ uint32_t *editOpScreen1BMP = NULL, *editOpScreen2BMP   = NULL, *samplerVolumeBMP
 uint32_t *editOpScreen3BMP = NULL, *editOpScreen4BMP   = NULL, *spectrumVisualsBMP = NULL;
 uint32_t *muteButtonsBMP   = NULL, *posEdBMP           = NULL, *samplerFiltersBMP  = NULL;
 uint32_t *samplerScreenBMP = NULL, *pat2SmpDialogBMP   = NULL, *trackerFrameBMP    = NULL;
-uint32_t *yesNoDialogBMP   = NULL, *bigYesNoDialogBMP  = NULL;
+uint32_t *yesNoDialogBMP   = NULL, *bigYesNoDialogBMP  = NULL, *sampleMonitorBMP   = NULL;
+uint32_t *samplingBoxBMP   = NULL;
 
 void createBitmaps(void)
 {
@@ -94,7 +95,7 @@ void createBitmaps(void)
 
 	// create spectrum analyzer bar graphics
 	for (i = 0; i < 36; i++)
-		spectrumAnaBMP[i] = RGB12_to_RGB24(analyzerColors[35-i]);
+		analyzerColorsRGB24[i] = RGB12_to_RGB24(analyzerColors[35-i]);
 
 	// create VU-Meter bar graphics
 	for (i = 0; i < 48; i++)
@@ -179,6 +180,8 @@ void freeBMPs(void)
 	if (aboutScreenBMP != NULL) free(aboutScreenBMP);
 	if (muteButtonsBMP != NULL) free(muteButtonsBMP);
 	if (editOpModeCharsBMP != NULL) free(editOpModeCharsBMP);
+	if (sampleMonitorBMP != NULL) free(sampleMonitorBMP);
+	if (samplingBoxBMP != NULL) free(samplingBoxBMP);
 }
 
 uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
@@ -232,19 +235,19 @@ uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
 	{
 		byteIn = (tmpBuffer[i] & 0xC0) >> 6;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 0] = video.palette[byteIn];
+		dst[(i << 2) + 0] = video.palette[byteIn];
 
 		byteIn = (tmpBuffer[i] & 0x30) >> 4;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 1] = video.palette[byteIn];
+		dst[(i << 2) + 1] = video.palette[byteIn];
 
 		byteIn = (tmpBuffer[i] & 0x0C) >> 2;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 2] = video.palette[byteIn];
+		dst[(i << 2) + 2] = video.palette[byteIn];
 
 		byteIn = (tmpBuffer[i] & 0x03) >> 0;
 		assert(byteIn < PALETTE_NUM);
-		dst[(i * 4) + 3] = video.palette[byteIn];
+		dst[(i << 2) + 3] = video.palette[byteIn];
 	}
 
 	free(tmpBuffer);
@@ -272,6 +275,8 @@ bool unpackBMPs(void)
 	aboutScreenBMP = unpackBMP(aboutScreenPackedBMP, sizeof (aboutScreenPackedBMP));
 	muteButtonsBMP = unpackBMP(muteButtonsPackedBMP, sizeof (muteButtonsPackedBMP));
 	editOpModeCharsBMP = unpackBMP(editOpModeCharsPackedBMP, sizeof (editOpModeCharsPackedBMP));
+	sampleMonitorBMP = unpackBMP(sampleMonitorPackedBMP, sizeof (sampleMonitorPackedBMP));
+	samplingBoxBMP = unpackBMP(samplingBoxPackedBMP, sizeof (samplingBoxPackedBMP));
 
 	if (trackerFrameBMP    == NULL || samplerScreenBMP   == NULL || samplerVolumeBMP  == NULL ||
 		clearDialogBMP     == NULL || diskOpScreenBMP    == NULL || mod2wavBMP        == NULL ||
@@ -279,7 +284,7 @@ bool unpackBMPs(void)
 		editOpScreen1BMP   == NULL || editOpScreen2BMP   == NULL || editOpScreen3BMP  == NULL ||
 		editOpScreen4BMP   == NULL || aboutScreenBMP     == NULL || muteButtonsBMP    == NULL ||
 		editOpModeCharsBMP == NULL || samplerFiltersBMP  == NULL || yesNoDialogBMP    == NULL ||
-		bigYesNoDialogBMP  == NULL)
+		bigYesNoDialogBMP  == NULL || sampleMonitorBMP   == NULL || samplingBoxBMP    == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false; // BMPs are free'd in cleanUp()

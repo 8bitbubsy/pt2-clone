@@ -18,6 +18,17 @@ enum
 	SPRITE_TYPE_RGB = 1
 };
 
+void blit32(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *src);
+void putPixel(int32_t x, int32_t y, const uint32_t pixelColor);
+void hLine(int32_t x, int32_t y, int32_t w, const uint32_t pixelColor);
+void vLine(int32_t x, int32_t y, int32_t h, const uint32_t pixelColor);
+void drawFramework1(int32_t x, int32_t y, int32_t w, int32_t h);
+void drawFramework2(int32_t x, int32_t y, int32_t w, int32_t h);
+void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t pixelColor);
+void drawButton(int32_t x, int32_t y, int32_t w, const char *text);
+void drawUpButton(int32_t x, int32_t y);
+void drawDownButton(int32_t x, int32_t y);
+
 void statusAllRight(void);
 void statusOutOfMemory(void);
 void statusSampleIsEmpty(void);
@@ -37,7 +48,6 @@ void sinkVisualizerBars(void);
 void updatePosEd(void);
 void updateVisualizer(void);
 void updateEditOp(void);
-void updateDiskOp(void);
 void toggleFullScreen(void);
 void videoClose(void);
 
@@ -46,7 +56,6 @@ void renderAskDialog(void);
 void renderBigAskDialog(void);
 void showDownsampleAskDialog(void);
 void renderPosEdScreen(void);
-void renderDiskOpScreen(void);
 void renderMuteButtons(void);
 void renderClearScreen(void);
 void renderAboutScreen(void);

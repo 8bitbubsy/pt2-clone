@@ -84,6 +84,15 @@
     <ClInclude Include="..\..\src\pt2_module_saver.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sampling.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sync.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_sinc.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -166,6 +175,9 @@
     <ClCompile Include="..\..\src\pt2_pattern_viewer.c" />
     <ClCompile Include="..\..\src\pt2_module_saver.c" />
     <ClCompile Include="..\..\src\pt2_replayer.c" />
+    <ClCompile Include="..\..\src\pt2_sampling.c" />
+    <ClCompile Include="..\..\src\pt2_sync.c" />
+    <ClCompile Include="..\..\src\pt2_sinc.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

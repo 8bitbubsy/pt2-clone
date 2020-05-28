@@ -12,7 +12,7 @@
 #include "pt2_helpers.h"
 #include "pt2_diskop.h"
 
-#define PLAYBACK_FREQ 16574 /* C-3 */
+#define PLAYBACK_FREQ 16574 /* C-3, period 214 */
 
 static void removeSampleFileExt(char *text) // for sample saver
 {

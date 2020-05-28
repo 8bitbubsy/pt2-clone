@@ -219,6 +219,7 @@ enum ptbuttons
 	PTB_SA_TUNETONE,
 	PTB_SA_FIXDC,
 	PTB_SA_FILTERS,
+	PTB_SA_SAMPLE,
 	PTB_SA_RESAMPLE,
 	PTB_SA_RESAMPLENOTE,
 	PTB_SA_SAMPLEAREA,
@@ -261,6 +262,7 @@ extern SDL_Cursor *cursors[NUM_CURSORS];
 void setMsgPointer(void);
 void setErrPointer(void);
 void pointerSetMode(uint8_t pointerMode, bool carry);
+void pointerResetThreadSafe(void); // used for effect F00 in replayer (stop song)
 void pointerSetPreviousMode(void);
 bool setSystemCursor(SDL_Cursor *cur);
 void freeMouseCursors(void);

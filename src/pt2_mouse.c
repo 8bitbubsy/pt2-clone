@@ -25,6 +25,7 @@
 #include "pt2_keyboard.h"
 #include "pt2_config.h"
 #include "pt2_bmp.h"
+#include "pt2_sampling.h"
 
 /* TODO: Move irrelevant routines outta here! Disgusting design!
 ** Keep in mind that this was programmed in my early programming days...
@@ -106,6 +107,14 @@ void pointerSetMode(uint8_t pointerMode, bool carry)
 		case POINTER_MODE_MSG2:   pointerSetColor(POINTER_GREEN);  break;
 		default: break;
 	}
+}
+
+void pointerResetThreadSafe(void) // used for effect F00 in replayer (stop song)
+{
+	ui.previousPointerMode = ui.pointerMode = POINTER_MODE_IDLE;
+
+	if (config.hwMouse)
+		mouse.resetCursorColorFlag = true;
 }
 
 void pointerSetPreviousMode(void)
@@ -242,6 +251,12 @@ void readMouseXY(void)
 {
 	int32_t mx, my, windowX, windowY;
 
+	if (mouse.resetCursorColorFlag) // used for effect F00 in replayer (stop song)
+	{
+		mouse.resetCursorColorFlag = false;
+		pointerSetColor(POINTER_GRAY);
+	}
+
 	if (mouse.setPosFlag)
 	{
 		if (!video.windowHidden)
@@ -374,6 +389,7 @@ void mouseButtonUpHandler(uint8_t mouseButton)
 
 		mouse.lastGUIButton = -1;
 		mouse.lastSmpFilterButton = -1;
+		mouse.lastSamplingButton = -1;
 	}
 
 	if (mouseButton == SDL_BUTTON_RIGHT)
@@ -416,6 +432,12 @@ void handleGUIButtonRepeat(void)
 	if (ui.samplerFiltersBoxShown)
 	{
 		handleRepeatedSamplerFilterButtons();
+		return;
+	}
+
+	if (ui.samplingBoxShown)
+	{
+		handleRepeatedSamplingButtons();
 		return;
 	}
 
@@ -1041,7 +1063,7 @@ void tempoUpButton(void)
 		val = 255;
 
 	song->currBPM = val;
-	modSetTempo(song->currBPM);
+	modSetTempo(song->currBPM, true);
 	ui.updateSongBPM = true;
 }
 
@@ -1062,7 +1084,7 @@ void tempoDownButton(void)
 		val = 32;
 
 	song->currBPM = val;
-	modSetTempo(song->currBPM);
+	modSetTempo(song->currBPM, true);
 	ui.updateSongBPM = true;
 }
 
@@ -2062,7 +2084,7 @@ void handleTextEditing(uint8_t mouseButton)
 
 void mouseWheelUpHandler(void)
 {
-	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag || ui.samplingBoxShown)
 		return;
 
 	if (mouse.y < 121)
@@ -2093,7 +2115,7 @@ void mouseWheelUpHandler(void)
 
 void mouseWheelDownHandler(void)
 {
-	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag || ui.samplingBoxShown)
 		return;
 
 	if (mouse.y < 121)
@@ -2167,7 +2189,8 @@ bool handleRightMouseButton(void)
 	{
 		if (!ui.posEdScreenShown && !ui.editOpScreenShown && !ui.diskOpScreenShown &&
 			!ui.aboutScreenShown && !ui.samplerVolBoxShown &&
-			!ui.samplerFiltersBoxShown && !editor.isWAVRendering)
+			!ui.samplerFiltersBoxShown && !ui.samplingBoxShown &&
+			!editor.isWAVRendering)
 		{
 			     if (mouse.x > 127 && mouse.x <= 167) editor.muted[0] ^= 1;
 			else if (mouse.x > 175 && mouse.x <= 215) editor.muted[1] ^= 1;
@@ -2180,7 +2203,7 @@ bool handleRightMouseButton(void)
 
 	// sample hand drawing
 	if (mouse.y >= 138 && mouse.y <= 201 && ui.samplerScreenShown &&
-		!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown)
+		!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown && !ui.samplingBoxShown)
 	{
 		samplerEditSample(false);
 	}
@@ -2202,10 +2225,17 @@ bool handleLeftMouseButton(void)
 		return true;
 	}
 
-	// handle filters toolbox in sampler
+	// handle filters toolbox in sampler screen
 	else if (ui.samplerFiltersBoxShown)
 	{
 		handleSamplerFiltersBox();
+		return true;
+	}
+
+	// handle sampling toolbox in sampler screen
+	else if (ui.samplingBoxShown)
+	{
+		handleSamplingBox();
 		return true;
 	}
 
@@ -2238,11 +2268,12 @@ bool handleLeftMouseButton(void)
 	}
 
 	// cancel note input gadgets with left/right mouse button
-	if (ui.changingSmpResample || ui.changingChordNote || ui.changingDrumPadNote)
+	if (ui.changingSmpResample || ui.changingChordNote || ui.changingDrumPadNote || ui.changingSamplingNote)
 	{
 		if (mouse.leftButtonPressed || mouse.rightButtonPressed)
 		{
 			ui.changingSmpResample = false;
+			ui.changingSamplingNote = false;
 			ui.changingChordNote = false;
 			ui.changingDrumPadNote = false;
 
@@ -2348,7 +2379,7 @@ void updateMouseCounters(void)
 
 	if (editor.errorMsgActive)
 	{
-		if (++editor.errorMsgCounter >= (uint8_t)(VBLANK_HZ/1.25))
+		if (++editor.errorMsgCounter >= (uint8_t)(VBLANK_HZ/1.15))
 		{
 			editor.errorMsgCounter = 0;
 
@@ -2356,7 +2387,7 @@ void updateMouseCounters(void)
 			if (!ui.askScreenShown && !ui.clearScreenShown &&
 				!ui.pat2SmpDialogShown && !ui.changingChordNote &&
 				!ui.changingDrumPadNote && !ui.changingSmpResample &&
-				!editor.swapChannelFlag)
+				!editor.swapChannelFlag && !ui.changingSamplingNote)
 			{
 				pointerSetPreviousMode();
 				setPrevStatusMessage();
@@ -4027,12 +4058,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		}
 		break;
 
-		case PTB_SA_RESAMPLENOTE:
+		case PTB_SA_SAMPLE:
 		{
-			ui.changingSmpResample = true;
-			ui.updateResampleNote = true;
-			setStatusMessage("SELECT NOTE", NO_CARRY);
-			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
+			ui.samplingBoxShown = true;
+			renderSamplingBox();
 		}
 		break;
 
@@ -4043,6 +4072,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 			setStatusMessage("RESAMPLE?", NO_CARRY);
 			renderAskDialog();
+		}
+		break;
+
+		case PTB_SA_RESAMPLENOTE:
+		{
+			ui.changingSmpResample = true;
+			ui.updateResampleNote = true;
+			setStatusMessage("SELECT NOTE", NO_CARRY);
+			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 		}
 		break;
 

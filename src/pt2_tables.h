@@ -5,6 +5,8 @@
 #include "pt2_mouse.h"
 
 // TABLES
+extern const char *ftuneStrTab[16];
+extern const int8_t vuMeterHeights[65];
 extern const char hexTable[16];
 extern const uint32_t cursorColors[6][3];
 extern const char *noteNames1[2+36];
@@ -35,7 +37,7 @@ extern uint16_t vuMeterColors[48];
 #define EDITOP2_BUTTONS 22
 #define EDITOP3_BUTTONS 29
 #define EDITOP4_BUTTONS 29
-#define SAMPLER_BUTTONS 24
+#define SAMPLER_BUTTONS 25
 // -----------------------------------------------
 
 extern const guiButton_t bAsk[];

@@ -1,27 +1,36 @@
  == Frequently Asked Questions (FAQ) ==
  
- * How do I change the Multi channel ordering?
- - When in idle mode (not edit/play etc), press ALT+1/2/3/4 to increase
-   the according multi slot. CTRL+M enables multi.
-   Multi
-   
+  * Is there a way to make the window bigger?
+ - Set VIDEOSCALE to 2X, 3x or 4X in protracker.ini.
+ 
+ * Is there a way to run the program in fullscreen mode?
+ - Press F11. On some keyboards/configurations you may need to press fn+F11.
+ 
  * Alt+F5/ALT+F5 (copy/paste) doesn't work!
  - Windows: you need to make sure those keybinding are disabled in
    'GeForce Experience' if you have that software installed.
  - OS X/mac OS/Linux: You need to remove or re-bind ALT+F4/ALT+F5 to other keys
    in your OS settings.
- 
- * Is there a way to make the window bigger?
- - Set VIDEOSCALE to 2X, 3x or 4X in protracker.ini.
-
- * Is there a way to run the program in fullscreen mode?
- - Press F11.
-
+   
+ * Is there a quicker way to save my module?
+ - Press CTRL+S. This hotkey is "split mode" in Amiga ProTracker, which is not
+   included in this PT clone.
+   
  * How do I change the stereo separation (panning)?
  - Adjust the STEREOSEPARATION setting in protracker.ini. It's a percentage
    value ranging from 0 to 100. 0 being mono and 100 being 100% separated like
    the audio output from an Amiga.
    Pressing SHIFT+F12 will toggle between STEREOSEPARATION and 100% (hard pan).
+
+ * How do I change the Multi channel ordering?
+ - When in idle mode (not edit/play etc), press ALT+1/2/3/4 to increase
+   the according multi slot. CTRL+M enables multi.
+ 
+ * Is there a more practical way to sample audio than clicking on "Sample"?
+ - Press the right mouse button. This means that you don't have to look at the
+   tracker to see where you are pressing, while you are getting ready to start
+   triggering the sampling source. Pressing the right mouse button again will
+   stop it before the buffer got filled.
 
  * Can this ProTracker clone load PT.Config files?
  - Yes. Put one in the same directory as the executable program, and it will
@@ -30,26 +39,24 @@
 
  * Will there ever be MIDI support?
  - No, sorry. Try a modern module tracker instead, or ProTracker on the Amiga.
- 
- * Is there a quick way to save my module?
- - Press CTRL+S. This hotkey is "split mode" in Amiga ProTracker, which is not
-   included in this PT clone.
    
  * Can I revert a sample after I edited it?
- - Press CTRL+Z while the sampler screen is open.
+ - Press CTRL+Z while the sampler screen is open. Keep in mind that this
+   function is extremely limited and will only revert to the last loaded sample.
 
  * [insert random question]
  - Try to send an email to olav.sorensen@live.no or visit #protracker at IRCnet.
 
  == Some misc. info ==
 
- WARNING: Note B-3 (or pitches getting near; pitch slides, vibrato or arpeggio)
- may not play correctly on a real Amiga. It might crackle/pop because of a
- DMA underrun. Take extra care when doing high pitches!
+ WARNING: Any pitch *higher* than A-3 finetune +4 (period 124, 28603.99Hz)
+ may not play correctly on a real Amiga. It might crackle/pop because of a DMA
+ underrun. This also applies to any pattern effect that changes the pitch.
+ Take extra care when doing high pitches!
 
  == Missing things that will NOT be added in the future ==
   
-  * Split keys (kinda pointless without MIDI). ctrl+s is now used for MOD saving
+  * Split keys (kinda pointless without MIDI). CTRL+S is now used for MOD saving
   * MIDI support
   * Setup screen
   
@@ -157,10 +164,10 @@
  This tool is handy for making drum loops.
  
  - Quality mode: -
- HI: 28836Hz - Play the new sample at note A-3 (finetune +5)
+ HI: 28604Hz - Play the new sample at note A-3 (finetune +4)
  LO: 22168Hz - Play the new sample at note F-3 (finetune +1)
   
- HI has the highest possible quality, but can only fit 2.27 seconds of audio.
+ HI has the highest possible quality, but can only fit 2.29 seconds of audio.
  LO is worse in quality, but can fit slightly more at 2.95 seconds.
  
  You should use this feature in sequences to fit as much rows as you need.

@@ -178,7 +178,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 
 	editor.abortMod2Wav = false;
 
-	modSetTempo(song->currBPM); // update BPM with MOD2WAV audio output rate
+	modSetTempo(song->currBPM, true); // update BPM with MOD2WAV audio output rate
 
 	editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, NULL, fOut);
 	if (editor.mod2WavThread != NULL)

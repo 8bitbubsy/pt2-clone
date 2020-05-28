@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_header.h"
+
 enum
 {
 	DISKOP_NO_CACHE = 0,
@@ -28,3 +29,5 @@ void freeDiskOpMem(void);
 void freeDiskOpEntryMem(void);
 void setPathFromDiskOpMode(void);
 bool changePathToHome(void);
+void renderDiskOpScreen(void);
+void updateDiskOp(void);

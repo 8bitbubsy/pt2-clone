@@ -26,6 +26,7 @@
 #include "pt2_module_loader.h"
 #include "pt2_sample_loader.h"
 #include "pt2_config.h"
+#include "pt2_sampling.h"
 
 typedef struct mem_t
 {
@@ -944,14 +945,14 @@ void setupNewMod(void)
 	editor.sampleZero = false;
 	editor.hiLowInstr = 0;
 
-	setLEDFilter(false); // real PT doesn't do this, but that's insane
+	setLEDFilter(false, false); // real PT doesn't do this, but that's insane
 
 	updateWindowTitle(MOD_NOT_MODIFIED);
 
 	editor.timingMode = TEMPO_MODE_CIA;
 
 	modSetSpeed(6);
-	modSetTempo(song->header.initialTempo); // 125 for normal MODs, custom value for certain STK/UST MODs
+	modSetTempo(song->header.initialTempo, false); // 125 for normal MODs, custom value for certain STK/UST MODs
 
 	updateCurrSample();
 	editor.samplePos = 0;
@@ -1041,7 +1042,8 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 
 	// don't allow drag n' drop if the tracker is busy
 	if (ui.pointerMode == POINTER_MODE_MSG1 || diskop.isFilling ||
-		editor.isWAVRendering || ui.samplerFiltersBoxShown || ui.samplerVolBoxShown)
+		editor.isWAVRendering || editor.isSMPRendering ||
+		ui.samplerFiltersBoxShown || ui.samplerVolBoxShown || ui.samplingBoxShown)
 	{
 		return;
 	}

@@ -28,6 +28,7 @@
 #include "pt2_mouse.h"
 #include "pt2_unicode.h"
 #include "pt2_config.h"
+#include "pt2_sampling.h"
 
 #if defined _WIN32 && !defined _DEBUG
 extern bool windowsKeyIsDown;
@@ -59,7 +60,6 @@ void readKeyModifiers(void)
 	keyb.leftCtrlPressed = (modState & KMOD_LCTRL)  ? true : false;
 	keyb.leftAltPressed = (modState & KMOD_LALT) ? true : false;
 	keyb.shiftPressed = (modState & (KMOD_LSHIFT + KMOD_RSHIFT)) ? true : false;
-
 
 #ifdef __APPLE__
 	keyb.leftCommandPressed = (modState & KMOD_LGUI) ? true : false;
@@ -430,7 +430,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 	if (!handleGeneralModes(keycode, scancode)) return;
 	if (!handleTextEditMode(scancode)) return;
-	if (ui.samplerVolBoxShown) return;
+	if (ui.samplerVolBoxShown || ui.samplingBoxShown) return;
 
 	if (ui.samplerFiltersBoxShown)
 	{
@@ -726,11 +726,11 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (editor.timingMode == TEMPO_MODE_VBLANK)
 				{
 					editor.oldTempo = song->currBPM;
-					modSetTempo(125);
+					modSetTempo(125, true);
 				}
 				else
 				{
-					modSetTempo(editor.oldTempo);
+					modSetTempo(editor.oldTempo, true);
 				}
 
 				ui.updateSongTiming = true;
@@ -857,12 +857,15 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					statusAllRight();
 				}
 			}
-			else if (!ui.samplerScreenShown)
+			else
 			{
-				modStop();
-				editor.currMode = MODE_EDIT;
-				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
-				statusAllRight();
+				if (!ui.samplerScreenShown)
+				{
+					modStop();
+					editor.currMode = MODE_EDIT;
+					pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
+					statusAllRight();
+				}
 			}
 		}
 		break;
@@ -3037,7 +3040,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				}
 				else
 				{
-					modSetTempo(125);
+					modSetTempo(125, true);
 					modSetSpeed(6);
 
 					for (i = 0; i < AMIGA_VOICES; i++)
@@ -3484,6 +3487,70 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 		return false;
 	}
 
+	// SAMPLER SCREEN (sampling box)
+	if (ui.samplingBoxShown)
+	{
+		if (audio.isSampling)
+		{
+			stopSampling();
+			return false;
+		}
+
+
+		if (scancode == SDL_SCANCODE_F1)
+			editor.keyOctave = OCTAVE_LOW;
+		else if (scancode == SDL_SCANCODE_F2)
+			editor.keyOctave = OCTAVE_HIGH;
+
+		if (ui.changingSamplingNote)
+		{
+			if (scancode == SDL_SCANCODE_ESCAPE)
+			{
+				ui.changingSamplingNote = false;
+				setPrevStatusMessage();
+				pointerSetPreviousMode();
+			}
+
+			rawKey = keyToNote(scancode);
+			if (rawKey >= 0)
+			{
+				ui.changingSamplingNote = false;
+
+				setSamplingNote(rawKey);
+
+				setPrevStatusMessage();
+				pointerSetPreviousMode();
+			}
+
+			return false;
+		}
+		else
+		{
+			if (keyb.leftCtrlPressed)
+			{
+				if (scancode == SDL_SCANCODE_LEFT)
+					samplingSampleNumDown();
+				else if (scancode == SDL_SCANCODE_RIGHT)
+					samplingSampleNumUp();
+			}
+			else
+			{
+				if (scancode == SDL_SCANCODE_SPACE)
+					turnOffVoices();
+				else
+					handleSampleJamming(scancode);
+			}
+		}
+
+		if (!ui.editTextFlag && scancode == SDL_SCANCODE_ESCAPE)
+		{
+			ui.samplingBoxShown = false;
+			removeSamplingBox();
+		}
+
+		return false;
+	}
+
 	// EDIT OP. SCREEN #3
 	if (editor.mixFlag && scancode == SDL_SCANCODE_ESCAPE)
 	{
@@ -3606,14 +3673,14 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 	{
 		if (ui.askScreenShown && ui.askScreenType == ASK_QUIT)
 		{
-			if (keycode == SDLK_y)
+			if (keycode == SDLK_y || keycode == SDLK_RETURN)
 			{
 				ui.askScreenShown = false;
 				ui.answerNo = false;
 				ui.answerYes = true;
 				handleAskYes();
 			}
-			else if (keycode == SDLK_n)
+			else if (keycode == SDLK_n || keycode == SDLK_ESCAPE)
 			{
 				ui.askScreenShown = false;
 				ui.answerNo = true;

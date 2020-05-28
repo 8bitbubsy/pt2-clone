@@ -5,7 +5,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <ctype.h> // tolower()
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -28,6 +27,8 @@
 #include "pt2_scopes.h"
 #include "pt2_structs.h"
 #include "pt2_config.h"
+#include "pt2_audio.h"
+#include "pt2_sync.h"
 
 const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
 {
@@ -96,7 +97,6 @@ void updateTextObject(int16_t editObject)
 void exitGetTextLine(bool updateValue)
 {
 	int8_t tmp8;
-	uint8_t i;
 	int16_t posEdPos, tmp16;
 	int32_t tmp32;
 	UNICHAR *pathU;
@@ -147,12 +147,6 @@ void exitGetTextLine(bool updateValue)
 	{
 		if (ui.dstOffset != NULL)
 			*ui.dstOffset = '\0';
-
-		if (ui.editObject == PTB_SONGNAME)
-		{
-			for (i = 0; i < 20; i++)
-				song->header.name[i] = (char)tolower(song->header.name[i]);
-		}
 
 		pointerSetPreviousMode();
 
@@ -639,7 +633,7 @@ void getTextLine(int16_t editObject)
 	ui.editObject = editObject;
 
 	if (ui.dstOffset != NULL)
-	   *ui.dstOffset  = '\0';
+		ui.dstOffset[0] = '\0';
 
 	// kludge
 	if (editor.mixFlag)
@@ -905,6 +899,66 @@ bool handleSpecialKeys(SDL_Scancode scancode)
 	return false;
 }
 
+void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature (in SAMPLER)
+{
+	const int32_t ch = cursor.channel;
+
+	if (scancode == SDL_SCANCODE_NONUSBACKSLASH)
+	{
+		turnOffVoices(); // magic "kill all voices" button
+		return;
+	}
+
+	const int8_t noteVal = keyToNote(scancode);
+	if (noteVal < 0 || noteVal > 35)
+		return;
+
+	moduleSample_t *s = &song->samples[editor.currSample];
+	if (s->length <= 1)
+		return;
+
+	song->channels[ch].n_samplenum = editor.currSample; // needed for sample playback/sampling line
+
+	const int8_t *n_start = &song->sampleData[s->offset];
+	const int8_t vol = 64;
+	const uint16_t n_length = s->length >> 1;
+	const uint16_t period = periodTable[((s->fineTune & 0xF) * 37) + noteVal];
+
+	paulaSetVolume(ch, vol);
+	paulaSetPeriod(ch, period);
+	paulaSetData(ch, n_start);
+	paulaSetLength(ch, n_length);
+
+	if (!editor.songPlaying)
+	{
+		scopeSetVolume(ch, vol);
+		scopeSetPeriod(ch, period);
+		scopeSetData(ch, n_start);
+		scopeSetLength(ch, n_length);
+	}
+
+	if (!editor.muted[ch])
+	{
+		paulaStartDMA(ch);
+		if (!editor.songPlaying)
+			scopeTrigger(ch);
+	}
+	else
+	{
+		paulaStopDMA(ch);
+	}
+
+	// these take effect after the current DMA cycle is done
+	paulaSetData(ch, NULL);
+	paulaSetLength(ch, 1);
+
+	if (!editor.songPlaying)
+	{
+		scopeSetData(ch, NULL);
+		scopeSetLength(ch, 1);
+	}
+}
+
 void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 {
 	int8_t noteVal;
@@ -952,14 +1006,34 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			paulaSetData(ch, chn->n_start);
 			paulaSetLength(ch, chn->n_length);
 
+			if (!editor.songPlaying)
+			{
+				scopeSetVolume(ch, chn->n_volume);
+				scopeSetPeriod(ch, chn->n_period);
+				scopeSetData(ch, chn->n_start);
+				scopeSetLength(ch, chn->n_length);
+			}
+
 			if (!editor.muted[ch])
+			{
 				paulaStartDMA(ch);
+				if (!editor.songPlaying)
+					scopeTrigger(ch);
+			}
 			else
+			{
 				paulaStopDMA(ch);
+			}
 
 			// these take effect after the current DMA cycle is done
 			paulaSetData(ch, chn->n_loopstart);
 			paulaSetLength(ch, chn->n_replen);
+
+			if (!editor.songPlaying)
+			{
+				scopeSetData(ch, chn->n_loopstart);
+				scopeSetLength(ch, chn->n_replen);
+			}
 		}
 
 		// normalMode = normal keys, or else keypad keys (in jam mode)

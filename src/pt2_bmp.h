@@ -29,20 +29,22 @@ extern const uint8_t editOpScreen4PackedBMP[1713];
 extern const uint8_t mod2wavPackedBMP[607];
 extern const uint8_t muteButtonsPackedBMP[46];
 extern const uint8_t posEdPackedBMP[1375];
+extern const uint8_t sampleMonitorPackedBMP[441];
 extern const uint8_t samplerVolumePackedBMP[706];
 extern const uint8_t samplerFiltersPackedBMP[933];
-extern const uint8_t samplerScreenPackedBMP[3056];
+extern const uint8_t samplerScreenPackedBMP[3076];
 extern const uint8_t spectrumVisualsPackedBMP[2217];
 extern const uint8_t trackerFramePackedBMP[8486];
 extern const uint8_t yesNoDialogPackedBMP[476];
 extern const uint8_t bigYesNoDialogPackedBMP[472];
 extern const uint8_t pat2SmpDialogPackedBMP[520];
+extern const uint8_t samplingBoxPackedBMP[1379];
 
 // these are filled/normalized on init, so no const
 extern uint32_t vuMeterBMP[480];
 extern uint32_t loopPinsBMP[512];
 extern uint32_t samplingPosBMP[64];
-extern uint32_t spectrumAnaBMP[36];
+extern uint32_t analyzerColorsRGB24[36];
 extern uint32_t patternCursorBMP[154];
 extern uint32_t *editOpScreen1BMP;
 extern uint32_t *editOpScreen2BMP;
@@ -63,6 +65,8 @@ extern uint32_t *aboutScreenBMP;
 extern uint32_t *muteButtonsBMP;
 extern uint32_t *editOpModeCharsBMP;
 extern uint32_t *pat2SmpDialogBMP;
+extern uint32_t *sampleMonitorBMP;
+extern uint32_t *samplingBoxBMP;
 
 bool unpackBMPs(void);
 void createBitmaps(void);

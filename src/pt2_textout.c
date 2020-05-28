@@ -16,16 +16,54 @@ void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 
 	if (ch == '\0' || ch == ' ')
 		return;
+
+	int32_t h = FONT_CHAR_H;
+	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
+		h++;
 	
 	srcPtr = &fontBMP[(ch & 0x7F) << 3];
 	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
-	for (int32_t y = 0; y < FONT_CHAR_H; y++)
+	for (int32_t y = 0; y < h; y++)
 	{
 		for (int32_t x = 0; x < FONT_CHAR_W; x++)
 		{
 			if (srcPtr[x])
 				dstPtr[x] = color;
+		}
+
+		srcPtr += 127*FONT_CHAR_W;
+		dstPtr += SCREEN_W;
+	}
+}
+
+void charOut2(uint32_t xPos, uint32_t yPos, char ch) // for static GUI text
+{
+	const uint8_t *srcPtr;
+	uint32_t *dstPtr;
+
+	if (ch == '\0' || ch == ' ')
+		return;
+
+	int32_t h = FONT_CHAR_H;
+	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
+		h++;
+	
+	srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+
+	const uint32_t fgColor = video.palette[PAL_BORDER];
+	const uint32_t bgColor = video.palette[PAL_GENBKG2];
+
+	for (int32_t y = 0; y < h; y++)
+	{
+		for (int32_t x = 0; x < FONT_CHAR_W; x++)
+		{
+			if (srcPtr[x])
+			{
+				dstPtr[x+(SCREEN_W+1)] = bgColor;
+				dstPtr[x] = fgColor;
+			}
 		}
 
 		srcPtr += 127*FONT_CHAR_W;
@@ -41,13 +79,17 @@ void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t
 	if (ch == '\0')
 		return;
 
+	int32_t h = FONT_CHAR_H;
+	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
+		h++;
+
 	srcPtr = &fontBMP[(ch & 0x7F) << 3];
 	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
 	colors[0] = bgColor;
 	colors[1] = fgColor;
 
-	for (int32_t y = 0; y < FONT_CHAR_H; y++)
+	for (int32_t y = 0; y < h; y++)
 	{
 		for (int32_t x = 0; x < FONT_CHAR_W; x++)
 			dstPtr[x] = colors[srcPtr[x]];
@@ -65,11 +107,15 @@ void charOutBig(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 	if (ch == '\0' || ch == ' ')
 		return;
 
+	int32_t h = FONT_CHAR_H;
+	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
+		h++;
+
 	srcPtr = &fontBMP[(ch & 0x7F) << 3];
 	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 	dstPtr2 = dstPtr1 + SCREEN_W;
 
-	for (int32_t y = 0; y < FONT_CHAR_H; y++)
+	for (int32_t y = 0; y < h; y++)
 	{
 		for (int32_t x = 0; x < FONT_CHAR_W; x++)
 		{
@@ -128,6 +174,32 @@ void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 	}
 }
 
+void textOutN(uint32_t xPos, uint32_t yPos, const char *text, uint32_t n, uint32_t color)
+{
+	assert(text != NULL);
+
+	uint32_t x = xPos;
+	uint32_t i = 0;
+
+	while (*text != '\0' && i++ < n)
+	{
+		charOut(x, yPos, *text++, color);
+		x += FONT_CHAR_W;
+	}
+}
+
+void textOut2(uint32_t xPos, uint32_t yPos, const char *text) // for static GUI text
+{
+	assert(text != NULL);
+
+	uint32_t x = xPos;
+	while (*text != '\0')
+	{
+		charOut2(x, yPos, *text++);
+		x += FONT_CHAR_W-1;
+	}
+}
+
 void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
 	assert(text != NULL);
@@ -136,7 +208,21 @@ void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color
 	while (*text != '\0')
 	{
 		charOut(x, yPos, *text++, color);
-		x += (FONT_CHAR_W - 1);
+		x += FONT_CHAR_W-1;
+	}
+}
+
+void textOutTightN(uint32_t xPos, uint32_t yPos, const char *text, uint32_t n, uint32_t color)
+{
+	assert(text != NULL);
+
+	uint32_t x = xPos;
+	uint32_t i = 0;
+
+	while (*text != '\0' && i++ < n)
+	{
+		charOut(x, yPos, *text++, color);
+		x += FONT_CHAR_W-1;
 	}
 }
 

@@ -154,4 +154,4 @@ const uint8_t spectrumVisualsPackedBMP[2217] =
 	0x6A,0xCC,0x2F,0xAA,0xAB,0xBF,0xCC,0x30,0xFF
 };
 
-uint32_t spectrumAnaBMP[36];
+uint32_t analyzerColorsRGB24[36];

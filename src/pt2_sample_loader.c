@@ -7,7 +7,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <ctype.h> // tolower()
 #include "pt2_header.h"
 #include "pt2_textout.h"
 #include "pt2_mouse.h"
@@ -18,7 +17,12 @@
 #include "pt2_helpers.h"
 #include "pt2_unicode.h"
 #include "pt2_config.h"
+#include "pt2_sampling.h"
 
+/* TODO: Get a low-pass filter with a steeper slope!
+** A 6db/oct filter may not be very suitable for filtering out frequencies above nyquist,
+** before 2x downsampling.
+*/
 #define DOWNSAMPLE_CUTOFF_FACTOR 4.0
 
 enum
@@ -842,7 +846,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		for (i = 0; i < 21; i++)
 		{
 			if (i < inamLen)
-				s->text[i] = (char)tolower(fgetc(f));
+				s->text[i] = (char)fgetc(f);
 			else
 				s->text[i] = '\0';
 		}
@@ -861,7 +865,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	{
 		nameLen = (uint32_t)strlen(entryName);
 		for (i = 0; i < 21; i++)
-			s->text[i] = (i < nameLen) ? (char)tolower(entryName[i]) : '\0';
+			s->text[i] = (i < nameLen) ? (char)entryName[i] : '\0';
 
 		s->text[21] = '\0';
 		s->text[22] = '\0';
@@ -876,6 +880,14 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	editor.samplePos = 0;
 
 	fixSampleBeep(s);
+	fillSampleRedoBuffer(editor.currSample);
+
+	if (ui.samplingBoxShown)
+	{
+		removeSamplingBox();
+		ui.samplingBoxShown = false;
+	}
+
 	updateCurrSample();
 
 	updateWindowTitle(MOD_IS_MODIFIED);
@@ -1124,8 +1136,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 		if (nameLen > 21)
 			nameLen = 21;
 
-		for (i = 0; i < nameLen; i++)
-			s->text[i] = (char)tolower(tmpCharBuf[i]);
+		memcpy(s->text, tmpCharBuf, nameLen);
 	}
 	else
 	{
@@ -1133,8 +1144,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 		if (nameLen > 21)
 			nameLen = 21;
 
-		for (i = 0; i < nameLen; i++)
-			s->text[i] = (char)tolower(entryName[i]);
+		memcpy(s->text, entryName, nameLen);
 	}
 
 	// remove .iff from end of sample name (if present)
@@ -1146,6 +1156,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName)
 	editor.samplePos = 0;
 
 	fixSampleBeep(s);
+	fillSampleRedoBuffer(editor.currSample);
 	updateCurrSample();
 
 	updateWindowTitle(MOD_IS_MODIFIED);
@@ -1194,7 +1205,7 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 	// copy over sample name
 	nameLen = (uint32_t)strlen(entryName);
 	for (i = 0; i < 21; i++)
-		s->text[i] = (i < nameLen) ? (char)tolower(entryName[i]) : '\0';
+		s->text[i] = (i < nameLen) ? (char)entryName[i] : '\0';
 
 	s->text[21] = '\0';
 	s->text[22] = '\0';
@@ -1203,6 +1214,14 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 	editor.samplePos = 0;
 
 	fixSampleBeep(s);
+	fillSampleRedoBuffer(editor.currSample);
+
+	if (ui.samplingBoxShown)
+	{
+		removeSamplingBox();
+		ui.samplingBoxShown = false;
+	}
+
 	updateCurrSample();
 
 	updateWindowTitle(MOD_IS_MODIFIED);
@@ -1675,7 +1694,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	// copy over sample name
 	nameLen = (uint32_t)strlen(entryName);
 	for (i = 0; i < 21; i++)
-		s->text[i] = (i < nameLen) ? (char)tolower(entryName[i]) : '\0';
+		s->text[i] = (i < nameLen) ? (char)entryName[i] : '\0';
 
 	s->text[21] = '\0';
 	s->text[22] = '\0';
@@ -1689,6 +1708,14 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	editor.samplePos = 0;
 
 	fixSampleBeep(s);
+	fillSampleRedoBuffer(editor.currSample);
+
+	if (ui.samplingBoxShown)
+	{
+		removeSamplingBox();
+		ui.samplingBoxShown = false;
+	}
+
 	updateCurrSample();
 
 	updateWindowTitle(MOD_IS_MODIFIED);

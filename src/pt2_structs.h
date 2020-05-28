@@ -75,6 +75,11 @@ typedef struct moduleChannel_t
 	int16_t n_period, n_note, n_wantedperiod;
 	uint16_t n_cmd, n_length, n_replen;
 	uint32_t n_scopedelta;
+
+	// for pt2_sync.c
+	uint8_t syncFlags;
+	int8_t syncAnalyzerVolume, syncVuVolume;
+	uint16_t syncAnalyzerPeriod;
 } moduleChannel_t;
 
 typedef struct module_t
@@ -112,10 +117,11 @@ typedef struct keyb_t
 
 typedef struct mouse_t
 {
-	volatile bool setPosFlag;
+	volatile bool setPosFlag, resetCursorColorFlag;
 	bool buttonWaiting, leftButtonPressed, rightButtonPressed;
 	uint8_t repeatCounter, buttonWaitCounter;
-	int32_t x, y, lastMouseX, setPosX, setPosY, lastGUIButton, lastSmpFilterButton, prevX, prevY;
+	int32_t x, y, lastMouseX, setPosX, setPosY, lastGUIButton, prevX, prevY;
+	int32_t lastSmpFilterButton, lastSamplingButton;
 	uint32_t buttonState;
 } mouse_t;
 
@@ -203,7 +209,9 @@ typedef struct ui_t
 	bool leftLoopPinMoving, rightLoopPinMoving, changingSmpResample, changingDrumPadNote;
 	bool forceSampleDrag, forceSampleEdit, introScreenShown;
 	bool aboutScreenShown, clearScreenShown, posEdScreenShown, diskOpScreenShown;
-	bool samplerVolBoxShown, samplerFiltersBoxShown, editOpScreenShown;
+	bool samplerVolBoxShown, samplerFiltersBoxShown, samplingBoxShown, editOpScreenShown;
+
+	bool changingSamplingNote;
 
 	int8_t *numPtr8, tmpDisp8, pointerMode, editOpScreen, editTextType, askScreenType;
 	int8_t visualizerMode, previousPointerMode, forceVolDrag, changingChordNote;

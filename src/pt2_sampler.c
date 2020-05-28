@@ -21,6 +21,7 @@
 #include "pt2_structs.h"
 #include "pt2_config.h"
 #include "pt2_bmp.h"
+#include "pt2_sync.h"
 
 #define CENTER_LINE_COLOR 0x303030
 #define MARK_COLOR_1 0x666666 /* inverted background */
@@ -200,7 +201,7 @@ void fillSampleFilterUndoBuffer(void)
 	}
 }
 
-static void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_y2)
+void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_y2)
 {
 	int32_t d, x, y, ax, ay, sx, sy, dx, dy;
 	uint32_t color = 0x01000000 | video.palette[PAL_QADSCP];
@@ -219,7 +220,7 @@ static void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_
 
 	if (ax > ay)
 	{
-		d = ay - ((uint16_t)ax / 2);
+		d = ay - ((uint16_t)ax >> 1);
 		while (true)
 		{
 			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
@@ -241,7 +242,7 @@ static void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_
 	}
 	else
 	{
-		d = ax - ((uint16_t)ay / 2);
+		d = ax - ((uint16_t)ay >> 1);
 		while (true)
 		{
 			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
@@ -266,57 +267,29 @@ static void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_
 static void setDragBar(void)
 {
 	int32_t pos;
-	uint32_t *dstPtr, pixel, bgPixel;
+
+	// clear drag bar background
+	fillRect(4, 206, 312, 4, video.palette[PAL_BACKGRD]);
 
 	if (sampler.samLength > 0 && sampler.samDisplay != sampler.samLength)
 	{
-		int32_t roundingBias = sampler.samLength >> 1;
+		const int32_t roundingBias = sampler.samLength >> 1;
 
 		// update drag bar coordinates
-		pos = ((sampler.samOffset * 311) + roundingBias) / sampler.samLength;
-		sampler.dragStart = (uint16_t)(pos + 4);
-		sampler.dragStart = CLAMP(sampler.dragStart, 4, 315);
+		pos = 4 + (((sampler.samOffset * 311) + roundingBias) / sampler.samLength);
+		sampler.dragStart = (uint16_t)CLAMP(pos, 4, 315);
 
-		pos = (((sampler.samDisplay + sampler.samOffset) * 311) + roundingBias) / sampler.samLength;
-		sampler.dragEnd = (uint16_t)(pos + 5);
-		sampler.dragEnd = CLAMP(sampler.dragEnd, 5, 316);
+		pos = 5 + ((((sampler.samDisplay + sampler.samOffset) * 311) + roundingBias) / sampler.samLength);
+		sampler.dragEnd = (uint16_t)CLAMP(pos, 5, 316);
 
 		if (sampler.dragStart > sampler.dragEnd-1)
 			sampler.dragStart = sampler.dragEnd-1;
 
 		// draw drag bar
 
-		dstPtr = &video.frameBuffer[206 * SCREEN_W];
-		pixel = video.palette[PAL_QADSCP];
-		bgPixel = video.palette[PAL_BACKGRD];
-
-		for (int32_t y = 0; y < 4; y++)
-		{
-			for (int32_t x = 4; x < 316; x++)
-			{
-				if (x >= sampler.dragStart && x <= sampler.dragEnd)
-					dstPtr[x] = pixel; // drag bar
-				else
-					dstPtr[x] = bgPixel; // background
-			}
-
-			dstPtr += SCREEN_W;
-		}
-	}
-	else
-	{
-		// clear drag bar background
-
-		dstPtr = &video.frameBuffer[(206 * SCREEN_W) + 4];
-		pixel = video.palette[PAL_BACKGRD];
-
-		for (int32_t y = 0; y < 4; y++)
-		{
-			for (int32_t x = 0; x < 312; x++)
-				dstPtr[x] = pixel;
-
-			dstPtr += SCREEN_W;
-		}
+		const uint32_t dragWidth = sampler.dragEnd - sampler.dragStart;
+		if (dragWidth > 0)
+			fillRect(sampler.dragStart, 206, dragWidth, 4, video.palette[PAL_QADSCP]);
 	}
 }
 
@@ -382,31 +355,21 @@ static void getSampleDataPeak(int8_t *smpPtr, int32_t numBytes, int16_t *outMin,
 	*outMax = SAMPLE_AREA_Y_CENTER - (smpMax >> 2);
 }
 
-static void renderSampleData(void)
+void renderSampleData(void)
 {
 	int8_t *smpPtr;
 	int16_t y1, y2, min, max, oldMin, oldMax;
-	int32_t x, y, smpIdx, smpNum;
-	uint32_t *dstPtr, pixel;
+	int32_t x, smpIdx, smpNum;
+	uint32_t *dstPtr;
 	moduleSample_t *s;
 
 	s = &song->samples[editor.currSample];
 
 	// clear sample data background
+	fillRect(3, 138, SAMPLE_AREA_WIDTH, SAMPLE_VIEW_HEIGHT, video.palette[PAL_BACKGRD]);
 
-	dstPtr = &video.frameBuffer[(138 * SCREEN_W) + 3];
-	pixel = video.palette[PAL_BACKGRD];
-
-	for (y = 0; y < SAMPLE_VIEW_HEIGHT; y++)
-	{
-		for (x = 0; x < SAMPLE_AREA_WIDTH; x++)
-			dstPtr[x] = pixel;
-
-		dstPtr += SCREEN_W;
-	}
-
-	// display center line
-	if (config.dottedCenterFlag)
+	// display center line (if enabled)
+	if (config.waveformCenterLine)
 	{
 		dstPtr = &video.frameBuffer[(SAMPLE_AREA_Y_CENTER * SCREEN_W) + 3];
 		for (x = 0; x < SAMPLE_AREA_WIDTH; x++)
@@ -463,6 +426,9 @@ static void renderSampleData(void)
 			}
 		}
 	}
+
+	if (ui.samplingBoxShown)
+		return;
 
 	// render "sample display" text
 	if (sampler.samStart == sampler.blankSample)
@@ -552,10 +518,6 @@ void redrawSample(void)
 
 		ui.update9xxPos = true;
 		ui.lastSampleOffset = 0x900;
-
-		// for quadrascope
-		sampler.samDrawStart = s->offset;
-		sampler.samDrawEnd = s->offset + s->length;
 	}
 }
 
@@ -1527,18 +1489,24 @@ void toggleTuningTone(void)
 	{
 		// turn tuning tone on
 
-		editor.tuningChan = (cursor.channel + 1) & 3;
+		const int8_t ch = editor.tuningChan = (cursor.channel + 1) & 3;
 
 		if (editor.tuningNote > 35)
 			editor.tuningNote = 35;
 
-		song->channels[editor.tuningChan].n_volume = 64; // we need this for the scopes
+		song->channels[ch].n_volume = 64; // we need this for the scopes
 
-		paulaSetPeriod(editor.tuningChan, periodTable[editor.tuningNote]);
-		paulaSetVolume(editor.tuningChan, 64);
-		paulaSetData(editor.tuningChan, tuneToneData);
-		paulaSetLength(editor.tuningChan, sizeof (tuneToneData) / 2);
-		paulaStartDMA(editor.tuningChan);
+		paulaSetPeriod(ch, periodTable[editor.tuningNote]);
+		paulaSetVolume(ch, 64);
+		paulaSetData(ch, tuneToneData);
+		paulaSetLength(ch, sizeof (tuneToneData) / 2);
+		paulaStartDMA(ch);
+
+		scopeSetPeriod(ch, periodTable[editor.tuningNote]);
+		scopeSetVolume(ch, 64);
+		scopeSetData(ch, tuneToneData);
+		scopeSetLength(ch, sizeof (tuneToneData) / 2);
+		scopeTrigger(ch);
 	}
 	else
 	{
@@ -2048,9 +2016,9 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	if (playWaveformFlag)
 	{
 		ch->n_start = &song->sampleData[s->offset];
-		ch->n_length = (s->loopStart > 0) ? (uint32_t)(s->loopStart + s->loopLength) / 2 : s->length / 2;
+		ch->n_length = (s->loopStart > 0) ? (uint32_t)(s->loopStart + s->loopLength) >> 1 : s->length >> 1;
 		ch->n_loopstart = &song->sampleData[s->offset + s->loopStart];
-		ch->n_replen = s->loopLength / 2;
+		ch->n_replen = s->loopLength >> 1;
 	}
 	else
 	{
@@ -2068,21 +2036,47 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	paulaSetData(chn, ch->n_start);
 	paulaSetLength(chn, ch->n_length);
 
+	if (!editor.songPlaying)
+	{
+		scopeSetVolume(chn, ch->n_volume);
+		scopeSetPeriod(chn, ch->n_period);
+		scopeSetData(chn, ch->n_start);
+		scopeSetLength(chn, ch->n_length);
+	}
+
 	if (!editor.muted[chn])
+	{
 		paulaStartDMA(chn);
+		if (!editor.songPlaying)
+			scopeTrigger(chn);
+	}
 	else
+	{
 		paulaStopDMA(chn);
+	}
 
 	// these take effect after the current DMA cycle is done
 	if (playWaveformFlag)
 	{
 		paulaSetData(chn, ch->n_loopstart);
 		paulaSetLength(chn, ch->n_replen);
+
+		if (!editor.songPlaying)
+		{
+			scopeSetData(chn, ch->n_loopstart);
+			scopeSetLength(chn, ch->n_replen);
+		}
 	}
 	else
 	{
 		paulaSetData(chn, NULL);
 		paulaSetLength(chn, 1);
+
+		if (!editor.songPlaying)
+		{
+			scopeSetData(chn, NULL);
+			scopeSetLength(chn, 1);
+		}
 	}
 
 	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
@@ -2171,7 +2165,7 @@ void setLoopSprites(void)
 void samplerShowAll(void)
 {
 	if (sampler.samDisplay == sampler.samLength)
-		return; // don't attempt to show all if already showing all! }
+		return; // don't attempt to show all if already showing all!
 
 	sampler.samOffset = 0;
 	sampler.samDisplay = sampler.samLength;

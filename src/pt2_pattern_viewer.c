@@ -6,12 +6,11 @@
 #include "pt2_textout.h"
 #include "pt2_structs.h"
 #include "pt2_config.h"
+#include "pt2_visuals.h"
 
 #define MIDDLE_ROW 7
 #define VISIBLE_ROWS 15
 
-static const char *emptyRowNum = "  ";
-static const char *emptyRowData = "        ";
 static const char emptyDottedEffect[4] = { 0x02, 0x02, 0x02, 0x00 };
 static const char emptyDottedSample[3] = { 0x02, 0x02, 0x00 };
 
@@ -64,11 +63,11 @@ static void drawPatternNormal(void)
 		if (row < 0 || row >= MOD_ROWS)
 		{
 			// clear empty rows outside of pattern data
-			textOutBg(8, y, emptyRowNum, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(0*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(1*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(2*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(3*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
+			fillRect(8,         y, FONT_CHAR_W*2, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(0*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(1*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(2*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(3*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
 		}
 		else
 		{
@@ -149,11 +148,11 @@ static void drawPatternDotted(void)
 		if (row < 0 || row >= MOD_ROWS)
 		{
 			// clear empty rows outside of pattern data
-			textOutBg(8, y, emptyRowNum, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(0*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(1*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(2*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
-			textOutBg(32+(3*72), y, emptyRowData, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
+			fillRect(8,         y, FONT_CHAR_W*2, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(0*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(1*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(2*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+			fillRect(32+(3*72), y, FONT_CHAR_W*8, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
 		}
 		else
 		{

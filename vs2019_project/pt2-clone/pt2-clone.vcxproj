@@ -290,8 +290,11 @@
     <ClInclude Include="..\..\src\pt2_sample_loader.h" />
     <ClInclude Include="..\..\src\pt2_sampler.h" />
     <ClInclude Include="..\..\src\pt2_sample_saver.h" />
+    <ClInclude Include="..\..\src\pt2_sampling.h" />
     <ClInclude Include="..\..\src\pt2_scopes.h" />
+    <ClInclude Include="..\..\src\pt2_sinc.h" />
     <ClInclude Include="..\..\src\pt2_structs.h" />
+    <ClInclude Include="..\..\src\pt2_sync.h" />
     <ClInclude Include="..\..\src\pt2_tables.h" />
     <ClInclude Include="..\..\src\pt2_textout.h" />
     <ClInclude Include="..\..\src\pt2_unicode.h" />
@@ -338,8 +341,11 @@
     <ClCompile Include="..\..\src\pt2_sample_loader.c" />
     <ClCompile Include="..\..\src\pt2_sampler.c" />
     <ClCompile Include="..\..\src\pt2_sample_saver.c" />
+    <ClCompile Include="..\..\src\pt2_sampling.c" />
     <ClCompile Include="..\..\src\pt2_scopes.c" />
+    <ClCompile Include="..\..\src\pt2_sinc.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
+    <ClCompile Include="..\..\src\pt2_sync.c" />
     <ClCompile Include="..\..\src\pt2_tables.c" />
     <ClCompile Include="..\..\src\pt2_textout.c" />
     <ClCompile Include="..\..\src\pt2_unicode.c" />

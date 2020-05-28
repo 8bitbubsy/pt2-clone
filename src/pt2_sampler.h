@@ -12,10 +12,12 @@ typedef struct sampler_t
 	uint16_t dragStart, dragEnd;
 	int32_t samPointWidth, samOffset, samDisplay, samLength, saveMouseX, lastSamPos;
 	int32_t lastMouseX, lastMouseY, tmpLoopStart, tmpLoopLength;
-	uint32_t copyBufSize, samDrawStart, samDrawEnd;
+	uint32_t copyBufSize;
 } sampler_t;
 
 extern sampler_t sampler; // pt2_sampler.c
+
+void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_y2);
 
 void downSample(void);
 void upSample(void);
@@ -60,6 +62,7 @@ void exitFromSam(void);
 void samplerScreen(void);
 void displaySample(void);
 void redrawSample(void);
+void renderSampleData(void);
 bool allocSamplerVars(void);
 void deAllocSamplerVars(void);
 void setLoopSprites(void);

@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <math.h> // modf()
 #ifdef _WIN32
 #define WIN32_MEAN_AND_LEAN
@@ -40,6 +41,7 @@
 #include "pt2_mod2wav.h"
 #include "pt2_config.h"
 #include "pt2_bmp.h"
+#include "pt2_sampling.h"
 
 typedef struct sprite_t
 {
@@ -63,12 +65,110 @@ static const uint16_t cursorPosTable[24] =
 	246, 270, 278, 286, 294, 302
 };
 
-
 void updateSongInfo1(void);
 void updateSongInfo2(void);
 void updateSampler(void);
 void updatePatternData(void);
 void updateMOD2WAVDialog(void);
+
+void blit32(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *src)
+{
+	const uint32_t *srcPtr = src;
+	uint32_t *dstPtr = &video.frameBuffer[(y * SCREEN_W) + x];
+
+	for (int32_t yy = 0; yy < h; yy++)
+	{
+		memcpy(dstPtr, srcPtr, w * sizeof (int32_t));
+
+		srcPtr += w;
+		dstPtr += SCREEN_W;
+	}
+}
+
+void putPixel(int32_t x, int32_t y, const uint32_t pixelColor)
+{
+	video.frameBuffer[(y * SCREEN_W) + x] = pixelColor;
+}
+
+void hLine(int32_t x, int32_t y, int32_t w, const uint32_t pixelColor)
+{
+	uint32_t *dstPtr = &video.frameBuffer[(y * SCREEN_W) + x];
+	for (int32_t xx = 0; xx < w; xx++)
+		dstPtr[xx] = pixelColor;
+}
+
+void vLine(int32_t x, int32_t y, int32_t h, const uint32_t pixelColor)
+{
+	uint32_t *dstPtr = &video.frameBuffer[(y * SCREEN_W) + x];
+	for (int32_t yy = 0; yy < h; yy++)
+	{
+		*dstPtr = pixelColor;
+		dstPtr += SCREEN_W;
+	}
+}
+
+void drawFramework1(int32_t x, int32_t y, int32_t w, int32_t h)
+{
+	hLine(x, y, w-1, video.palette[PAL_BORDER]);
+	vLine(x, y+1, h-2, video.palette[PAL_BORDER]);
+	hLine(x+1, y+h-1, w-1, video.palette[PAL_GENBKG2]);
+	vLine(x+w-1, y+1, h-2, video.palette[PAL_GENBKG2]);
+
+	putPixel(x, y+h-1, video.palette[PAL_GENBKG]);
+	putPixel(x+w-1, y, video.palette[PAL_GENBKG]);
+
+	fillRect(x+1, y+1, w-2, h-2, video.palette[PAL_GENBKG]);
+}
+
+void drawFramework2(int32_t x, int32_t y, int32_t w, int32_t h)
+{
+	hLine(x, y, w-1, video.palette[PAL_GENBKG2]);
+	vLine(x, y+1, h-2, video.palette[PAL_GENBKG2]);
+	hLine(x+1, y+h-1, w-1, video.palette[PAL_BORDER]);
+	vLine(x+w-1, y+1, h-2, video.palette[PAL_BORDER]);
+
+	putPixel(x, y+h-1, video.palette[PAL_GENBKG]);
+	putPixel(x+w-1, y, video.palette[PAL_GENBKG]);
+
+	fillRect(x+1, y+1, w-2, h-2, video.palette[PAL_BACKGRD]);
+}
+
+void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t pixelColor)
+{
+	uint32_t *dstPtr = &video.frameBuffer[(y * SCREEN_W) + x];
+
+	for (int32_t yy = 0; yy < h; yy++)
+	{
+		for (int32_t xx = 0; xx < w; xx++)
+			dstPtr[xx] = pixelColor;
+
+		dstPtr += SCREEN_W;
+	}
+}
+
+void drawButton(int32_t x, int32_t y, int32_t w, const char *text)
+{
+	if (w < 2)
+		return;
+
+	const int32_t textW = (int32_t)strlen(text) * (FONT_CHAR_W-1);
+	const int32_t textX = x + (((w - 2) - textW) >> 1);
+
+	drawFramework1(x, y, w, 11);
+	textOut2(textX, y+3, text);
+}
+
+void drawUpButton(int32_t x, int32_t y)
+{
+	drawFramework1(x, y, 11, 11);
+	textOut2(x+1, y+2, ARROW_UP_STR);
+}
+
+void drawDownButton(int32_t x, int32_t y)
+{
+	drawFramework1(x, y, 11, 11);
+	textOut2(x+1, y+2, ARROW_DOWN_STR);
+}
 
 void statusAllRight(void)
 {
@@ -169,25 +269,35 @@ void renderFrame(void)
 	updateVisualizer();
 	handleLastGUIObjectDown();
 	drawSamplerLine();
+	writeSampleMonitorWaveform();
 }
 
-void resetAllScreens(void)
+void resetAllScreens(void) // prepare GUI for "really quit?" dialog
 {
 	editor.mixFlag = false;
 	editor.swapChannelFlag = false;
 	ui.clearScreenShown = false;
+
 	ui.changingChordNote = false;
 	ui.changingSmpResample = false;
+	ui.changingSamplingNote = false;
+	ui.changingDrumPadNote = false;
+
 	ui.pat2SmpDialogShown = false;
 	ui.disablePosEd = false;
 	ui.disableVisualizer = false;
-
+	
 	if (ui.samplerScreenShown)
 	{
+		if (ui.samplingBoxShown)
+		{
+			ui.samplingBoxShown = false;
+			removeSamplingBox();
+		}
+
 		ui.samplerVolBoxShown = false;
 		ui.samplerFiltersBoxShown = false;
-
-		displaySample();
+		displaySample(); // removes volume/filter box
 	}
 
 	if (ui.editTextFlag)
@@ -205,46 +315,19 @@ void removeAskDialog(void)
 
 void renderAskDialog(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
 	ui.disablePosEd = true;
 	ui.disableVisualizer = true;
 
-	// render ask dialog
-
-	srcPtr = ui.pat2SmpDialogShown ? pat2SmpDialogBMP : yesNoDialogBMP;
-	dstPtr = &video.frameBuffer[(51 * SCREEN_W) + 160];
-
-	for (uint32_t y = 0; y < 39; y++)
-	{
-		memcpy(dstPtr, srcPtr, 104 * sizeof (int32_t));
-
-		srcPtr += 104;
-		dstPtr += SCREEN_W;
-	}
+	const uint32_t *srcPtr = ui.pat2SmpDialogShown ? pat2SmpDialogBMP : yesNoDialogBMP;
+	blit32(160, 51, 104, 39, srcPtr);
 }
 
 void renderBigAskDialog(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
 	ui.disablePosEd = true;
 	ui.disableVisualizer = true;
 
-	// render custom big ask dialog
-
-	srcPtr = bigYesNoDialogBMP;
-	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
-
-	for (uint32_t y = 0; y < 55; y++)
-	{
-		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
-
-		srcPtr += 200;
-		dstPtr += SCREEN_W;
-	}
+	blit32(120, 44, 200, 55, bigYesNoDialogBMP);
 }
 
 void showDownsampleAskDialog(void)
@@ -381,23 +464,7 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 		ui.updateCurrSampleFineTune = false;
 
 		if (!editor.isWAVRendering)
-		{
-			if (currSample->fineTune >= 8)
-			{
-				charOutBg(80, 36, '-', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-				charOutBg(88, 36, '0' + (0x10 - (currSample->fineTune & 0xF)), video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-			}
-			else if (currSample->fineTune > 0)
-			{
-				charOutBg(80, 36, '+', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-				charOutBg(88, 36, '0' + (currSample->fineTune & 0xF), video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-			}
-			else
-			{
-				charOutBg(80, 36, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
-				charOutBg(88, 36, '0', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-			}
-		}
+			textOutBg(80, 36, ftuneStrTab[currSample->fineTune & 0xF], video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (ui.updateCurrSampleNum)
@@ -448,7 +515,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		ui.updateStatusText = false;
 
 		// clear background
-		textOutBg(88, 127, "                 ", video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
+		fillRect(88, 127, 17*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_GENBKG]);
 
 		// render status text
 		if (!editor.errorMsgActive && editor.blockMarkFlag && !ui.askScreenShown
@@ -520,15 +587,15 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		charOutBg(311, 128, ' ', video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
 		if (editor.pNoteFlag == 1)
 		{
-			video.frameBuffer[(129 * SCREEN_W) + 314] = video.palette[PAL_GENTXT];
-			video.frameBuffer[(129 * SCREEN_W) + 315] = video.palette[PAL_GENTXT];
+			putPixel(314, 129, video.palette[PAL_GENTXT]);
+			putPixel(315, 129, video.palette[PAL_GENTXT]);
 		}
 		else if (editor.pNoteFlag == 2)
 		{
-			video.frameBuffer[(128 * SCREEN_W) + 314] = video.palette[PAL_GENTXT];
-			video.frameBuffer[(128 * SCREEN_W) + 315] = video.palette[PAL_GENTXT];
-			video.frameBuffer[(130 * SCREEN_W) + 314] = video.palette[PAL_GENTXT];
-			video.frameBuffer[(130 * SCREEN_W) + 315] = video.palette[PAL_GENTXT];
+			putPixel(314, 128, video.palette[PAL_GENTXT]);
+			putPixel(315, 128, video.palette[PAL_GENTXT]);
+			putPixel(314, 130, video.palette[PAL_GENTXT]);
+			putPixel(315, 130, video.palette[PAL_GENTXT]);
 		}
 	}
 
@@ -586,9 +653,10 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		ui.updateSongSize = false;
 
 		// clear background
-		textOutBg(264, 123, "      ", video.palette[PAL_GENBKG], video.palette[PAL_GENBKG]);
+		fillRect(264, 123, 6*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_GENBKG]);
 
 		// calculate module length
+
 		uint32_t totalSampleDataSize = 0;
 		for (i = 0; i < MOD_SAMPLES; i++)
 			totalSampleDataSize += song->samples[i].length;
@@ -630,7 +698,7 @@ void updateSampler(void)
 	int32_t tmpSampleOffset;
 	moduleSample_t *s;
 
-	if (!ui.samplerScreenShown)
+	if (!ui.samplerScreenShown || ui.samplingBoxShown)
 		return;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
@@ -767,19 +835,7 @@ void showVolToSlider(void)
 
 void renderSamplerVolBox(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	srcPtr = samplerVolumeBMP;
-	dstPtr = &video.frameBuffer[(154 * SCREEN_W) + 72];
-
-	for (uint32_t y = 0; y < 33; y++)
-	{
-		memcpy(dstPtr, srcPtr, 136 * sizeof (int32_t));
-
-		srcPtr += 136;
-		dstPtr += SCREEN_W;
-	}
+	blit32(72, 154, 136, 33, samplerVolumeBMP);
 
 	ui.updateVolFromText = true;
 	ui.updateVolToText = true;
@@ -798,19 +854,7 @@ void removeSamplerVolBox(void)
 
 void renderSamplerFiltersBox(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	srcPtr = samplerFiltersBMP;
-	dstPtr = &video.frameBuffer[(154 * SCREEN_W) + 65];
-
-	for (uint32_t y = 0; y < 33; y++)
-	{
-		memcpy(dstPtr, srcPtr, 186 * sizeof (int32_t));
-
-		srcPtr += 186;
-		dstPtr += SCREEN_W;
-	}
+	blit32(65, 154, 186, 33, samplerFiltersBMP);
 
 	textOut(200, 157, "HZ", video.palette[PAL_GENTXT]);
 	textOut(200, 168, "HZ", video.palette[PAL_GENTXT]);
@@ -829,83 +873,8 @@ void removeSamplerFiltersBox(void)
 	displaySample();
 }
 
-void renderDiskOpScreen(void)
-{
-	memcpy(video.frameBuffer, diskOpScreenBMP, (99 * 320) * sizeof (int32_t));
-
-	ui.updateDiskOpPathText = true;
-	ui.updatePackText = true;
-	ui.updateSaveFormatText = true;
-	ui.updateLoadMode = true;
-	ui.updateDiskOpFileList = true;
-}
-
-void updateDiskOp(void)
-{
-	char tmpChar;
-
-	if (!ui.diskOpScreenShown || ui.posEdScreenShown)
-		return;
-
-	if (ui.updateDiskOpFileList)
-	{
-		ui.updateDiskOpFileList = false;
-		diskOpRenderFileList();
-	}
-
-	if (ui.updateLoadMode)
-	{
-		ui.updateLoadMode = false;
-
-		// draw load mode arrow
-		if (diskop.mode == 0)
-		{
-			charOutBg(147,14, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]); // clear other box
-			charOutBg(147, 3, 0x3, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		}
-		else
-		{
-			charOutBg(147, 3, ' ', video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]); // clear other box
-			charOutBg(147,14, 0x3, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		}
-	}
-
-	if (ui.updatePackText)
-	{
-		ui.updatePackText = false;
-		textOutBg(120, 3, diskop.modPackFlg ? "ON " : "OFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-	}
-
-	if (ui.updateSaveFormatText)
-	{
-		ui.updateSaveFormatText = false;
-		     if (diskop.smpSaveType == DISKOP_SMP_WAV) textOutBg(120, 14, "WAV", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		else if (diskop.smpSaveType == DISKOP_SMP_IFF) textOutBg(120, 14, "IFF", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		else if (diskop.smpSaveType == DISKOP_SMP_RAW) textOutBg(120, 14, "RAW", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-	}
-
-	if (ui.updateDiskOpPathText)
-	{
-		ui.updateDiskOpPathText = false;
-
-		// print disk op. path
-		for (uint32_t i = 0; i < 26; i++)
-		{
-			tmpChar = editor.currPath[ui.diskOpPathTextOffset+i];
-			if (tmpChar == '\0')
-				tmpChar = '_';
-
-			charOutBg(24 + (i * FONT_CHAR_W), 25, tmpChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		}
-	}
-}
-
 void updatePosEd(void)
 {
-	int16_t posEdPosition;
-	int32_t x, y, y2;
-	uint32_t *dstPtr, bgPixel;
-
 	if (!ui.posEdScreenShown || !ui.updatePosEd)
 		return;
 
@@ -913,14 +882,12 @@ void updatePosEd(void)
 
 	if (!ui.disablePosEd)
 	{
-		bgPixel = video.palette[PAL_BACKGRD];
-
-		posEdPosition = song->currOrder;
+		int32_t posEdPosition = song->currOrder;
 		if (posEdPosition > song->header.numOrders-1)
 			posEdPosition = song->header.numOrders-1;
 
 		// top five
-		for (y = 0; y < 5; y++)
+		for (int32_t y = 0; y < 5; y++)
 		{
 			if (posEdPosition-(5-y) >= 0)
 			{
@@ -929,14 +896,7 @@ void updatePosEd(void)
 			}
 			else
 			{
-				dstPtr = &video.frameBuffer[((23+(y*6)) * SCREEN_W) + 128];
-				for (y2 = 0; y2 < 5; y2++)
-				{
-					for (x = 0; x < FONT_CHAR_W*22; x++)
-						dstPtr[x] = bgPixel;
-
-					dstPtr += SCREEN_W;
-				}
+				fillRect(128, 23+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
 			}
 		}
 
@@ -945,7 +905,7 @@ void updatePosEd(void)
 		printTwoDecimalsBg(160, 53, *editor.currPosEdPattDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 		// bottom six
-		for (y = 0; y < 6; y++)
+		for (int32_t y = 0; y < 6; y++)
 		{
 			if (posEdPosition+y < song->header.numOrders-1)
 			{
@@ -954,14 +914,7 @@ void updatePosEd(void)
 			}
 			else
 			{
-				dstPtr = &video.frameBuffer[((59+(y*6)) * SCREEN_W) + 128];
-				for (y2 = 0; y2 < 5; y2++)
-				{
-					for (x = 0; x < FONT_CHAR_W*22; x++)
-						dstPtr[x] = bgPixel;
-
-					dstPtr += SCREEN_W;
-				}
+				fillRect(128, 59+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
 			}
 		}
 
@@ -973,19 +926,7 @@ void updatePosEd(void)
 
 void renderPosEdScreen(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	srcPtr = posEdBMP;
-	dstPtr = &video.frameBuffer[120];
-
-	for (uint32_t y = 0; y < 99; y++)
-	{
-		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
-
-		srcPtr += 200;
-		dstPtr += SCREEN_W;
-	}
+	blit32(120, 0, 200, 99, posEdBMP);
 }
 
 void renderMuteButtons(void)
@@ -1025,22 +966,10 @@ void renderMuteButtons(void)
 
 void renderClearScreen(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
 	ui.disablePosEd = true;
 	ui.disableVisualizer = true;
 
-	srcPtr = clearDialogBMP;
-	dstPtr = &video.frameBuffer[(51 * SCREEN_W) + 160];
-
-	for (uint32_t y = 0; y < 39; y++)
-	{
-		memcpy(dstPtr, srcPtr, 104 * sizeof (int32_t));
-
-		srcPtr += 104;
-		dstPtr += SCREEN_W;
-	}
+	blit32(160, 51, 104, 39, clearDialogBMP);
 }
 
 void removeClearScreen(void)
@@ -1088,20 +1017,13 @@ void updatePatternData(void)
 
 void removeTextEditMarker(void)
 {
-	uint32_t *dstPtr, pixel;
-
 	if (!ui.editTextFlag)
 		return;
-
-	dstPtr = &video.frameBuffer[((ui.lineCurY - 1) * SCREEN_W) + (ui.lineCurX - 4)];
 
 	if (ui.editObject == PTB_PE_PATT)
 	{
 		// position editor text editing
-
-		pixel = video.palette[PAL_GENBKG2];
-		for (uint32_t x = 0; x < 7; x++)
-			dstPtr[x] = pixel;
+		hLine(ui.lineCurX - 4, ui.lineCurY - 1, 7, video.palette[PAL_GENBKG2]);
 
 		// no need to clear the second row of pixels
 
@@ -1110,35 +1032,16 @@ void removeTextEditMarker(void)
 	else
 	{
 		// all others
-
-		pixel = video.palette[PAL_GENBKG];
-		for (uint32_t y = 0; y < 2; y++)
-		{
-			for (uint32_t x = 0; x < 7; x++)
-				dstPtr[x] = pixel;
-
-			dstPtr += SCREEN_W;
-		}
+		fillRect(ui.lineCurX - 4, ui.lineCurY - 1, 7, 2, video.palette[PAL_GENBKG]);
 	}
 }
 
 void renderTextEditMarker(void)
 {
-	uint32_t *dstPtr, pixel;
-
 	if (!ui.editTextFlag)
 		return;
 
-	dstPtr = &video.frameBuffer[((ui.lineCurY - 1) * SCREEN_W) + (ui.lineCurX - 4)];
-	pixel = video.palette[PAL_TEXTMARK];
-
-	for (uint32_t y = 0; y < 2; y++)
-	{
-		for (uint32_t x = 0; x < 7; x++)
-			dstPtr[x] = pixel;
-
-		dstPtr += SCREEN_W;
-	}
+	fillRect(ui.lineCurX - 4, ui.lineCurY - 1, 7, 2, video.palette[PAL_TEXTMARK]);
 }
 
 static void sendMouseButtonUpEvent(uint8_t button)
@@ -1199,14 +1102,10 @@ void handleLastGUIObjectDown(void)
 
 void updateVisualizer(void)
 {
-	const uint32_t *srcPtr;
-	int32_t tmpVol;
-	uint32_t *dstPtr, pixel;
-
 	if (ui.disableVisualizer || ui.diskOpScreenShown ||
 		ui.posEdScreenShown  || ui.editOpScreenShown ||
 		ui.aboutScreenShown  || ui.askScreenShown    ||
-		editor.isWAVRendering)
+		editor.isWAVRendering || ui.samplingBoxShown)
 	{
 		return;
 	}
@@ -1215,13 +1114,13 @@ void updateVisualizer(void)
 	{
 		// spectrum analyzer
 
-		dstPtr = &video.frameBuffer[(59 * SCREEN_W) + 129];
+		uint32_t *dstPtr = &video.frameBuffer[(59 * SCREEN_W) + 129];
 		for (uint32_t i = 0; i < SPECTRUM_BAR_NUM; i++)
 		{
-			srcPtr = spectrumAnaBMP;
-			pixel = video.palette[PAL_GENBKG];
+			const uint32_t *srcPtr = analyzerColorsRGB24;
+			uint32_t pixel = video.palette[PAL_GENBKG];
 
-			tmpVol = editor.spectrumVolumes[i];
+			int32_t tmpVol = editor.spectrumVolumes[i];
 			if (tmpVol > SPECTRUM_BAR_HEIGHT)
 				tmpVol = SPECTRUM_BAR_HEIGHT;
 
@@ -1267,40 +1166,18 @@ void renderQuadrascopeBg(void)
 
 void renderSpectrumAnalyzerBg(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	srcPtr = spectrumVisualsBMP;
-	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
-
-	for (uint32_t y = 0; y < 55; y++)
-	{
-		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
-
-		srcPtr += 200;
-		dstPtr += SCREEN_W;
-	}
+	blit32(120, 44, 200, 55, spectrumVisualsBMP);
 }
 
 void renderAboutScreen(void)
 {
 	char verString[16];
-	const uint32_t *srcPtr;
-	uint32_t verStringX, *dstPtr;
+	uint32_t verStringX;
 
 	if (!ui.aboutScreenShown || ui.diskOpScreenShown || ui.posEdScreenShown || ui.editOpScreenShown)
 		return;
 
-	srcPtr = aboutScreenBMP;
-	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
-
-	for (uint32_t y = 0; y < 55; y++)
-	{
-		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
-
-		srcPtr += 200;
-		dstPtr += SCREEN_W;
-	}
+	blit32(120, 44, 200, 55, aboutScreenBMP);
 
 	// draw version string
 
@@ -1312,7 +1189,6 @@ void renderAboutScreen(void)
 void renderEditOpMode(void)
 {
 	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
 
 	// select what character box to render
 
@@ -1341,24 +1217,14 @@ void renderEditOpMode(void)
 	}
 
 	// render it...
-
-	dstPtr = &video.frameBuffer[(47 * SCREEN_W) + 310];
-	for (uint32_t y = 0; y < 6; y++)
-	{
-		for (uint32_t x = 0; x < 7; x++)
-			dstPtr[x] = srcPtr[x];
-
-		srcPtr += 7;
-		dstPtr += SCREEN_W;
-	}
+	blit32(310, 47, 7, 6, srcPtr);
 }
 
 void renderEditOpScreen(void)
 {
 	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
 
-	// select which background to render
+	// select which graphics to render
 	switch (ui.editOpScreen)
 	{
 		default:
@@ -1368,15 +1234,7 @@ void renderEditOpScreen(void)
 		case 3: srcPtr = editOpScreen4BMP; break;
 	}
 
-	// render background
-	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
-	for (uint32_t y = 0; y < 55; y++)
-	{
-		memcpy(dstPtr, srcPtr, 200 * sizeof (int32_t));
-
-		srcPtr += 200;
-		dstPtr += SCREEN_W;
-	}
+	blit32(120, 44, 200, 55, srcPtr);
 
 	renderEditOpMode();
 
@@ -1420,26 +1278,11 @@ void renderEditOpScreen(void)
 
 void renderMOD2WAVDialog(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	srcPtr = mod2wavBMP;
-	dstPtr = &video.frameBuffer[(27 * SCREEN_W) + 64];
-
-	for (uint32_t y = 0; y < 48; y++)
-	{
-		memcpy(dstPtr, srcPtr, 192 * sizeof (int32_t));
-
-		srcPtr += 192;
-		dstPtr += SCREEN_W;
-	}
+	blit32(64, 27, 192, 48, mod2wavBMP);
 }
 
 void updateMOD2WAVDialog(void)
 {
-	int32_t barLength, percent;
-	uint32_t *dstPtr, bgPixel, pixel;
-
 	if (!ui.updateMod2WavDialog)
 		return;
 
@@ -1465,44 +1308,37 @@ void updateMOD2WAVDialog(void)
 			}
 
 			editor.isWAVRendering = false;
-			modSetTempo(song->currBPM); // update BPM with normal audio output rate
+			modSetTempo(song->currBPM, true); // update BPM with normal audio output rate
 			displayMainScreen();
 		}
 		else
 		{
+			if (song->rowsInTotal == 0)
+				return;
+
 			// render progress bar
 
-			percent = (uint8_t)((song->rowsCounter * 100) / song->rowsInTotal);
+			int32_t percent = (song->rowsCounter * 100) / song->rowsInTotal;
 			if (percent > 100)
 				percent = 100;
 
-			barLength = ((percent * 180) + 50) / 100;
-			dstPtr = &video.frameBuffer[(42 * SCREEN_W) + 70];
-			pixel = video.palette[PAL_GENBKG2];
-			bgPixel = video.palette[PAL_BORDER];
+			// foreground (progress)
+			const int32_t progressBarWidth = ((percent * 180) + 50) / 100;
+			if (progressBarWidth > 0)
+				fillRect(70, 42, progressBarWidth, 11, video.palette[PAL_GENBKG2]); // foreground (progress)
 
-			for (int32_t y = 0; y < 11; y++)
-			{
-				for (int32_t x = 0; x < 180; x++)
-				{
-					uint32_t color = bgPixel;
-					if (x < barLength)
-						color = pixel;
+			// background
+			int32_t bgWidth = 180 - progressBarWidth;
+			if (bgWidth > 0)
+				fillRect(70+progressBarWidth, 42, bgWidth, 11, video.palette[PAL_BORDER]);
 
-					dstPtr[x] = color;
-				}
-
-				dstPtr += SCREEN_W;
-			}
-
-			// render percentage
-			pixel = video.palette[PAL_GENTXT];
+			// draw percentage text
 			if (percent > 99)
-				printThreeDecimals(144, 45, percent, pixel);
+				printThreeDecimals(144, 45, percent, video.palette[PAL_GENTXT]);
 			else
-				printTwoDecimals(152, 45, percent, pixel);
+				printTwoDecimals(152, 45, percent, video.palette[PAL_GENTXT]);
 
-			charOut(168, 45, '%', pixel);
+			charOut(168, 45, '%', video.palette[PAL_GENTXT]);
 		}
 	}
 }
@@ -1685,18 +1521,18 @@ void displayMainScreen(void)
 	if (ui.samplerScreenShown)
 	{
 		if (!ui.diskOpScreenShown)
-			memcpy(video.frameBuffer, trackerFrameBMP, 320 * 121 * sizeof (int32_t));
+			blit32(0, 0, 320, 121, trackerFrameBMP);
 	}
 	else
 	{
 		if (!ui.diskOpScreenShown)
-			memcpy(video.frameBuffer, trackerFrameBMP, 320 * 255 * sizeof (int32_t));
+			blit32(0, 0, 320, 255, trackerFrameBMP);
 		else
-			memcpy(&video.frameBuffer[121 * SCREEN_W], &trackerFrameBMP[121 * SCREEN_W], 320 * 134 * sizeof (int32_t));
+			blit32(0, 121, 320, 134, &trackerFrameBMP[121 * SCREEN_W]);
 
 		ui.updateSongBPM = true;
 		ui.updateCurrPattText = true;
-		ui.updatePatternData  = true;
+		ui.updatePatternData = true;
 	}
 
 	if (ui.diskOpScreenShown)
@@ -1709,7 +1545,8 @@ void displayMainScreen(void)
 		ui.updateSongPattern = true;
 		ui.updateSongLength = true;
 
-		// zeroes (can't integrate zeroes in the graphics, the palette entry is above the 2-bit range)
+		// draw zeroes that will never change (to the left of numbers)
+
 		charOut(64,  3, '0', video.palette[PAL_GENTXT]);
 		textOut(64, 14, "00", video.palette[PAL_GENTXT]);
 
@@ -1982,7 +1819,7 @@ void handleAskYes(void)
 			{
 				for (i = 0; i < 20; i++)
 				{
-					fileName[i] = (char)(tolower(song->header.name[i]));
+					fileName[i] = (char)tolower(song->header.name[i]);
 					if (fileName[i] == '\0') break;
 					sanitizeFilenameChar(&fileName[i]);
 				}
