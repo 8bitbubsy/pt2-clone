@@ -7,8 +7,8 @@ Has additional audio filters and audio mixer improvements to make it sound close
 
 # Screenshots
 
-![Example #1](https://16-bits.org/pt2-clone-3.png)
-![Example #2](https://16-bits.org/pt2-clone-4.png)
+![Screenshot #1](https://16-bits.org/pt2-clone-1.png)
+![Screenshot #2](https://16-bits.org/pt2-clone-2.png)
 
 # Releases
 Windows/macOS binary releases can always be found at [16-bits.org](https://16-bits.org/pt2.php).
