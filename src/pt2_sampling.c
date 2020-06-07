@@ -312,7 +312,9 @@ static void drawSamplingFrequency(void)
 {
 	char str[16];
 	sprintf(str, "%05dHZ", roundedOutputFrequency);
-	textOutBg(262, 208, str, roundedOutputFrequency <= 28604 ? video.palette[PAL_GENTXT] : 0x8C0F0F, video.palette[PAL_GENBKG]);
+
+	const int32_t maxSafeFrequency = (int32_t)(PAL_PAULA_MAX_SAFE_HZ + 0.5); // rounded
+	textOutBg(262, 208, str, roundedOutputFrequency <= maxSafeFrequency ? video.palette[PAL_GENTXT] : 0x8C0F0F, video.palette[PAL_GENBKG]);
 }
 
 static void drawSamplingModeCross(void)

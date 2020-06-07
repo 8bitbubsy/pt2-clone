@@ -900,7 +900,7 @@ void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck)
 					modFree();
 
 					song = newSong;
-					setupNewMod();
+					setupLoadedMod();
 					song->loaded = true;
 
 					statusAllRight();

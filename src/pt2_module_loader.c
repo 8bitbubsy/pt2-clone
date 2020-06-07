@@ -585,8 +585,7 @@ module_t *modLoad(UNICHAR *fileName)
 		}
 	}
 
-	// allocate sample data (+2 sample slots for overflow safety (Paula and scopes))
-	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN);
+	newMod->sampleData = allocMemForAllSamples();
 	if (newMod->sampleData == NULL)
 	{
 		statusOutOfMemory();
@@ -905,7 +904,7 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 	return true;
 }
 
-void setupNewMod(void)
+void setupLoadedMod(void)
 {
 	int8_t i;
 
@@ -988,7 +987,7 @@ void loadModFromArg(char *arg)
 		song->loaded = false;
 		modFree();
 		song = newSong;
-		setupNewMod();
+		setupLoadedMod();
 		song->loaded = true;
 	}
 	else
@@ -1120,7 +1119,7 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 			modFree();
 
 			song = newSong;
-			setupNewMod();
+			setupLoadedMod();
 			song->loaded = true;
 
 			statusAllRight();
@@ -1183,7 +1182,7 @@ void loadDroppedFile2(void)
 	loadDroppedFile(oldFullPath, oldFullPathLen, oldAutoPlay, false);
 }
 
-module_t *createNewMod(void)
+module_t *createEmptyMod(void)
 {
 	uint8_t i;
 	module_t *newMod;
@@ -1199,23 +1198,23 @@ module_t *createNewMod(void)
 			goto oom;
 	}
 
-	// +2 sample slots for overflow safety (Paula and scopes)
-	newMod->sampleData = (int8_t *)calloc(MOD_SAMPLES + 2, MAX_SAMPLE_LEN);
+	newMod->sampleData = allocMemForAllSamples();
 	if (newMod->sampleData == NULL)
 		goto oom;
 
 	newMod->header.numOrders = 1;
 
-	for (i = 0; i < MOD_SAMPLES; i++)
+	moduleSample_t *s = newMod->samples;
+	for (i = 0; i < MOD_SAMPLES; i++, s++)
 	{
-		newMod->samples[i].offset = MAX_SAMPLE_LEN * i;
-		newMod->samples[i].loopLength = 2;
+		s->offset = MAX_SAMPLE_LEN * i;
+		s->loopLength = 2;
 
 		// setup GUI text pointers
-		newMod->samples[i].volumeDisp = &newMod->samples[i].volume;
-		newMod->samples[i].lengthDisp = &newMod->samples[i].length;
-		newMod->samples[i].loopStartDisp = &newMod->samples[i].loopStart;
-		newMod->samples[i].loopLengthDisp = &newMod->samples[i].loopLength;
+		s->volumeDisp = &s->volume;
+		s->lengthDisp = &s->length;
+		s->loopStartDisp = &s->loopStart;
+		s->loopLengthDisp = &s->loopLength;
 	}
 
 	for (i = 0; i < AMIGA_VOICES; i++)

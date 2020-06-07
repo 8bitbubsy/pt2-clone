@@ -35,6 +35,25 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 	0x10, 0x13, 0x16, 0x1A, 0x20, 0x2B, 0x40, 0x80
 };
 
+int8_t *allocMemForAllSamples(void)
+{
+	/* Allocate memoru for all sample data blocks.
+	**
+	** We need three extra sample slots:
+	** The 1st is extra safety padding since setting a Paula length of 0
+	** results in reading (1+65535)*2 bytes. The 2nd and 3rd (64K*2 = 1x 128K)
+	** are reserved for NULL pointers. This is needed for emulating a PT quirk.
+	**
+	** We have a padding of 4 bytes at the end for length=0 quirk safety.
+	**
+	** PS: I don't really know if it's possible for ProTracker to set a Paula
+	** length of 0, but I fully support this Paula behavior just in case.
+	*/
+	const size_t allocLen = ((MOD_SAMPLES + 3) * MAX_SAMPLE_LEN) + 4;
+
+	return (int8_t *)calloc(1, allocLen);
+}
+
 void modSetSpeed(uint8_t speed)
 {
 	song->speed = speed;
@@ -105,11 +124,15 @@ static void setVUMeterHeight(moduleChannel_t *ch)
 	if (vol > 64)
 		vol = 64;
 
-	ch->syncVuVolume = vol;
-	ch->syncFlags |= UPDATE_VUMETER;
-
 	if (!editor.songPlaying)
+	{
 		editor.vuMeterVolumes[ch->n_chanindex] = vuMeterHeights[vol];
+	}
+	else
+	{
+		ch->syncVuVolume = vol;
+		ch->syncFlags |= UPDATE_VUMETER;
+	}
 }
 
 static void updateFunk(moduleChannel_t *ch)
@@ -853,7 +876,7 @@ static void playVoice(moduleChannel_t *ch)
 
 		// non-PT2 quirk
 		if (ch->n_length == 0)
-			ch->n_loopstart = ch->n_wavestart = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+			ch->n_loopstart = ch->n_wavestart = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 	}
 
 	if ((ch->n_note & 0xFFF) > 0)

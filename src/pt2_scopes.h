@@ -23,13 +23,10 @@ typedef struct scope_t
 
 void resetCachedScopePeriod(void);
 
-void scopeSetVolume(int32_t ch, uint16_t vol);
-void scopeSetPeriod(int32_t ch, uint16_t period);
-void scopeSetData(int32_t ch, const int8_t *src);
-void scopeSetLength(int32_t ch, uint16_t len);
+void scopeSetPeriod(int32_t ch, int32_t period);
 void scopeTrigger(int32_t ch);
 
-int32_t getSampleReadPos(int32_t ch, uint8_t smpNum);
+int32_t getSampleReadPos(int32_t ch);
 void updateScopes(void);
 void drawScopes(void);
 bool initScopes(void);

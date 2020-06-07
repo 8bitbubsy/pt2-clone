@@ -147,30 +147,33 @@ void updateChannelSyncBuffer(void)
 	{
 		scope_t *s = scope;
 		syncedChannel_t *c = chSyncEntry->channels;
-		for (int32_t i = 0; i < AMIGA_VOICES; i++, s++, c++)
+		for (int32_t ch = 0; ch < AMIGA_VOICES; ch++, s++, c++)
 		{
-			const uint8_t flags = updateFlags[i];
+			const uint8_t flags = updateFlags[ch];
 			if (flags == 0)
 				continue;
 
-			if (flags & UPDATE_VOLUME)
-				scopeSetVolume(i, c->volume);
+			if (flags & SET_SCOPE_VOLUME)
+				scope[ch].volume = c->volume;
 
-			if (flags & UPDATE_PERIOD)
-				scopeSetPeriod(i, c->period);
+			if (flags & SET_SCOPE_PERIOD)
+				scopeSetPeriod(ch, c->period);
 
-			if (flags & TRIGGER_SAMPLE)
+			if (flags & TRIGGER_SCOPE)
 			{
 				s->newData = c->triggerData;
-				s->newLength = c->triggerLength << 1;
-				scopeTrigger(i);
+				s->newLength = c->triggerLength;
+				scopeTrigger(ch);
 			}
 
-			if (flags & UPDATE_DATA)
-				scopeSetData(i, c->newData);
+			if (flags & SET_SCOPE_DATA)
+				scope[ch].newData = c->newData;
 
-			if (flags & UPDATE_LENGTH)
-				scopeSetLength(i, c->newLength);
+			if (flags & SET_SCOPE_LENGTH)
+				scope[ch].newLength = c->newLength;
+
+			if (flags & STOP_SCOPE)
+				scope[ch].active = false;
 
 			if (flags & UPDATE_ANALYZER)
 				updateSpectrumAnalyzer(c->analyzerVolume, c ->analyzerPeriod);
@@ -178,7 +181,7 @@ void updateChannelSyncBuffer(void)
 			if (flags & UPDATE_VUMETER) // for fake VU-meters only
 			{
 				if (c->vuVolume <= 64)
-					editor.vuMeterVolumes[i] = vuMeterHeights[c->vuVolume];
+					editor.vuMeterVolumes[ch] = vuMeterHeights[c->vuVolume];
 			}
 		}
 	}

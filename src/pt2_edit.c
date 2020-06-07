@@ -929,34 +929,14 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 	paulaSetData(ch, n_start);
 	paulaSetLength(ch, n_length);
 
-	if (!editor.songPlaying)
-	{
-		scopeSetVolume(ch, vol);
-		scopeSetPeriod(ch, period);
-		scopeSetData(ch, n_start);
-		scopeSetLength(ch, n_length);
-	}
-
 	if (!editor.muted[ch])
-	{
 		paulaStartDMA(ch);
-		if (!editor.songPlaying)
-			scopeTrigger(ch);
-	}
 	else
-	{
 		paulaStopDMA(ch);
-	}
 
 	// these take effect after the current DMA cycle is done
 	paulaSetData(ch, NULL);
 	paulaSetLength(ch, 1);
-
-	if (!editor.songPlaying)
-	{
-		scopeSetData(ch, NULL);
-		scopeSetLength(ch, 1);
-	}
 }
 
 void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
@@ -1006,34 +986,14 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			paulaSetData(ch, chn->n_start);
 			paulaSetLength(ch, chn->n_length);
 
-			if (!editor.songPlaying)
-			{
-				scopeSetVolume(ch, chn->n_volume);
-				scopeSetPeriod(ch, chn->n_period);
-				scopeSetData(ch, chn->n_start);
-				scopeSetLength(ch, chn->n_length);
-			}
-
 			if (!editor.muted[ch])
-			{
 				paulaStartDMA(ch);
-				if (!editor.songPlaying)
-					scopeTrigger(ch);
-			}
 			else
-			{
 				paulaStopDMA(ch);
-			}
 
 			// these take effect after the current DMA cycle is done
 			paulaSetData(ch, chn->n_loopstart);
 			paulaSetLength(ch, chn->n_replen);
-
-			if (!editor.songPlaying)
-			{
-				scopeSetData(ch, chn->n_loopstart);
-				scopeSetLength(ch, chn->n_replen);
-			}
 		}
 
 		// normalMode = normal keys, or else keypad keys (in jam mode)

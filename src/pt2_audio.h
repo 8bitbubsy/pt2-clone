@@ -40,9 +40,9 @@ typedef struct voice_t
 
 	// used for pt2_sync.c
 	uint8_t syncFlags;
-	int8_t syncVolume;
-	uint16_t syncPeriod;
-	uint16_t syncTriggerLength;
+	uint8_t syncVolume;
+	int32_t syncPeriod;
+	int32_t syncTriggerLength;
 	const int8_t *syncTriggerData;
 } paulaVoice_t;
 

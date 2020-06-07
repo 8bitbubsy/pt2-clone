@@ -73,67 +73,42 @@ void readKeyModifiers(void)
 }
 
 #if defined _WIN32 && !defined _DEBUG
-/* For taking control over windows key if the program has focus.
+/* For taking control over the windows key if the program has focus.
 ** Warning: Don't do this in debug mode, it will completely ruin the keyboard input
 ** latency (in the OS in general) when the debugger is breaking.
 */
 LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lParam)
 {
-	SDL_Event inputEvent;
 	SDL_Window *window = video.window;
 
-	if (window == NULL || nCode < 0 || nCode != HC_ACTION) // do not process message
-		return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
-
-	bool bEatKeystroke = false;
-
-	KBDLLHOOKSTRUCT *p = (KBDLLHOOKSTRUCT *)lParam;
-	switch (wParam)
+	if (nCode == HC_ACTION && window != NULL)
 	{
-		case WM_KEYUP:
-		case WM_KEYDOWN:
+		switch (wParam)
 		{
-			const bool windowHasFocus = SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS;
-
-			bEatKeystroke = windowHasFocus && (p->vkCode == VK_LWIN || p->vkCode == VK_NUMLOCK);
-			if (!bEatKeystroke)
-				break;
-
-			memset(&inputEvent, 0, sizeof (SDL_Event));
-
-			const bool keyDown = (wParam == WM_KEYDOWN);
-			if (keyDown)
+			case WM_KEYUP:
+			case WM_KEYDOWN:
+			case WM_SYSKEYUP: // needed to prevent stuck Windows key if used with ALT
 			{
-				if (windowsKeyIsDown)
-					break; // Windows-key is already down (XXX: Do we need this check?)
+				const bool windowHasFocus = SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS;
+				if (!windowHasFocus)
+				{
+					windowsKeyIsDown = false;
+					break;
+				}
 
-				inputEvent.type = SDL_KEYDOWN;
-				inputEvent.key.type = SDL_KEYDOWN;
-				inputEvent.key.state = SDL_PRESSED;
-				windowsKeyIsDown = true;
+				if (((KBDLLHOOKSTRUCT *)lParam)->vkCode != VK_LWIN)
+					break;
+
+				windowsKeyIsDown = (wParam == WM_KEYDOWN);
+				return 1; // eat keystroke
 			}
-			else
-			{
-				inputEvent.type = SDL_KEYUP;
-				inputEvent.key.type = SDL_KEYUP;
-				inputEvent.key.state = SDL_RELEASED;
-				windowsKeyIsDown = false;
-			}
+			break;
 
-			inputEvent.key.keysym.sym = SDLK_LGUI;
-			inputEvent.key.keysym.scancode = SDL_SCANCODE_LGUI;
-			inputEvent.key.keysym.mod = SDL_GetModState();
-			inputEvent.key.timestamp = SDL_GetTicks();
-			inputEvent.key.windowID = SDL_GetWindowID(window);
-
-			SDL_PushEvent(&inputEvent);
+			default: break;
 		}
-		break;
-
-		default: break;
 	}
 
-	return bEatKeystroke ? 1 : CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
+	return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
 }
 #endif
 
@@ -366,12 +341,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		return;
 	}
 
-	// kludge to allow certain repeat-keys to use custom repeat/delay values
-	if (editor.repeatKeyFlag && keyb.repeatKey && scancode == keyb.lastRepKey &&
-		(keyb.leftAltPressed || keyb.leftAmigaPressed || keyb.leftCtrlPressed))
-	{
+	// these keys should not allow to be repeated in keyrepeat mode (caps lock)
+	const bool illegalKeys = keyb.leftAltPressed || keyb.leftAmigaPressed || keyb.leftCtrlPressed
+		|| scancode == SDL_SCANCODE_LEFT || scancode == SDL_SCANCODE_RIGHT
+		|| scancode == SDL_SCANCODE_UP   || scancode == SDL_SCANCODE_DOWN;
+	if (editor.repeatKeyFlag && keyb.repeatKey && scancode == keyb.lastRepKey && illegalKeys)
 		return;
-	}
 
 	if (scancode == SDL_SCANCODE_KP_PLUS)
 		keyb.keypadEnterPressed = true;
@@ -427,6 +402,8 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			return;
 		}
 	}
+
+	// XXX: This really needs some refactoring, it's messy and not logical
 
 	if (!handleGeneralModes(keycode, scancode)) return;
 	if (!handleTextEditMode(scancode)) return;
@@ -3453,9 +3430,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		break;
 	}
 
-	// repeat keys at 50Hz rate
-
-	const uint64_t keyRepeatDelta = ((uint64_t)AMIGA_PAL_VBLANK_HZ << 32) / VBLANK_HZ;
+	// repeat keys at 49.92Hz (Amiga PAL) rate
+	const uint64_t keyRepeatDelta = (uint64_t)(((UINT32_MAX + 1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
 
 	keyb.repeatFrac += keyRepeatDelta; // 32.32 fixed-point counter
 	if (keyb.repeatFrac > 0xFFFFFFFF)

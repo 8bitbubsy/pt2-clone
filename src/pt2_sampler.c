@@ -1501,12 +1501,6 @@ void toggleTuningTone(void)
 		paulaSetData(ch, tuneToneData);
 		paulaSetLength(ch, sizeof (tuneToneData) / 2);
 		paulaStartDMA(ch);
-
-		scopeSetPeriod(ch, periodTable[editor.tuningNote]);
-		scopeSetVolume(ch, 64);
-		scopeSetData(ch, tuneToneData);
-		scopeSetLength(ch, sizeof (tuneToneData) / 2);
-		scopeTrigger(ch);
 	}
 	else
 	{
@@ -1909,7 +1903,7 @@ void samplerSamPaste(void)
 		readPos += markStart;
 	}
 
-	// copy buffer
+	// copy actual buffer
 	memcpy(&tmpBuf[readPos], sampler.copyBuf, sampler.copyBufSize);
 
 	// copy end part
@@ -1925,7 +1919,7 @@ void samplerSamPaste(void)
 	if (newLength > MAX_SAMPLE_LEN)
 		newLength = MAX_SAMPLE_LEN;
 
-	sampler.samLength = (uint16_t)newLength;
+	sampler.samLength = s->length = (uint16_t)newLength;
 
 	if (s->loopLength > 2) // loop enabled?
 	{
@@ -1974,6 +1968,8 @@ void samplerSamPaste(void)
 	}
 
 	memcpy(&song->sampleData[s->offset], tmpBuf, s->length);
+
+	// clear data after sample's length (if present)
 	if (s->length < MAX_SAMPLE_LEN)
 		memset(&song->sampleData[s->offset+s->length], 0, MAX_SAMPLE_LEN - s->length);
 
@@ -2036,47 +2032,21 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	paulaSetData(chn, ch->n_start);
 	paulaSetLength(chn, ch->n_length);
 
-	if (!editor.songPlaying)
-	{
-		scopeSetVolume(chn, ch->n_volume);
-		scopeSetPeriod(chn, ch->n_period);
-		scopeSetData(chn, ch->n_start);
-		scopeSetLength(chn, ch->n_length);
-	}
-
 	if (!editor.muted[chn])
-	{
 		paulaStartDMA(chn);
-		if (!editor.songPlaying)
-			scopeTrigger(chn);
-	}
 	else
-	{
 		paulaStopDMA(chn);
-	}
 
 	// these take effect after the current DMA cycle is done
 	if (playWaveformFlag)
 	{
 		paulaSetData(chn, ch->n_loopstart);
 		paulaSetLength(chn, ch->n_replen);
-
-		if (!editor.songPlaying)
-		{
-			scopeSetData(chn, ch->n_loopstart);
-			scopeSetLength(chn, ch->n_replen);
-		}
 	}
 	else
 	{
 		paulaSetData(chn, NULL);
 		paulaSetLength(chn, 1);
-
-		if (!editor.songPlaying)
-		{
-			scopeSetData(chn, NULL);
-			scopeSetLength(chn, 1);
-		}
 	}
 
 	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
@@ -2854,24 +2824,18 @@ void samplerScreen(void)
 
 void drawSamplerLine(void)
 {
-	uint8_t i;
-	int32_t pos;
-
 	hideSprite(SPRITE_SAMPLING_POS_LINE);
 	if (!ui.samplerScreenShown || ui.samplerVolBoxShown || ui.samplerFiltersBoxShown)
 		return;
 
-	for (i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t ch = 0; ch < AMIGA_VOICES; ch++)
 	{
-		if (song->channels[i].n_samplenum == editor.currSample && !editor.muted[i])
+		int32_t pos = getSampleReadPos(ch);
+		if (pos >= 0)
 		{
-			pos = getSampleReadPos(i, editor.currSample);
-			if (pos >= 0)
-			{
-				pos = 3 + smpPos2Scr(pos);
-				if (pos >= 3 && pos <= 316)
-					setSpritePos(SPRITE_SAMPLING_POS_LINE, pos, 138);
-			}
+			pos = 3 + smpPos2Scr(pos);
+			if (pos >= 3 && pos <= 316)
+				setSpritePos(SPRITE_SAMPLING_POS_LINE, pos, 138);
 		}
 	}
 }

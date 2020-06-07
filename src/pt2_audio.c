@@ -337,12 +337,6 @@ void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 
 			paulaSetData(i, ch->n_start + s->loopStart);
 			paulaSetLength(i, s->loopLength >> 1);
-
-			if (!editor.songPlaying)
-			{
-				scopeSetData(i, ch->n_start + s->loopStart);
-				scopeSetLength(i, s->loopLength >> 1);
-			}
 		}
 	}
 }
@@ -388,14 +382,15 @@ void mixerKillVoice(int32_t ch)
 	const double dOldPanR = paula[ch].dPanR;
 
 	memset(&paula[ch], 0, sizeof (paulaVoice_t));
-	stopScope(ch);
-
-	// store old pans
-	paula[ch].dPanL = dOldPanL;
-	paula[ch].dPanR = dOldPanR;
-
 	memset(&blep[ch], 0, sizeof (blep_t));
 	memset(&blepVol[ch], 0, sizeof (blep_t));
+
+	stopScope(ch); // it should be safe to clear the scope now
+	memset(&scope[ch], 0, sizeof (scope_t));
+
+	// restore old pans
+	paula[ch].dPanL = dOldPanL;
+	paula[ch].dPanR = dOldPanR;
 
 	if (audioWasntLocked)
 		unlockAudio();
@@ -432,21 +427,24 @@ void resetCachedMixerPeriod(void)
 
 void paulaSetPeriod(int32_t ch, uint16_t period)
 {
-	int32_t realPeriod;
 	double dPeriodToDeltaDiv;
-	paulaVoice_t *v;
+	paulaVoice_t *v = &paula[ch];
 
-	v = &paula[ch];
-
-	v->syncPeriod = period; // used for pt2_sync.c
-	v->syncFlags |= UPDATE_PERIOD; // used for pt2_sync.c
-
-	if (period == 0)
+	int32_t realPeriod = period;
+	if (realPeriod == 0)
 		realPeriod = 1+65535; // confirmed behavior on real Amiga
-	else if (period < 113)
+	else if (realPeriod < 113)
 		realPeriod = 113; // close to what happens on real Amiga (and needed for BLEP synthesis)
+
+	if (editor.songPlaying)
+	{
+		v->syncPeriod = realPeriod;
+		v->syncFlags |= SET_SCOPE_PERIOD;
+	}
 	else
-		realPeriod = period;
+	{
+		scopeSetPeriod(ch, realPeriod);
+	}
 
 	// if the new period was the same as the previous period, use cached deltas
 	if (realPeriod != oldPeriod)
@@ -478,48 +476,72 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 
 void paulaSetVolume(int32_t ch, uint16_t vol)
 {
-	paulaVoice_t *v;
+	paulaVoice_t *v = &paula[ch];
 
-	v = &paula[ch];
+	int32_t realVol = vol;
 
-	vol &= 127; // confirmed behavior on real Amiga
+	// confirmed behavior on real Amiga
+	realVol &= 127;
+	if (realVol > 64)
+		realVol = 64;
 
-	if (vol > 64)
-		vol = 64; // confirmed behavior on real Amiga
+	v->dVolume = realVol * (1.0 / 64.0);
 
-	v->dVolume = vol * (1.0 / 64.0);
-
-	v->syncVolume = (int8_t)vol; // used for pt2_sync.c
-	v->syncFlags |= UPDATE_VOLUME; // used for pt2_sync.c
+	if (editor.songPlaying)
+	{
+		v->syncVolume = (uint8_t)realVol;
+		v->syncFlags |= SET_SCOPE_VOLUME;
+	}
+	else
+	{
+		scope[ch].volume = (uint8_t)realVol;
+	}
 }
 
 void paulaSetLength(int32_t ch, uint16_t len)
 {
-	if (len == 0)
+	int32_t realLength = len;
+	if (realLength == 0)
 	{
-		len = 65535;
-		/* Confirmed behavior on real Amiga (also needed for safety).
-		** And yes, we have room for this, it will never overflow!
+		realLength = 1+65535;
+		/* Confirmed behavior on real Amiga. We have room for this
+		** even at the last sample slot, so it will never overflow!
+		**
+		** PS: I don't really know if it's possible for ProTracker to
+		** set a Paula length of 0, but I fully support this Paula
+		** behavior just in case.
 		*/
 	}
 
-	paula[ch].newLength = len << 1; // our mixer works with bytes, not words
-	paula[ch].syncFlags |= UPDATE_LENGTH; // for pt2_sync.c
+	realLength <<= 1; // we work with bytes, not words
+
+	paula[ch].newLength = realLength;
+	if (editor.songPlaying)
+		paula[ch].syncFlags |= SET_SCOPE_LENGTH;
+	else
+		scope[ch].newLength = realLength;
 }
 
 void paulaSetData(int32_t ch, const int8_t *src)
 {
-	// set voice data
 	if (src == NULL)
-		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
 	paula[ch].newData = src;
-	paula[ch].syncFlags |= UPDATE_DATA; // for pt2_sync.c
+	if (editor.songPlaying)
+		paula[ch].syncFlags |= SET_SCOPE_DATA;
+	else
+		scope[ch].newData = src;
 }
 
 void paulaStopDMA(int32_t ch)
 {
 	paula[ch].active = false;
+
+	if (editor.songPlaying)
+		paula[ch].syncFlags |= STOP_SCOPE;
+	else
+		scope[ch].active = false;
 }
 
 void paulaStartDMA(int32_t ch)
@@ -534,9 +556,9 @@ void paulaStartDMA(int32_t ch)
 
 	dat = v->newData;
 	if (dat == NULL)
-		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
-	length = v->newLength;
+	length = v->newLength; // in bytes, not words
 	if (length < 2)
 		length = 2; // for safety
 
@@ -546,10 +568,18 @@ void paulaStartDMA(int32_t ch)
 	v->length = length;
 	v->active = true;
 
-	// for pt2_sync.c
-	v->syncTriggerData = dat;
-	v->syncTriggerLength = (uint16_t)(length >> 1);
-	v->syncFlags |= TRIGGER_SAMPLE;
+	if (editor.songPlaying)
+	{
+		v->syncTriggerData = dat;
+		v->syncTriggerLength = length;
+		v->syncFlags |= TRIGGER_SCOPE;
+	}
+	else
+	{
+		scope[ch].newData = dat;
+		scope[ch].newLength = length;
+		scopeTrigger(ch);
+	}
 }
 
 void toggleA500Filters(void)
@@ -1015,7 +1045,7 @@ static void fillVisualsSyncBuffer(void)
 		s->triggerData = v->syncTriggerData;
 		s->triggerLength = v->syncTriggerLength;
 		s->newData = v->newData;
-		s->newLength = (uint16_t)(v->newLength >> 1);
+		s->newLength = v->newLength;
 		s->vuVolume = c->syncVuVolume;
 		s->analyzerVolume = c->syncAnalyzerVolume;
 		s->analyzerPeriod = c->syncAnalyzerPeriod;
@@ -1139,14 +1169,14 @@ static void calculateFilterCoeffs(void)
 
 	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
 	{
-		// A1200 one-pole 6db/oct static RC low-pass filter:
+		// A1200 1-pole (6db/oct) static RC low-pass filter:
 		R = 680.0;  // R321 (680 ohm resistor)
 		C = 6.8e-9; // C321 (6800pf capacitor)
 		fc = 1.0 / (2.0 * M_PI * R * C);
 		calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA1200);
 	}
 
-	// A500 one-pole 6db/oct static RC low-pass filter:
+	// A500 1-pole (6db/oct) static RC low-pass filter:
 	R = 360.0; // R321 (360 ohm resistor)
 	C = 1e-7;  // C321 (0.1uF capacitor)
 	fc = 1.0 / (2.0 * M_PI * R * C);
@@ -1161,7 +1191,7 @@ static void calculateFilterCoeffs(void)
 	fb = 0.125; // Fb = 0.125 : Q ~= 1/sqrt(2)
 	calcLEDFilterCoeffs(audio.outputRate, fc, fb, &filterLED);
 
-	// A1200 one-pole 6db/oct static RC high-pass filter:
+	// A1200 1-pole (6db/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.2e-5; // C334 (22uF capacitor)
 	fc = 1.0 / (2.0 * M_PI * R * C);

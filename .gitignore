@@ -19,3 +19,5 @@ vs2019_project/pt2-clone/x64/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
 *.opendb
 *.cod
 vs2019_project/pt2-clone/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
+*.db-wal
+*.db-shm

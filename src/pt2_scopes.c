@@ -35,89 +35,81 @@ void resetCachedScopePeriod(void)
 	oldPeriod = -1;
 }
 
-int32_t getSampleReadPos(int32_t ch, uint8_t smpNum)
+// this is quite hackish, but fixes sample swapping issues
+static int32_t getSampleSlotFromReadAddress(const int8_t *sampleReadAddress)
 {
-	const int8_t *data;
-	volatile bool active;
-	volatile int32_t pos;
-	volatile scope_t *sc;
+	assert(song != NULL);
+	const int8_t *sampleData = song->sampleData;
+	const int32_t sampleSlotSize = MAX_SAMPLE_LEN;
 
-	moduleSample_t *s;
-	
-	sc = &scope[ch];
-
-	// cache some stuff
-	active = sc->active;
-	data = sc->data;
-	pos = sc->pos;
-
-	if (!active || data == NULL || pos <= 2) // pos 0..2 = sample loop area for non-looping samples
+	if (sampleData == NULL) // shouldn't really happen, but just in case
 		return -1;
 
-	s = &song->samples[smpNum];
+	int32_t sampleSlot = 30; // start at last slot
 
-	// hackish way of getting real scope/sampling position
-	pos = (int32_t)(&data[pos] - &song->sampleData[s->offset]);
-	if (pos < 0 || pos >= s->length)
-		return -1;
+	const int8_t *sampleBaseAddress = &sampleData[sampleSlot * sampleSlotSize];
+	if (sampleReadAddress == NULL || sampleReadAddress >= sampleBaseAddress+sampleSlotSize)
+		return -1; // out of range
 
-	return pos;
-}
-
-void scopeSetVolume(int32_t ch, uint16_t vol)
-{
-	vol &= 127; // confirmed behavior on real Amiga
-
-	if (vol > 64)
-		vol = 64; // confirmed behavior on real Amiga
-
-	scope[ch].volume = (uint8_t)vol;
-}
-
-void scopeSetPeriod(int32_t ch, uint16_t period)
-{
-	int32_t realPeriod;
-
-	if (period == 0)
-		realPeriod = 1+65535; // confirmed behavior on real Amiga
-	else if (period < 113)
-		realPeriod = 113; // close to what happens on real Amiga (and needed for BLEP synthesis)
-	else
-		realPeriod = period;
-
-	// if the new period was the same as the previous period, use cached deltas
-	if (realPeriod != oldPeriod)
+	for (; sampleSlot >= 0; sampleSlot--)
 	{
-		oldPeriod = realPeriod;
+		if (sampleReadAddress >= sampleBaseAddress)
+			break;
 
-		// this period is not cached, calculate scope delta
+		sampleBaseAddress -= sampleSlotSize;
+	}
 
+	return sampleSlot; // 0..30, or -1 if out of range
+}
+
+int32_t getSampleReadPos(int32_t ch) // used for the sampler screen
+{
+	// cache some stuff
+	const scope_t *sc = &scope[ch];
+	const bool active = sc->active;
+	const int8_t *data = sc->data;
+	const int32_t pos = sc->pos;
+	const int32_t len = sc->length;
+
+	if (song == NULL || !active || data == NULL)
+		return -1;
+
+	/* Because the scopes work like the Paula emulation, we have a DATA
+	** and LENGTH variable, which are not static. This means that we have
+	** to get creative to get the absolute sampling position.
+	*/
+
+	int32_t sample = getSampleSlotFromReadAddress(data);
+	if (sample != editor.currSample)
+		return -1; // sample is not the one we're seeing in the sampler screen
+
+	const moduleSample_t *s = &song->samples[sample];
+	const int8_t *sampleReadAddress = &data[pos];
+	const int8_t *sampleBaseAddress = &song->sampleData[s->offset];
+	const int32_t realPos = (int32_t)(sampleReadAddress - sampleBaseAddress);
+
+	// return -1 if sample has no loop and read length is 2 (playing sample "loop" area)
+	const bool loopEnabled = (s->loopStart + s->loopLength) > 2;
+	if (!loopEnabled && len == 2)
+		return -1;
+
+	if (realPos < 0 || realPos >= s->length)
+		return -1;
+
+	return realPos;
+}
+
+void scopeSetPeriod(int32_t ch, int32_t period)
+{
+	// if the new period was the same as the previous period, use cached deltas
+	if (period != oldPeriod)
+	{
+		oldPeriod = period;
 		const float fPeriodToScopeDeltaDiv = PAULA_PAL_CLK / (float)SCOPE_HZ;
-		fOldScopeDelta = fPeriodToScopeDeltaDiv / realPeriod;
+		fOldScopeDelta = fPeriodToScopeDeltaDiv / period;
 	}
 
 	scope[ch].fDelta = fOldScopeDelta;
-}
-
-void scopeSetData(int32_t ch, const int8_t *src)
-{
-	// set voice data
-	if (src == NULL)
-		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
-
-	scope[ch].newData = src;
-}
-
-void scopeSetLength(int32_t ch, uint16_t len)
-{
-	if (len == 0)
-	{
-		len = 65535;
-		/* Confirmed behavior on real Amiga (also needed for safety).
-		** And yes, we have room for this, it will never overflow!
-		*/
-	}
-	scope[ch].newLength = len << 1;
 }
 
 void scopeTrigger(int32_t ch)
@@ -127,11 +119,11 @@ void scopeTrigger(int32_t ch)
 
 	const int8_t *newData = tempState.newData;
 	if (newData == NULL)
-		newData = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // dummy sample
+		newData = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
-	int32_t newLength = tempState.newLength;
+	int32_t newLength = tempState.newLength; // in bytes, not words
 	if (newLength < 2)
-		newLength = 2;
+		newLength = 2; // for safety
 
 	tempState.fPhase = 0.0f;
 	tempState.pos = 0;
@@ -180,7 +172,7 @@ void updateScopes(void)
 			tempState.pos -= tempState.length;
 
 			tempState.length = tempState.newLength;
-			if (tempState.length > 0)
+			if (tempState.pos >= tempState.length && tempState.length > 0)
 				tempState.pos %= tempState.length;
 
 			tempState.data = tempState.newData;
@@ -202,7 +194,7 @@ static void updateRealVuMeters(void)
 	// sink VU-meters first
 	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
-		editor.realVuMeterVolumes[i] -= 3;
+		editor.realVuMeterVolumes[i] -= 4;
 		if (editor.realVuMeterVolumes[i] < 0)
 			editor.realVuMeterVolumes[i] = 0;
 	}
@@ -260,41 +252,34 @@ static void updateRealVuMeters(void)
 
 void drawScopes(void)
 {
-	int16_t scopeData;
-	int32_t i, x;
-	uint32_t *scopeDrawPtr;
-	volatile scope_t *sc;
-	scope_t tmpScope;
+	volatile scope_t *sc = scope; // cache it
+	int32_t scopeX = 128;
 
-	scopeDrawPtr = &video.frameBuffer[(71 * SCREEN_W) + 128];
-
+	const uint32_t bgColor = video.palette[PAL_BACKGRD];
 	const uint32_t fgColor = video.palette[PAL_QADSCP];
 
-	sc = scope;
-
 	scopesDisplayingFlag = true;
-	for (i = 0; i < AMIGA_VOICES; i++, sc++)
+	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
 	{
-		tmpScope = *sc; // cache it
+		scope_t tmpScope = *sc; // cache it
 
 		// render scope
 		if (tmpScope.active && tmpScope.data != NULL && tmpScope.volume != 0 && tmpScope.length > 0)
 		{
-			// scope is active
-
 			sc->emptyScopeDrawn = false;
 
 			// fill scope background
-			fillRect(128 + (i * (SCOPE_WIDTH + 8)), 55, SCOPE_WIDTH, SCOPE_HEIGHT, video.palette[PAL_BACKGRD]);
+			fillRect(scopeX, 55, SCOPE_WIDTH, SCOPE_HEIGHT, bgColor);
 
 			// render scope data
-
+			int16_t scopeData;
 			int32_t pos = tmpScope.pos;
 			int32_t length = tmpScope.length;
 			const int16_t volume = -(tmpScope.volume << 7);
 			const int8_t *data = tmpScope.data;
+			uint32_t *scopeDrawPtr = &video.frameBuffer[(71 * SCREEN_W) + scopeX];
 
-			for (x = 0; x < SCOPE_WIDTH; x++)
+			for (int32_t x = 0; x < SCOPE_WIDTH; x++)
 			{
 				scopeData = 0;
 				if (data != NULL)
@@ -302,37 +287,30 @@ void drawScopes(void)
 
 				scopeDrawPtr[(scopeData * SCREEN_W) + x] = fgColor;
 
-				pos++;
-				if (pos >= length)
+				if (++pos >= length)
 				{
 					pos = 0;
 
-					/* Read cycle done, temporarily update the display data/length variables
-					** before the scope thread does it.
-					*/
+					// read cycle done, update the drawing data/length variables
 					length = tmpScope.newLength;
 					data = tmpScope.newData;
 				}
 			}
 		}
-		else
+		else if (!sc->emptyScopeDrawn)
 		{
-			// scope is inactive, draw empty scope once until it gets active again
+			// scope is inactive (or vol=0), draw empty scope once until it gets active again
 
-			if (!sc->emptyScopeDrawn)
-			{
-				// fill scope background
-				fillRect(128 + (i * (SCOPE_WIDTH + 8)), 55, SCOPE_WIDTH, SCOPE_HEIGHT, video.palette[PAL_BACKGRD]);
+			// fill scope background
+			fillRect(scopeX, 55, SCOPE_WIDTH, SCOPE_HEIGHT, bgColor);
 
-				// draw scope line
-				for (x = 0; x < SCOPE_WIDTH; x++)
-					scopeDrawPtr[x] = fgColor;
+			// draw scope line
+			hLine(scopeX, 71, SCOPE_WIDTH, fgColor);
 
-				sc->emptyScopeDrawn = true;
-			}
+			sc->emptyScopeDrawn = true;
 		}
 
-		scopeDrawPtr += SCOPE_WIDTH+8;
+		scopeX += SCOPE_WIDTH+8;
 	}
 	scopesDisplayingFlag = false;
 }

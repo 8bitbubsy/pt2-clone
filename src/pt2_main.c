@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
 
 	setupSprites();
 
-	song = createNewMod();
+	song = createEmptyMod();
 	if (song == NULL)
 	{
 		cleanUp();
@@ -327,6 +327,7 @@ int main(int argc, char *argv[])
 	setupWaitVBL();
 	while (editor.programRunning)
 	{
+		sinkVisualizerBars();
 		updateChannelSyncBuffer();
 		readMouseXY();
 		readKeyModifiers(); // set/clear CTRL/ALT/SHIFT/AMIGA key states
@@ -342,7 +343,6 @@ int main(int argc, char *argv[])
 
 		renderFrame();
 		flipFrame();
-		sinkVisualizerBars();
 	}
 
 	cleanUp();

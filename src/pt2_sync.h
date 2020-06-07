@@ -6,13 +6,15 @@
 
 enum // flags
 {
-	UPDATE_VOLUME = 1,
-	UPDATE_PERIOD = 2,
-	TRIGGER_SAMPLE = 4,
-	UPDATE_DATA = 8,
-	UPDATE_LENGTH = 16,
-	UPDATE_VUMETER = 32,
-	UPDATE_ANALYZER = 64
+	SET_SCOPE_VOLUME = 1,
+	SET_SCOPE_PERIOD = 2,
+	SET_SCOPE_DATA = 4,
+	SET_SCOPE_LENGTH = 8,
+	TRIGGER_SCOPE = 16,
+	STOP_SCOPE = 32,
+
+	UPDATE_VUMETER = 64,
+	UPDATE_ANALYZER = 128
 };
 
 // 2^n-1 - don't change this! Queue buffer is already ~1MB in size
@@ -22,9 +24,10 @@ typedef struct syncedChannel_t
 {
 	uint8_t flags;
 	const int8_t *triggerData, *newData;
-	uint16_t triggerLength, newLength;
+	int32_t triggerLength, newLength;
 	uint8_t volume, vuVolume, analyzerVolume;
-	uint16_t period, analyzerPeriod;
+	uint16_t analyzerPeriod;
+	int32_t period;
 } syncedChannel_t;
 
 typedef struct chSyncData_t

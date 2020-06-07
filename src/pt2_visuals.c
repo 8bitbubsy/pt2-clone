@@ -2186,10 +2186,10 @@ void sinkVisualizerBars(void)
 {
 	int32_t i;
 
-	// sink stuff @ 50Hz rate
+	// sink stuff @ 49.92Hz (Amiga PAL) rate
 
 	static uint64_t counter50Hz;
-	const uint64_t counter50HzDelta = ((uint64_t)AMIGA_PAL_VBLANK_HZ << 32) / VBLANK_HZ;
+	const uint64_t counter50HzDelta = (uint64_t)(((UINT32_MAX + 1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
 
 	counter50Hz += counter50HzDelta; // 32.32 fixed-point counter
 	if (counter50Hz > 0xFFFFFFFF)

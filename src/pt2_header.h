@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.17"
+#define PROG_VER_STR "1.18"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -36,13 +36,13 @@
 */
 #define VBLANK_HZ 60
 
-/* Scopes are clocked at 64Hz instead of 60Hz to prevent +/- interference
-** from monitors not being exactly 60Hz (and unstable non-vsync mode).
-** Sadly the scopes might midly flicker from this.
+/* Scopes are clocked at 64Hz instead of 60Hz to prevent the small +/- Hz 
+** interference from monitors not being exactly 60Hz (and unstable non-vsync mode).
+** Sadly, the scopes might midly flicker from this in some cases.
 */
 #define SCOPE_HZ 64
 
-#define AMIGA_PAL_VBLANK_HZ 50
+#define AMIGA_PAL_VBLANK_HZ 49.9204092835
 
 #define FONT_BMP_WIDTH 
 #define FONT_CHAR_W 8 // actual data length is 7, includes right spacing (1px column)
@@ -54,7 +54,9 @@
 #define MAX_PATTERNS 100
 
 #define MAX_SAMPLE_LEN 65534
-#define RESERVED_SAMPLE_OFFSET (31 * MAX_SAMPLE_LEN)
+
+// for NULL pointers
+#define RESERVED_SAMPLE_OFFSET ((31+1) * MAX_SAMPLE_LEN)
 
 #define AMIGA_VOICES 4
 #define SCOPE_WIDTH 40
@@ -65,11 +67,15 @@
 
 #define POSED_LIST_SIZE 12
 
+
 // main crystal oscillator
 #define AMIGA_PAL_XTAL_HZ 28375160
 
 #define PAULA_PAL_CLK (AMIGA_PAL_XTAL_HZ / 8)
 #define CIA_PAL_CLK (AMIGA_PAL_XTAL_HZ / 40)
+
+#define PAL_PAULA_MIN_SAFE_PERIOD 124
+#define PAL_PAULA_MAX_SAFE_HZ (PAULA_PAL_CLK / (double)PAL_PAULA_MIN_SAFE_PERIOD)
 
 #define FILTERS_BASE_FREQ (PAULA_PAL_CLK / 214.0)
 
@@ -206,6 +212,8 @@ enum
 	TEXT_EDIT_DECIMAL = 1,
 	TEXT_EDIT_HEX = 2
 };
+
+int8_t *allocMemForAllSamples(void); // pt2_replayer.c
 
 void restartSong(void);
 void resetSong(void);
