@@ -1757,12 +1757,8 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 
 			if (ID == 0x45564157) // "WAVE"
 			{
-				fread(&ID, 4, 1, f);
-				if (ID == 0x20746D66) // "fmt "
-				{
-					fclose(f);
-					return loadWAVSample(fileName, entryName, -1);
-				}
+				fclose(f);
+				return loadWAVSample(fileName, entryName, -1);
 			}
 		}	
 		else if (ID == 0x4D524F46) // "FORM"
