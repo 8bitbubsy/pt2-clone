@@ -48,7 +48,7 @@ static int8_t defStereoSep;
 static bool amigaPanFlag;
 static uint16_t ch1Pan, ch2Pan, ch3Pan, ch4Pan;
 static int32_t oldPeriod = -1, randSeed = INITIAL_DITHER_SEED;
-static uint32_t sampleCounter, audLatencyPerfValInt, audLatencyPerfValFrac;
+static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
 static double dPrngStateL, dPrngStateR;
@@ -62,7 +62,6 @@ static uint32_t tickTimeLen, tickTimeLenFrac;
 
 // globalized
 audio_t audio;
-uint32_t samplesPerTick;
 paulaVoice_t paula[AMIGA_VOICES];
 
 bool intMusic(void); // defined in pt_modplayer.c
@@ -95,26 +94,16 @@ void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac)
 	tickTimeLenFrac = timeLenFrac;
 }
 
-static uint16_t bpm2SmpsPerTick(int32_t bpm, double dAudioFreq)
-{
-	if (bpm == 0)
-		return 0;
-
-	const int32_t ciaVal = (int32_t)(1773447 / bpm); // yes, PT truncates here
-	const double dCiaHz = (double)CIA_PAL_CLK / ciaVal;
-
-	int32_t smpsPerTick = (int32_t)((dAudioFreq / dCiaHz) + 0.5); // rounded
-	return (uint16_t)smpsPerTick;
-}
-
 static void generateBpmTables(void)
 {
 	for (int32_t i = 32; i <= 255; i++)
 	{
-		audio.bpmTab[i-32] = bpm2SmpsPerTick(i, audio.outputRate);
-		audio.bpmTab28kHz[i-32] = bpm2SmpsPerTick(i, PAT2SMP_HI_FREQ); // PAT2SMP hi quality
-		audio.bpmTab22kHz[i-32] = bpm2SmpsPerTick(i, PAT2SMP_LO_FREQ); // PAT2SMP low quality
-		audio.bpmTabMod2Wav[i-32] = bpm2SmpsPerTick(i, MOD2WAV_FREQ); // MOD2WAV
+		const double dBpmHz = i / 2.5;
+
+		audio.bpmTab[i-32] = audio.outputRate / dBpmHz;
+		audio.bpmTab28kHz[i-32] = PAT2SMP_HI_FREQ / dBpmHz; // PAT2SMP hi quality
+		audio.bpmTab22kHz[i-32] = PAT2SMP_LO_FREQ / dBpmHz; // PAT2SMP low quality
+		audio.bpmTabMod2Wav[i-32] = MOD2WAV_FREQ / dBpmHz; // MOD2WAV
 	}
 }
 
@@ -1065,21 +1054,18 @@ static void fillVisualsSyncBuffer(void)
 
 static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 {
-	int16_t *streamOut;
-	uint32_t samplesLeft;
-
 	if (audio.forceMixerOff) // during MOD2WAV
 	{
 		memset(stream, 0, len);
 		return;
 	}
 
-	streamOut = (int16_t *)stream;
+	int16_t *streamOut = (int16_t *)stream;
 
-	samplesLeft = len >> 2;
+	int32_t samplesLeft = len >> 2;
 	while (samplesLeft > 0)
 	{
-		if (sampleCounter == 0)
+		if (audio.dTickSampleCounter <= 0.0)
 		{
 			// new replayer tick
 
@@ -1089,18 +1075,20 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 				fillVisualsSyncBuffer();
 			}
 
-			sampleCounter = samplesPerTick;
+			audio.dTickSampleCounter += audio.dSamplesPerTick;
 		}
 
-		uint32_t samplesTodo = sampleCounter;
-		if (samplesTodo > samplesLeft)
-			samplesTodo = samplesLeft;
+		const int32_t remainingTick = (int32_t)ceil(audio.dTickSampleCounter);
 
-		outputAudio(streamOut, samplesTodo);
-		streamOut += samplesTodo << 1;
+		int32_t samplesToMix = samplesLeft;
+		if (samplesToMix > remainingTick)
+			samplesToMix = remainingTick;
 
-		samplesLeft -= samplesTodo;
-		sampleCounter -= samplesTodo;
+		outputAudio(streamOut, samplesToMix);
+		streamOut += samplesToMix << 1;
+
+		samplesLeft -= samplesToMix;
+		audio.dTickSampleCounter -= samplesToMix;
 	}
 
 	(void)userdata;
@@ -1254,11 +1242,11 @@ bool setupAudio(void)
 	** won't overflow.
 	*/
 
-	uint32_t maxSamplesToMix;
+	int32_t maxSamplesToMix;
 	if (MOD2WAV_FREQ > audio.outputRate)
-		maxSamplesToMix = audio.bpmTabMod2Wav[32-32]; // BPM 32
+		maxSamplesToMix = (int32_t)ceil(audio.bpmTabMod2Wav[32-32]); // BPM 32
 	else
-		maxSamplesToMix = audio.bpmTab[32-32]; // BPM 32
+		maxSamplesToMix = (int32_t)ceil(audio.bpmTab[32-32]); // BPM 32
 
 	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
 	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
@@ -1278,15 +1266,17 @@ bool setupAudio(void)
 	filterFlags = config.a500LowPassFilter ? FILTER_A500 : 0;
 	calculateFilterCoeffs();
 
-	samplesPerTick = audio.bpmTab[125-32]; // BPM 125
-	sampleCounter = 0;
+	audio.dSamplesPerTick = audio.bpmTab[125-32]; // BPM 125
+	audio.dTickSampleCounter = 0;
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
-	for (int32_t i = 0; i < 256-32; i++)
+
+	audio.tickTimeLengthTab[0] = UINT64_MAX;
+	const double dMul = (editor.dPerfFreq / audio.outputRate) * (UINT32_MAX + 1.0);
+	for (int32_t i = 1; i < 256-32; i++)
 	{
 		// number of samples per tick -> tick length for performance counter (syncing visuals to audio)
-		const double dTickTimeLenMul = (editor.dPerfFreq / audio.outputRate) * (UINT32_MAX + 1.0);
-		audio.tickTimeLengthTab[i] = (uint64_t)(audio.bpmTab[i] * dTickTimeLenMul);
+		audio.tickTimeLengthTab[i] = (uint64_t)(audio.bpmTab[i] * dMul);
 	}
 
 	audio.resetSyncTickTimeFlag = true;
@@ -1314,16 +1304,6 @@ void audioClose(void)
 		free(dMixBufferRUnaligned);
 		dMixBufferRUnaligned = NULL;
 	}
-}
-
-void mixerSetSamplesPerTick(uint32_t val)
-{
-	samplesPerTick = val;
-}
-
-void mixerClearSampleCounter(void)
-{
-	sampleCounter = 0;
 }
 
 void toggleAmigaPanMode(void)

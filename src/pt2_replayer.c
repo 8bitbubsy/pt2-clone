@@ -977,8 +977,8 @@ bool intMusic(void)
 	uint16_t *patt;
 	moduleChannel_t *c;
 
-	if (modBPM > 0)
-		editor.musicTime += (65536 / modBPM); // for playback counter
+	if (modBPM >= 32 && modBPM <= 255)
+		editor.musicTime64 += musicTimeTab64[modBPM-32]; // for playback counter
 
 	if (updateUIPositions)
 	{
@@ -1181,8 +1181,6 @@ void modSetPos(int16_t order, int16_t row)
 
 void modSetTempo(uint16_t bpm, bool doLockAudio)
 {
-	uint32_t smpsPerTick;
-
 	if (bpm < 32)
 		return;
 
@@ -1200,14 +1198,15 @@ void modSetTempo(uint16_t bpm, bool doLockAudio)
 
 	bpm -= 32; // 32..255 -> 0..223
 
+	double dSamplesPerTick;
 	if (editor.isSMPRendering)
-		smpsPerTick = editor.pat2SmpHQ ? audio.bpmTab28kHz[bpm] : audio.bpmTab22kHz[bpm];
+		dSamplesPerTick = editor.pat2SmpHQ ? audio.bpmTab28kHz[bpm] : audio.bpmTab22kHz[bpm];
 	else if (editor.isWAVRendering)
-		smpsPerTick = audio.bpmTabMod2Wav[bpm];
+		dSamplesPerTick = audio.bpmTabMod2Wav[bpm];
 	else
-		smpsPerTick = audio.bpmTab[bpm];
+		dSamplesPerTick = audio.bpmTab[bpm];
 
-	mixerSetSamplesPerTick(smpsPerTick);
+	audio.dSamplesPerTick = dSamplesPerTick;
 
 	// calculate tick time length for audio/video sync timestamp
 	const uint64_t tickTimeLen64 = audio.tickTimeLengthTab[bpm];
@@ -1251,7 +1250,7 @@ void playPattern(int8_t startRow)
 	if (!editor.stepPlayEnabled)
 		pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 
-	mixerClearSampleCounter();
+	audio.dTickSampleCounter = 0.0; // zero tick sample counter so that it will instantly initiate a tick
 
 	song->currRow = song->row = startRow & 0x3F;
 	song->tick = song->speed;
@@ -1290,9 +1289,13 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 {
 	uint8_t oldPlayMode, oldMode;
 
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	doStopIt(false);
 	turnOffVoices();
-	mixerClearSampleCounter();
+	audio.dTickSampleCounter = 0.0; // zero tick sample counter so that it will instantly initiate a tick
 
 	if (row != -1)
 	{
@@ -1347,7 +1350,10 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	modHasBeenPlayed = false;
 	editor.songPlaying = true;
 	editor.didQuantize = false;
-	editor.musicTime = 0;
+	editor.musicTime64 = 0;
+
+	if (audioWasntLocked)
+		unlockAudio();
 
 	if (!editor.isSMPRendering && !editor.isWAVRendering)
 	{
@@ -1381,7 +1387,7 @@ void clearSong(void)
 	editor.f9Pos = 48;
 	editor.f10Pos = 63;
 
-	editor.musicTime = 0;
+	editor.musicTime64 = 0;
 
 	editor.metroFlag = false;
 	editor.currSample = 0;

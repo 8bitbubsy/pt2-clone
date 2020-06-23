@@ -17,6 +17,7 @@ extern const uint8_t vibratoTable[32];
 extern const uint8_t arpTickTable[32];
 extern const int16_t periodTable[(37*16)+15];
 extern int8_t pNoteTable[32];
+extern const uint64_t musicTimeTab64[256-32];
 
 // changable by config file
 extern uint16_t analyzerColors[36];

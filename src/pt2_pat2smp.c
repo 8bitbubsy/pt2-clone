@@ -14,7 +14,6 @@
 #include "pt2_textout.h"
 
 bool intMusic(void); // pt_modplayer.c
-extern uint32_t samplesPerTick; // pt_audio.c
 void storeTempVariables(void); // pt_modplayer.c
 
 void doPat2Smp(void)
@@ -36,8 +35,7 @@ void doPat2Smp(void)
 		return;
 	}
 
-	int8_t oldRow = editor.songPlaying ? 0 : song->currRow;
-	uint32_t oldSamplesPerTick = samplesPerTick;
+	const int8_t oldRow = editor.songPlaying ? 0 : song->currRow;
 
 	editor.isSMPRendering = true; // this must be set before restartSong()
 	storeTempVariables();
@@ -51,21 +49,28 @@ void doPat2Smp(void)
 	modSetTempo(song->currBPM, true);
 	editor.pat2SmpPos = 0;
 
+	double dTickSamples = audio.dSamplesPerTick;
+
 	editor.smpRenderingDone = false;
 	while (!editor.smpRenderingDone)
 	{
-		if (!intMusic())
+		const int32_t tickSamples = (int32_t)dTickSamples;
+
+		const bool ended = !intMusic() || !editor.songPlaying;
+		outputAudio(NULL, tickSamples);
+
+		dTickSamples -= tickSamples; // keep fractional part
+		dTickSamples += audio.dSamplesPerTick;
+
+		if (ended)
 			editor.smpRenderingDone = true;
 
-		outputAudio(NULL, samplesPerTick);
 	}
 	editor.isSMPRendering = false;
 	resetSong();
 
-	// set back old row and samplesPerTick
-	song->row = oldRow;
-	song->currRow = song->row;
-	mixerSetSamplesPerTick(oldSamplesPerTick);
+	// set back old row
+	song->currRow = song->row = oldRow;
 
 	normalize16bitSigned(editor.pat2SmpBuf, MIN(editor.pat2SmpPos, MAX_SAMPLE_LEN));
 

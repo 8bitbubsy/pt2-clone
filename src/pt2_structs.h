@@ -178,7 +178,8 @@ typedef struct editor_t
 	uint16_t effectMacros[10], oldTempo, currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	uint16_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
 	int32_t modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos;
-	uint32_t musicTime, vblankTimeLen, vblankTimeLenFrac;
+	uint32_t vblankTimeLen, vblankTimeLenFrac;
+	uint64_t musicTime64;
 	double dPerfFreq, dPerfFreqMulMicro;
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
 	note_t patternBuffer[MOD_ROWS * AMIGA_VOICES], undoBuffer[MOD_ROWS * AMIGA_VOICES];

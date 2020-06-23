@@ -19,20 +19,18 @@
 
 void storeTempVariables(void); // pt_modplayer.c
 bool intMusic(void); // pt_modplayer.c
-extern uint32_t samplesPerTick; // pt_audio.c
 
 static volatile bool wavRenderingDone;
 static int16_t *mod2WavBuffer;
 
 static void calcMod2WavTotalRows(void);
 
-static uint32_t getAudioFrame(int16_t *outStream)
+static void renderSamples(int32_t samplesPerTick, int16_t *outStream)
 {
 	if (!intMusic())
 		wavRenderingDone = true;
 
 	outputAudio(outStream, samplesPerTick);
-	return samplesPerTick;
 }
 
 static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
@@ -50,6 +48,8 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	uint8_t loopCounter = 8;
 	uint32_t totalSampleCounter = 0;
 
+	double dTickSamples = audio.dSamplesPerTick;
+
 	bool renderDone = false;
 	while (!renderDone)
 	{
@@ -59,18 +59,21 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 		int16_t *ptr16 = mod2WavBuffer;
 		for (uint32_t i = 0; i < TICKS_PER_RENDER_CHUNK; i++)
 		{
-			if (!editor.isWAVRendering || wavRenderingDone || editor.abortMod2Wav)
+			if (!editor.isWAVRendering || wavRenderingDone || editor.abortMod2Wav || !editor.songPlaying)
 			{
 				renderDone = true;
 				break;
 			}
 
-			uint32_t tickSamples = getAudioFrame(ptr16) << 1; // *2 for stereo
+			int32_t tickSamples = (int32_t)dTickSamples;
+			renderSamples(tickSamples, ptr16);
+			
+			dTickSamples -= tickSamples; // keep fractional part
+			dTickSamples += audio.dSamplesPerTick;
 
+			tickSamples *= 2; // stereo
 			samplesInChunk += tickSamples;
 			totalSampleCounter += tickSamples;
-
-			// increase buffer pointer
 			ptr16 += tickSamples;
 
 			if (++loopCounter >= 8)
@@ -154,7 +157,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 		return false;
 	}
 
-	const uint32_t maxSamplesToMix = TICKS_PER_RENDER_CHUNK * audio.bpmTabMod2Wav[32-32]; // BPM 32, stereo
+	const int32_t maxSamplesToMix = (int32_t)ceil(TICKS_PER_RENDER_CHUNK * audio.bpmTabMod2Wav[32-32]); // BPM 32, stereo
 
 	mod2WavBuffer = (int16_t *)malloc(maxSamplesToMix * (2 * sizeof (int16_t)));
 	if (mod2WavBuffer == NULL)

@@ -938,7 +938,7 @@ void setupLoadedMod(void)
 
 	editor.editMoveAdd = 1;
 	editor.currSample = 0;
-	editor.musicTime = 0;
+	editor.musicTime64 = 0;
 	editor.modLoaded = true;
 	editor.blockMarkFlag = false;
 	editor.sampleZero = false;

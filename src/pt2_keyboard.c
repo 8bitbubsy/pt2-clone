@@ -30,6 +30,7 @@
 #include "pt2_config.h"
 #include "pt2_sampling.h"
 
+
 #if defined _WIN32 && !defined _DEBUG
 extern bool windowsKeyIsDown;
 extern HHOOK g_hKeyboardHook;
@@ -3198,10 +3199,17 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		{
 			if (ui.editTextFlag)
 			{
-				if (keyb.repeatCounter >= 4)
+				if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
 				{
-					keyb.repeatCounter = 0;
-					textCharPrevious();
+					if (keyb.repeatCounter >= 3)
+					{
+						keyb.repeatCounter = 0;
+						textCharPrevious();
+					}
+				}
+				else
+				{
+					keyb.delayCounter++;
 				}
 			}
 			else
@@ -3248,10 +3256,17 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		{
 			if (ui.editTextFlag)
 			{
-				if (keyb.repeatCounter >= 4)
+				if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
 				{
-					keyb.repeatCounter = 0;
-					textCharNext();
+					if (keyb.repeatCounter >= 3)
+					{
+						keyb.repeatCounter = 0;
+						textCharNext();
+					}
+				}
+				else
+				{
+					keyb.delayCounter++;
 				}
 			}
 			else
@@ -3406,10 +3421,18 @@ void handleKeyRepeat(SDL_Scancode scancode)
 			if (ui.editTextFlag)
 			{
 				// only repeat backspace while editing texts
-				if (keyb.repeatCounter >= 3)
+
+				if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
 				{
-					keyb.repeatCounter = 0;
-					keyDownHandler(scancode, 0);
+					if (keyb.repeatCounter >= 3)
+					{
+						keyb.repeatCounter = 0;
+						keyDownHandler(scancode, 0);
+					}
+				}
+				else
+				{
+					keyb.delayCounter++;
 				}
 			}
 		}
@@ -4202,7 +4225,7 @@ bool handleTextEditMode(SDL_Scancode scancode)
 					keyb.delayCounter = 0;
 
 				keyb.repeatKey = true;
-				keyb.delayKey = false;
+				keyb.delayKey = true;
 
 				updateTextObject(ui.editObject);
 			}

@@ -507,7 +507,7 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 void updateSongInfo2(void) // two middle rows of screen, always present
 {
 	char tempChar;
-	int32_t secs, MI_TimeM, MI_TimeS, x, i;
+	int32_t x, i;
 	moduleSample_t *currSample;
 
 	if (ui.updateStatusText)
@@ -601,13 +601,15 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 
 	// playback timer
 
-	secs = ((editor.musicTime >> 8) * 5) >> 9;
-	secs -= ((secs / 3600) * 3600);
+	const uint32_t milliseconds = editor.musicTime64 >> 32;
+	uint32_t seconds = milliseconds / 1000;
 
-	if (secs <= 5999) // below 99 minutes 59 seconds
+	seconds -= ((seconds / 3600) * 3600); // remove hours
+	if (seconds <= 5999) // below 99 minutes 59 seconds
 	{
-		MI_TimeM = secs / 60;
-		MI_TimeS = secs - (MI_TimeM * 60);
+		uint32_t MI_TimeM = seconds / 60;
+		seconds -= MI_TimeM * 60; // remove minutes
+		uint32_t MI_TimeS = seconds;
 
 		// xx:xx
 		printTwoDecimalsBg(272, 102, MI_TimeM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);

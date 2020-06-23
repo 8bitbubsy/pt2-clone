@@ -18,9 +18,11 @@ typedef struct audio_t
 	volatile bool locked, isSampling;
 
 	bool forceMixerOff;
-	uint16_t bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32], bpmTabMod2Wav[256-32];
+	double bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32], bpmTabMod2Wav[256-32];
 	uint32_t outputRate, audioBufferSize;
 	double dPeriodToDeltaDiv;
+
+	double dSamplesPerTick, dTickSampleCounter;
 
 	// for audio sampling
 	bool rescanAudioDevicesSupported;
@@ -75,8 +77,6 @@ void mixerUpdateLoops(void);
 void mixerKillVoice(int32_t ch);
 void turnOffVoices(void);
 void mixerCalcVoicePans(uint8_t stereoSeparation);
-void mixerSetSamplesPerTick(uint32_t val);
-void mixerClearSampleCounter(void);
 void outputAudio(int16_t *target, int32_t numSamples);
 
 extern audio_t audio; // pt2_audio.c
