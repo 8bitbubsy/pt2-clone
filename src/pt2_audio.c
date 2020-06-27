@@ -1267,7 +1267,7 @@ bool setupAudio(void)
 	calculateFilterCoeffs();
 
 	audio.dSamplesPerTick = audio.bpmTab[125-32]; // BPM 125
-	audio.dTickSampleCounter = 0;
+	audio.dTickSampleCounter = 0.0;
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 

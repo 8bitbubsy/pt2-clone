@@ -601,15 +601,13 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 
 	// playback timer
 
-	const uint32_t milliseconds = editor.musicTime64 >> 32;
-	uint32_t seconds = milliseconds / 1000;
+	const uint32_t ms1024 = editor.musicTime64 >> 32; // milliseconds (scaled from 1000 to 1024)
 
-	seconds -= ((seconds / 3600) * 3600); // remove hours
-	if (seconds <= 5999) // below 99 minutes 59 seconds
+	uint32_t seconds = ms1024 >> 10;
+	if (seconds <= 5999) // below 100 minutes (99:59 is max for the UI)
 	{
-		uint32_t MI_TimeM = seconds / 60;
-		seconds -= MI_TimeM * 60; // remove minutes
-		uint32_t MI_TimeS = seconds;
+		const uint32_t MI_TimeM = seconds / 60;
+		const uint32_t MI_TimeS = seconds - (MI_TimeM * 60);
 
 		// xx:xx
 		printTwoDecimalsBg(272, 102, MI_TimeM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
