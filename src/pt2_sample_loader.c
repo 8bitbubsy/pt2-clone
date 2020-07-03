@@ -31,12 +31,12 @@ enum
 	WAV_FORMAT_IEEE_FLOAT = 0x0003
 };
 
+static bool loadedFileWasAIFF;
+
 static bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling);
 static bool loadIFFSample(UNICHAR *fileName, char *entryName);
 static bool loadRAWSample(UNICHAR *fileName, char *entryName);
 static bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling);
-
-static bool loadedFileWasAIFF;
 
 static bool lowPassSample8Bit(int8_t *buffer, int32_t length, int32_t sampleFrequency, double cutoff)
 {

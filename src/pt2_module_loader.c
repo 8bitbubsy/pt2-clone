@@ -37,6 +37,7 @@ typedef struct mem_t
 
 static bool oldAutoPlay;
 static char oldFullPath[(PATH_MAX * 2) + 2];
+static int32_t realSampleLengths[MOD_SAMPLES];
 static uint32_t oldFullPathLen;
 
 static MEMFILE *mopen(const uint8_t *src, uint32_t length);
@@ -310,7 +311,8 @@ module_t *modLoad(UNICHAR *fileName)
 			fixZeroesInString(s->text, 22);
 		}
 
-		s->length = (uint16_t)(((mgetc(m) << 8) | mgetc(m)) * 2);
+		realSampleLengths[i] = ((mgetc(m) << 8) | mgetc(m)) * 2;
+		s->length = (realSampleLengths[i] > MAX_SAMPLE_LEN) ? MAX_SAMPLE_LEN : (uint16_t)realSampleLengths[i];
 
 		/* Only late versions of Ultimate SoundTracker could have samples larger than 9999 bytes.
 		** If found, we know for sure that this is a late STK module.
@@ -601,8 +603,6 @@ module_t *modLoad(UNICHAR *fileName)
 	s = newMod->samples;
 	for (i = 0; i < numSamples; i++, s++)
 	{
-		uint32_t bytesToSkip = 0;
-
 		/* For Ultimate SoundTracker modules, only the loop area of a looped sample is played.
 		** Skip loading of eventual data present before loop start.
 		*/
@@ -614,13 +614,11 @@ module_t *modLoad(UNICHAR *fileName)
 		}
 
 		/* We don't support loading samples bigger than 65534 bytes in our PT2 clone,
-		** so clamp length and skip overflown data.
+		** so skip overflown data in .MOD file if present.
 		*/
-		if (s->length > MAX_SAMPLE_LEN)
-		{
-			s->length = MAX_SAMPLE_LEN;
-			bytesToSkip = s->length - MAX_SAMPLE_LEN;
-		}
+		int32_t bytesToSkip = 0;
+		if (realSampleLengths[i] > MAX_SAMPLE_LEN)
+			bytesToSkip = realSampleLengths[i] - MAX_SAMPLE_LEN;
 
 		// For Ultimate SoundTracker modules, don't load sample data after loop end
 		uint16_t loopEnd = s->loopStart + s->loopLength;
@@ -631,7 +629,6 @@ module_t *modLoad(UNICHAR *fileName)
 		}
 
 		mread(&newMod->sampleData[s->offset], 1, s->length, m);
-
 		if (bytesToSkip > 0)
 			mseek(m, bytesToSkip, SEEK_CUR);
 
