@@ -245,7 +245,11 @@ void clearRCFilterState(rcFilter_t *f)
 // aciddose: input 0 is resistor side of capacitor (low-pass), input 1 is reference side (high-pass)
 static inline double getLowpassOutput(rcFilter_t *f, const double input_0, const double input_1, const double buffer)
 {
-	return buffer * f->g + input_0 * f->cg + input_1 * (1.0 - f->cg);
+	double dOutput = DENORMAL_OFFSET;
+
+	dOutput += buffer * f->g + input_0 * f->cg + input_1 * (1.0 - f->cg);
+
+	return dOutput;
 }
 
 void RCLowPassFilter(rcFilter_t *f, const double *in, double *out)

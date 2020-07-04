@@ -4,8 +4,8 @@
 #include <stdbool.h>
 #include "pt2_header.h" // AMIGA_VOICES
 
-// adding this forces the FPU to enter slow mode
-#define DENORMAL_OFFSET 1e-10
+// adding this prevents denormalized numbers, which is slow
+#define DENORMAL_OFFSET 1e-15
 
 typedef struct rcFilter_t
 {

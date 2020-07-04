@@ -30,7 +30,6 @@
 #include "pt2_config.h"
 #include "pt2_sampling.h"
 
-
 #if defined _WIN32 && !defined _DEBUG
 extern bool windowsKeyIsDown;
 extern HHOOK g_hKeyboardHook;
