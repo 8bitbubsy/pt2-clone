@@ -5,17 +5,17 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>English</string>
     <key>CFBundleExecutable</key>
-    <string>pt_pal_editor-osx</string>
+    <string>pt_pal_editor-macos</string>
     <key>CFBundleGetInfoString</key>
-    <string>Palette editor for ProTracker 2.3D clone</string>
+    <string>Palette editor for ProTracker 2 clone</string>
     <key>CFBundleIconFile</key>
-    <string>pt_pal_editor-osx.icns</string>
+    <string>pt_pal_editor-macos.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>org.16-bits.pt_pal_editor-osx</string>
+    <string>org.16-bits.pt_pal_editor-macos</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>pt_pal_editor-osx</string>
+    <string>pt_pal_editor-macos</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

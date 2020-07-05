@@ -27,12 +27,15 @@
 #pragma warning(disable: 4221)
 #endif
 
-volatile bool programRunning, redrawScreen, allowSigterm = true;
-uint32_t *frameBuffer;
-
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
+
+// globals
+volatile bool programRunning, redrawScreen, allowSigterm = true;
+uint32_t *frameBuffer;
+keyb_t keyb;
+mouse_t mouse;
 
 static bool setupVideo(void);
 static void readMouseXY(void);
@@ -94,22 +97,16 @@ int main(int argc, char *argv[])
 
 static void readMouseXY(void)
 {
-	int32_t mx, my;
+	int32_t windowX, windowY, mx, my;
 
-	SDL_PumpEvents();
-	SDL_GetMouseState(&mx, &my);
+	SDL_GetGlobalMouseState(&mx, &my);
+	SDL_GetWindowPosition(window, &windowX, &windowY);
 
-	if (mx < 0) mx = 0;
-	if (my < 0) my = 0;
+	mx -= windowX;
+	my -= windowY;
 
-	mx = (((uint32_t)mx * input.mouse.xScaleMul) + (1 << 15)) >> 16;
-	my = (((uint32_t)my * input.mouse.yScaleMul) + (1 << 15)) >> 16;
-
-	if (mx >= SCREEN_W) mx = SCREEN_W - 1;
-	if (my >= SCREEN_H) my = SCREEN_H - 1;
-
-	input.mouse.x = (int16_t)mx;
-	input.mouse.y = (int16_t)my;
+	mouse.x = (int32_t)(mx * mouse.fMouseXMul);
+	mouse.y = (int32_t)(my * mouse.fMouseYMul);
 }
 
 static void showAskToSaveDialog(void)
@@ -237,13 +234,13 @@ static void osxSetDirToProgramDirFromArgs(char **argv)
 
 static bool setupVideo(void)
 {
-	int32_t w, h;
-	double dScaleX, dScaleY;
+	int32_t renderW, renderH;
 
 	/* SDL 2.0.9 for Windows has a serious bug where you need to initialize the joystick subsystem
 	** (even if you don't use it) or else weird things happen like random stutters, keyboard (rarely) being
 	** reinitialized in Windows and what not.
-	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4391 */
+	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4391
+	*/
 #if defined _WIN32 && SDL_PATCHLEVEL == 9
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0)
 #else
@@ -254,7 +251,7 @@ static bool setupVideo(void)
 		return false;
 	}
 
-	window = SDL_CreateWindow("Palette editor for ProTracker 2.3D clone",
+	window = SDL_CreateWindow("Palette editor for ProTracker 2 clone",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, SCREEN_W * 2, SCREEN_H * 2, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI);
 
 	if (window == NULL)
@@ -297,13 +294,9 @@ static bool setupVideo(void)
 		return false;
 	}
 
-	SDL_GetWindowSize(window, &w, &h);
-
-	dScaleX = w / (double)SCREEN_W;
-	dScaleY = h / (double)SCREEN_H;
-
-	input.mouse.xScaleMul = (dScaleX == 0.0) ? 65536 : (uint32_t)round(65536.0 / dScaleX);
-	input.mouse.yScaleMul = (dScaleY == 0.0) ? 65536 : (uint32_t)round(65536.0 / dScaleY);
+	SDL_GetWindowSize(window, &renderW, &renderH);
+	if (renderW > 0) mouse.fMouseXMul = (float)SCREEN_W / renderW;
+	if (renderH > 0) mouse.fMouseYMul = (float)SCREEN_H / renderH;
 
 	return true;
 }

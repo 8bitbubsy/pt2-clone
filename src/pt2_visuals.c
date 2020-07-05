@@ -2224,7 +2224,7 @@ void updateRenderSizeVars(void)
 
 	di = SDL_GetWindowDisplayIndex(video.window);
 	if (di < 0)
-		di = 0; /* return display index 0 (default) on error */
+		di = 0; // return display index 0 (default) on error
 
 	SDL_GetDesktopDisplayMode(di, &dm);
 	video.displayW = dm.w;
@@ -2251,8 +2251,8 @@ void updateRenderSizeVars(void)
 			SDL_GL_GetDrawableSize(video.window, &actualScreenW, &actualScreenH);
 			SDL_GetDesktopDisplayMode(0, &dm);
 
-			dXUpscale = ((double)actualScreenW / video.displayW);
-			dYUpscale = ((double)actualScreenH / video.displayH);
+			dXUpscale = (double)actualScreenW / video.displayW;
+			dYUpscale = (double)actualScreenH / video.displayH;
 
 			// downscale back to correct sizes
 			if (dXUpscale != 0.0) video.renderW = (int32_t)(video.renderW / dXUpscale);

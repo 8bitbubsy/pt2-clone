@@ -160,7 +160,7 @@ static void _loadPaletteFromPtConfig(FILE *f)
 
 	// read vu colors
 	fseek(f, 546, SEEK_SET);
-	for (i = 0; i < 48; ++i)
+	for (i = 0; i < 48; i++)
 	{
 		fread(&tmp16, 2, 1, f); // stored as Big-Endian
 		tmp16 = SWAP16(tmp16);

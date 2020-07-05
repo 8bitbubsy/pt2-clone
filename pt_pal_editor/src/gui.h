@@ -25,27 +25,23 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
-struct input_t
+typedef struct keyb_t
 {
-	struct keyb_t
-	{
-		bool leftShiftKeyDown, leftCtrlKeyDown, leftAltKeyDown;
-	} keyb;
+	bool leftShiftKeyDown, leftCtrlKeyDown, leftAltKeyDown;
+} keyb_t;
 
-	struct mouse_t
-	{
-		bool leftButtonPressed, rightButtonPressed;
-		int16_t x, y;
-		uint32_t xScaleMul, yScaleMul;
-	} mouse;
-} input;
+typedef struct mouse_t
+{
+	bool leftButtonPressed, rightButtonPressed;
+	int32_t x, y;
+	float fMouseXMul, fMouseYMul;
+} mouse_t;
 
-
-void charOut(uint32_t xPos, uint32_t yPos, uint32_t color, char chr);
-void textOut(uint32_t xPos, uint32_t yPos, uint32_t color, const char *text);
-void textOutShadow(uint32_t xPos, uint32_t yPos, uint32_t fgColor, uint32_t bgColor, const char *text);
-void hLine(uint32_t x, uint32_t y, uint32_t w, uint32_t color);
-void vLine(uint32_t x, uint32_t y, uint32_t h, uint32_t color);
+void charOut(int32_t xPos, int32_t yPos, uint32_t color, char chr);
+void textOut(int32_t xPos, int32_t yPos, uint32_t color, const char *text);
+void textOutShadow(int32_t xPos, int32_t yPos, uint32_t fgColor, uint32_t bgColor, const char *text);
+void hLine(int32_t x, int32_t y, int32_t w, uint32_t color);
+void vLine(int32_t x, int32_t y, int32_t h, uint32_t color);
 
 void showErrorMsgBox(const char *fmt, ...); // main.c
 
@@ -61,10 +57,12 @@ void handleRainbowHeldDown(void);
 void handleRainbowUpDownButtons(void);
 
 // gui.c
-extern bool topScreen, bottomScreen, analyzerShown;
+extern bool topScreenShown, bottomScreenShown, analyzerShown;
 extern uint8_t currColor, rainbowPos, colorsMax;
 extern uint16_t *theRightColors;
 
 // main.c
 extern volatile bool programRunning, redrawScreen;
 extern uint32_t *frameBuffer;
+extern keyb_t keyb;
+extern mouse_t mouse;
