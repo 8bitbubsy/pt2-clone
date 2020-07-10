@@ -1468,6 +1468,8 @@ void clearAll(void)
 {
 	clearSamples();
 	clearSong();
+
+	updateWindowTitle(MOD_NOT_MODIFIED);
 }
 
 void modFree(void)
