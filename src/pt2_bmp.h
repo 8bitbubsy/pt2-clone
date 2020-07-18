@@ -18,7 +18,7 @@ extern const uint8_t mousePointerBMP[256];
 extern const uint8_t fontBMP[6096];
 
 // PACKED GFX
-extern const uint8_t aboutScreenPackedBMP[1684];
+extern const uint8_t aboutScreenPackedBMP[1408];
 extern const uint8_t clearDialogPackedBMP[525];
 extern const uint8_t diskOpScreenPackedBMP[1898];
 extern const uint8_t editOpModeCharsPackedBMP[88];
