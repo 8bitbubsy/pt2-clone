@@ -1275,12 +1275,22 @@ bool setupAudio(void)
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
-	audio.tickTimeLengthTab[0] = UINT64_MAX;
-	const double dMul = (editor.dPerfFreq / audio.outputRate) * (UINT32_MAX + 1.0);
-	for (int32_t i = 1; i < 256-32; i++)
+	for (int32_t i = 32; i <= 255; i++)
 	{
+		const double dBpmHz = i / 2.5;
+
 		// number of samples per tick -> tick length for performance counter (syncing visuals to audio)
-		audio.tickTimeLengthTab[i] = (uint64_t)(audio.bpmTab[i] * dMul);
+		double dTimeInt;
+		double dTimeFrac = modf(editor.dPerfFreq / dBpmHz, &dTimeInt);
+		const int32_t timeInt = (int32_t)dTimeInt;
+
+		// fractional part (scaled to 0..2^32-1)
+		dTimeFrac *= UINT32_MAX;
+		dTimeFrac += 0.5;
+		if (dTimeFrac > UINT32_MAX)
+			dTimeFrac = UINT32_MAX;
+
+		audio.tickTimeLengthTab[i-32] = ((uint64_t)timeInt << 32) | (uint32_t)dTimeFrac;
 	}
 
 	audio.resetSyncTickTimeFlag = true;
