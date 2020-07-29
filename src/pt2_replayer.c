@@ -977,8 +977,8 @@ bool intMusic(void)
 	uint16_t *patt;
 	moduleChannel_t *c;
 
-	if (modBPM >= 32 && modBPM <= 255)
-		editor.musicTime64 += musicTimeTab64[modBPM-32]; // for playback counter
+	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= 32 && modBPM <= 255)
+		editor.musicTime64 += musicTimeTab64[modBPM-32]; // for playback counter (don't increase in "play/rec pattern" mode)
 
 	if (updateUIPositions)
 	{
@@ -1350,7 +1350,9 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	modHasBeenPlayed = false;
 	editor.songPlaying = true;
 	editor.didQuantize = false;
-	editor.musicTime64 = 0;
+
+	if (editor.playMode != PLAY_MODE_PATTERN)
+		editor.musicTime64 = 0; // don't reset playback counter in "play/rec pattern" mode
 
 	if (audioWasntLocked)
 		unlockAudio();
