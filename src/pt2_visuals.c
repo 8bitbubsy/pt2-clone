@@ -209,11 +209,8 @@ void setupPerfFreq(void)
 	// integer part
 	editor.vblankTimeLen = (int32_t)dInt;
 
-	// fractional part scaled to 0..2^32-1
-	dFrac *= UINT32_MAX;
-	dFrac += 0.5;
-	if (dFrac > UINT32_MAX)
-		dFrac = UINT32_MAX;
+	// fractional part (scaled to 0..2^32-1)
+	dFrac *= UINT32_MAX+1.0;
 	editor.vblankTimeLenFrac = (uint32_t)dFrac;
 }
 
@@ -2189,7 +2186,7 @@ void sinkVisualizerBars(void)
 	// sink stuff @ 49.92Hz (Amiga PAL) rate
 
 	static uint64_t counter50Hz;
-	const uint64_t counter50HzDelta = (uint64_t)(((UINT32_MAX + 1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
+	const uint64_t counter50HzDelta = (uint64_t)(((UINT32_MAX+1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
 
 	counter50Hz += counter50HzDelta; // 32.32 fixed-point counter
 	if (counter50Hz > 0xFFFFFFFF)

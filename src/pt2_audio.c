@@ -81,10 +81,7 @@ static void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq)
 	audLatencyPerfValInt = (int32_t)dInt;
 
 	// fractional part (scaled to 0..2^32-1)
-	dFrac *= UINT32_MAX;
-	dFrac += 0.5;
-	if (dFrac > UINT32_MAX)
-		dFrac = UINT32_MAX;
+	dFrac *= UINT32_MAX+1.0;
 	audLatencyPerfValFrac = (uint32_t)dFrac;
 }
 
@@ -776,8 +773,8 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
-	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
+	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -817,8 +814,8 @@ static inline void processMixedSamplesA1200LED(int32_t i, int16_t *out)
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
 	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
-	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
+	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -851,8 +848,8 @@ static inline void processMixedSamplesA500(int32_t i, int16_t *out)
 	// process high-pass filter
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
-	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
-	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
+	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -888,8 +885,8 @@ static inline void processMixedSamplesA500LED(int32_t i, int16_t *out)
 	// process high-pass filter
 	RCHighPassFilter(&filterHi, dOut, dOut);
 
-	dOut[0] *= (-INT16_MAX / (double)AMIGA_VOICES);
-	dOut[1] *= (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
+	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -917,8 +914,8 @@ static inline void processMixedSamplesRaw(int32_t i, int16_t *out) // for PAT2SM
 	dOut[1] = dMixBufferR[i];
 
 	// normalize (don't flip the phase this time)
-	dOut[0] *= (INT16_MAX / (double)AMIGA_VOICES);
-	dOut[1] *= (INT16_MAX / (double)AMIGA_VOICES);
+	dOut[0] *= INT16_MAX / (double)AMIGA_VOICES;
+	dOut[1] *= INT16_MAX / (double)AMIGA_VOICES;
 
 	dOut[0] = (dOut[0] + dOut[1]) * 0.5; // mix to mono
 
@@ -1279,16 +1276,12 @@ bool setupAudio(void)
 	{
 		const double dBpmHz = i / 2.5;
 
-		// number of samples per tick -> tick length for performance counter (syncing visuals to audio)
+		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
 		double dTimeInt;
 		double dTimeFrac = modf(editor.dPerfFreq / dBpmHz, &dTimeInt);
 		const int32_t timeInt = (int32_t)dTimeInt;
-
-		// fractional part (scaled to 0..2^32-1)
-		dTimeFrac *= UINT32_MAX;
-		dTimeFrac += 0.5;
-		if (dTimeFrac > UINT32_MAX)
-			dTimeFrac = UINT32_MAX;
+	
+		dTimeFrac *= UINT32_MAX+1.0; // fractional part (scaled to 0..2^32-1)
 
 		audio.tickTimeLengthTab[i-32] = ((uint64_t)timeInt << 32) | (uint32_t)dTimeFrac;
 	}

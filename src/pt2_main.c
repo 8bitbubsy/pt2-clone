@@ -163,6 +163,11 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef _WIN32
+
+#ifndef _MSC_VER
+	SetProcessDPIAware();
+#endif
+
 	if (!SDL_HasSSE())
 	{
 		showErrorMsgBox("Your computer's processor doesn't have the SSE+SSE2 instruction set\n" \

@@ -3453,7 +3453,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 	}
 
 	// repeat keys at 49.92Hz (Amiga PAL) rate
-	const uint64_t keyRepeatDelta = (uint64_t)(((UINT32_MAX + 1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
+	const uint64_t keyRepeatDelta = (uint64_t)(((UINT32_MAX+1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
 
 	keyb.repeatFrac += keyRepeatDelta; // 32.32 fixed-point counter
 	if (keyb.repeatFrac > 0xFFFFFFFF)
