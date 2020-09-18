@@ -15,7 +15,7 @@
 #else
 #include <unistd.h>
 #endif
-#include <math.h> // sqrt(),tan(),M_PI
+#include <math.h> // sqrt(),tan()
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -26,7 +26,6 @@
 #include "pt2_blep.h"
 #include "pt2_config.h"
 #include "pt2_tables.h"
-#include "pt2_palette.h"
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
@@ -34,26 +33,22 @@
 #include "pt2_pat2smp.h"
 #include "pt2_sync.h"
 #include "pt2_structs.h"
+#include "pt2_rcfilter.h"
+#include "pt2_ledfilter.h"
 
 #define INITIAL_DITHER_SEED 0x12345000
 
-typedef struct ledFilter_t
-{
-	double buffer[4];
-	double c, ci, feedback, bg, cg, c2;
-} ledFilter_t;
-
-static volatile int8_t filterFlags;
+static volatile bool ledFilterEnabled;
+static volatile uint8_t filterModel;
 static int8_t defStereoSep;
 static bool amigaPanFlag;
-static uint16_t ch1Pan, ch2Pan, ch3Pan, ch4Pan;
 static int32_t oldPeriod = -1, randSeed = INITIAL_DITHER_SEED;
 static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
 static double dPrngStateL, dPrngStateR;
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
-static rcFilter_t filterLoA500, filterLoA1200, filterHi;
+static rcFilter_t filterLoA500, filterLoA1200, filterHiA500, filterHiA1200;
 static ledFilter_t filterLED;
 static SDL_AudioDeviceID dev;
 
@@ -65,6 +60,36 @@ audio_t audio;
 paulaVoice_t paula[AMIGA_VOICES];
 
 bool intMusic(void); // defined in pt_modplayer.c
+
+void setLEDFilter(bool state, bool doLockAudio)
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (doLockAudio && audioWasntLocked)
+		lockAudio();
+
+	clearLEDFilterState(&filterLED);
+
+	editor.useLEDFilter = state;
+	ledFilterEnabled = editor.useLEDFilter;
+
+	if (doLockAudio && audioWasntLocked)
+		unlockAudio();
+}
+
+void toggleLEDFilter(void)
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	clearLEDFilterState(&filterLED);
+
+	editor.useLEDFilter ^= 1;
+	ledFilterEnabled = editor.useLEDFilter;
+
+	if (audioWasntLocked)
+		unlockAudio();
+}
 
 static void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq)
 {
@@ -104,196 +129,6 @@ static void generateBpmTables(void)
 	}
 }
 
-static void clearLEDFilterState(void)
-{
-	filterLED.buffer[0] = 0.0; // left channel
-	filterLED.buffer[1] = 0.0;
-	filterLED.buffer[2] = 0.0; // right channel
-	filterLED.buffer[3] = 0.0;
-}
-
-void setLEDFilter(bool state, bool doLockAudio)
-{
-	const bool audioWasntLocked = !audio.locked;
-	if (doLockAudio && audioWasntLocked)
-		lockAudio();
-
-	editor.useLEDFilter = state;
-	if (editor.useLEDFilter)
-	{
-		clearLEDFilterState();
-		filterFlags |= FILTER_LED_ENABLED;
-	}
-	else
-	{
-		filterFlags &= ~FILTER_LED_ENABLED;
-	}
-
-	if (doLockAudio && audioWasntLocked)
-		unlockAudio();
-}
-
-void toggleLEDFilter(void)
-{
-	const bool audioWasntLocked = !audio.locked;
-	if (audioWasntLocked)
-		lockAudio();
-
-	editor.useLEDFilter ^= 1;
-	if (editor.useLEDFilter)
-	{
-		clearLEDFilterState();
-		filterFlags |= FILTER_LED_ENABLED;
-	}
-	else
-	{
-		filterFlags &= ~FILTER_LED_ENABLED;
-	}
-
-	if (audioWasntLocked)
-		unlockAudio();
-}
-
-/* Imperfect "LED" filter implementation. This may be further improved in the future.
-** Based upon ideas posted by mystran @ the kvraudio.com forum.
-**
-** This filter may not function correctly used outside the fixed-cutoff context here!
-*/
-
-static double sigmoid(double x, double coefficient)
-{
-	/* Coefficient from:
-	**   0.0 to  inf (linear)
-	**  -1.0 to -inf (linear)
-	*/
-	return x / (x + coefficient) * (coefficient + 1.0);
-}
-
-static void calcLEDFilterCoeffs(const double sr, const double hz, const double fb, ledFilter_t *filter)
-{
-	/* tan() may produce NaN or other bad results in some cases!
-	** It appears to work correctly with these specific coefficients.
-	*/
-	const double c = (hz < (sr / 2.0)) ? tan((M_PI * hz) / sr) : 1.0;
-	const double g = 1.0 / (1.0 + c);
-
-	// dirty compensation
-	const double s = 0.5;
-	const double t = 0.5;
-	const double ic = c > t ? 1.0 / ((1.0 - s*t) + s*c) : 1.0;
-	const double cg = c * g;
-	const double fbg = 1.0 / (1.0 + fb * cg*cg);
-
-	filter->c = c;
-	filter->ci = g;
-	filter->feedback = 2.0 * sigmoid(fb, 0.5);
-	filter->bg = fbg * filter->feedback * ic;
-	filter->cg = cg;
-	filter->c2 = c * 2.0;
-}
-
-static inline void LEDFilter(ledFilter_t *f, const double *in, double *out)
-{
-	const double in_1 = DENORMAL_OFFSET;
-	const double in_2 = DENORMAL_OFFSET;
-
-	const double c = f->c;
-	const double g = f->ci;
-	const double cg = f->cg;
-	const double bg = f->bg;
-	const double c2 = f->c2;
-
-	double *v = f->buffer;
-
-	// left channel
-	const double estimate_L = in_2 + g*(v[1] + c*(in_1 + g*(v[0] + c*in[0])));
-	const double y0_L = v[0]*g + in[0]*cg + in_1 + estimate_L * bg;
-	const double y1_L = v[1]*g + y0_L*cg + in_2;
-
-	v[0] += c2 * (in[0] - y0_L);
-	v[1] += c2 * (y0_L - y1_L);
-	out[0] = y1_L;
-
-	// right channel
-	const double estimate_R = in_2 + g*(v[3] + c*(in_1 + g*(v[2] + c*in[1])));
-	const double y0_R = v[2]*g + in[1]*cg + in_1 + estimate_R * bg;
-	const double y1_R = v[3]*g + y0_R*cg + in_2;
-
-	v[2] += c2 * (in[1] - y0_R);
-	v[3] += c2 * (y0_R - y1_R);
-	out[1] = y1_R;
-}
-
-void calcRCFilterCoeffs(double dSr, double dHz, rcFilter_t *f)
-{
-	const double c = (dHz < (dSr / 2.0)) ? tan((M_PI * dHz) / dSr) : 1.0;
-	f->c = c;
-	f->c2 = f->c * 2.0;
-	f->g = 1.0 / (1.0 + f->c);
-	f->cg = f->c * f->g;
-}
-
-void clearRCFilterState(rcFilter_t *f)
-{
-	f->buffer[0] = 0.0; // left channel
-	f->buffer[1] = 0.0; // right channel
-}
-
-// aciddose: input 0 is resistor side of capacitor (low-pass), input 1 is reference side (high-pass)
-static inline double getLowpassOutput(rcFilter_t *f, const double input_0, const double input_1, const double buffer)
-{
-	double dOutput = DENORMAL_OFFSET;
-
-	dOutput += buffer * f->g + input_0 * f->cg + input_1 * (1.0 - f->cg);
-
-	return dOutput;
-}
-
-void RCLowPassFilter(rcFilter_t *f, const double *in, double *out)
-{
-	double output;
-
-	// left channel RC low-pass
-	output = getLowpassOutput(f, in[0], 0.0, f->buffer[0]);
-	f->buffer[0] += (in[0] - output) * f->c2;
-	out[0] = output;
-
-	// right channel RC low-pass
-	output = getLowpassOutput(f, in[1], 0.0, f->buffer[1]);
-	f->buffer[1] += (in[1] - output) * f->c2;
-	out[1] = output;
-}
-
-void RCHighPassFilter(rcFilter_t *f, const double *in, double *out)
-{
-	double low[2];
-
-	RCLowPassFilter(f, in, low);
-
-	out[0] = in[0] - low[0]; // left channel high-pass
-	out[1] = in[1] - low[1]; // right channel high-pass
-}
-
-/* These two are used for the filters in the SAMPLER screen, and
-** also the 2x downsampling when loading samples whose frequency
-** is above 22kHz.
-*/
-
-void RCLowPassFilterMono(rcFilter_t *f, const double in, double *out)
-{
-	double output = getLowpassOutput(f, in, 0.0, f->buffer[0]);
-	f->buffer[0] += (in - output) * f->c2;
-	*out = output;
-}
-
-void RCHighPassFilterMono(rcFilter_t *f, const double in, double *out)
-{
-	double low;
-
-	RCLowPassFilterMono(f, in, &low);
-	*out = in - low; // high-pass
-}
-
 void lockAudio(void)
 {
 	if (dev != 0)
@@ -329,36 +164,6 @@ void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 			paulaSetLength(i, s->loopLength >> 1);
 		}
 	}
-}
-
-/* aciddose: these sin/cos approximations both use a 0..1
-** parameter range and have 'normalized' (1/2 = 0db) coeffs
-**
-** the coeffs are for LERP(x, x * x, 0.224) * sqrt(2)
-** max_error is minimized with 0.224 = 0.0013012886
-*/
-static double sinApx(double x)
-{
-	x = x * (2.0 - x);
-	return x * 1.09742972 + x * x * 0.31678383;
-}
-
-static double cosApx(double x)
-{
-	x = (1.0 - x) * (1.0 + x);
-	return x * 1.09742972 + x * x * 0.31678383;
-}
-
-static void mixerSetVoicePan(uint8_t ch, uint16_t pan) // pan = 0..256
-{
-	/* aciddose: proper 'normalized' equal-power panning is (assuming pan left to right):
-	** L = cos(p * pi * 1/2) * sqrt(2);
-	** R = sin(p * pi * 1/2) * sqrt(2);
-	*/
-	const double dPan = pan * (1.0 / 256.0); // 0.0..1.0
-
-	paula[ch].dPanL = cosApx(dPan);
-	paula[ch].dPanR = sinApx(dPan);
 }
 
 void mixerKillVoice(int32_t ch)
@@ -397,8 +202,9 @@ void turnOffVoices(void)
 
 	clearRCFilterState(&filterLoA500);
 	clearRCFilterState(&filterLoA1200);
-	clearRCFilterState(&filterHi);
-	clearLEDFilterState();
+	clearRCFilterState(&filterHiA500);
+	clearRCFilterState(&filterHiA1200);
+	clearLEDFilterState(&filterLED);
 
 	resetAudioDithering();
 
@@ -572,7 +378,7 @@ void paulaStartDMA(int32_t ch)
 	}
 }
 
-void toggleA500Filters(void)
+void toggleFilterModel(void)
 {
 	const bool audioWasntLocked = !audio.locked;
 	if (audioWasntLocked)
@@ -580,19 +386,15 @@ void toggleA500Filters(void)
 
 	clearRCFilterState(&filterLoA500);
 	clearRCFilterState(&filterLoA1200);
-	clearRCFilterState(&filterHi);
-	clearLEDFilterState();
+	clearRCFilterState(&filterHiA500);
+	clearRCFilterState(&filterHiA1200);
+	clearLEDFilterState(&filterLED);
 
-	if (filterFlags & FILTER_A500)
-	{
-		filterFlags &= ~FILTER_A500;
-		displayMsg("LP FILTER: A1200");
-	}
+	filterModel ^= 1;
+	if (filterModel == FILTERMODEL_A500)
+		displayMsg("AUDIO: AMIGA 500");
 	else
-	{
-		filterFlags |= FILTER_A500;
-		displayMsg("LP FILTER: A500");
-	}
+		displayMsg("AUDIO: AMIGA 1200");
 
 	if (audioWasntLocked)
 		unlockAudio();
@@ -669,77 +471,6 @@ void mixChannels(int32_t numSamples)
 	}
 }
 
-void mixChannelsMultiStep(int32_t numSamples) // for PAT2SMP
-{
-	double dSmp, dVol;
-	blep_t *bSmp, *bVol;
-	paulaVoice_t *v;
-
-	memset(dMixBufferL, 0, numSamples * sizeof (double));
-	memset(dMixBufferR, 0, numSamples * sizeof (double));
-
-	v = paula;
-	bSmp = blep;
-	bVol = blepVol;
-
-	for (int32_t i = 0; i < AMIGA_VOICES; i++, v++, bSmp++, bVol++)
-	{
-		if (!v->active || v->data == NULL)
-			continue;
-
-		for (int32_t j = 0; j < numSamples; j++)
-		{
-			assert(v->data != NULL);
-			dSmp = v->data[v->pos] * (1.0 / 128.0);
-			dVol = v->dVolume;
-
-			if (dSmp != bSmp->dLastValue)
-			{
-				if (v->dLastDelta > v->dLastPhase)
-				{
-					// div->mul trick: v->dLastDeltaMul is 1.0 / v->dLastDelta
-					blepAdd(bSmp, v->dLastPhase * v->dLastDeltaMul, bSmp->dLastValue - dSmp);
-				}
-
-				bSmp->dLastValue = dSmp;
-			}
-
-			if (dVol != bVol->dLastValue)
-			{
-				blepVolAdd(bVol, bVol->dLastValue - dVol);
-				bVol->dLastValue = dVol;
-			}
-
-			if (bSmp->samplesLeft > 0) dSmp = blepRun(bSmp, dSmp);
-			if (bVol->samplesLeft > 0) dVol = blepRun(bVol, dVol);
-
-			dSmp *= dVol;
-
-			dMixBufferL[j] += dSmp * v->dPanL;
-			dMixBufferR[j] += dSmp * v->dPanR;
-
-			v->dPhase += v->dDelta;
-			while (v->dPhase >= 1.0) // deltas can be >= 1.0 here
-			{
-				v->dPhase -= 1.0;
-
-				v->dLastPhase = v->dPhase;
-				v->dLastDelta = v->dDelta;
-				v->dLastDeltaMul = v->dDeltaMul;
-
-				if (++v->pos >= v->length)
-				{
-					v->pos = 0;
-
-					// re-fetch new Paula register values now
-					v->length = v->newLength;
-					v->data = v->newData;
-				}
-			}
-		}
-	}
-}
-
 void resetAudioDithering(void)
 {
 	randSeed = INITIAL_DITHER_SEED;
@@ -755,7 +486,7 @@ static inline int32_t random32(void)
 	return randSeed;
 }
 
-static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
+static inline void processMixedSamples(int32_t i, int16_t *out)
 {
 	int32_t smp32;
 	double dOut[2], dPrng;
@@ -763,16 +494,33 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 	dOut[0] = dMixBufferL[i];
 	dOut[1] = dMixBufferR[i];
 
-	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
+	if (filterModel == FILTERMODEL_A500)
 	{
-		// process low-pass filter
-		RCLowPassFilter(&filterLoA1200, dOut, dOut);
+		// A500 low-pass RC filter
+		RCLowPassFilterStereo(&filterLoA500, dOut, dOut);
+
+		// "LED" Sallen-Key filter
+		if (ledFilterEnabled)
+			LEDFilter(&filterLED, dOut, dOut);
+
+		// A500 high-pass RC filter
+		RCHighPassFilterStereo(&filterHiA500, dOut, dOut);
+	}
+	else
+	{
+		// A1200 low-pass RC filter
+		if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
+			RCLowPassFilterStereo(&filterLoA1200, dOut, dOut);
+
+		// "LED" Sallen-Key filter
+		if (ledFilterEnabled)
+			LEDFilter(&filterLED, dOut, dOut);
+
+		// A1200 high-pass RC filter
+		RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
 	}
 
-	// process high-pass filter
-	RCHighPassFilter(&filterHi, dOut, dOut);
-
-	// normalize and flip phase (A500/A1200 has an inverted audio signal)
+	// normalize and flip phase (A500/A1200 has a phase-inverted audio signal)
 	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
 	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
 
@@ -791,142 +539,11 @@ static inline void processMixedSamplesA1200(int32_t i, int16_t *out)
 	smp32 = (int32_t)dOut[1];
 	CLAMP16(smp32);
 	out[1] = (int16_t)smp32;
-}
-
-static inline void processMixedSamplesA1200LED(int32_t i, int16_t *out)
-{
-	int32_t smp32;
-	double dOut[2], dPrng;
-
-	dOut[0] = dMixBufferL[i];
-	dOut[1] = dMixBufferR[i];
-
-	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
-	{
-		// process low-pass filter
-		RCLowPassFilter(&filterLoA1200, dOut, dOut);
-	}
-
-	// process "LED" filter
-	LEDFilter(&filterLED, dOut, dOut);
-
-	// process high-pass filter
-	RCHighPassFilter(&filterHi, dOut, dOut);
-
-	// normalize and flip phase (A500/A1200 has an inverted audio signal)
-	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
-	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
-
-	// left channel - 1-bit triangular dithering (high-pass filtered)
-	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
-	dOut[0] = (dOut[0] + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	smp32 = (int32_t)dOut[0];
-	CLAMP16(smp32);
-	out[0] = (int16_t)smp32;
-
-	// right channel - 1-bit triangular dithering (high-pass filtered)
-	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
-	dOut[1] = (dOut[1] + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	smp32 = (int32_t)dOut[1];
-	CLAMP16(smp32);
-	out[1] = (int16_t)smp32;
-}
-
-static inline void processMixedSamplesA500(int32_t i, int16_t *out)
-{
-	int32_t smp32;
-	double dOut[2], dPrng;
-
-	dOut[0] = dMixBufferL[i];
-	dOut[1] = dMixBufferR[i];
-
-	// process low-pass filter
-	RCLowPassFilter(&filterLoA500, dOut, dOut);
-
-	// process high-pass filter
-	RCHighPassFilter(&filterHi, dOut, dOut);
-
-	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
-	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
-
-	// left channel - 1-bit triangular dithering (high-pass filtered)
-	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
-	dOut[0] = (dOut[0] + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	smp32 = (int32_t)dOut[0];
-	CLAMP16(smp32);
-	out[0] = (int16_t)smp32;
-
-	// right channel - 1-bit triangular dithering (high-pass filtered)
-	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
-	dOut[1] = (dOut[1] + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	smp32 = (int32_t)dOut[1];
-	CLAMP16(smp32);
-	out[1] = (int16_t)smp32;
-}
-
-static inline void processMixedSamplesA500LED(int32_t i, int16_t *out)
-{
-	int32_t smp32;
-	double dOut[2], dPrng;
-
-	dOut[0] = dMixBufferL[i];
-	dOut[1] = dMixBufferR[i];
-
-	// process low-pass filter
-	RCLowPassFilter(&filterLoA500, dOut, dOut);
-
-	// process "LED" filter
-	LEDFilter(&filterLED, dOut, dOut);
-
-	// process high-pass filter
-	RCHighPassFilter(&filterHi, dOut, dOut);
-
-	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
-	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
-
-	// left channel - 1-bit triangular dithering (high-pass filtered)
-	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
-	dOut[0] = (dOut[0] + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	smp32 = (int32_t)dOut[0];
-	CLAMP16(smp32);
-	out[0] = (int16_t)smp32;
-
-	// right channel - 1-bit triangular dithering (high-pass filtered)
-	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
-	dOut[1] = (dOut[1] + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	smp32 = (int32_t)dOut[1];
-	CLAMP16(smp32);
-	out[1] = (int16_t)smp32;
-}
-
-static inline void processMixedSamplesRaw(int32_t i, int16_t *out) // for PAT2SMP
-{
-	int32_t smp32;
-	double dOut[2];
-
-	dOut[0] = dMixBufferL[i];
-	dOut[1] = dMixBufferR[i];
-
-	// normalize (don't flip the phase this time)
-	dOut[0] *= INT16_MAX / (double)AMIGA_VOICES;
-	dOut[1] *= INT16_MAX / (double)AMIGA_VOICES;
-
-	dOut[0] = (dOut[0] + dOut[1]) * 0.5; // mix to mono
-
-	smp32 = (int32_t)dOut[0];
-	CLAMP16(smp32);
-	*out = (int16_t)smp32;
 }
 
 void outputAudio(int16_t *target, int32_t numSamples)
 {
-	int16_t *outStream, out[2];
+	int16_t out[2];
 	int32_t i;
 
 	if (editor.isSMPRendering)
@@ -934,20 +551,17 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		// render to sample (PAT2SMP)
 
 		int32_t samplesTodo = numSamples;
-		if (editor.pat2SmpPos+samplesTodo > MAX_SAMPLE_LEN)
-			samplesTodo = MAX_SAMPLE_LEN-editor.pat2SmpPos;
+		if (editor.pat2SmpPos+samplesTodo > MAX_SAMPLE_LEN*2)
+			samplesTodo = (MAX_SAMPLE_LEN*2)-editor.pat2SmpPos;
 
-		mixChannelsMultiStep(samplesTodo);
+		mixChannels(samplesTodo);
 
-		outStream = &editor.pat2SmpBuf[editor.pat2SmpPos];
+		double *dOutStream = &editor.dPat2SmpBuf[editor.pat2SmpPos];
 		for (i = 0; i < samplesTodo; i++)
-		{
-			processMixedSamplesRaw(i, out);
-			outStream[i] = out[0];
-		}
+			dOutStream[i] = dMixBufferL[i] + dMixBufferR[i]; // normalized to -128..127 later
 
 		editor.pat2SmpPos += samplesTodo;
-		if (editor.pat2SmpPos >= MAX_SAMPLE_LEN)
+		if (editor.pat2SmpPos >= MAX_SAMPLE_LEN*2)
 		{
 			editor.smpRenderingDone = true;
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -959,52 +573,12 @@ void outputAudio(int16_t *target, int32_t numSamples)
 
 		mixChannels(numSamples);
 
-		outStream = target;
-		if (filterFlags & FILTER_A500)
+		int16_t *outStream = target;
+		for (i = 0; i < numSamples; i++)
 		{
-			// Amiga 500 filter model
-
-			if (filterFlags & FILTER_LED_ENABLED)
-			{
-				for (i = 0; i < numSamples; i++)
-				{
-					processMixedSamplesA500LED(i, out);
-					*outStream++ = out[0];
-					*outStream++ = out[1];
-				}
-			}
-			else
-			{
-				for (i = 0; i < numSamples; i++)
-				{
-					processMixedSamplesA500(i, out);
-					*outStream++ = out[0];
-					*outStream++ = out[1];
-				}
-			}
-		}
-		else
-		{
-			// Amiga 1200 filter model
-
-			if (filterFlags & FILTER_LED_ENABLED)
-			{
-				for (i = 0; i < numSamples; i++)
-				{
-					processMixedSamplesA1200LED(i, out);
-					*outStream++ = out[0];
-					*outStream++ = out[1];
-				}
-			}
-			else
-			{
-				for (i = 0; i < numSamples; i++)
-				{
-					processMixedSamplesA1200(i, out);
-					*outStream++ = out[0];
-					*outStream++ = out[1];
-				}
-			}
+			processMixedSamples(i, out);
+			*outStream++ = out[0];
+			*outStream++ = out[1];
 		}
 	}
 }
@@ -1147,59 +721,71 @@ static void calculateFilterCoeffs(void)
 	** - RC 6dB/oct low-pass: R=680 ohm, C=6800pF (f=34419.321Hz)
 	** - Sallen-key low-pass ("LED"): Same as A500 (f=3090.532Hz)
 	** - RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22uF (f=5.204Hz)
-	**
-	** Correct values for A600 (a600_schematics.pdf):
-	** - RC 6dB/oct low-pass: Same as A500 (f=4420.970Hz)
-	** - Sallen-key low-pass ("LED"): Same as A500 (f=3090.532Hz)
-	** - RC 6dB/oct high-pass: Same as A1200 (f=5.204Hz)
 	*/
 
 	double R, C, R1, R2, C1, C2, fc, fb;
-
-	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
-	{
-		// A1200 1-pole (6db/oct) static RC low-pass filter:
-		R = 680.0;  // R321 (680 ohm resistor)
-		C = 6.8e-9; // C321 (6800pf capacitor)
-		fc = 1.0 / (2.0 * M_PI * R * C);
-		calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA1200);
-	}
+	const double pi = 4.0 * atan(1.0); // M_PI can not be trusted
 
 	// A500 1-pole (6db/oct) static RC low-pass filter:
 	R = 360.0; // R321 (360 ohm resistor)
 	C = 1e-7;  // C321 (0.1uF capacitor)
-	fc = 1.0 / (2.0 * M_PI * R * C);
+	fc = 1.0 / (2.0 * pi * R * C);
 	calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA500);
 
-	// Sallen-Key filter ("LED"):
+	// A1200 1-pole (6db/oct) static RC low-pass filter:
+	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
+	{
+		R = 680.0;  // R321 (680 ohm resistor)
+		C = 6.8e-9; // C321 (6800pf capacitor)
+		fc = 1.0 / (2.0 * pi * R * C);
+		calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA1200);
+	}
+
+	// Sallen-Key filter ("LED" filter, same RC values on A500 and A1200):
 	R1 = 10000.0; // R322 (10K ohm resistor)
 	R2 = 10000.0; // R323 (10K ohm resistor)
 	C1 = 6.8e-9;  // C322 (6800pF capacitor)
 	C2 = 3.9e-9;  // C323 (3900pF capacitor)
-	fc = 1.0 / (2.0 * M_PI * sqrt(R1 * R2 * C1 * C2));
+	fc = 1.0 / (2.0 * pi * sqrt(R1 * R2 * C1 * C2));
 	fb = 0.125; // Fb = 0.125 : Q ~= 1/sqrt(2)
 	calcLEDFilterCoeffs(audio.outputRate, fc, fb, &filterLED);
+
+	// A500 1-pole (6db/oct) static RC high-pass filter:
+	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
+	C = 2.233e-5; // C334 (22uF capacitor) + C335 (0.33µF capacitor)
+	fc = 1.0 / (2.0 * pi * R * C);
+	calcRCFilterCoeffs(audio.outputRate, fc, &filterHiA500);
 
 	// A1200 1-pole (6db/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.2e-5; // C334 (22uF capacitor)
-	fc = 1.0 / (2.0 * M_PI * R * C);
-	calcRCFilterCoeffs(audio.outputRate, fc, &filterHi);
+	fc = 1.0 / (2.0 * pi * R * C);
+	calcRCFilterCoeffs(audio.outputRate, fc, &filterHiA1200);
 }
 
-void mixerCalcVoicePans(uint8_t stereoSeparation)
+static void setVoicePan(int32_t ch, double pan) // pan = 0.0 .. 1.0
 {
-	const uint8_t scaledPanPos = (stereoSeparation * 128) / 100;
+	// constant power panning
 
-	ch1Pan = 128 - scaledPanPos;
-	ch2Pan = 128 + scaledPanPos;
-	ch3Pan = 128 + scaledPanPos;
-	ch4Pan = 128 - scaledPanPos;
+	const double pi = 4.0 * atan(1.0); // M_PI can not be trusted
 
-	mixerSetVoicePan(0, ch1Pan);
-	mixerSetVoicePan(1, ch2Pan);
-	mixerSetVoicePan(2, ch3Pan);
-	mixerSetVoicePan(3, ch4Pan);
+	paula[ch].dPanL = cos(pan * pi * 0.5) * sqrt(2.0);
+	paula[ch].dPanR = sin(pan * pi * 0.5) * sqrt(2.0);
+}
+
+void mixerCalcVoicePans(uint8_t stereoSeparation) // 0..100 (percentage)
+{
+	assert(stereoSeparation <= 100);
+
+	const double panMid = 0.5;
+
+	const double panR = panMid + (stereoSeparation / (100.0 * 2.0));
+	const double panL = 1.0 - panR;
+
+	setVoicePan(0, panL);
+	setVoicePan(1, panR);
+	setVoicePan(2, panR);
+	setVoicePan(3, panL);
 }
 
 bool setupAudio(void)
@@ -1238,16 +824,12 @@ bool setupAudio(void)
 
 	generateBpmTables();
 
-	/* If the audio output rate is lower than MOD2WAV_FREQ, we need
-	** to allocate slightly more space so that MOD2WAV rendering
-	** won't overflow.
-	*/
+	const int32_t lowestBPM = 32;
+	const int32_t pat2SmpMaxSamples = (int32_t)ceil(audio.bpmTab22kHz[lowestBPM-32]);
+	const int32_t mod2WavMaxSamples = (int32_t)ceil(audio.bpmTabMod2Wav[lowestBPM-32]);
+	const int32_t renderMaxSamples = (int32_t)ceil(audio.bpmTab[lowestBPM-32]);
 
-	int32_t maxSamplesToMix;
-	if (MOD2WAV_FREQ > audio.outputRate)
-		maxSamplesToMix = (int32_t)ceil(audio.bpmTabMod2Wav[32-32]); // BPM 32
-	else
-		maxSamplesToMix = (int32_t)ceil(audio.bpmTab[32-32]); // BPM 32
+	const int32_t maxSamplesToMix = MAX(pat2SmpMaxSamples, MAX(mod2WavMaxSamples, renderMaxSamples));
 
 	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
 	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
@@ -1264,7 +846,8 @@ bool setupAudio(void)
 	mixerCalcVoicePans(config.stereoSeparation);
 	defStereoSep = config.stereoSeparation;
 
-	filterFlags = config.a500LowPassFilter ? FILTER_A500 : 0;
+	filterModel = config.filterModel;
+	ledFilterEnabled = false;
 	calculateFilterCoeffs();
 
 	audio.dSamplesPerTick = audio.bpmTab[125-32]; // BPM 125
@@ -1335,97 +918,104 @@ void toggleAmigaPanMode(void)
 		unlockAudio();
 }
 
-void normalize32bitSigned(int32_t *sampleData, uint32_t sampleLength)
+uint16_t get16BitPeak(int16_t *sampleData, uint32_t sampleLength)
 {
-	int32_t sample, sampleVolPeak;
-	uint32_t i;
-	double dGain;
-
-	sampleVolPeak = 0;
-	for (i = 0; i < sampleLength; i++)
+	uint16_t samplePeak = 0;
+	for (uint32_t i = 0; i < sampleLength; i++)
 	{
-		sample = ABS(sampleData[i]);
-		if (sampleVolPeak < sample)
-			sampleVolPeak = sample;
+		uint16_t sample = ABS(sampleData[i]);
+		if (samplePeak < sample)
+			samplePeak = sample;
 	}
 
-	if (sampleVolPeak >= INT32_MAX)
-		return; // sample is already normalized
+	return samplePeak;
+}
 
-	// prevent division by zero!
-	if (sampleVolPeak <= 0)
-		sampleVolPeak = 1;
-
-	dGain = (double)INT32_MAX / sampleVolPeak;
-	for (i = 0; i < sampleLength; i++)
+uint32_t get32BitPeak(int32_t *sampleData, uint32_t sampleLength)
+{
+	uint32_t samplePeak = 0;
+	for (uint32_t i = 0; i < sampleLength; i++)
 	{
-		sample = (int32_t)(sampleData[i] * dGain);
+		uint32_t sample = ABS(sampleData[i]);
+		if (samplePeak < sample)
+			samplePeak = sample;
+	}
+
+	return samplePeak;
+}
+
+float getFloatPeak(float *fSampleData, uint32_t sampleLength)
+{
+	float fSamplePeak = 0.0f;
+	for (uint32_t i = 0; i < sampleLength; i++)
+	{
+		const float fSample = fabsf(fSampleData[i]);
+		if (fSamplePeak < fSample)
+			fSamplePeak = fSample;
+	}
+
+	return fSamplePeak;
+}
+
+double getDoublePeak(double *dSampleData, uint32_t sampleLength)
+{
+	double dSamplePeak = 0.0;
+	for (uint32_t i = 0; i < sampleLength; i++)
+	{
+		const double dSample = fabs(dSampleData[i]);
+		if (dSamplePeak < dSample)
+			dSamplePeak = dSample;
+	}
+
+	return dSamplePeak;
+}
+
+void normalize16BitTo8Bit(int16_t *sampleData, uint32_t sampleLength)
+{
+	const uint16_t samplePeak = get16BitPeak(sampleData, sampleLength);
+	if (samplePeak == 0 || samplePeak >= INT16_MAX)
+		return;
+
+	const double dGain = (double)INT16_MAX / samplePeak;
+	for (uint32_t i = 0; i < sampleLength; i++)
+	{
+		const int32_t sample = (const int32_t)(sampleData[i] * dGain);
+		sampleData[i] = (int16_t)sample;
+	}
+}
+
+void normalize32BitTo8Bit(int32_t *sampleData, uint32_t sampleLength)
+{
+	const uint32_t samplePeak = get32BitPeak(sampleData, sampleLength);
+	if (samplePeak == 0 || samplePeak >= INT32_MAX)
+		return;
+
+	const double dGain = (double)INT32_MAX / samplePeak;
+	for (uint32_t i = 0; i < sampleLength; i++)
+	{
+		const int32_t sample = (const int32_t)(sampleData[i] * dGain);
 		sampleData[i] = (int32_t)sample;
 	}
 }
 
-void normalize16bitSigned(int16_t *sampleData, uint32_t sampleLength)
+void normalizeFloatTo8Bit(float *fSampleData, uint32_t sampleLength)
 {
-	uint32_t i;
-	int32_t sample, sampleVolPeak, gain;
-
-	sampleVolPeak = 0;
-	for (i = 0; i < sampleLength; i++)
-	{
-		sample = ABS(sampleData[i]);
-		if (sampleVolPeak < sample)
-			sampleVolPeak = sample;
-	}
-
-	if (sampleVolPeak >= INT16_MAX)
-		return; // sample is already normalized
-
-	if (sampleVolPeak < 1)
+	const float fSamplePeak = getFloatPeak(fSampleData, sampleLength);
+	if (fSamplePeak <= 0.0f)
 		return;
 
-	gain = (INT16_MAX * 65536) / sampleVolPeak;
-	for (i = 0; i < sampleLength; i++)
-		sampleData[i] = (int16_t)((sampleData[i] * gain) >> 16);
-}
-
-void normalize8bitFloatSigned(float *fSampleData, uint32_t sampleLength)
-{
-	uint32_t i;
-	float fSample, fSampleVolPeak, fGain;
-
-	fSampleVolPeak = 0.0f;
-	for (i = 0; i < sampleLength; i++)
-	{
-		fSample = fabsf(fSampleData[i]);
-		if (fSampleVolPeak < fSample)
-			fSampleVolPeak = fSample;
-	}
-
-	if (fSampleVolPeak <= 0.0f)
-		return;
-
-	fGain = INT8_MAX / fSampleVolPeak;
-	for (i = 0; i < sampleLength; i++)
+	const float fGain = INT8_MAX / fSamplePeak;
+	for (uint32_t i = 0; i < sampleLength; i++)
 		fSampleData[i] *= fGain;
 }
 
-void normalize8bitDoubleSigned(double *dSampleData, uint32_t sampleLength)
+void normalizeDoubleTo8Bit(double *dSampleData, uint32_t sampleLength)
 {
-	uint32_t i;
-	double dSample, dSampleVolPeak, dGain;
-
-	dSampleVolPeak = 0.0;
-	for (i = 0; i < sampleLength; i++)
-	{
-		dSample = fabs(dSampleData[i]);
-		if (dSampleVolPeak < dSample)
-			dSampleVolPeak = dSample;
-	}
-
-	if (dSampleVolPeak <= 0.0)
+	const double dSamplePeak = getDoublePeak(dSampleData, sampleLength);
+	if (dSamplePeak <= 0.0)
 		return;
 
-	dGain = INT8_MAX / dSampleVolPeak;
-	for (i = 0; i < sampleLength; i++)
+	const double dGain = INT8_MAX / dSamplePeak;
+	for (uint32_t i = 0; i < sampleLength; i++)
 		dSampleData[i] *= dGain;
 }

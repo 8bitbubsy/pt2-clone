@@ -23,7 +23,6 @@
 #include "pt2_keyboard.h"
 #include "pt2_mouse.h"
 #include "pt2_audio.h"
-#include "pt2_palette.h"
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
 #include "pt2_tables.h"
@@ -42,6 +41,7 @@
 #include "pt2_config.h"
 #include "pt2_bmp.h"
 #include "pt2_sampling.h"
+#include "pt2_chordmaker.h"
 
 typedef struct sprite_t
 {
@@ -183,6 +183,12 @@ void statusOutOfMemory(void)
 void statusSampleIsEmpty(void)
 {
 	displayErrorMsg("SAMPLE IS EMPTY");
+}
+
+void changeStatusText(const char *text)
+{
+	fillRect(88, 127, 17*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_GENBKG]);
+	textOut(88, 127, text, video.palette[PAL_GENTXT]);
 }
 
 void statusNotSampleZero(void)
@@ -1620,13 +1626,7 @@ void handleAskNo(void)
 		break;
 
 		default:
-		{
 			restoreStatusAndMousePointer();
-			editor.errorMsgActive = true;
-			editor.errorMsgBlock = true;
-			editor.errorMsgCounter = 0;
-			setErrPointer();
-		}
 		break;
 	}
 

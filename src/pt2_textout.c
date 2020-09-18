@@ -4,7 +4,6 @@
 #include "pt2_header.h"
 #include "pt2_helpers.h"
 #include "pt2_tables.h"
-#include "pt2_palette.h"
 #include "pt2_visuals.h"
 #include "pt2_structs.h"
 #include "pt2_bmp.h"

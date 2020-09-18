@@ -33,6 +33,7 @@ void statusAllRight(void);
 void statusOutOfMemory(void);
 void statusSampleIsEmpty(void);
 void statusNotSampleZero(void);
+void changeStatusText(const char *text);
 
 void setupPerfFreq(void);
 void setupWaitVBL(void);

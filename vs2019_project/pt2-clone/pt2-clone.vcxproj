@@ -88,7 +88,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;_USE_MATH_DEFINES;HAVE_M_PI</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -99,12 +99,12 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <FloatingPointModel>Fast</FloatingPointModel>
       <DebugInformationFormat>None</DebugInformationFormat>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <OmitFramePointers>true</OmitFramePointers>
       <CompileAsWinRT>false</CompileAsWinRT>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -135,7 +135,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;_USE_MATH_DEFINES;HAVE_M_PI</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <StringPooling>true</StringPooling>
@@ -145,11 +145,11 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <FloatingPointModel>Fast</FloatingPointModel>
       <DebugInformationFormat>None</DebugInformationFormat>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <OmitFramePointers>true</OmitFramePointers>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -177,7 +177,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;_USE_MATH_DEFINES;HAVE_M_PI</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
@@ -205,7 +205,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;_USE_MATH_DEFINES;HAVE_M_PI</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <OmitFramePointers>false</OmitFramePointers>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
@@ -242,12 +242,14 @@
     <ClInclude Include="..\..\src\pt2_audio.h" />
     <ClInclude Include="..\..\src\pt2_blep.h" />
     <ClInclude Include="..\..\src\pt2_bmp.h" />
+    <ClInclude Include="..\..\src\pt2_chordmaker.h" />
     <ClInclude Include="..\..\src\pt2_config.h" />
     <ClInclude Include="..\..\src\pt2_diskop.h" />
     <ClInclude Include="..\..\src\pt2_edit.h" />
     <ClInclude Include="..\..\src\pt2_header.h" />
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
+    <ClInclude Include="..\..\src\pt2_ledfilter.h" />
     <ClInclude Include="..\..\src\pt2_mod2wav.h" />
     <ClInclude Include="..\..\src\pt2_module_loader.h" />
     <ClInclude Include="..\..\src\pt2_module_saver.h" />
@@ -255,12 +257,13 @@
     <ClInclude Include="..\..\src\pt2_palette.h" />
     <ClInclude Include="..\..\src\pt2_pat2smp.h" />
     <ClInclude Include="..\..\src\pt2_pattern_viewer.h" />
+    <ClInclude Include="..\..\src\pt2_rcfilter.h" />
+    <ClInclude Include="..\..\src\pt2_downsamplers2x.h" />
     <ClInclude Include="..\..\src\pt2_sample_loader.h" />
     <ClInclude Include="..\..\src\pt2_sampler.h" />
     <ClInclude Include="..\..\src\pt2_sample_saver.h" />
     <ClInclude Include="..\..\src\pt2_sampling.h" />
     <ClInclude Include="..\..\src\pt2_scopes.h" />
-    <ClInclude Include="..\..\src\pt2_sinc.h" />
     <ClInclude Include="..\..\src\pt2_structs.h" />
     <ClInclude Include="..\..\src\pt2_sync.h" />
     <ClInclude Include="..\..\src\pt2_tables.h" />
@@ -292,26 +295,29 @@
     </ClCompile>
     <ClCompile Include="..\..\src\pt2_blep.c" />
     <ClCompile Include="..\..\src\pt2_bmp.c" />
+    <ClCompile Include="..\..\src\pt2_chordmaker.c" />
     <ClCompile Include="..\..\src\pt2_config.c" />
     <ClCompile Include="..\..\src\pt2_diskop.c" />
     <ClCompile Include="..\..\src\pt2_edit.c" />
     <ClCompile Include="..\..\src\pt2_helpers.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
+    <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_module_loader.c" />
+    <ClCompile Include="..\..\src\pt2_rcfilter.c" />
     <ClCompile Include="..\..\src\pt2_replayer.c" />
     <ClCompile Include="..\..\src\pt2_module_saver.c" />
     <ClCompile Include="..\..\src\pt2_mouse.c" />
     <ClCompile Include="..\..\src\pt2_palette.c" />
     <ClCompile Include="..\..\src\pt2_pat2smp.c" />
     <ClCompile Include="..\..\src\pt2_pattern_viewer.c" />
+    <ClCompile Include="..\..\src\pt2_downsample2x.c" />
     <ClCompile Include="..\..\src\pt2_sample_loader.c" />
     <ClCompile Include="..\..\src\pt2_sampler.c" />
     <ClCompile Include="..\..\src\pt2_sample_saver.c" />
     <ClCompile Include="..\..\src\pt2_sampling.c" />
     <ClCompile Include="..\..\src\pt2_scopes.c" />
-    <ClCompile Include="..\..\src\pt2_sinc.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
     <ClCompile Include="..\..\src\pt2_sync.c" />
     <ClCompile Include="..\..\src\pt2_tables.c" />

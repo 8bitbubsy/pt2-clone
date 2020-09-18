@@ -1,8 +1,3 @@
-// for finding memory leaks in debug mode with Visual Studio 
-#if defined _DEBUG && defined _MSC_VER
-#include <crtdbg.h>
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h> // modf()
@@ -13,8 +8,6 @@
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
-#include "pt2_sampler.h"
-#include "pt2_palette.h"
 #include "pt2_tables.h"
 #include "pt2_structs.h"
 #include "pt2_config.h"
@@ -25,7 +18,7 @@ static volatile bool scopesUpdatingFlag, scopesDisplayingFlag;
 static int32_t oldPeriod = -1;
 static uint32_t scopeTimeLen, scopeTimeLenFrac;
 static uint64_t timeNext64, timeNext64Frac;
-static float fOldScopeDelta;
+static double dOldScopeDelta;
 static SDL_Thread *scopeThread;
 
 scope_t scope[AMIGA_VOICES]; // global
@@ -33,6 +26,7 @@ scope_t scope[AMIGA_VOICES]; // global
 void resetCachedScopePeriod(void)
 {
 	oldPeriod = -1;
+	dOldScopeDelta = 0.0;
 }
 
 // this is quite hackish, but fixes sample swapping issues
@@ -105,11 +99,11 @@ void scopeSetPeriod(int32_t ch, int32_t period)
 	if (period != oldPeriod)
 	{
 		oldPeriod = period;
-		const float fPeriodToScopeDeltaDiv = PAULA_PAL_CLK / (float)SCOPE_HZ;
-		fOldScopeDelta = fPeriodToScopeDeltaDiv / period;
+		const double dPeriodToScopeDeltaDiv = PAULA_PAL_CLK / (double)SCOPE_HZ;
+		dOldScopeDelta = dPeriodToScopeDeltaDiv / period;
 	}
 
-	scope[ch].fDelta = fOldScopeDelta;
+	scope[ch].dDelta = dOldScopeDelta;
 }
 
 void scopeTrigger(int32_t ch)
@@ -125,7 +119,7 @@ void scopeTrigger(int32_t ch)
 	if (newLength < 2)
 		newLength = 2; // for safety
 
-	tempState.fPhase = 0.0f;
+	tempState.dPhase = 0.0;
 	tempState.pos = 0;
 	tempState.data = newData;
 	tempState.length = newLength;
@@ -156,10 +150,10 @@ void updateScopes(void)
 		if (!tempState.active)
 			continue; // scope is not active
 
-		tempState.fPhase += tempState.fDelta;
+		tempState.dPhase += tempState.dDelta;
 
-		const int32_t wholeSamples = (int32_t)tempState.fPhase;
-		tempState.fPhase -= wholeSamples;
+		const int32_t wholeSamples = (int32_t)tempState.dPhase;
+		tempState.dPhase -= wholeSamples;
 		tempState.pos += wholeSamples;
 
 		if (tempState.pos >= tempState.length)
@@ -208,7 +202,8 @@ static void updateRealVuMeters(void)
 		if (!tmpScope.active || tmpScope.data == NULL || tmpScope.volume == 0 || tmpScope.length == 0)
 			continue;
 
-		int32_t samplesToScan = (int32_t)tmpScope.fDelta; // amount of integer samples getting skipped every frame
+		// amount of integer samples getting skipped every frame
+		const int32_t samplesToScan = (const int32_t)tmpScope.dDelta;
 		if (samplesToScan <= 0)
 			continue;
 
@@ -237,11 +232,11 @@ static void updateRealVuMeters(void)
 			}
 		}
 
-		float fAvgAmplitude = runningAmplitude / (float)samplesToScan;
+		double dAvgAmplitude = runningAmplitude / (double)samplesToScan;
 
-		fAvgAmplitude *= 96.0f / (128.0f * 64.0f); // normalize
+		dAvgAmplitude *= 96.0 / (128.0 * 64.0); // normalize
 
-		int32_t vuHeight = (int32_t)(fAvgAmplitude + 0.5f); // rounded
+		int32_t vuHeight = (int32_t)(dAvgAmplitude + 0.5); // rounded
 		if (vuHeight > 48) // max VU-meter height
 			vuHeight = 48;
 

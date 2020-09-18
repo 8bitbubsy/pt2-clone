@@ -1,4 +1,4 @@
-// C port of ProTracker 2.3D's replayer by 8bitbubsy, slightly modified.
+// C port of ProTracker 2.3D's replayer (with some modifications, but still accurate)
 
 // for finding memory leaks in debug mode with Visual Studio 
 #if defined _DEBUG && defined _MSC_VER
@@ -13,7 +13,6 @@
 #include "pt2_header.h"
 #include "pt2_audio.h"
 #include "pt2_helpers.h"
-#include "pt2_palette.h"
 #include "pt2_tables.h"
 #include "pt2_module_loader.h"
 #include "pt2_config.h"
@@ -37,7 +36,7 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 
 int8_t *allocMemForAllSamples(void)
 {
-	/* Allocate memoru for all sample data blocks.
+	/* Allocate memory for all sample data blocks.
 	**
 	** We need three extra sample slots:
 	** The 1st is extra safety padding since setting a Paula length of 0

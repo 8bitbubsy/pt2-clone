@@ -12,7 +12,6 @@
 #include "pt2_header.h"
 #include "pt2_mouse.h"
 #include "pt2_helpers.h"
-#include "pt2_palette.h"
 #include "pt2_diskop.h"
 #include "pt2_sampler.h"
 #include "pt2_module_loader.h"
@@ -26,6 +25,7 @@
 #include "pt2_config.h"
 #include "pt2_bmp.h"
 #include "pt2_sampling.h"
+#include "pt2_chordmaker.h"
 
 /* TODO: Move irrelevant routines outta here! Disgusting design!
 ** Keep in mind that this was programmed in my early programming days...
@@ -2164,12 +2164,6 @@ bool handleRightMouseButton(void)
 		ui.clearScreenShown = false;
 		setPrevStatusMessage();
 		pointerSetPreviousMode();
-
-		editor.errorMsgActive = true;
-		editor.errorMsgBlock = true;
-		editor.errorMsgCounter = 0;
-
-		setErrPointer();
 		removeClearScreen();
 		return true;
 	}
@@ -2379,7 +2373,7 @@ void updateMouseCounters(void)
 
 	if (editor.errorMsgActive)
 	{
-		if (++editor.errorMsgCounter >= (uint8_t)(VBLANK_HZ/1.15))
+		if (++editor.errorMsgCounter >= 55)
 		{
 			editor.errorMsgCounter = 0;
 
@@ -3268,340 +3262,31 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		case PTB_EO_VOL_DOWN: edVolDownButton(); break;
 		// ----------------------------------------------------------
 
-		// Edit Op. Screen #4
+		// Edit Op. Screen #4 (chord maker)
 
-		case PTB_EO_DOCHORD:
-		{
-			ui.askScreenShown = true;
-			ui.askScreenType = ASK_MAKE_CHORD;
-			pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			setStatusMessage("MAKE CHORD?", NO_CARRY);
-			renderAskDialog();
-		}
-		break;
-
-		case PTB_EO_MAJOR:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 4;
-			editor.note3 = editor.note1 + 7;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-
-			editor.note4 = 36;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_MAJOR7:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 4;
-			editor.note3 = editor.note1 + 7;
-			editor.note4 = editor.note1 + 11;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-			if (editor.note4 >= 36) editor.note4 -= 12;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_NOTE1:
-		{
-			if (mouse.rightButtonPressed)
-			{
-				editor.note1 = 36;
-			}
-			else
-			{
-				ui.changingChordNote = 1;
-				setStatusMessage("SELECT NOTE", NO_CARRY);
-				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			}
-			ui.updateNote1Text = true;
-		}
-		break;
-
+		case PTB_EO_DOCHORD: makeChord(); break;
+		case PTB_EO_NOTE1: selectChordNote1(); break;
+		case PTB_EO_NOTE2: selectChordNote2(); break;
+		case PTB_EO_NOTE3: selectChordNote3(); break;
+		case PTB_EO_NOTE4: selectChordNote4(); break;
 		case PTB_EO_NOTE1_UP: edNote1UpButton(); break;
 		case PTB_EO_NOTE1_DOWN: edNote1DownButton(); break;
-
-		case PTB_EO_NOTE2:
-		{
-			if (mouse.rightButtonPressed)
-			{
-				editor.note2 = 36;
-			}
-			else
-			{
-				ui.changingChordNote = 2;
-				setStatusMessage("SELECT NOTE", NO_CARRY);
-				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			}
-			ui.updateNote2Text = true;
-		}
-		break;
-
 		case PTB_EO_NOTE2_UP: edNote2UpButton(); break;
 		case PTB_EO_NOTE2_DOWN: edNote2DownButton(); break;
-
-		case PTB_EO_NOTE3:
-		{
-			if (mouse.rightButtonPressed)
-			{
-				editor.note3 = 36;
-			}
-			else
-			{
-				ui.changingChordNote = 3;
-				setStatusMessage("SELECT NOTE", NO_CARRY);
-				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			}
-			ui.updateNote3Text = true;
-		}
-		break;
-
 		case PTB_EO_NOTE3_UP: edNote3UpButton(); break;
 		case PTB_EO_NOTE3_DOWN: edNote3DownButton(); break;
-
-		case PTB_EO_NOTE4:
-		{
-			if (mouse.rightButtonPressed)
-			{
-				editor.note4 = 36;
-			}
-			else
-			{
-				ui.changingChordNote = 4;
-				setStatusMessage("SELECT NOTE", NO_CARRY);
-				pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-			}
-			ui.updateNote4Text = true;
-		}
-		break;
-
 		case PTB_EO_NOTE4_UP: edNote4UpButton(); break;
 		case PTB_EO_NOTE4_DOWN: edNote4DownButton(); break;
-
-		case PTB_EO_RESET:
-		{
-			editor.note1 = 36;
-			editor.note2 = 36;
-			editor.note3 = 36;
-			editor.note4 = 36;
-
-			editor.chordLengthMin = false;
-
-			ui.updateNote1Text = true;
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_MINOR:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 3;
-			editor.note3 = editor.note1 + 7;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-
-			editor.note4 = 36;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_MINOR7:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 3;
-			editor.note3 = editor.note1 + 7;
-			editor.note4 = editor.note1 + 10;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-			if (editor.note4 >= 36) editor.note4 -= 12;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_UNDO:
-		{
-			editor.note1 = editor.oldNote1;
-			editor.note2 = editor.oldNote2;
-			editor.note3 = editor.oldNote3;
-			editor.note4 = editor.oldNote4;
-
-			ui.updateNote1Text = true;
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_SUS4:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 5;
-			editor.note3 = editor.note1 + 7;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-
-			editor.note4 = 36;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_MAJOR6:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 4;
-			editor.note3 = editor.note1 + 7;
-			editor.note4 = editor.note1 + 9;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-			if (editor.note4 >= 36) editor.note4 -= 12;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
-
-		case PTB_EO_LENGTH:
-		{
-			if (song->samples[editor.currSample].loopLength == 2 && song->samples[editor.currSample].loopStart == 0)
-			{
-				editor.chordLengthMin = mouse.rightButtonPressed ? true : false;
-				recalcChordLength();
-			}
-		}
-		break;
-
-		case PTB_EO_MINOR6:
-		{
-			if (editor.note1 == 36)
-			{
-				displayErrorMsg("NO BASENOTE!");
-				break;
-			}
-
-			editor.oldNote1 = editor.note1;
-			editor.oldNote2 = editor.note2;
-			editor.oldNote3 = editor.note3;
-			editor.oldNote4 = editor.note4;
-
-			editor.note2 = editor.note1 + 3;
-			editor.note3 = editor.note1 + 7;
-			editor.note4 = editor.note1 + 9;
-
-			if (editor.note2 >= 36) editor.note2 -= 12;
-			if (editor.note3 >= 36) editor.note3 -= 12;
-			if (editor.note4 >= 36) editor.note4 -= 12;
-
-			ui.updateNote2Text = true;
-			ui.updateNote3Text = true;
-			ui.updateNote4Text = true;
-
-			recalcChordLength();
-		}
-		break;
+		case PTB_EO_RESET: resetChord(); break;
+		case PTB_EO_UNDO: undoChord(); break;
+		case PTB_EO_LENGTH: toggleChordLength(); break;
+		case PTB_EO_MAJOR: setChordMajor(); break;
+		case PTB_EO_MINOR: setChordMinor(); break;
+		case PTB_EO_SUS4: setChordSus4(); break;
+		case PTB_EO_MAJOR7: setChordMajor7(); break;
+		case PTB_EO_MINOR7: setChordMinor7(); break;
+		case PTB_EO_MAJOR6: setChordMajor6(); break;
+		case PTB_EO_MINOR6: setChordMinor6(); break;
 		// ----------------------------------------------------------
 
 		case PTB_ABOUT:
@@ -4646,10 +4331,6 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			removeClearScreen();
 			setPrevStatusMessage();
 			pointerSetPreviousMode();
-			editor.errorMsgActive = true;
-			editor.errorMsgBlock = true;
-			editor.errorMsgCounter = 0;
-			setErrPointer();
 		}
 		break;
 

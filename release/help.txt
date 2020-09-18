@@ -11,6 +11,9 @@ https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-d
  * Is there a way to run the program in fullscreen mode?
  - Press F11. On some keyboards/configurations you may need to press fn+F11.
  
+ * How can I toggle the audio type between Amiga 500 and Amiga 1200?
+ - Press F12. You can also change "FILTERMODEL" in protracker.ini.
+ 
  * Alt+F5/ALT+F5 (copy/paste) doesn't work!
  - Windows: you need to make sure those keybinding are disabled in
    'GeForce Experience' if you have that software installed.
@@ -170,10 +173,10 @@ https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-d
  
  - Quality mode: -
  HI: 28604Hz - Play the new sample at note A-3 (finetune +4)
- LO: 22168Hz - Play the new sample at note F-3 (finetune +1)
+ LO: 20864Hz - Play the new sample at note E-3 (finetune  0)
   
  HI has the highest possible quality, but can only fit 2.29 seconds of audio.
- LO is worse in quality, but can fit slightly more at 2.95 seconds.
+ LO is worse in quality, but can fit slightly more at 3.14 seconds.
  
  You should use this feature in sequences to fit as much rows as you need.
  F.ex. start from row 0 to row 23, then make another sample from row 24 to 47,

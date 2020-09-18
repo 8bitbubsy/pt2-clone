@@ -11,7 +11,6 @@
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
 #include "pt2_audio.h"
-#include "pt2_palette.h"
 #include "pt2_tables.h"
 #include "pt2_visuals.h"
 #include "pt2_blep.h"
@@ -22,6 +21,8 @@
 #include "pt2_config.h"
 #include "pt2_bmp.h"
 #include "pt2_sync.h"
+#include "pt2_rcfilter.h"
+#include "pt2_chordmaker.h"
 
 #define CENTER_LINE_COLOR 0x303030
 #define MARK_COLOR_1 0x666666 /* inverted background */
@@ -30,12 +31,6 @@
 
 #define SAMPLE_AREA_Y_CENTER 169
 #define SAMPLE_AREA_HEIGHT 64
-
-typedef struct sampleMixer_t
-{
-	int32_t length, pos;
-	uint32_t posFrac, delta;
-} sampleMixer_t;
 
 sampler_t sampler; // globalized
 
@@ -312,7 +307,7 @@ int32_t smpPos2Scr(int32_t pos) // sample pos -> screen x pos
 	if (sampler.samDisplay == 0)
 		return 0;
 
-	uint32_t roundingBias = (uint32_t)sampler.samDisplay >> 1;
+	const uint32_t roundingBias = (const uint32_t)sampler.samDisplay >> 1;
 
 	pos = (((uint32_t)pos * SAMPLE_AREA_WIDTH) + roundingBias) / (uint32_t)sampler.samDisplay; // rounded
 	pos -= samOffsetScaled;
@@ -465,7 +460,7 @@ void invertRange(void)
 	for (y = 0; y < 64; y++)
 	{
 		for (x = 0; x < rangeLen; x++)
-			dstPtr[x] = waveInvertTable[((dstPtr[x] >> 24) & 7) ^ 4]; // It's magic! ptr[x]>>24 = wave/invert color number
+			dstPtr[x] = waveInvertTable[((dstPtr[x] >> 24) & 7) ^ 4]; // ptr[x]>>24 = wave/invert color number
 
 		dstPtr += SCREEN_W;
 	}
@@ -523,7 +518,7 @@ void redrawSample(void)
 
 void highPassSample(int32_t cutOff)
 {
-	int32_t smp32, i, from, to;
+	int32_t i, from, to;
 	double *dSampleData, dBaseFreq, dCutOff;
 	moduleSample_t *s;
 	rcFilter_t filterHi;
@@ -589,25 +584,31 @@ void highPassSample(int32_t cutOff)
 
 	calcRCFilterCoeffs(dBaseFreq, dCutOff, &filterHi);
 
-	// copy over sample data to double buffer
-	for (i = 0; i < s->length; i++)
-		dSampleData[i] = song->sampleData[s->offset+i];
-
 	clearRCFilterState(&filterHi);
 	if (to <= s->length)
 	{
+		const int8_t *smpPtr = &song->sampleData[s->offset];
 		for (i = from; i < to; i++)
-			RCHighPassFilterMono(&filterHi, dSampleData[i], &dSampleData[i]);
+		{
+			double dSmp = smpPtr[i];
+			RCHighPassFilter(&filterHi, dSmp, &dSampleData[i]);
+		}
 	}
 
+	double dAmp = 1.0;
 	if (editor.normalizeFiltersFlag)
-		normalize8bitDoubleSigned(dSampleData, s->length);
+	{
+		const double dPeak = getDoublePeak(dSampleData, s->length);
+		if (dPeak > 0.0)
+			dAmp = INT8_MAX / dPeak;
+	}
 
+	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (i = from; i < to; i++)
 	{
-		smp32 = (int32_t)dSampleData[i];
-		CLAMP8(smp32);
-		song->sampleData[s->offset + i] = (int8_t)smp32;
+		int16_t smp16 = (int16_t)round(dSampleData[i] * dAmp);
+		CLAMP8(smp16);
+		smpPtr[i] = (int8_t)smp16;
 	}
 
 	free(dSampleData);
@@ -619,7 +620,7 @@ void highPassSample(int32_t cutOff)
 
 void lowPassSample(int32_t cutOff)
 {
-	int32_t smp32, i, from, to;
+	int32_t i, from, to;
 	double *dSampleData, dBaseFreq, dCutOff;
 	moduleSample_t *s;
 	rcFilter_t filterLo;
@@ -692,18 +693,29 @@ void lowPassSample(int32_t cutOff)
 	clearRCFilterState(&filterLo);
 	if (to <= s->length)
 	{
+		const int8_t *smpPtr = &song->sampleData[s->offset];
 		for (i = from; i < to; i++)
-			RCLowPassFilterMono(&filterLo, dSampleData[i], &dSampleData[i]);
+		{ 
+			double dSmp = smpPtr[i];
+			RCLowPassFilter(&filterLo, dSmp, &dSampleData[i]);
+		}
 	}
 
-	if (editor.normalizeFiltersFlag)
-		normalize8bitDoubleSigned(dSampleData, s->length);
+	double dAmp = 1.0;
 
+	if (editor.normalizeFiltersFlag)
+	{
+		const double dPeak = getDoublePeak(dSampleData, s->length);
+		if (dPeak > 0.0)
+			dAmp = INT8_MAX / dPeak;
+	}
+
+	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (i = from; i < to; i++)
 	{
-		smp32 = (int32_t)dSampleData[i];
-		CLAMP8(smp32);
-		song->sampleData[s->offset + i] = (int8_t)smp32;
+		int16_t smp16 = (int16_t)round(dSampleData[i] * dAmp);
+		CLAMP8(smp16);
+		smpPtr[i] = (int8_t)smp16;
 	}
 
 	free(dSampleData);
@@ -888,20 +900,6 @@ void samplerRemoveDcOffset(void)
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
 
-#define INTRP_QUADRATIC_TAPS 3
-#define INTRP8_QUADRATIC(s1, s2, s3, f) /* output: -32768..32767 (+ spline overshoot) */ \
-{ \
-	int32_t s4, frac = (f) >> 1; \
-	\
-	s2 <<= 8; \
-	s4 = ((s1 + s3) << (8 - 1)) - s2; \
-	s4 = ((s4 * frac) >> 16) + s2; \
-	s3 = (s1 + s3) << (8 - 1); \
-	s1 <<= 8; \
-	s3 = (s1 + s3) >> 1; \
-	s1 += ((s4 - s3) * frac) >> 14; \
-} \
-
 #define INTRP_LINEAR_TAPS 2
 #define INTRP8_LINEAR(s1, s2, f) /* output: -127..128 */ \
 	s2 -= s1; \
@@ -911,237 +909,6 @@ void samplerRemoveDcOffset(void)
 	s1 += s2; \
 	s1 >>= 8; \
 
-void mixChordSample(void)
-{
-	bool smpLoopFlag;
-	char smpText[22 + 1];
-	int8_t *smpData, sameNotes, smpVolume;
-	uint8_t smpFinetune, finetune;
-	int32_t channels, samples[INTRP_QUADRATIC_TAPS], *mixData, i, j, k, pos, smpLoopStart, smpLoopLength, smpEnd;
-	sampleMixer_t mixCh[4], *v;
-	moduleSample_t *s;
-
-	if (editor.sampleZero)
-	{
-		statusNotSampleZero();
-		return;
-	}
-
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	assert(editor.tuningNote <= 35);
-
-	if (editor.note1 == 36)
-	{
-		displayErrorMsg("NO BASENOTE!");
-		return;
-	}
-
-	if (song->samples[editor.currSample].length == 0)
-	{
-		statusSampleIsEmpty();
-		return;
-	}
-
-	// check if all notes are the same (illegal)
-	sameNotes = true;
-	if ((editor.note2 != 36) && (editor.note2 != editor.note1)) sameNotes = false; else editor.note2 = 36;
-	if ((editor.note3 != 36) && (editor.note3 != editor.note1)) sameNotes = false; else editor.note3 = 36;
-	if ((editor.note4 != 36) && (editor.note4 != editor.note1)) sameNotes = false; else editor.note4 = 36;
-
-	if (sameNotes)
-	{
-		displayErrorMsg("ONLY ONE NOTE!");
-		return;
-	}
-
-	// sort the notes
-
-	for (i = 0; i < 3; i++)
-	{
-		if (editor.note2 == 36)
-		{
-			editor.note2 = editor.note3;
-			editor.note3 = editor.note4;
-			editor.note4 = 36;
-		}
-	}
-
-	for (i = 0; i < 3; i++)
-	{
-		if (editor.note3 == 36)
-		{
-			editor.note3 = editor.note4;
-			editor.note4 = 36;
-		}
-	}
-
-	// remove eventual note duplicates
-	if (editor.note4 == editor.note3) editor.note4 = 36;
-	if (editor.note4 == editor.note2) editor.note4 = 36;
-	if (editor.note3 == editor.note2) editor.note3 = 36;
-
-	ui.updateNote1Text = true;
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
-
-	// setup some variables
-
-	smpLoopStart = song->samples[editor.currSample].loopStart;
-	smpLoopLength = song->samples[editor.currSample].loopLength;
-	smpLoopFlag = (smpLoopStart + smpLoopLength) > 2;
-	smpEnd = smpLoopFlag ? (smpLoopStart + smpLoopLength) : song->samples[editor.currSample].length;
-	smpData = &song->sampleData[song->samples[editor.currSample].offset];
-
-	if (editor.newOldFlag == 0)
-	{
-		// find a free sample slot for the new sample
-
-		for (i = 0; i < MOD_SAMPLES; i++)
-		{
-			if (song->samples[i].length == 0)
-				break;
-		}
-
-		if (i == MOD_SAMPLES)
-		{
-			displayErrorMsg("NO EMPTY SAMPLE!");
-			return;
-		}
-
-		smpFinetune = song->samples[editor.currSample].fineTune;
-		smpVolume = song->samples[editor.currSample].volume;
-		memcpy(smpText, song->samples[editor.currSample].text, sizeof (smpText));
-
-		s = &song->samples[i];
-		s->fineTune = smpFinetune;
-		s->volume = smpVolume;
-
-		memcpy(s->text, smpText, sizeof (smpText));
-		editor.currSample = (int8_t)i;
-	}
-	else
-	{
-		// overwrite current sample
-		s = &song->samples[editor.currSample];
-	}
-
-	mixData = (int32_t *)calloc(MAX_SAMPLE_LEN, sizeof (int32_t));
-	if (mixData == NULL)
-	{
-		statusOutOfMemory();
-		return;
-	}
-
-	s->length = smpLoopFlag ? MAX_SAMPLE_LEN : editor.chordLength; // if sample loops, set max length
-	s->loopLength = 2;
-	s->loopStart = 0;
-	s->text[21] = '!'; // chord sample indicator
-	s->text[22] = '\0';
-
-	memset(mixCh, 0, sizeof (mixCh));
-
-	// setup mixing lengths and deltas
-
-	finetune = s->fineTune & 0xF;
-	channels = 0;
-
-	if (editor.note1 < 36)
-	{
-		mixCh[0].delta = (periodTable[editor.tuningNote] << 16) / (periodTable[(finetune * 37) + editor.note1]);
-		mixCh[0].length = (smpEnd * periodTable[(finetune * 37) + editor.note1]) / periodTable[editor.tuningNote];
-		channels++;
-	}
-
-	if (editor.note2 < 36)
-	{
-		mixCh[1].delta = (periodTable[editor.tuningNote] << 16) / (periodTable[(finetune * 37) + editor.note2]);
-		mixCh[1].length = (smpEnd * periodTable[(finetune * 37) + editor.note2]) / periodTable[editor.tuningNote];
-		channels++;
-	}
-
-	if (editor.note3 < 36)
-	{
-		mixCh[2].delta = (periodTable[editor.tuningNote] << 16) / (periodTable[(finetune * 37) + editor.note3]);
-		mixCh[2].length = (smpEnd * periodTable[(finetune * 37) + editor.note3]) / periodTable[editor.tuningNote];
-		channels++;
-	}
-
-	if (editor.note4 < 36)
-	{
-		mixCh[3].delta = (periodTable[editor.tuningNote] << 16) / (periodTable[(finetune * 37) + editor.note4]);
-		mixCh[3].length = (smpEnd * periodTable[(finetune * 37) + editor.note4]) / periodTable[editor.tuningNote];
-		channels++;
-	}
-
-	// start mixing
-
-	turnOffVoices();
-	for (i = 0; i < channels; i++)
-	{
-		v = &mixCh[i];
-		if (v->length <= 0)
-			continue; // mix active channels only
-
-		for (j = 0; j < MAX_SAMPLE_LEN; j++) // don't mix more than we can handle in a sample slot
-		{
-			// collect samples for interpolation
-			for (k = 0; k < INTRP_QUADRATIC_TAPS; k++)
-			{
-				pos = v->pos + k;
-				if (smpLoopFlag)
-				{
-					while (pos >= smpEnd)
-						pos -= smpLoopLength;
-
-					samples[k] = smpData[pos];
-				}
-				else
-				{
-					if (pos >= smpEnd)
-						samples[k] = 0;
-					else
-						samples[k] = smpData[pos];
-				}
-			}
-
-			INTRP8_QUADRATIC(samples[0], samples[1], samples[2], v->posFrac);
-			mixData[j] += samples[0];
-
-			v->posFrac += v->delta;
-			if (v->posFrac > 0xFFFF)
-			{
-				v->pos += v->posFrac >> 16;
-				v->posFrac &= 0xFFFF;
-
-				if (smpLoopFlag)
-				{
-					while (v->pos >= smpEnd)
-						v->pos -= smpLoopLength;
-				}
-			}
-		}
-	}
-
-	normalize32bitSigned(mixData, s->length);
-
-	// normalize gain and quantize to 8-bit
-	for (i = 0; i < s->length; i++)
-		song->sampleData[s->offset + i] = (int8_t)(mixData[i] >> 24);
-
-	if (s->length < MAX_SAMPLE_LEN)
-		memset(&song->sampleData[s->offset + s->length], 0, MAX_SAMPLE_LEN - s->length);
-
-	// we're done
-
-	free(mixData);
-
-	editor.samplePos = 0;
-	fixSampleBeep(s);
-	updateCurrSample();
-
-	updateWindowTitle(MOD_IS_MODIFIED);
-}
 
 void samplerResample(void)
 {

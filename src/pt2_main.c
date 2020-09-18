@@ -19,7 +19,6 @@
 #include <sys/stat.h>
 #include "pt2_header.h"
 #include "pt2_helpers.h"
-#include "pt2_palette.h"
 #include "pt2_keyboard.h"
 #include "pt2_textout.h"
 #include "pt2_mouse.h"
@@ -428,7 +427,7 @@ static void handleInput(void)
 
 			if (!ui.askScreenShown && ui.introScreenShown)
 			{
-				if (!ui.clearScreenShown && !ui.diskOpScreenShown)
+				if (!ui.clearScreenShown && !ui.diskOpScreenShown && !editor.errorMsgActive)
 					statusAllRight();
 
 				ui.introScreenShown = false;
@@ -509,7 +508,7 @@ static bool initializeVars(void)
 	editor.oldNote4 = 36;
 	editor.tuningVol = 32;
 	editor.sampleVol = 100;
-	editor.tuningNote = 24;
+	editor.tuningNote = 24; // C-3
 	editor.metroSpeed = 4;
 	editor.editMoveAdd = 1;
 	editor.initialTempo = 125;
@@ -648,39 +647,37 @@ static bool checkIfAppWasTranslocated(int argc, char **argv)
 #ifdef _WIN32
 static void disableWasapi(void)
 {
-	const char *audioDriver;
-	int32_t i, numAudioDrivers;
-
 	// disable problematic WASAPI SDL2 audio driver on Windows (causes clicks/pops sometimes...)
 
-	numAudioDrivers = SDL_GetNumAudioDrivers();
-	for (i = 0; i < numAudioDrivers; i++)
+	const int32_t numAudioDrivers = SDL_GetNumAudioDrivers();
+	if (numAudioDrivers <= 1)
+		return;
+
+	// look for directsound and enable it if found
+	for (int32_t i = 0; i < numAudioDrivers; i++)
 	{
-		audioDriver = SDL_GetAudioDriver(i);
+		const char *audioDriver = SDL_GetAudioDriver(i);
 		if (audioDriver != NULL && strcmp("directsound", audioDriver) == 0)
 		{
 			SDL_setenv("SDL_AUDIODRIVER", "directsound", true);
 			audio.rescanAudioDevicesSupported = false;
-			break;
+			return;
 		}
 	}
 
-	if (i == numAudioDrivers)
+	// directsound is not available, try winmm
+	for (int32_t i = 0; i < numAudioDrivers; i++)
 	{
-		// directsound is not available, try winmm
-		for (i = 0; i < numAudioDrivers; i++)
+		const char *audioDriver = SDL_GetAudioDriver(i);
+		if (audioDriver != NULL && strcmp("winmm", audioDriver) == 0)
 		{
-			audioDriver = SDL_GetAudioDriver(i);
-			if (audioDriver != NULL && strcmp("winmm", audioDriver) == 0)
-			{
-				SDL_setenv("SDL_AUDIODRIVER", "winmm", true);
-				audio.rescanAudioDevicesSupported = false;
-				break;
-			}
+			SDL_setenv("SDL_AUDIODRIVER", "winmm", true);
+			audio.rescanAudioDevicesSupported = false;
+			return;
 		}
 	}
 
-	// maybe we didn't find directsound or winmm, let's use wasapi after all then...
+	// we didn't find directsound or winmm, let's use wasapi after all...
 }
 
 static void makeSureDirIsProgramDir(void)

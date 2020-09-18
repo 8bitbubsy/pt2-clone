@@ -22,3 +22,5 @@ vs2019_project/pt2-clone/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
 *.db-wal
 *.db-shm
 pt_pal_editor/vs2019_project/pt_pal_editor/Debug/pt_pal_editor.vcxproj.FileListAbsolute.txt
+vs2019_project/pt2-clone/Release/pt2-clone-win64.exe.recipe
+*.recipe

@@ -27,7 +27,6 @@
 #include "pt2_textout.h"
 #include "pt2_diskop.h"
 #include "pt2_tables.h"
-#include "pt2_palette.h"
 #include "pt2_module_loader.h"
 #include "pt2_audio.h"
 #include "pt2_sampler.h"

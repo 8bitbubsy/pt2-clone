@@ -4,15 +4,6 @@
 #include <stdbool.h>
 #include "pt2_header.h" // AMIGA_VOICES
 
-// adding this prevents denormalized numbers, which is slow
-#define DENORMAL_OFFSET 1e-15
-
-typedef struct rcFilter_t
-{
-	double buffer[2];
-	double c, c2, g, cg;
-} rcFilter_t;
-
 typedef struct audio_t
 {
 	volatile bool locked, isSampling;
@@ -51,20 +42,20 @@ typedef struct voice_t
 void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac);
 void resetCachedMixerPeriod(void);
 void resetAudioDithering(void);
-void calcRCFilterCoeffs(const double sr, const double hz, rcFilter_t *f);
-void clearRCFilterState(rcFilter_t *f);
-void RCLowPassFilter(rcFilter_t *f, const double *in, double *out);
-void RCHighPassFilter(rcFilter_t *f, const double *in, double *out);
-void RCLowPassFilterMono(rcFilter_t *f, const double in, double *out);
-void RCHighPassFilterMono(rcFilter_t *f, const double in, double *out);
-void normalize32bitSigned(int32_t *sampleData, uint32_t sampleLength);
-void normalize16bitSigned(int16_t *sampleData, uint32_t sampleLength);
-void normalize8bitFloatSigned(float *fSampleData, uint32_t sampleLength);
-void normalize8bitDoubleSigned(double *dSampleData, uint32_t sampleLength);
+
+uint16_t get16BitPeak(int16_t *sampleData, uint32_t sampleLength);
+uint32_t get32BitPeak(int32_t *sampleData, uint32_t sampleLength);
+float getFloatPeak(float *fSampleData, uint32_t sampleLength);
+double getDoublePeak(double *dSampleData, uint32_t sampleLength);
+void normalize16BitTo8Bit(int16_t *sampleData, uint32_t sampleLength);
+void normalize32BitTo8Bit(int32_t *sampleData, uint32_t sampleLength);
+void normalizeFloatTo8Bit(float *fSampleData, uint32_t sampleLength);
+void normalizeDoubleTo8Bit(double *dSampleData, uint32_t sampleLength);
+
 void setLEDFilter(bool state, bool doLockAudio);
 void toggleLEDFilter(void);
 void toggleAmigaPanMode(void);
-void toggleA500Filters(void);
+void toggleFilterModel(void);
 void paulaStopDMA(int32_t ch);
 void paulaStartDMA(int32_t ch);
 void paulaSetPeriod(int32_t ch, uint16_t period);

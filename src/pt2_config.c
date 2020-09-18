@@ -45,8 +45,8 @@ void loadConfig(void)
 	config.fullScreenStretch = false;
 	config.pattDots = false;
 	config.waveformCenterLine = true;
-	config.a500LowPassFilter = false;
-	config.soundFrequency = 96000;
+	config.filterModel = FILTERMODEL_A1200;
+	config.soundFrequency = 48000;
 	config.rememberPlayMode = false;
 	config.stereoSeparation = 20;
 	config.videoScaleFactor = 2;
@@ -61,12 +61,10 @@ void loadConfig(void)
 	config.autoCloseDiskOp = true;
 	config.vsyncOff = false;
 	config.hwMouse = true;
-	config.sampleLowpass = true;
 	config.startInFullscreen = false;
 	config.pixelFilter = PIXELFILTER_NEAREST;
 	config.integerScaling = true;
 	config.audioInputFrequency = 44100;
-	config.normalizeSampling = true;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -199,13 +197,6 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			     if (!_strnicmp(&configLine[8], "TRUE",  4)) config.hwMouse = true;
 			else if (!_strnicmp(&configLine[8], "FALSE", 5)) config.hwMouse = false;
-		}
-
-		// SAMPLELOWPASS
-		else if (!_strnicmp(configLine, "SAMPLELOWPASS=", 14))
-		{
-			     if (!_strnicmp(&configLine[14], "TRUE",  4)) config.sampleLowpass = true;
-			else if (!_strnicmp(&configLine[14], "FALSE", 5)) config.sampleLowpass = false;
 		}
 
 		// VSYNCOFF
@@ -375,18 +366,25 @@ static bool loadProTrackerDotIni(FILE *f)
 			}
 		}
 
-		// A500LOWPASSFILTER
-		else if (!_strnicmp(configLine, "A500LOWPASSFILTER=", 18))
+		// FILTERMODEL
+		else if (!_strnicmp(configLine, "FILTERMODEL=", 12))
 		{
-			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.a500LowPassFilter = true;
-			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.a500LowPassFilter = false;
+			     if (!_strnicmp(&configLine[12], "A500",  4)) config.filterModel = FILTERMODEL_A500;
+			else if (!_strnicmp(&configLine[12], "A1200", 5)) config.filterModel = FILTERMODEL_A1200;
 		}
 
-		// A4000LOWPASSFILTER (deprecated, same as A500LOWPASSFILTER)
+		// A500LOWPASSFILTER (deprecated, same as A4000LOWPASSFILTER)
+		else if (!_strnicmp(configLine, "A500LOWPASSFILTER=", 18))
+		{
+			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.filterModel = FILTERMODEL_A500;
+			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.filterModel = FILTERMODEL_A1200;
+		}
+
+		// A4000LOWPASSFILTER (deprecated)
 		else if (!_strnicmp(configLine, "A4000LOWPASSFILTER=", 19))
 		{
-			     if (!_strnicmp(&configLine[19], "TRUE",  4)) config.a500LowPassFilter = true;
-			else if (!_strnicmp(&configLine[19], "FALSE", 5)) config.a500LowPassFilter = false;
+			     if (!_strnicmp(&configLine[19], "TRUE",  4)) config.filterModel = FILTERMODEL_A500;
+			else if (!_strnicmp(&configLine[19], "FALSE", 5)) config.filterModel = FILTERMODEL_A1200;
 		}
 
 		// SAMPLINGFREQ
@@ -397,13 +395,6 @@ static bool loadProTrackerDotIni(FILE *f)
 				const int32_t num = atoi(&configLine[13]);
 				config.audioInputFrequency = CLAMP(num, 44100, 192000);
 			}
-		}
-
-		// NORMALIZESAMPLING
-		else if (!_strnicmp(configLine, "NORMALIZESAMPLING=", 18))
-		{
-			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.normalizeSampling = true;
-			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.normalizeSampling = false;
 		}
 
 		// FREQUENCY

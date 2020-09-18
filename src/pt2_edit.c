@@ -18,7 +18,6 @@
 #include "pt2_textout.h"
 #include "pt2_tables.h"
 #include "pt2_audio.h"
-#include "pt2_palette.h"
 #include "pt2_diskop.h"
 #include "pt2_mouse.h"
 #include "pt2_sampler.h"
@@ -29,6 +28,7 @@
 #include "pt2_config.h"
 #include "pt2_audio.h"
 #include "pt2_sync.h"
+#include "pt2_chordmaker.h"
 
 const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
 {

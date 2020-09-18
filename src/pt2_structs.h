@@ -173,14 +173,14 @@ typedef struct editor_t
 	uint8_t blockFromPos, blockToPos, timingMode, f6Pos, f7Pos, f8Pos, f9Pos, f10Pos, keyOctave, pNoteFlag;
 	uint8_t tuningNote, resampleNote, initialTempo, initialSpeed, editMoveAdd;
 
-	int16_t *pat2SmpBuf, modulateSpeed;
+	int16_t modulateSpeed;
 	uint16_t metroSpeed, metroChannel, sampleVol, samplePos, chordLength;
 	uint16_t effectMacros[10], oldTempo, currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	uint16_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
 	int32_t modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos;
 	uint32_t vblankTimeLen, vblankTimeLenFrac;
 	uint64_t musicTime64;
-	double dPerfFreq, dPerfFreqMulMicro;
+	double dPerfFreq, dPerfFreqMulMicro, *dPat2SmpBuf;
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
 	note_t patternBuffer[MOD_ROWS * AMIGA_VOICES], undoBuffer[MOD_ROWS * AMIGA_VOICES];
 	SDL_Thread *mod2WavThread, *pat2SmpThread;

@@ -1,7 +1,6 @@
 // these BLEP routines were coded by aciddose
 
 #include <stdint.h>
-#include <stdbool.h>
 #include <assert.h>
 #include "pt2_blep.h"
 

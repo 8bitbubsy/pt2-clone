@@ -12,6 +12,9 @@
 #include "pt2_audio.h"
 #include "pt2_sampler.h"
 #include "pt2_textout.h"
+#include "pt2_rcfilter.h"
+#include "pt2_pat2smp.h"
+#include "pt2_downsamplers2x.h"
 
 bool intMusic(void); // pt_modplayer.c
 void storeTempVariables(void); // pt_modplayer.c
@@ -28,8 +31,8 @@ void doPat2Smp(void)
 		return;
 	}
 
-	editor.pat2SmpBuf = (int16_t *)malloc(MAX_SAMPLE_LEN * sizeof (int16_t));
-	if (editor.pat2SmpBuf == NULL)
+	editor.dPat2SmpBuf = (double *)malloc((MAX_SAMPLE_LEN*2) * sizeof (double));
+	if (editor.dPat2SmpBuf == NULL)
 	{
 		statusOutOfMemory();
 		return;
@@ -69,36 +72,54 @@ void doPat2Smp(void)
 	editor.isSMPRendering = false;
 	resetSong();
 
-	// set back old row
-	song->currRow = song->row = oldRow;
-
-	normalize16bitSigned(editor.pat2SmpBuf, MIN(editor.pat2SmpPos, MAX_SAMPLE_LEN));
+	int32_t renderLength = editor.pat2SmpPos;
 
 	s = &song->samples[editor.currSample];
 
-	// quantize to 8-bit
-	for (int32_t i = 0; i < editor.pat2SmpPos; i++)
-		song->sampleData[s->offset+i] = editor.pat2SmpBuf[i] >> 8;
+	// set back old row
+	song->currRow = song->row = oldRow;
 
-	// clear the rest of the sample
-	if (editor.pat2SmpPos < MAX_SAMPLE_LEN)
-		memset(&song->sampleData[s->offset+editor.pat2SmpPos], 0, MAX_SAMPLE_LEN - editor.pat2SmpPos);
+	// downsample oversampled buffer, normalize and quantize to 8-bit
 
-	free(editor.pat2SmpBuf);
+	downsample2xDouble(editor.dPat2SmpBuf, renderLength);
+	renderLength /= 2;
+
+	double dAmp = 1.0;
+	const double dPeak = getDoublePeak(editor.dPat2SmpBuf, renderLength);
+	if (dPeak > 0.0)
+		dAmp = INT8_MAX / dPeak;
+
+	double dVol = 64.0 * dPeak;
+	if (dVol > 64.0)
+		dVol = 64.0;
+
+	int8_t *smpPtr = &song->sampleData[s->offset];
+	for (int32_t i = 0; i < renderLength; i++)
+	{
+		const int32_t smp = (const int32_t)round(editor.dPat2SmpBuf[i] * dAmp);
+		assert(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp (but just in case)
+		smpPtr[i] = (int8_t)smp;
+	}
+
+	free(editor.dPat2SmpBuf);
+	
+	// clear the rest of the sample (if not full)
+	if (renderLength < MAX_SAMPLE_LEN)
+		memset(&song->sampleData[s->offset+renderLength], 0, MAX_SAMPLE_LEN - renderLength);
 
 	if (editor.pat2SmpHQ)
 	{
-		strcpy(s->text, "pat2smp (a-3 tune:+4)");
+		strcpy(s->text, "pat2smp(a-3 ftune:+4)");
 		s->fineTune = 4;
 	}
 	else
 	{
-		strcpy(s->text, "pat2smp (f-3 tune:+1)");
-		s->fineTune = 1;
+		strcpy(s->text, "pat2smp(e-3 ftune: 0)");
+		s->fineTune = 0;
 	}
 
-	s->length = (uint16_t)editor.pat2SmpPos;
-	s->volume = 64;
+	s->length = (uint16_t)renderLength;
+	s->volume = (int8_t)round(dVol);
 	s->loopStart = 0;
 	s->loopLength = 2;
 

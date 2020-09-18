@@ -13,11 +13,11 @@ enum
 typedef struct config_t
 {
 	char *defModulesDir, *defSamplesDir;
-	bool waveformCenterLine, pattDots, a500LowPassFilter, compoMode, autoCloseDiskOp, hideDiskOpDates, hwMouse;
+	bool waveformCenterLine, pattDots, compoMode, autoCloseDiskOp, hideDiskOpDates, hwMouse;
 	bool transDel, fullScreenStretch, vsyncOff, modDot, blankZeroFlag, realVuMeters, rememberPlayMode;
-	bool sampleLowpass, startInFullscreen, integerScaling, normalizeSampling;
+	bool startInFullscreen, integerScaling;
 	int8_t stereoSeparation, videoScaleFactor, accidental;
-	uint8_t pixelFilter;
+	uint8_t pixelFilter, filterModel;
 	uint16_t quantizeValue;
 	uint32_t soundFrequency, soundBufferSize, audioInputFrequency;
 } config_t;

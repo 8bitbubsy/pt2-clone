@@ -5,10 +5,6 @@
 #include "pt2_header.h"
 #include "pt2_structs.h"
 
-#define SCOPE_FRAC_BITS 16
-#define SCOPE_FRAC_SCALE (1UL << 16)
-#define SCOPE_FRAC_MASK (SCOPE_FRAC_SCALE-1)
-
 typedef struct scope_t
 {
 	const int8_t *data;
@@ -16,7 +12,7 @@ typedef struct scope_t
 	uint8_t volume;
 	int32_t length, pos;
 
-	float fDelta, fPhase;
+	double dDelta, dPhase;
 	const int8_t *newData;
 	int32_t newLength;
 } scope_t;

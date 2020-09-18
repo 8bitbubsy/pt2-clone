@@ -18,7 +18,6 @@
 #include "pt2_helpers.h"
 #include "pt2_header.h"
 #include "pt2_tables.h"
-#include "pt2_palette.h"
 #include "pt2_structs.h"
 #include "pt2_config.h"
 
@@ -161,45 +160,4 @@ void updateWindowTitle(bool modified)
 	}
 
 	 SDL_SetWindowTitle(video.window, titleTemp);
-}
-
-void recalcChordLength(void)
-{
-	int8_t note;
-	int32_t len;
-	moduleSample_t *s;
-
-	s = &song->samples[editor.currSample];
-
-	if (editor.chordLengthMin)
-	{
-		note = MAX(MAX((editor.note1 == 36) ? -1 : editor.note1,
-		               (editor.note2 == 36) ? -1 : editor.note2),
-		           MAX((editor.note3 == 36) ? -1 : editor.note3,
-		               (editor.note4 == 36) ? -1 : editor.note4));
-	}
-	else
-	{
-		note = MIN(MIN(editor.note1, editor.note2), MIN(editor.note3, editor.note4));
-	}
-
-	if (note < 0 || note > 35)
-	{
-		editor.chordLength = 0;
-	}
-	else
-	{
-		assert(editor.tuningNote < 36);
-		if (editor.tuningNote < 36)
-		{
-			len = (s->length * periodTable[(37 * s->fineTune) + note]) / periodTable[editor.tuningNote];
-			if (len > MAX_SAMPLE_LEN)
-				len = MAX_SAMPLE_LEN;
-
-			editor.chordLength = len & 0xFFFE;
-		}
-	}
-
-	if (ui.editOpScreenShown && ui.editOpScreen == 3)
-		ui.updateLengthText = true;
 }

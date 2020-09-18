@@ -16,7 +16,6 @@
 #include "pt2_header.h"
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
-#include "pt2_palette.h"
 #include "pt2_diskop.h"
 #include "pt2_edit.h"
 #include "pt2_sampler.h"
@@ -29,6 +28,7 @@
 #include "pt2_unicode.h"
 #include "pt2_config.h"
 #include "pt2_sampling.h"
+#include "pt2_chordmaker.h"
 
 #if defined _WIN32 && !defined _DEBUG
 extern bool windowsKeyIsDown;
@@ -718,7 +718,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else
 			{
-				toggleA500Filters();
+				toggleFilterModel();
 			}
 		}
 		break;
@@ -3959,12 +3959,6 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 
 				pointerSetPreviousMode();
 				setPrevStatusMessage();
-
-				editor.errorMsgActive = true;
-				editor.errorMsgBlock = true;
-				editor.errorMsgCounter = 0;
-
-				setErrPointer();
 			}
 			break;
 

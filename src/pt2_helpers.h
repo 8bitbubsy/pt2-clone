@@ -64,4 +64,3 @@ void sanitizeFilenameChar(char *chr);
 bool sampleNameIsEmpty(char *name);
 bool moduleNameIsEmpty(char *name);
 void updateWindowTitle(bool modified);
-void recalcChordLength(void);
