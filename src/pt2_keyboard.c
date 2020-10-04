@@ -699,16 +699,25 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.leftCtrlPressed)
 			{
+				const bool audioWasntLocked = !audio.locked;
+				if (audioWasntLocked)
+					lockAudio();
+
 				editor.timingMode ^= 1;
+				updateReplayerTimingMode();
+
 				if (editor.timingMode == TEMPO_MODE_VBLANK)
 				{
 					editor.oldTempo = song->currBPM;
-					modSetTempo(125, true);
+					modSetTempo(125, false);
 				}
 				else
 				{
-					modSetTempo(editor.oldTempo, true);
+					modSetTempo(editor.oldTempo, false);
 				}
+
+				if (audioWasntLocked)
+					unlockAudio();
 
 				ui.updateSongTiming = true;
 			}
@@ -3452,10 +3461,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		break;
 	}
 
-	// repeat keys at 49.92Hz (Amiga PAL) rate
-	const uint64_t keyRepeatDelta = (uint64_t)(((UINT32_MAX+1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
-
-	keyb.repeatFrac += keyRepeatDelta; // 32.32 fixed-point counter
+	keyb.repeatFrac += keyb.repeatDelta; // 32.32 fixed-point counter
 	if (keyb.repeatFrac > 0xFFFFFFFF)
 	{
 		keyb.repeatFrac &= 0xFFFFFFFF;

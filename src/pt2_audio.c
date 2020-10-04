@@ -116,19 +116,6 @@ void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac)
 	tickTimeLenFrac = timeLenFrac;
 }
 
-static void generateBpmTables(void)
-{
-	for (int32_t i = 32; i <= 255; i++)
-	{
-		const double dBpmHz = i / 2.5;
-
-		audio.bpmTab[i-32] = audio.outputRate / dBpmHz;
-		audio.bpmTab28kHz[i-32] = PAT2SMP_HI_FREQ / dBpmHz; // PAT2SMP hi quality
-		audio.bpmTab22kHz[i-32] = PAT2SMP_LO_FREQ / dBpmHz; // PAT2SMP low quality
-		audio.bpmTabMod2Wav[i-32] = MOD2WAV_FREQ / dBpmHz; // MOD2WAV
-	}
-}
-
 void lockAudio(void)
 {
 	if (dev != 0)
@@ -788,6 +775,69 @@ void mixerCalcVoicePans(uint8_t stereoSeparation) // 0..100 (percentage)
 	setVoicePan(3, panL);
 }
 
+static double ciaBpm2Hz(int32_t bpm)
+{
+	if (bpm == 0)
+		return 0.0;
+
+	const uint32_t ciaPeriod = 1773447 / bpm; // yes, PT truncates here
+	return (double)CIA_PAL_CLK / ciaPeriod;
+}
+
+static void generateBpmTables(bool vblankTimingFlag)
+{
+	for (int32_t bpm = 32; bpm <= 255; bpm++)
+	{
+		double dHz;
+		
+		if (vblankTimingFlag)
+			dHz = AMIGA_PAL_VBLANK_HZ;
+		else
+			dHz = ciaBpm2Hz(bpm);
+
+		audio.bpmTable[bpm-32] = audio.outputRate / dHz;
+		audio.bpmTable28kHz[bpm-32] = PAT2SMP_HI_FREQ / dHz; // PAT2SMP hi quality
+		audio.bpmTable22kHz[bpm-32] = PAT2SMP_LO_FREQ / dHz; // PAT2SMP low quality
+		audio.bpmTableMod2Wav[bpm-32] = MOD2WAV_FREQ / dHz; // MOD2WAV
+	}
+}
+
+static void generateTickLengthTable(bool vblankTimingFlag)
+{
+	for (int32_t bpm = 32; bpm <= 255; bpm++)
+	{
+		double dHz;
+
+		if (vblankTimingFlag)
+			dHz = AMIGA_PAL_VBLANK_HZ;
+		else
+			dHz = ciaBpm2Hz(bpm);
+
+		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
+		double dTimeInt;
+		double dTimeFrac = modf(editor.dPerfFreq / dHz, &dTimeInt);
+		const int32_t timeInt = (int32_t)dTimeInt;
+	
+		dTimeFrac = floor((UINT32_MAX+1.0) * dTimeFrac); // fractional part (scaled to 0..2^32-1)
+
+		audio.tickLengthTable[bpm-32] = ((uint64_t)timeInt << 32) | (uint32_t)dTimeFrac;
+	}
+}
+
+void updateReplayerTimingMode(void)
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	const bool vblankTimingMode = (editor.timingMode == TEMPO_MODE_VBLANK);
+	generateBpmTables(vblankTimingMode);
+	generateTickLengthTable(vblankTimingMode);
+
+	if (audioWasntLocked)
+		unlockAudio();
+}
+
 bool setupAudio(void)
 {
 	SDL_AudioSpec want, have;
@@ -822,12 +872,12 @@ bool setupAudio(void)
 	audio.audioBufferSize = have.samples;
 	audio.dPeriodToDeltaDiv = (double)PAULA_PAL_CLK / audio.outputRate;
 
-	generateBpmTables();
+	updateReplayerTimingMode();
 
 	const int32_t lowestBPM = 32;
-	const int32_t pat2SmpMaxSamples = (int32_t)ceil(audio.bpmTab22kHz[lowestBPM-32]);
-	const int32_t mod2WavMaxSamples = (int32_t)ceil(audio.bpmTabMod2Wav[lowestBPM-32]);
-	const int32_t renderMaxSamples = (int32_t)ceil(audio.bpmTab[lowestBPM-32]);
+	const int32_t pat2SmpMaxSamples = (int32_t)ceil(audio.bpmTable22kHz[lowestBPM-32]);
+	const int32_t mod2WavMaxSamples = (int32_t)ceil(audio.bpmTableMod2Wav[lowestBPM-32]);
+	const int32_t renderMaxSamples = (int32_t)ceil(audio.bpmTable[lowestBPM-32]);
 
 	const int32_t maxSamplesToMix = MAX(pat2SmpMaxSamples, MAX(mod2WavMaxSamples, renderMaxSamples));
 
@@ -850,24 +900,13 @@ bool setupAudio(void)
 	ledFilterEnabled = false;
 	calculateFilterCoeffs();
 
-	audio.dSamplesPerTick = audio.bpmTab[125-32]; // BPM 125
+	audio.dSamplesPerTick = audio.bpmTable[125-32]; // BPM 125
 	audio.dTickSampleCounter = 0.0;
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
-	for (int32_t i = 32; i <= 255; i++)
-	{
-		const double dBpmHz = i / 2.5;
 
-		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
-		double dTimeInt;
-		double dTimeFrac = modf(editor.dPerfFreq / dBpmHz, &dTimeInt);
-		const int32_t timeInt = (int32_t)dTimeInt;
 	
-		dTimeFrac *= UINT32_MAX+1.0; // fractional part (scaled to 0..2^32-1)
-
-		audio.tickTimeLengthTab[i-32] = ((uint64_t)timeInt << 32) | (uint32_t)dTimeFrac;
-	}
 
 	audio.resetSyncTickTimeFlag = true;
 	SDL_PauseAudioDevice(dev, false);

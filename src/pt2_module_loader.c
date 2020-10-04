@@ -946,6 +946,7 @@ void setupLoadedMod(void)
 	updateWindowTitle(MOD_NOT_MODIFIED);
 
 	editor.timingMode = TEMPO_MODE_CIA;
+	updateReplayerTimingMode();
 
 	modSetSpeed(6);
 	modSetTempo(song->header.initialTempo, false); // 125 for normal MODs, custom value for certain STK/UST MODs

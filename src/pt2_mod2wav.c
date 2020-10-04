@@ -157,7 +157,8 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 		return false;
 	}
 
-	const int32_t maxSamplesToMix = (int32_t)ceil(TICKS_PER_RENDER_CHUNK * audio.bpmTabMod2Wav[32-32]); // BPM 32, stereo
+	const int32_t lowestBPM = 32;
+	const int32_t maxSamplesToMix = (int32_t)ceil(TICKS_PER_RENDER_CHUNK * audio.bpmTableMod2Wav[lowestBPM-32]); // stereo
 
 	mod2WavBuffer = (int16_t *)malloc(maxSamplesToMix * (2 * sizeof (int16_t)));
 	if (mod2WavBuffer == NULL)

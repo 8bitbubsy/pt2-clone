@@ -87,7 +87,7 @@ typedef struct module_t
 	bool loaded, modified;
 	int8_t *sampleData;
 
-	volatile uint8_t tick, speed;
+	volatile int32_t tick, speed;
 
 	int8_t row; // used for different things, so must not be internal to replayer
 
@@ -98,8 +98,8 @@ typedef struct module_t
 
 	// for pattern viewer
 	int8_t currRow;
-	uint8_t currSpeed;
-	uint16_t currOrder, currPattern, currBPM;
+	int32_t currSpeed, currBPM;
+	uint16_t currOrder, currPattern;
 
 	// for MOD2WAV progress bar
 	uint32_t rowsCounter, rowsInTotal;
@@ -111,7 +111,7 @@ typedef struct keyb_t
 	bool shiftPressed, leftCtrlPressed, leftAltPressed;
 	bool leftCommandPressed, leftAmigaPressed, keypadEnterPressed;
 	uint8_t repeatCounter, delayCounter;
-	uint64_t repeatFrac;
+	uint64_t repeatDelta, repeatFrac;
 	SDL_Scancode lastRepKey, lastKey;
 } keyb_t;
 
@@ -175,9 +175,9 @@ typedef struct editor_t
 
 	int16_t modulateSpeed;
 	uint16_t metroSpeed, metroChannel, sampleVol, samplePos, chordLength;
-	uint16_t effectMacros[10], oldTempo, currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
+	uint16_t effectMacros[10], currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	uint16_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
-	int32_t modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos;
+	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos;
 	uint32_t vblankTimeLen, vblankTimeLenFrac;
 	uint64_t musicTime64;
 	double dPerfFreq, dPerfFreqMulMicro, *dPat2SmpBuf;

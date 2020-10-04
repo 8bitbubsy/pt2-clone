@@ -1048,7 +1048,7 @@ void sampleRepeatLengthDownButton(bool fast)
 
 void tempoUpButton(void)
 {
-	int16_t val;
+	int32_t val;
 
 	if (editor.timingMode == TEMPO_MODE_VBLANK)
 		return;
@@ -1069,7 +1069,7 @@ void tempoUpButton(void)
 
 void tempoDownButton(void)
 {
-	int16_t val;
+	int32_t val;
 
 	if (editor.timingMode == TEMPO_MODE_VBLANK)
 		return;

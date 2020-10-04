@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.23"
+#define PROG_VER_STR "1.24"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -225,8 +225,8 @@ void modStop(void);
 void doStopIt(bool resetPlayMode);
 void playPattern(int8_t startRow);
 void modPlay(int16_t patt, int16_t order, int8_t row);
-void modSetSpeed(uint8_t speed);
-void modSetTempo(uint16_t bpm, bool doLockAudio);
+void modSetSpeed(int32_t speed);
+void modSetTempo(int32_t bpm, bool doLockAudio);
 void modFree(void);
 bool setupAudio(void);
 void audioClose(void);

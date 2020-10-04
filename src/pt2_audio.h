@@ -9,7 +9,7 @@ typedef struct audio_t
 	volatile bool locked, isSampling;
 
 	bool forceMixerOff;
-	double bpmTab[256-32], bpmTab28kHz[256-32], bpmTab22kHz[256-32], bpmTabMod2Wav[256-32];
+	double bpmTable[256-32], bpmTable28kHz[256-32], bpmTable22kHz[256-32], bpmTableMod2Wav[256-32];
 	uint32_t outputRate, audioBufferSize;
 	double dPeriodToDeltaDiv;
 
@@ -20,7 +20,7 @@ typedef struct audio_t
 
 	// for audio/video syncing
 	bool resetSyncTickTimeFlag;
-	uint64_t tickTimeLengthTab[224];
+	uint64_t tickLengthTable[224];
 } audio_t;
 
 typedef struct voice_t
@@ -38,6 +38,8 @@ typedef struct voice_t
 	int32_t syncTriggerLength;
 	const int8_t *syncTriggerData;
 } paulaVoice_t;
+
+void updateReplayerTimingMode(void);
 
 void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac);
 void resetCachedMixerPeriod(void);

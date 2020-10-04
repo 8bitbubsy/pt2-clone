@@ -24,9 +24,9 @@
 
 static bool posJumpAssert, pBreakFlag, updateUIPositions, modHasBeenPlayed;
 static int8_t pBreakPosition, oldRow, modPattern;
-static uint8_t pattDelTime, setBPMFlag, lowMask = 0xFF, pattDelTime2, oldSpeed;
+static uint8_t pattDelTime, lowMask = 0xFF, pattDelTime2;
 static int16_t modOrder, oldPattern, oldOrder;
-static uint16_t modBPM, oldBPM;
+static int32_t modBPM, oldBPM, oldSpeed, ciaSetBPM;
 
 static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 {
@@ -53,10 +53,9 @@ int8_t *allocMemForAllSamples(void)
 	return (int8_t *)calloc(1, allocLen);
 }
 
-void modSetSpeed(uint8_t speed)
+void modSetSpeed(int32_t speed)
 {
-	song->speed = speed;
-	song->currSpeed = speed;
+	song->currSpeed = song->speed = speed;
 	song->tick = 0;
 }
 
@@ -345,7 +344,7 @@ static void setSpeed(moduleChannel_t *ch)
 		if (editor.timingMode == TEMPO_MODE_VBLANK || (ch->n_cmd & 0xFF) < 32)
 			modSetSpeed(ch->n_cmd & 0xFF);
 		else
-			setBPMFlag = ch->n_cmd & 0xFF; // CIA doesn't refresh its registers until the next interrupt, so change it later
+			ciaSetBPM = ch->n_cmd & 0xFF; // the CIA chip doesn't use its new timer value until the next interrupt, so change it later
 	}
 	else
 	{
@@ -976,6 +975,13 @@ bool intMusic(void)
 	uint16_t *patt;
 	moduleChannel_t *c;
 
+	// Quirk: CIA uses newly set timer values on the next interrupt, so handle BPM change now (ciaSetBPM was set on previous interrupt)
+	if (ciaSetBPM != -1)
+	{
+		modSetTempo(ciaSetBPM, false);
+		ciaSetBPM = -1;
+	}
+
 	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= 32 && modBPM <= 255)
 		editor.musicTime64 += musicTimeTab64[modBPM-32]; // for playback counter (don't increase in "play/rec pattern" mode)
 
@@ -1006,20 +1012,13 @@ bool intMusic(void)
 		}
 	}
 
-	// PT quirk: CIA refreshes its timer values on the next interrupt, so do the real tempo change here
-	if (setBPMFlag != 0)
-	{
-		modSetTempo(setBPMFlag, false);
-		setBPMFlag = 0;
-	}
-
 	if (editor.isWAVRendering && song->tick == 0)
 		editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row] = true;
 
 	if (!editor.stepPlayEnabled)
 		song->tick++;
 
-	if (song->tick >= song->speed || editor.stepPlayEnabled)
+	if ((uint32_t)song->tick >= (uint32_t)song->speed || editor.stepPlayEnabled)
 	{
 		song->tick = 0;
 
@@ -1178,13 +1177,12 @@ void modSetPos(int16_t order, int16_t row)
 		ui.updateStatusText = true;
 }
 
-void modSetTempo(uint16_t bpm, bool doLockAudio)
+void modSetTempo(int32_t bpm, bool doLockAudio)
 {
 	if (bpm < 32)
 		return;
 
 	const bool audioWasntLocked = !audio.locked;
-
 	if (doLockAudio && audioWasntLocked)
 		lockAudio();
 
@@ -1199,16 +1197,16 @@ void modSetTempo(uint16_t bpm, bool doLockAudio)
 
 	double dSamplesPerTick;
 	if (editor.isSMPRendering)
-		dSamplesPerTick = editor.pat2SmpHQ ? audio.bpmTab28kHz[bpm] : audio.bpmTab22kHz[bpm];
+		dSamplesPerTick = editor.pat2SmpHQ ? audio.bpmTable28kHz[bpm] : audio.bpmTable22kHz[bpm];
 	else if (editor.isWAVRendering)
-		dSamplesPerTick = audio.bpmTabMod2Wav[bpm];
+		dSamplesPerTick = audio.bpmTableMod2Wav[bpm];
 	else
-		dSamplesPerTick = audio.bpmTab[bpm];
+		dSamplesPerTick = audio.bpmTable[bpm];
 
 	audio.dSamplesPerTick = dSamplesPerTick;
 
 	// calculate tick time length for audio/video sync timestamp
-	const uint64_t tickTimeLen64 = audio.tickTimeLengthTab[bpm];
+	const uint64_t tickTimeLen64 = audio.tickLengthTable[bpm];
 	const uint32_t tickTimeLen = tickTimeLen64 >> 32;
 	const uint32_t tickTimeLenFrac = tickTimeLen64 & 0xFFFFFFFF;
 
@@ -1225,10 +1223,9 @@ void modStop(void)
 
 	if (song != NULL)
 	{
-		for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		moduleChannel_t *c = song->channels;
+		for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
 		{
-			moduleChannel_t *c = &song->channels[i];
-
 			c->n_wavecontrol = 0;
 			c->n_glissfunk = 0;
 			c->n_finetune = 0;
@@ -1250,9 +1247,9 @@ void playPattern(int8_t startRow)
 		pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 
 	audio.dTickSampleCounter = 0.0; // zero tick sample counter so that it will instantly initiate a tick
-
 	song->currRow = song->row = startRow & 0x3F;
 	song->tick = song->speed;
+	ciaSetBPM = -1;
 
 	editor.playMode = PLAY_MODE_PATTERN;
 	editor.currMode = MODE_PLAY;
@@ -1295,6 +1292,7 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	doStopIt(false);
 	turnOffVoices();
 	audio.dTickSampleCounter = 0.0; // zero tick sample counter so that it will instantly initiate a tick
+	ciaSetBPM = -1;
 
 	if (row != -1)
 	{

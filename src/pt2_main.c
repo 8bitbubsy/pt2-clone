@@ -471,6 +471,10 @@ static bool initializeVars(void)
 
 	editor.repeatKeyFlag = (SDL_GetModState() & KMOD_CAPS) ? true : false;
 
+	// set key repeat rate to 49.9204Hz (Amiga PAL vblank rate)
+	const double dVblankHzRatio = AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ;
+	keyb.repeatDelta = (uint64_t)floor((UINT32_MAX+1.0) * dVblankHzRatio);
+
 	strcpy(editor.mixText, "MIX 01+02 TO 03");
 
 	// allocate some memory
