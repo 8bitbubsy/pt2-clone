@@ -905,9 +905,6 @@ bool setupAudio(void)
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
-
-	
-
 	audio.resetSyncTickTimeFlag = true;
 	SDL_PauseAudioDevice(dev, false);
 	return true;
