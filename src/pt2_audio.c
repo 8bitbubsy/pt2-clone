@@ -750,6 +750,28 @@ static void calculateFilterCoeffs(void)
 	calcRCFilterCoeffs(audio.outputRate, fc, &filterHiA1200);
 }
 
+void recalcFilterCoeffs(int32_t outputRate) // for MOD2WAV
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	const int32_t oldOutputRate = audio.outputRate;
+	audio.outputRate = outputRate;
+
+	clearRCFilterState(&filterLoA500);
+	clearRCFilterState(&filterLoA1200);
+	clearRCFilterState(&filterHiA500);
+	clearRCFilterState(&filterHiA1200);
+	clearLEDFilterState(&filterLED);
+
+	calculateFilterCoeffs();
+
+	audio.outputRate = oldOutputRate;
+	if (audioWasntLocked)
+		unlockAudio();
+}
+
 static void setVoicePan(int32_t ch, double pan) // pan = 0.0 .. 1.0
 {
 	// constant power panning

@@ -54,6 +54,7 @@ void normalize32BitTo8Bit(int32_t *sampleData, uint32_t sampleLength);
 void normalizeFloatTo8Bit(float *fSampleData, uint32_t sampleLength);
 void normalizeDoubleTo8Bit(double *dSampleData, uint32_t sampleLength);
 
+void recalcFilterCoeffs(int32_t outputRate); // for MOD2WAV
 void setLEDFilter(bool state, bool doLockAudio);
 void toggleLEDFilter(void);
 void toggleAmigaPanMode(void);

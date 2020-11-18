@@ -35,6 +35,9 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	// skip wav header place, render data first
 	fseek(f, sizeof (wavHeader_t), SEEK_SET);
 
+	if (MOD2WAV_FREQ != audio.outputRate)
+		recalcFilterCoeffs(MOD2WAV_FREQ);
+
 	wavRenderingDone = false;
 
 	uint32_t sampleCounter = 0;
@@ -88,6 +91,9 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 		if (samplesInChunk > 0)
 			fwrite(mod2WavBuffer, sizeof (int16_t), samplesInChunk, f);
 	}
+
+	if (MOD2WAV_FREQ != audio.outputRate)
+		recalcFilterCoeffs(audio.outputRate);
 
 	free(mod2WavBuffer);
 
