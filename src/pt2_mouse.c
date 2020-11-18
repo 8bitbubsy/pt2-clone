@@ -267,20 +267,25 @@ void readMouseXY(void)
 	}
 
 	if (video.useDesktopMouseCoords)
+	{
 		mouse.buttonState = SDL_GetGlobalMouseState(&mx, &my);
+
+		// convert desktop coords to window coords
+		SDL_GetWindowPosition(video.window, &windowX, &windowY);
+		mx -= windowX;
+		my -= windowY;
+	}
 	else
+	{
 		mouse.buttonState = SDL_GetMouseState(&mx, &my);
+	}
 
 	if (video.fullscreen)
 	{
-		/* If fullscreen without filtering mode, translate coords and warp mouse
-		** inside the render space.
-		** Fullscreen + filtering mode takes up 100% of the screen area used, so no
-		** need to translate coords in that mode.
-		*/
-
+		// centered fullscreen mode (not stretched) needs further coord translation
 		if (!config.fullScreenStretch)
 		{
+			// if software mouse is enabled, warp mouse inside render space
 			if (!config.hwMouse)
 			{
 				bool warpMouse = false;
@@ -315,16 +320,6 @@ void readMouseXY(void)
 			mx -= video.renderX;
 			my -= video.renderY;
 		}
-	}
-	else if (video.useDesktopMouseCoords)
-	{
-		// convert desktop coords to window coords
-
-		// (a call to this function is really fast in windowed mode)
-		SDL_GetWindowPosition(video.window, &windowX, &windowY);
-
-		mx -= windowX;
-		my -= windowY;
 	}
 
 	// multiply coords by video upscaling factors (don't round)
