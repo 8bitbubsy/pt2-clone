@@ -79,10 +79,9 @@ void doStopIt(bool resetPlayMode)
 
 	if (song != NULL)
 	{
-		for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		moduleChannel_t *c = song->channels;
+		for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
 		{
-			moduleChannel_t *c = &song->channels[i];
-
 			c->n_wavecontrol = 0;
 			c->n_glissfunk = 0;
 			c->n_finetune = 0;
@@ -348,11 +347,13 @@ static void setSpeed(moduleChannel_t *ch)
 	}
 	else
 	{
+		// F00 - stop song
+
 		editor.songPlaying = false;
 		editor.playMode = PLAY_MODE_NORMAL;
 		editor.currMode = MODE_IDLE;
 
-		pointerResetThreadSafe(); // set gray mouse cursor
+		pointerResetThreadSafe(); // set normal gray mouse pointer
 	}
 }
 
@@ -1024,10 +1025,9 @@ bool intMusic(void)
 
 		if (pattDelTime2 == 0)
 		{
-			for (i = 0; i < AMIGA_VOICES; i++)
+			c = song->channels;
+			for (i = 0; i < AMIGA_VOICES; i++, c++)
 			{
-				c = &song->channels[i];
-
 				playVoice(c);
 				paulaSetVolume(i, c->n_volume);
 
@@ -1038,8 +1038,9 @@ bool intMusic(void)
 		}
 		else
 		{
-			for (i = 0; i < AMIGA_VOICES; i++)
-				checkEffects(&song->channels[i]);
+			c = song->channels;
+			for (i = 0; i < AMIGA_VOICES; i++, c++)
+				checkEffects(c);
 		}
 
 		if (!editor.isWAVRendering && !editor.isSMPRendering)
@@ -1103,8 +1104,9 @@ bool intMusic(void)
 	}
 	else
 	{
-		for (i = 0; i < AMIGA_VOICES; i++)
-			checkEffects(&song->channels[i]);
+		c = song->channels;
+		for (i = 0; i < AMIGA_VOICES; i++, c++)
+			checkEffects(c);
 
 		if (posJumpAssert)
 			nextPosition();
@@ -1185,7 +1187,7 @@ void modSetTempo(int32_t bpm, bool doLockAudio)
 	const bool audioWasntLocked = !audio.locked;
 	if (doLockAudio && audioWasntLocked)
 		lockAudio();
-
+	
 	modBPM = bpm;
 	if (!editor.isSMPRendering && !editor.isWAVRendering)
 	{
