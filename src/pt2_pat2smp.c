@@ -52,22 +52,24 @@ void doPat2Smp(void)
 	modSetTempo(song->currBPM, true);
 	editor.pat2SmpPos = 0;
 
-	double dTickSamples = audio.dSamplesPerTick;
+	double dTickSampleCounter = 0.0;
 
 	editor.smpRenderingDone = false;
-	while (!editor.smpRenderingDone)
+	while (!editor.smpRenderingDone && editor.songPlaying)
 	{
-		const int32_t tickSamples = (int32_t)dTickSamples;
+		if (dTickSampleCounter <= 0.0)
+		{
+			// new replayer tick
 
-		const bool ended = !intMusic() || !editor.songPlaying;
-		outputAudio(NULL, tickSamples);
+			if (!intMusic())
+				editor.smpRenderingDone = true;
 
-		dTickSamples -= tickSamples; // keep fractional part
-		dTickSamples += audio.dSamplesPerTick;
+			dTickSampleCounter += audio.dSamplesPerTick;
+		}
 
-		if (ended)
-			editor.smpRenderingDone = true;
-
+		const int32_t remainingTick = (int32_t)ceil(dTickSampleCounter);
+		outputAudio(NULL, remainingTick);
+		dTickSampleCounter -= remainingTick;
 	}
 	editor.isSMPRendering = false;
 	resetSong();
