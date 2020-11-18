@@ -15,7 +15,7 @@
 #include "pt2_mod2wav.h"
 #include "pt2_structs.h"
 
-#define TICKS_PER_RENDER_CHUNK 32
+#define TICKS_PER_RENDER_CHUNK 64
 
 void storeTempVariables(void); // pt_modplayer.c
 bool intMusic(void); // pt_modplayer.c
@@ -24,14 +24,6 @@ static volatile bool wavRenderingDone;
 static int16_t *mod2WavBuffer;
 
 static void calcMod2WavTotalRows(void);
-
-static void renderSamples(int32_t samplesPerTick, int16_t *outStream)
-{
-	if (!intMusic())
-		wavRenderingDone = true;
-
-	outputAudio(outStream, samplesPerTick);
-}
 
 static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 {
@@ -45,10 +37,9 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 
 	wavRenderingDone = false;
 
-	uint8_t loopCounter = 8;
-	uint32_t totalSampleCounter = 0;
-
-	double dTickSamples = audio.dSamplesPerTick;
+	uint32_t sampleCounter = 0;
+	uint8_t tickCounter = 8;
+	double dTickSampleCounter = 0.0;
 
 	bool renderDone = false;
 	while (!renderDone)
@@ -65,20 +56,30 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 				break;
 			}
 
-			int32_t tickSamples = (int32_t)dTickSamples;
-			renderSamples(tickSamples, ptr16);
-			
-			dTickSamples -= tickSamples; // keep fractional part
-			dTickSamples += audio.dSamplesPerTick;
-
-			tickSamples *= 2; // stereo
-			samplesInChunk += tickSamples;
-			totalSampleCounter += tickSamples;
-			ptr16 += tickSamples;
-
-			if (++loopCounter >= 8)
+			if (dTickSampleCounter <= 0.0)
 			{
-				loopCounter = 0;
+				// new replayer tick
+
+				if (!intMusic())
+					wavRenderingDone = true;
+
+				dTickSampleCounter += audio.dSamplesPerTick;
+			}
+
+			int32_t remainingTick = (int32_t)ceil(dTickSampleCounter);
+
+			outputAudio(ptr16, remainingTick);
+			dTickSampleCounter -= remainingTick;
+
+			remainingTick *= 2; // stereo
+			samplesInChunk += remainingTick;
+			sampleCounter += remainingTick;
+
+			ptr16 += remainingTick;
+
+			if (++tickCounter >= 4)
+			{
+				tickCounter = 0;
 				ui.updateMod2WavDialog = true;
 			}
 		}
@@ -90,7 +91,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 
 	free(mod2WavBuffer);
 
-	if (totalSampleCounter & 1)
+	if (sampleCounter & 1)
 		fputc(0, f); // pad align byte
 
 	uint32_t totalRiffChunkLen = (uint32_t)ftell(f) - 8;
@@ -110,7 +111,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	wavHeader.byteRate = (wavHeader.sampleRate * wavHeader.numChannels * wavHeader.bitsPerSample) / 8;
 	wavHeader.blockAlign = (wavHeader.numChannels * wavHeader.bitsPerSample) / 8;
 	wavHeader.subchunk2ID = 0x61746164; // "data"
-	wavHeader.subchunk2Size = totalSampleCounter * sizeof (int16_t);
+	wavHeader.subchunk2Size = sampleCounter * sizeof (int16_t);
 
 	// write main header
 	fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
