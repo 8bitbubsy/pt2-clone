@@ -73,6 +73,9 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 	samplerChunk_t samplerChunk;
 	mptExtraChunk_t mptExtraChunk;
 
+	memset(tmpBuffer, 0, sizeof (tmpBuffer));
+	memset(fileName, 0, sizeof (fileName));
+
 	const moduleSample_t *s = &song->samples[editor.currSample];
 
 	if (s->length == 0)
