@@ -130,6 +130,7 @@ bool saveModule(bool checkIfFileExist, bool giveNewFreeFilename)
 	int32_t i, j;
 	struct stat statBuffer;
 
+	memset(tmpBuffer, 0, sizeof (tmpBuffer));
 	memset(fileName, 0, sizeof (fileName));
 
 	if (config.modDot)
