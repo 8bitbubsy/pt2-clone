@@ -11,6 +11,9 @@ static double state[2];
 
 /*
 ** - all-pass halfband filters (2x downsample) -
+**
+** 8bitbubsy: Not sure who coded these. Possibly aciddose,
+** or maybe he found it on the internet somewhere...
 */
 
 static double f(const double in, double *b, const double c)

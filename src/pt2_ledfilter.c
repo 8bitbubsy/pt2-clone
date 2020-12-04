@@ -3,7 +3,8 @@
 #include "pt2_rcfilter.h" // DENORMAL_OFFSET definition
 #include "pt2_ledfilter.h"
 
-/* Imperfect Amiga "LED" filter implementation. This may be further improved in the future.
+/* aciddose:
+** Imperfect Amiga "LED" filter implementation. This may be further improved in the future.
 ** Based upon ideas posted by mystran @ the kvraudio.com forum.
 **
 ** This filter may not function correctly used outside the fixed-cutoff context here!

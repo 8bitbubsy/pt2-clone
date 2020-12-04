@@ -1,3 +1,6 @@
+// 1-pole 6dB/oct RC filters, code by aciddose (I think?)
+
+
 #include <stdint.h>
 #include <math.h>
 #include "pt2_rcfilter.h"

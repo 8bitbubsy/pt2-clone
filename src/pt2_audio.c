@@ -658,8 +658,9 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 
 static void calculateFilterCoeffs(void)
 {
-	/* Amiga 500 filter emulation, by aciddose
+	/* Amiga 500/1200 filter emulation
 	**
+	** aciddose:
 	** First comes a static low-pass 6dB formed by the supply current
 	** from the Paula's mixture of channels A+B / C+D into the opamp with
 	** 0.1uF capacitor and 360 ohm resistor feedback in inverting mode biased by
@@ -719,7 +720,7 @@ static void calculateFilterCoeffs(void)
 	fc = 1.0 / (2.0 * pi * R * C);
 	calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA500);
 
-	// A1200 1-pole (6db/oct) static RC low-pass filter:
+	// A1200 1-pole (6dB/oct) static RC low-pass filter:
 	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
 	{
 		R = 680.0;  // R321 (680 ohm resistor)
@@ -737,13 +738,13 @@ static void calculateFilterCoeffs(void)
 	fb = 0.125; // Fb = 0.125 : Q ~= 1/sqrt(2)
 	calcLEDFilterCoeffs(audio.outputRate, fc, fb, &filterLED);
 
-	// A500 1-pole (6db/oct) static RC high-pass filter:
+	// A500 1-pole (6dB/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.233e-5; // C334 (22uF capacitor) + C335 (0.33µF capacitor)
 	fc = 1.0 / (2.0 * pi * R * C);
 	calcRCFilterCoeffs(audio.outputRate, fc, &filterHiA500);
 
-	// A1200 1-pole (6db/oct) static RC high-pass filter:
+	// A1200 1-pole (6dB/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.2e-5; // C334 (22uF capacitor)
 	fc = 1.0 / (2.0 * pi * R * C);
