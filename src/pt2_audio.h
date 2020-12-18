@@ -72,6 +72,7 @@ void mixerKillVoice(int32_t ch);
 void turnOffVoices(void);
 void mixerCalcVoicePans(uint8_t stereoSeparation);
 void outputAudio(int16_t *target, int32_t numSamples);
+void resetAudioDownsamplingStates(void);
 
 extern audio_t audio; // pt2_audio.c
 extern paulaVoice_t paula[AMIGA_VOICES]; // pt2_audio.c

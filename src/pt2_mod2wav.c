@@ -123,6 +123,8 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
 	fclose(f);
 
+	resetAudioDownsamplingStates();
+
 	ui.mod2WavFinished = true;
 	ui.updateMod2WavDialog = true;
 

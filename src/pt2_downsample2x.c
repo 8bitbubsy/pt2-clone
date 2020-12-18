@@ -25,7 +25,7 @@ static double f(const double in, double *b, const double c)
 	return out;
 }
 
-static double d2x(const double *input, double *b)
+double d2x(const double *input, double *b)
 {
 	return (f(input[0], &b[0], 0.150634765625) + f(input[1], &b[1], -0.3925628662109375)) * 0.5;
 }

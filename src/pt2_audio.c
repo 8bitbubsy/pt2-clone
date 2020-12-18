@@ -35,6 +35,7 @@
 #include "pt2_structs.h"
 #include "pt2_rcfilter.h"
 #include "pt2_ledfilter.h"
+#include "pt2_downsamplers2x.h"
 
 #define INITIAL_DITHER_SEED 0x12345000
 
@@ -46,9 +47,9 @@ static int32_t oldPeriod = -1, randSeed = INITIAL_DITHER_SEED;
 static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
-static double dPrngStateL, dPrngStateR;
+static double dPrngStateL, dPrngStateR, dLState[2], dRState[2];
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
-static rcFilter_t filterLoA500, filterLoA1200, filterHiA500, filterHiA1200;
+static rcFilter_t filterLoA500, filterHiA500, filterHiA1200;
 static ledFilter_t filterLED;
 static SDL_AudioDeviceID dev;
 
@@ -188,7 +189,6 @@ void turnOffVoices(void)
 		mixerKillVoice(i);
 
 	clearRCFilterState(&filterLoA500);
-	clearRCFilterState(&filterLoA1200);
 	clearRCFilterState(&filterHiA500);
 	clearRCFilterState(&filterHiA1200);
 	clearLEDFilterState(&filterLED);
@@ -372,7 +372,6 @@ void toggleFilterModel(void)
 		lockAudio();
 
 	clearRCFilterState(&filterLoA500);
-	clearRCFilterState(&filterLoA1200);
 	clearRCFilterState(&filterHiA500);
 	clearRCFilterState(&filterHiA1200);
 	clearLEDFilterState(&filterLED);
@@ -465,6 +464,12 @@ void resetAudioDithering(void)
 	dPrngStateR = 0.0;
 }
 
+void resetAudioDownsamplingStates(void)
+{
+	dLState[0] = dLState[1] = 0.0;
+	dRState[0] = dRState[1] = 0.0;
+}
+
 static inline int32_t random32(void)
 {
 	// LCG random 32-bit generator (quite good and fast)
@@ -473,43 +478,55 @@ static inline int32_t random32(void)
 	return randSeed;
 }
 
-static inline void processMixedSamples(int32_t i, int16_t *out)
+static void processMixedSamples(int32_t i, int16_t *out)
 {
 	int32_t smp32;
-	double dOut[2], dPrng;
+	double dPrng, dOut[2], dMixL[2], dMixR[2];
 
-	dOut[0] = dMixBufferL[i];
-	dOut[1] = dMixBufferR[i];
-
-	if (filterModel == FILTERMODEL_A500)
+	// we run the filters at 2x the audio output rate for more precision
+	for (int32_t j = 0; j < 2; j++)
 	{
-		// A500 low-pass RC filter
-		RCLowPassFilterStereo(&filterLoA500, dOut, dOut);
+		// zero-padding (yes, this makes sense)
+		dOut[0] = (j == 0) ? dMixBufferL[i] : 0.0;
+		dOut[1] = (j == 0) ? dMixBufferR[i] : 0.0;
 
-		// "LED" Sallen-Key filter
-		if (ledFilterEnabled)
-			LEDFilter(&filterLED, dOut, dOut);
+		if (filterModel == FILTERMODEL_A500)
+		{
+			// A500 low-pass RC filter
+			RCLowPassFilterStereo(&filterLoA500, dOut, dOut);
 
-		// A500 high-pass RC filter
-		RCHighPassFilterStereo(&filterHiA500, dOut, dOut);
+			// "LED" Sallen-Key filter
+			if (ledFilterEnabled)
+				LEDFilter(&filterLED, dOut, dOut);
+
+			// A500 high-pass RC filter
+			RCHighPassFilterStereo(&filterHiA500, dOut, dOut);
+		}
+		else
+		{
+			// A1200 low-pass filter is ignored (we don't want it)
+
+			// "LED" Sallen-Key filter
+			if (ledFilterEnabled)
+				LEDFilter(&filterLED, dOut, dOut);
+
+			// A1200 high-pass RC filter
+			RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
+		}
+
+		dMixL[j] = dOut[0];
+		dMixR[j] = dOut[1];
 	}
-	else
-	{
-		// A1200 low-pass RC filter
-		if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
-			RCLowPassFilterStereo(&filterLoA1200, dOut, dOut);
 
-		// "LED" Sallen-Key filter
-		if (ledFilterEnabled)
-			LEDFilter(&filterLED, dOut, dOut);
+#define NORMALIZE_DOWNSAMPLE 2.0
 
-		// A1200 high-pass RC filter
-		RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
-	}
+	// 2x "all-pass halfband" downsampling
+	dOut[0] = d2x(dMixL, dLState);
+	dOut[1] = d2x(dMixR, dRState);
 
-	// normalize and flip phase (A500/A1200 has a phase-inverted audio signal)
-	dOut[0] *= -INT16_MAX / (double)AMIGA_VOICES;
-	dOut[1] *= -INT16_MAX / (double)AMIGA_VOICES;
+	// normalize and invert phase (A500/A1200 has a phase-inverted audio signal)
+	dOut[0] *= NORMALIZE_DOWNSAMPLE * (-INT16_MAX / (double)AMIGA_VOICES);
+	dOut[1] *= NORMALIZE_DOWNSAMPLE * (-INT16_MAX / (double)AMIGA_VOICES);
 
 	// left channel - 1-bit triangular dithering (high-pass filtered)
 	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
@@ -564,6 +581,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		for (i = 0; i < numSamples; i++)
 		{
 			processMixedSamples(i, out);
+
 			*outStream++ = out[0];
 			*outStream++ = out[1];
 		}
@@ -647,7 +665,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 			samplesToMix = remainingTick;
 
 		outputAudio(streamOut, samplesToMix);
-		streamOut += samplesToMix << 1;
+		streamOut += samplesToMix<<1;
 
 		samplesLeft -= samplesToMix;
 		audio.dTickSampleCounter -= samplesToMix;
@@ -711,23 +729,47 @@ static void calculateFilterCoeffs(void)
 	** - RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22uF (f=5.204Hz)
 	*/
 
+	// we run the filters at twice the frequency for improved precision (zero-padding)
+	const uint32_t audioFreq = audio.outputRate * 2;
+
 	double R, C, R1, R2, C1, C2, fc, fb;
 	const double pi = 4.0 * atan(1.0); // M_PI can not be trusted
+
+	/*
+	** 8bitbubsy:
+	** Hackish low-pass cutoff compensation to better match Amiga 500 when
+	** we use "lower" audio output rates. This has been loosely hand-picked
+	** after looking at many frequency analyses on a sine-sweep test module
+	** rendered on 7 different Amiga 500 machines (and taking the average).
+	** Don't try to make sense of this magic constant, and it should only be
+	** used within this very specific application!
+	**
+	** The reason we want this bias is because our digital RC filter is not
+	** that precise at lower audio output rates. It would otherwise lead to a
+	** slight unwanted cut of treble near the cutoff we aim for. It was easily
+	** audible, and especially visible on a plotted frequency spectrum.
+	**
+	** 1100Hz is the magic value I found that seems to be good. Higher than that
+	** would allow too much treble to pass.
+	**
+	** Scaling it like this is 'acceptable' (confirmed with further frequency analyses
+	** at output rates of 48, 96 and 192).
+	*/
+	double dLPCutoffBias = 1100.0 * (44100.0 / audio.outputRate);
 
 	// A500 1-pole (6db/oct) static RC low-pass filter:
 	R = 360.0; // R321 (360 ohm resistor)
 	C = 1e-7;  // C321 (0.1uF capacitor)
-	fc = 1.0 / (2.0 * pi * R * C);
-	calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA500);
-
-	// A1200 1-pole (6dB/oct) static RC low-pass filter:
-	if (audio.outputRate >= 96000) // cutoff is too high for 44.1kHz/48kHz
-	{
-		R = 680.0;  // R321 (680 ohm resistor)
-		C = 6.8e-9; // C321 (6800pf capacitor)
-		fc = 1.0 / (2.0 * pi * R * C);
-		calcRCFilterCoeffs(audio.outputRate, fc, &filterLoA1200);
-	}
+	fc = (1.0 / (2.0 * pi * R * C)) + dLPCutoffBias;
+	calcRCFilterCoeffs(audioFreq, fc, &filterLoA500);
+	
+	/*
+	** 8bitbubsy:
+	** We don't handle Amiga 1200's ~34kHz low-pass filter as it's not really
+	** needed. The reason it was still present in the A1200 (despite its high
+	** non-audible cutoff) was to filter away high-frequency noise from Paula's
+	** PWM (volume modulation). We don't do PWM for volume in the PT2 clone.
+	*/
 
 	// Sallen-Key filter ("LED" filter, same RC values on A500 and A1200):
 	R1 = 10000.0; // R322 (10K ohm resistor)
@@ -736,19 +778,19 @@ static void calculateFilterCoeffs(void)
 	C2 = 3.9e-9;  // C323 (3900pF capacitor)
 	fc = 1.0 / (2.0 * pi * sqrt(R1 * R2 * C1 * C2));
 	fb = 0.125; // Fb = 0.125 : Q ~= 1/sqrt(2)
-	calcLEDFilterCoeffs(audio.outputRate, fc, fb, &filterLED);
+	calcLEDFilterCoeffs(audioFreq, fc, fb, &filterLED);
 
 	// A500 1-pole (6dB/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.233e-5; // C334 (22uF capacitor) + C335 (0.33µF capacitor)
 	fc = 1.0 / (2.0 * pi * R * C);
-	calcRCFilterCoeffs(audio.outputRate, fc, &filterHiA500);
+	calcRCFilterCoeffs(audioFreq, fc, &filterHiA500);
 
 	// A1200 1-pole (6dB/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.2e-5; // C334 (22uF capacitor)
 	fc = 1.0 / (2.0 * pi * R * C);
-	calcRCFilterCoeffs(audio.outputRate, fc, &filterHiA1200);
+	calcRCFilterCoeffs(audioFreq, fc, &filterHiA1200);
 }
 
 void recalcFilterCoeffs(int32_t outputRate) // for MOD2WAV
@@ -761,7 +803,6 @@ void recalcFilterCoeffs(int32_t outputRate) // for MOD2WAV
 	audio.outputRate = outputRate;
 
 	clearRCFilterState(&filterLoA500);
-	clearRCFilterState(&filterLoA1200);
 	clearRCFilterState(&filterHiA500);
 	clearRCFilterState(&filterHiA1200);
 	clearLEDFilterState(&filterLED);
@@ -904,8 +945,8 @@ bool setupAudio(void)
 
 	const int32_t maxSamplesToMix = MAX(pat2SmpMaxSamples, MAX(mod2WavMaxSamples, renderMaxSamples));
 
-	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
-	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
+	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double) * 8, 256);
+	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double) * 8, 256);
 
 	if (dMixBufferLUnaligned == NULL || dMixBufferRUnaligned == NULL)
 	{
@@ -928,6 +969,7 @@ bool setupAudio(void)
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
+	resetAudioDownsamplingStates();
 	audio.resetSyncTickTimeFlag = true;
 	SDL_PauseAudioDevice(dev, false);
 	return true;

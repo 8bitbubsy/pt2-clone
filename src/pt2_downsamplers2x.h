@@ -4,6 +4,8 @@
 
 // all-pass halfband filters
 
+double d2x(const double *input, double *b);
+
 // Warning: These can exceed -1.0 .. 1.0 because of undershoot/overshoot!
 
 void downsample2xFloat(float *buffer, int32_t originalLength);
