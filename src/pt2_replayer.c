@@ -338,8 +338,6 @@ static void setSpeed(moduleChannel_t *ch)
 {
 	if ((ch->n_cmd & 0xFF) > 0)
 	{
-		song->tick = 0;
-
 		if (editor.timingMode == TEMPO_MODE_VBLANK || (ch->n_cmd & 0xFF) < 32)
 			modSetSpeed(ch->n_cmd & 0xFF);
 		else
