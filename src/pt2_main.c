@@ -202,6 +202,7 @@ int main(int argc, char *argv[])
 	}
 
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+	SDL_EnableScreenSaver(); // allow screensaver to activate
 
 	/* Text input is started by default in SDL2, turn it off to remove ~2ms spikes per key press.
 	** We manuallay start it again when someone clicks on a text edit box, and stop it when done.
