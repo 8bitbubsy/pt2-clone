@@ -1,5 +1,5 @@
 # pt2-clone
-ProTracker 2 clone for Windows/macOS/Linux
+ProTracker 2 clone for Windows/macOS/Linux, by [8bitbubsy](https://16-bits.org).
 
 Aims to be a **highly accurate** clone of the classic ProTracker 2.3D software for Amiga. \
 Has additional audio filters and audio mixer improvements to make it sound close to a real Amiga computer. \
