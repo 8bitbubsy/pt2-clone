@@ -1028,32 +1028,29 @@ void samplerResample(void)
 	updateWindowTitle(MOD_IS_MODIFIED);
 }
 
+// reads two hex chars from pointer and converts them to one byte
 static uint8_t hexToInteger2(char *ptr)
 {
-	char lo, hi;
+	char hi = ptr[0];
+	char lo = ptr[1];
 
-	/* This routine must ONLY be used on an address
-	** where two bytes can be read. It will mess up
-	** if the ASCII values are not '0 .. 'F' */
+	if (hi >= '0' && hi <= '9')
+		hi -= '0';
+	else if (hi >= 'A' && hi <= 'F')
+		hi -= 'A'-10;
+	else if (hi >= 'a' && hi <= 'f')
+		hi -= 'a'-10;
+	else
+		hi = 0;
 
-	hi = ptr[0];
-	lo = ptr[1];
-
-	// high nybble
-	if (hi >= 'a')
-		hi -= ' ';
-
-	hi -= '0';
-	if (hi > 9)
-		hi -= 7;
-
-	// low nybble
-	if (lo >= 'a')
-		lo -= ' ';
-
-	lo -= '0';
-	if (lo > 9)
-		lo -= 7;
+	if (lo >= '0' && lo <= '9')
+		lo -= '0';
+	else if (lo >= 'A' && lo <= 'F')
+		lo -= 'A'-10;
+	else if (lo >= 'a' && lo <= 'f')
+		lo -= 'a'-10;
+	else
+		lo = 0;
 
 	return (hi << 4) | lo;
 }
@@ -1076,9 +1073,13 @@ void doMix(void)
 		return;
 	}
 
-	s1 = &song->samples[--smpFrom1];
-	s2 = &song->samples[--smpFrom2];
-	s3 = &song->samples[--smpTo];
+	smpFrom1--;
+	smpFrom2--;
+	smpTo--;
+
+	s1 = &song->samples[smpFrom1];
+	s2 = &song->samples[smpFrom2];
+	s3 = &song->samples[smpTo];
 
 	if (s1->length == 0 || s2->length == 0)
 	{

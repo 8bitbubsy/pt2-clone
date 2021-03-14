@@ -4010,7 +4010,7 @@ void handleTextEditInputChar(char textChar)
 
 				textMarkerMoveRight();
 			}
-			else if ((textChar >= '0' && textChar <= '9') || (textChar >= 'A' && textChar <= 'F'))
+			else if ((textChar >= '0' && textChar <= '9') || (textChar >= 'a' && textChar <= 'f'))
 			{
 				if (ui.dstPos == 14) // hack for sample mix text
 				{
