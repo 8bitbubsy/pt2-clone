@@ -2105,9 +2105,16 @@ void renderSprites(void)
 
 void flipFrame(void)
 {
+	const uint32_t windowFlags = SDL_GetWindowFlags(video.window);
+	bool minimized = (windowFlags & SDL_WINDOW_MINIMIZED) ? true : false;
+
 	renderSprites();
 	SDL_UpdateTexture(video.texture, NULL, video.frameBuffer, SCREEN_W * sizeof (int32_t));
-	SDL_RenderClear(video.renderer);
+
+	// SDL2 bug on Windows (?): This function consumes ever-increasing memory if the program is minimized
+	if (!minimized) 
+		SDL_RenderClear(video.renderer);
+
 	SDL_RenderCopy(video.renderer, video.texture, NULL, NULL);
 	SDL_RenderPresent(video.renderer);
 	eraseSprites();
@@ -2118,21 +2125,19 @@ void flipFrame(void)
 	}
 	else
 	{
-		uint32_t windowFlags = SDL_GetWindowFlags(video.window);
-
 		/* We have VSync, but it can unexpectedly get inactive in certain scenarios.
 		** We have to force thread sleeping (to ~60Hz) if so.
 		*/
 #ifdef __APPLE__
 		// macOS: VSync gets disabled if the window is 100% covered by another window. Let's add a (crude) fix:
-		if ((windowFlags & SDL_WINDOW_MINIMIZED) || !(windowFlags & SDL_WINDOW_INPUT_FOCUS))
+		if (minimized || !(windowFlags & SDL_WINDOW_INPUT_FOCUS))
 			waitVBL();
 #elif __unix__
 		// *NIX: VSync gets disabled in fullscreen mode (at least on some distros/systems). Let's add a fix:
-		if ((windowFlags & SDL_WINDOW_MINIMIZED) || video.fullscreen)
+		if (minimized || video.fullscreen)
 			waitVBL();
 #else
-		if (windowFlags & SDL_WINDOW_MINIMIZED)
+		if (minimized)
 			waitVBL();
 #endif
 	}
@@ -2431,5 +2436,6 @@ bool setupVideo(void)
 	if (videoDriver != NULL && strcmp("KMSDRM", videoDriver) == 0)
 		video.useDesktopMouseCoords = false;
 
+	SDL_SetRenderDrawColor(video.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 	return true;
 }
