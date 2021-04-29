@@ -17,10 +17,11 @@
 
 #define TICKS_PER_RENDER_CHUNK 64
 
-void storeTempVariables(void); // pt_modplayer.c
-bool intMusic(void); // pt_modplayer.c
+// pt_modplayer.c
+void storeTempVariables(void);
+bool intMusic(void);
+// ---------------------
 
-static volatile bool wavRenderingDone;
 static int16_t *mod2WavBuffer;
 
 static void calcMod2WavTotalRows(void);
@@ -38,11 +39,9 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	if (MOD2WAV_FREQ != audio.outputRate)
 		recalcFilterCoeffs(MOD2WAV_FREQ);
 
-	wavRenderingDone = false;
-
 	uint32_t sampleCounter = 0;
 	uint8_t tickCounter = 8;
-	double dTickSampleCounter = 0.0;
+	int64_t tickSampleCounter64 = 0;
 
 	bool renderDone = false;
 	while (!renderDone)
@@ -53,26 +52,24 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 		int16_t *ptr16 = mod2WavBuffer;
 		for (uint32_t i = 0; i < TICKS_PER_RENDER_CHUNK; i++)
 		{
-			if (!editor.isWAVRendering || wavRenderingDone || editor.abortMod2Wav || !editor.songPlaying)
+			if (!editor.isWAVRendering || renderDone || editor.abortMod2Wav || !editor.songPlaying)
 			{
 				renderDone = true;
 				break;
 			}
 
-			if (dTickSampleCounter <= 0.0)
+			if (tickSampleCounter64 <= 0) // new replayer tick
 			{
-				// new replayer tick
-
 				if (!intMusic())
-					wavRenderingDone = true;
+					renderDone = true; // this tick is the last tick
 
-				dTickSampleCounter += audio.dSamplesPerTick;
+				tickSampleCounter64 += audio.samplesPerTick64;
 			}
 
-			int32_t remainingTick = (int32_t)ceil(dTickSampleCounter);
+			int32_t remainingTick = (tickSampleCounter64 + UINT32_MAX) >> 32; // ceil (rounded upwards)
 
 			outputAudio(ptr16, remainingTick);
-			dTickSampleCounter -= remainingTick;
+			tickSampleCounter64 -= (int64_t)remainingTick << 32;
 
 			remainingTick *= 2; // stereo
 			samplesInChunk += remainingTick;
@@ -167,7 +164,8 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 	}
 
 	const int32_t lowestBPM = 32;
-	const int32_t maxSamplesToMix = (int32_t)ceil(TICKS_PER_RENDER_CHUNK * audio.bpmTableMod2Wav[lowestBPM-32]); // stereo
+	const int64_t maxSamplesToMix64 = audio.bpmTableMod2Wav[lowestBPM-32];
+	const int32_t maxSamplesToMix = ((TICKS_PER_RENDER_CHUNK * maxSamplesToMix64) + (1LL << 31)) >> 32; // ceil (rounded upwards)
 
 	mod2WavBuffer = (int16_t *)malloc(maxSamplesToMix * (2 * sizeof (int16_t)));
 	if (mod2WavBuffer == NULL)

@@ -645,7 +645,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 	int32_t samplesLeft = len >> 2;
 	while (samplesLeft > 0)
 	{
-		if (audio.dTickSampleCounter <= 0.0)
+		if (audio.tickSampleCounter64 <= 0)
 		{
 			// new replayer tick
 
@@ -655,10 +655,10 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 				fillVisualsSyncBuffer();
 			}
 
-			audio.dTickSampleCounter += audio.dSamplesPerTick;
+			audio.tickSampleCounter64 += audio.samplesPerTick64;
 		}
 
-		const int32_t remainingTick = (int32_t)ceil(audio.dTickSampleCounter);
+		const int32_t remainingTick = (audio.tickSampleCounter64 + UINT32_MAX) >> 32; // ceil rounding (upwards)
 
 		int32_t samplesToMix = samplesLeft;
 		if (samplesToMix > remainingTick)
@@ -668,7 +668,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 		streamOut += samplesToMix<<1;
 
 		samplesLeft -= samplesToMix;
-		audio.dTickSampleCounter -= samplesToMix;
+		audio.tickSampleCounter64 -= (int64_t)samplesToMix << 32;
 	}
 
 	(void)userdata;
@@ -852,17 +852,24 @@ static void generateBpmTables(bool vblankTimingFlag)
 {
 	for (int32_t bpm = 32; bpm <= 255; bpm++)
 	{
-		double dHz;
+		double dBpmHz;
 		
 		if (vblankTimingFlag)
-			dHz = AMIGA_PAL_VBLANK_HZ;
+			dBpmHz = AMIGA_PAL_VBLANK_HZ;
 		else
-			dHz = ciaBpm2Hz(bpm);
+			dBpmHz = ciaBpm2Hz(bpm);
 
-		audio.bpmTable[bpm-32] = audio.outputRate / dHz;
-		audio.bpmTable28kHz[bpm-32] = PAT2SMP_HI_FREQ / dHz; // PAT2SMP hi quality
-		audio.bpmTable22kHz[bpm-32] = PAT2SMP_LO_FREQ / dHz; // PAT2SMP low quality
-		audio.bpmTableMod2Wav[bpm-32] = MOD2WAV_FREQ / dHz; // MOD2WAV
+		const double dSamplesPerTick = audio.outputRate / dBpmHz;
+		const double dSamplesPerTick28kHz = PAT2SMP_HI_FREQ / dBpmHz; // PAT2SMP hi quality
+		const double dSamplesPerTick22kHz = PAT2SMP_LO_FREQ / dBpmHz; // PAT2SMP low quality
+		const double dSamplesPerTickMod2Wav = MOD2WAV_FREQ / dBpmHz; // MOD2WAV
+
+		// convert to rounded 32.32 fixed-point
+		const int32_t i = bpm-32;
+		audio.bpmTable[i] = (int64_t)((dSamplesPerTick * (UINT32_MAX+1.0)) + 0.5);
+		audio.bpmTable28kHz[i] = (int64_t)((dSamplesPerTick28kHz * (UINT32_MAX+1.0)) + 0.5);
+		audio.bpmTable22kHz[i] = (int64_t)((dSamplesPerTick22kHz * (UINT32_MAX+1.0)) + 0.5);
+		audio.bpmTableMod2Wav[i] = (int64_t)((dSamplesPerTickMod2Wav * (UINT32_MAX+1.0)) + 0.5);
 	}
 }
 
@@ -939,9 +946,9 @@ bool setupAudio(void)
 	updateReplayerTimingMode();
 
 	const int32_t lowestBPM = 32;
-	const int32_t pat2SmpMaxSamples = (int32_t)ceil(audio.bpmTable22kHz[lowestBPM-32]);
-	const int32_t mod2WavMaxSamples = (int32_t)ceil(audio.bpmTableMod2Wav[lowestBPM-32]);
-	const int32_t renderMaxSamples = (int32_t)ceil(audio.bpmTable[lowestBPM-32]);
+	const int32_t pat2SmpMaxSamples = (audio.bpmTable22kHz[lowestBPM-32] + (1LL + 31)) >> 32; // ceil (rounded upwards)
+	const int32_t mod2WavMaxSamples = (audio.bpmTableMod2Wav[lowestBPM-32] + (1LL + 31)) >> 32; // ceil (rounded upwards)
+	const int32_t renderMaxSamples = (audio.bpmTable[lowestBPM-32] + (1LL + 31)) >> 32; // ceil (rounded upwards)
 
 	const int32_t maxSamplesToMix = MAX(pat2SmpMaxSamples, MAX(mod2WavMaxSamples, renderMaxSamples));
 
@@ -964,8 +971,8 @@ bool setupAudio(void)
 	ledFilterEnabled = false;
 	calculateFilterCoeffs();
 
-	audio.dSamplesPerTick = audio.bpmTable[125-32]; // BPM 125
-	audio.dTickSampleCounter = 0.0;
+	audio.samplesPerTick64 = audio.bpmTable[125-32]; // BPM 125
+	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 

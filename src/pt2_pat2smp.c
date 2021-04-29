@@ -52,26 +52,27 @@ void doPat2Smp(void)
 	modSetTempo(song->currBPM, true);
 	editor.pat2SmpPos = 0;
 
-	double dTickSampleCounter = 0.0;
+	int64_t tickSampleCounter64 = 0;
 
 	editor.smpRenderingDone = false;
 	while (!editor.smpRenderingDone && editor.songPlaying)
 	{
-		if (dTickSampleCounter <= 0.0)
+		if (tickSampleCounter64 <= 0) // new replayer tick
 		{
-			// new replayer tick
-
 			if (!intMusic())
-				editor.smpRenderingDone = true;
+				editor.smpRenderingDone = true; // this tick is the last tick
 
-			dTickSampleCounter += audio.dSamplesPerTick;
+			tickSampleCounter64 += audio.samplesPerTick64;
 		}
 
-		const int32_t remainingTick = (int32_t)ceil(dTickSampleCounter);
+		int32_t remainingTick = (tickSampleCounter64 + UINT32_MAX) >> 32; // ceil (rounded upwards)
 		outputAudio(NULL, remainingTick);
-		dTickSampleCounter -= remainingTick;
+		tickSampleCounter64 -= (int64_t)remainingTick << 32;
 	}
 	editor.isSMPRendering = false;
+
+	//const double dSamplesPerTick = audio.samplesPerTick64 / (UINT32_MAX+1.0);
+
 	resetSong();
 
 	int32_t renderLength = editor.pat2SmpPos;
@@ -99,7 +100,7 @@ void doPat2Smp(void)
 	for (int32_t i = 0; i < renderLength; i++)
 	{
 		const int32_t smp = (const int32_t)round(editor.dPat2SmpBuf[i] * dAmp);
-		assert(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp (but just in case)
+		assert(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp
 		smpPtr[i] = (int8_t)smp;
 	}
 
