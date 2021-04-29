@@ -22,7 +22,7 @@
 #include "pt2_scopes.h"
 #include "pt2_sync.h"
 
-static bool posJumpAssert, pBreakFlag, updateUIPositions, modHasBeenPlayed;
+static bool posJumpAssert, pBreakFlag, modRenderDone;
 static int8_t pBreakPosition, oldRow, modPattern;
 static uint8_t pattDelTime, lowMask = 0xFF, pattDelTime2;
 static int16_t modOrder, oldPattern, oldOrder;
@@ -909,8 +909,38 @@ static void playVoice(moduleChannel_t *ch)
 	}
 }
 
+static bool firstNextPos = true;
+
+static void updateUIPositions(void)
+{
+	// don't update UI under MOD2WAV/PAT2SMP rendering
+	if (editor.isWAVRendering || editor.isSMPRendering)
+		return;
+
+	song->currRow = song->row;
+	song->currOrder = modOrder;
+	song->currPattern = modPattern;
+
+	uint16_t *currPatPtr = &song->header.order[modOrder];
+	editor.currPatternDisp = currPatPtr;
+	editor.currPosEdPattDisp = currPatPtr;
+	editor.currPatternDisp = currPatPtr;
+	editor.currPosEdPattDisp = currPatPtr;
+
+	ui.updateSongPos = true;
+	ui.updateSongPattern = true;
+	ui.updateCurrPattText = true;
+	ui.updatePatternData = true;
+
+	if (ui.posEdScreenShown)
+		ui.updatePosEd = true;
+}
+
 static void nextPosition(void)
 {
+	if (editor.isSMPRendering)
+		modRenderDone = true;
+
 	song->row = pBreakPosition;
 	pBreakPosition = 0;
 	posJumpAssert = false;
@@ -925,9 +955,7 @@ static void nextPosition(void)
 			editor.stepPlayEnabled = false;
 			editor.stepPlayBackwards = false;
 
-			if (!editor.isWAVRendering && !editor.isSMPRendering)
-				song->currRow = song->row;
-
+			song->currRow = song->row;
 			return;
 		}
 
@@ -935,96 +963,101 @@ static void nextPosition(void)
 		if (modOrder >= song->header.numOrders)
 		{
 			modOrder = 0;
-			modHasBeenPlayed = true;
 
 			if (config.compoMode) // stop song for music competitions playing
 			{
 				doStopIt(true);
 				turnOffVoices();
 
-				song->currOrder = 0;
-				song->currRow = song->row = 0;
-				song->currPattern = modPattern = (int8_t)song->header.order[0];
+				modOrder = 0;
+				modPattern = (int8_t)song->header.order[modOrder];
+				song->row = 0;
 
-				editor.currPatternDisp = &song->currPattern;
-				editor.currPosEdPattDisp = &song->currPattern;
-				editor.currPatternDisp = &song->currPattern;
-				editor.currPosEdPattDisp = &song->currPattern;
-
-				if (ui.posEdScreenShown)
-					ui.updatePosEd = true;
-
-				ui.updateSongPos = true;
-				ui.updateSongPattern = true;
-				ui.updateCurrPattText = true;
+				updateUIPositions();
 			}
+
+			if (editor.isWAVRendering)
+				modRenderDone = true;
 		}
 
 		modPattern = (int8_t)song->header.order[modOrder];
 		if (modPattern > MAX_PATTERNS-1)
 			modPattern = MAX_PATTERNS-1;
-
-		updateUIPositions = true;
 	}
+
+	firstNextPos = false;
 }
 
-bool intMusic(void)
+static void increasePlaybackTimer(void)
 {
-	uint8_t i;
-	uint16_t *patt;
-	moduleChannel_t *c;
-
-	// Quirk: CIA uses newly set timer values on the next interrupt, so handle BPM change now (ciaSetBPM was set on previous interrupt)
-	if (ciaSetBPM != -1)
-	{
-		modSetTempo(ciaSetBPM, false);
-		ciaSetBPM = -1;
-	}
-
+	// the timer is not counting in "play pattern" mode
 	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= 32 && modBPM <= 255)
-		editor.musicTime64 += musicTimeTab64[modBPM-32]; // for playback counter (don't increase in "play/rec pattern" mode)
+		editor.musicTime64 += musicTimeTab64[modBPM-32];
+}
 
-	if (updateUIPositions)
+static void setCurrRowToVisited(void) // for MOD2WAV
+{
+	if (editor.isWAVRendering)
+		editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row] = true;
+}
+
+static bool renderEndCheck(void) // for MOD2WAV/PAT2SMP
+{
+	if (!editor.isWAVRendering && !editor.isSMPRendering)
+		return true; // we're not doing MOD2WAV/PAT2SMP
+
+	bool noPatternDelay = pattDelTime2 == 0;
+	if (noPatternDelay && song->tick == song->speed-1)
 	{
-		updateUIPositions = false;
-
-		if (!editor.isWAVRendering && !editor.isSMPRendering)
+		if (editor.isSMPRendering)
 		{
-			if (editor.playMode != PLAY_MODE_PATTERN)
-			{
-				song->currOrder = modOrder;
-				song->currPattern = modPattern;
-
-				patt = &song->header.order[modOrder];
-				editor.currPatternDisp = patt;
-				editor.currPosEdPattDisp = patt;
-				editor.currPatternDisp = patt;
-				editor.currPosEdPattDisp = patt;
-
-				if (ui.posEdScreenShown)
-					ui.updatePosEd = true;
-
-				ui.updateSongPos = true;
-				ui.updateSongPattern = true;
-				ui.updateCurrPattText = true;
-			}
+			if (modRenderDone)
+				return false; // we're done rendering
+		}
+		
+		if (editor.isWAVRendering)
+		{
+			bool rowVisited = editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row];
+			if (rowVisited || modRenderDone)
+				return false; // we're done rendering
 		}
 	}
 
-	if (editor.isWAVRendering && song->tick == 0)
-		editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row] = true;
+	return true;
+}
+
+bool intMusic(void) // replayer ticker
+{
+	// quirk: CIA BPM changes are delayed by one tick in PT, so handle previous tick's BPM change now
+	if (ciaSetBPM != -1)
+	{
+		const int32_t newBPM = ciaSetBPM;
+		modSetTempo(newBPM, false);
+		ciaSetBPM = -1;
+	}
+
+	increasePlaybackTimer();
 
 	if (!editor.stepPlayEnabled)
 		song->tick++;
 
-	if ((uint32_t)song->tick >= (uint32_t)song->speed || editor.stepPlayEnabled)
+	bool readNewNote = false;
+	if ((unsigned)song->tick >= (unsigned)song->speed)
 	{
 		song->tick = 0;
+		readNewNote = true;
+	}
 
-		if (pattDelTime2 == 0)
+	if (readNewNote || editor.stepPlayEnabled) // tick 0
+	{
+		if (pattDelTime2 == 0) // no pattern delay, time to read note data
 		{
-			c = song->channels;
-			for (i = 0; i < AMIGA_VOICES; i++, c++)
+			setCurrRowToVisited(); // for MOD2WAV/PAT2SMP
+			updateUIPositions(); // update current song positions in UI
+
+			// read note data and trigger voices
+			moduleChannel_t *c = song->channels;
+			for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
 			{
 				playVoice(c);
 				paulaSetVolume(i, c->n_volume);
@@ -1034,23 +1067,18 @@ bool intMusic(void)
 				paulaSetLength(i, c->n_replen);
 			}
 		}
-		else
+		else // pattern delay is on-going
 		{
-			c = song->channels;
-			for (i = 0; i < AMIGA_VOICES; i++, c++)
+			moduleChannel_t *c = song->channels;
+			for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
 				checkEffects(c);
 		}
 
-		if (!editor.isWAVRendering && !editor.isSMPRendering)
-		{
-			song->currRow = song->row;
-			ui.updatePatternData = true;
-		}
-
+		// increase row
 		if (!editor.stepPlayBackwards)
 		{
 			song->row++;
-			song->rowsCounter++;
+			song->rowsCounter++; // for MOD2WAV's progress bar
 		}
 
 		if (pattDelTime > 0)
@@ -1059,10 +1087,15 @@ bool intMusic(void)
 			pattDelTime = 0;
 		}
 
+		// undo row increase if pattern delay is on-going
 		if (pattDelTime2 > 0)
 		{
-			if (--pattDelTime2 > 0)
+			pattDelTime2--;
+			if (pattDelTime2 > 0)
+			{
 				song->row--;
+				song->rowsCounter--; // for MOD2WAV's progress bar
+			}
 		}
 
 		if (pBreakFlag)
@@ -1072,51 +1105,37 @@ bool intMusic(void)
 			pBreakFlag = false;
 		}
 
-		if (editor.blockMarkFlag)
-			ui.updateStatusText = true;
-
+		// step-play handling
 		if (editor.stepPlayEnabled)
 		{
 			doStopIt(true);
 
 			song->currRow = song->row & 0x3F;
-			ui.updatePatternData = true;
-
 			editor.stepPlayEnabled = false;
 			editor.stepPlayBackwards = false;
-			ui.updatePatternData = true;
 
+			ui.updatePatternData = true;
 			return true;
 		}
 
 		if (song->row >= MOD_ROWS || posJumpAssert)
-		{
-			if (editor.isSMPRendering)
-				modHasBeenPlayed = true;
-
 			nextPosition();
-		}
 
-		if (editor.isWAVRendering && !pattDelTime2 && editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row])
-			modHasBeenPlayed = true;
+		// for pattern block mark feature
+		if (editor.blockMarkFlag)
+			ui.updateStatusText = true;
 	}
-	else
+	else // tick > 0 (handle effects)
 	{
-		c = song->channels;
-		for (i = 0; i < AMIGA_VOICES; i++, c++)
+		moduleChannel_t *c = song->channels;
+		for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
 			checkEffects(c);
 
 		if (posJumpAssert)
 			nextPosition();
 	}
 
-	if ((editor.isSMPRendering || editor.isWAVRendering) && modHasBeenPlayed && song->tick == song->speed-1)
-	{
-		modHasBeenPlayed = false;
-		return false;
-	}
-
-	return true;
+	return renderEndCheck(); // MOD2WAV/PAT2SMP listens to the return value (true = not done yet)
 }
 
 void modSetPattern(uint8_t pattern)
@@ -1179,7 +1198,7 @@ void modSetPos(int16_t order, int16_t row)
 
 void modSetTempo(int32_t bpm, bool doLockAudio)
 {
-	if (bpm < 32)
+	if (bpm < 32 || bpm > 255)
 		return;
 
 	const bool audioWasntLocked = !audio.locked;
@@ -1195,20 +1214,20 @@ void modSetTempo(int32_t bpm, bool doLockAudio)
 
 	bpm -= 32; // 32..255 -> 0..223
 
-	double dSamplesPerTick;
+	int64_t samplesPerTick64;
 	if (editor.isSMPRendering)
-		dSamplesPerTick = editor.pat2SmpHQ ? audio.bpmTable28kHz[bpm] : audio.bpmTable22kHz[bpm];
+		samplesPerTick64 = editor.pat2SmpHQ ? audio.bpmTable28kHz[bpm] : audio.bpmTable22kHz[bpm];
 	else if (editor.isWAVRendering)
-		dSamplesPerTick = audio.bpmTableMod2Wav[bpm];
+		samplesPerTick64 = audio.bpmTableMod2Wav[bpm];
 	else
-		dSamplesPerTick = audio.bpmTable[bpm];
+		samplesPerTick64 = audio.bpmTable[bpm];
 
-	audio.dSamplesPerTick = dSamplesPerTick;
+	audio.samplesPerTick64 = samplesPerTick64;
 
 	// calculate tick time length for audio/video sync timestamp
 	const uint64_t tickTimeLen64 = audio.tickLengthTable[bpm];
 	const uint32_t tickTimeLen = tickTimeLen64 >> 32;
-	const uint32_t tickTimeLenFrac = tickTimeLen64 & 0xFFFFFFFF;
+	const uint32_t tickTimeLenFrac = (uint32_t)tickTimeLen64;
 
 	setSyncTickTimeLen(tickTimeLen, tickTimeLenFrac);
 
@@ -1238,7 +1257,7 @@ void modStop(void)
 	pattDelTime2 = 0;
 	pBreakPosition = 0;
 	posJumpAssert = false;
-	modHasBeenPlayed = true;
+	modRenderDone = true;
 }
 
 void playPattern(int8_t startRow)
@@ -1246,7 +1265,7 @@ void playPattern(int8_t startRow)
 	if (!editor.stepPlayEnabled)
 		pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 
-	audio.dTickSampleCounter = 0.0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
 	song->currRow = song->row = startRow & 0x3F;
 	song->tick = song->speed;
 	ciaSetBPM = -1;
@@ -1291,7 +1310,7 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 
 	doStopIt(false);
 	turnOffVoices();
-	audio.dTickSampleCounter = 0.0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
 	ciaSetBPM = -1;
 
 	if (row != -1)
@@ -1343,8 +1362,8 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	editor.playMode = oldPlayMode;
 	editor.currMode = oldMode;
 
-	song->tick = song->speed;
-	modHasBeenPlayed = false;
+	song->tick = song->speed-1;
+	modRenderDone = false;
 	editor.songPlaying = true;
 	editor.didQuantize = false;
 
@@ -1569,6 +1588,6 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 	doStopIt(true);
 
 	song->tick = 0;
-	modHasBeenPlayed = false;
+	modRenderDone = false;
 	audio.forceMixerOff = false;
 }
