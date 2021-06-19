@@ -544,20 +544,6 @@ void freeDiskOpEntryMem(void)
 	diskop.numEntries = 0;
 }
 
-static bool swapEntries(int32_t a, int32_t b)
-{
-	fileEntry_t tmpBuffer;
-
-	if (a >= diskop.numEntries || b >= diskop.numEntries)
-		return false;
-
-	tmpBuffer = diskOpEntry[a];
-	diskOpEntry[a] = diskOpEntry[b];
-	diskOpEntry[b] = tmpBuffer;
-
-	return true;
-}
-
 // thanks to aTc for creating this simplified routine for qsort() (I edited it a little bit)
 static int32_t fileEntryCompare(const void *f1, const void *f2)
 {
