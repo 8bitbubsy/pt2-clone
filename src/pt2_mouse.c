@@ -2079,7 +2079,8 @@ void handleTextEditing(uint8_t mouseButton)
 
 void mouseWheelUpHandler(void)
 {
-	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag || ui.samplingBoxShown)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag ||
+		ui.samplingBoxShown || ui.samplerVolBoxShown || ui.samplerFiltersBoxShown)
 		return;
 
 	if (mouse.y < 121)
@@ -2098,9 +2099,9 @@ void mouseWheelUpHandler(void)
 			modSetPos(song->currOrder - 1, DONT_SET_ROW);
 		}
 	}
-	else if (ui.samplerScreenShown)
+	else if (ui.samplerScreenShown) // lower part of screen
 	{
-		samplerZoomInMouseWheel(); // lower part of screen
+			samplerZoomInMouseWheel();
 	}
 	else if (!editor.songPlaying && song->currRow > 0)
 	{
@@ -2110,7 +2111,8 @@ void mouseWheelUpHandler(void)
 
 void mouseWheelDownHandler(void)
 {
-	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag || ui.samplingBoxShown)
+	if (ui.editTextFlag || ui.askScreenShown || ui.clearScreenShown || editor.swapChannelFlag ||
+		ui.samplingBoxShown || ui.samplerVolBoxShown || ui.samplerFiltersBoxShown)
 		return;
 
 	if (mouse.y < 121)
@@ -2129,9 +2131,10 @@ void mouseWheelDownHandler(void)
 			modSetPos(song->currOrder + 1, DONT_SET_ROW);
 		}
 	}
-	else if (ui.samplerScreenShown)
+	else if (ui.samplerScreenShown) // lower part of screen
 	{
-		samplerZoomOutMouseWheel(); // lower part of screen
+		if (!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown)
+			samplerZoomOutMouseWheel();
 	}
 	else if (!editor.songPlaying && song->currRow < MOD_ROWS)
 	{
