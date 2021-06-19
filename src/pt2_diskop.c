@@ -558,90 +558,44 @@ static bool swapEntries(int32_t a, int32_t b)
 	return true;
 }
 
-static char *getSortEntry(int32_t entry)
+// thanks to aTc for creating this simplified routine for qsort() (I edited it a little bit)
+static int32_t fileEntryCompare(const void *f1, const void *f2)
 {
-	char *p;
-	int32_t nameLen;
-	fileEntry_t *dirEntry;
+	static char fn_1[PATH_MAX+1], fn_2[PATH_MAX+1];
 
-	dirEntry = &diskOpEntry[entry];
+	fileEntry_t *fe1 = (fileEntry_t *)f1;
+	fileEntry_t *fe2 = (fileEntry_t *)f2;
 
-	unicharToAnsi(fileNameBuffer, dirEntry->nameU, PATH_MAX);
+	unicharToAnsi(fn_1, fe1->nameU, PATH_MAX);
+	unicharToAnsi(fn_2, fe2->nameU, PATH_MAX);
 
-	nameLen = (int32_t)strlen(fileNameBuffer);
-	if (nameLen == 0)
-		return NULL;
+	// ".." directories are always sorted first
+	if (fe1->isDir && strcmp(fn_1, "..") == 0) return -1;
+	if (fe2->isDir && strcmp(fn_2, "..") == 0) return  1;
 
-	p = (char *)malloc(nameLen + 2);
-	if (p == NULL)
-		return NULL;
+	/* ProTracker handles names in upper case during sorting,
+	** convert the string case.
+	*/
+	const int32_t fe1_l = (int32_t)strlen(fn_1);
+	const int32_t fe2_l = (int32_t)strlen(fn_2);
+	for (int32_t i = 0; i < fe1_l; i++) fn_1[i] = (char)toupper(fn_1[i]);
+	for (int32_t i = 0; i < fe2_l; i++) fn_2[i] = (char)toupper(fn_2[i]);
 
-	if (dirEntry->isDir)
-	{
-		if (nameLen == 2 && fileNameBuffer[0] == '.' && fileNameBuffer[1] == '.')
-			p[0] = 0x01; // make ".." directory first priority
-		else
-			p[0] = 0x02; // make second priority
+	// if both entries are the same type
+	if (fe1->isDir == fe2->isDir)
+		return strcmp(fn_1, fn_2);
 
-		strcpy(&p[1], fileNameBuffer);
-	}
-	else
-	{
-		strcpy(p, fileNameBuffer);
-	}
+	// different types, so one of them is a dir
+	if (fe1->isDir)
+		return -1; // first one is a dir
 
-	return p;
+	return 1; // second one is a dir
 }
 
 static void sortEntries(void)
 {
-	bool didSwap;
-	char *p1, *p2;
-	uint32_t offset, limit, i;
-
-	if (diskop.numEntries < 2)
-		return; // no need to sort
-
-	offset = diskop.numEntries >> 1;
-	while (offset > 0)
-	{
-		limit = diskop.numEntries - offset;
-		do
-		{
-			didSwap = false;
-			for (i = 0; i < limit; i++)
-			{
-				p1 = getSortEntry(i);
-				p2 = getSortEntry(offset + i);
-
-				if (p1 == NULL || p2 == NULL)
-				{
-					if (p1 != NULL) free(p1);
-					if (p2 != NULL) free(p2);
-					statusOutOfMemory();
-					return;
-				}
-
-				if (_stricmp(p1, p2) > 0)
-				{
-					if (!swapEntries(i , offset + i))
-					{
-						free(p1);
-						free(p2);
-						return;
-					}
-
-					didSwap = true;
-				}
-
-				free(p1);
-				free(p2);
-			}
-		}
-		while (didSwap);
-
-		offset >>= 1;
-	}
+	if (diskop.numEntries >= 2)
+		qsort(diskOpEntry, diskop.numEntries, sizeof (fileEntry_t), fileEntryCompare);
 }
 
 static bool diskOpFillBuffer(void)
