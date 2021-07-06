@@ -2430,10 +2430,10 @@ bool setupVideo(void)
 	else
 		SDL_ShowCursor(SDL_FALSE);
 
-	// Workaround: SDL_GetGlobalMouseState() doesn't work with KMSDRM
+	// Workaround: SDL_GetGlobalMouseState() doesn't work with KMSDRM/Wayland
 	video.useDesktopMouseCoords = true;
 	const char *videoDriver = SDL_GetCurrentVideoDriver();
-	if (videoDriver != NULL && strcmp("KMSDRM", videoDriver) == 0)
+	if (videoDriver != NULL && (strcmp("KMSDRM", videoDriver) == 0 || strcmp("wayland", videoDriver) == 0))
 		video.useDesktopMouseCoords = false;
 
 	SDL_SetRenderDrawColor(video.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
