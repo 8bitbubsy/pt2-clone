@@ -11,7 +11,7 @@ typedef struct audio_t
 	bool forceMixerOff;
 	
 	uint32_t outputRate, audioBufferSize;
-	int64_t tickSampleCounter64, samplesPerTick64, samplesPerTick64Tab[256-32];
+	int64_t tickSampleCounter64, samplesPerTick64;
 	int64_t bpmTable[256-32], bpmTable28kHz[256-32], bpmTable22kHz[256-32], bpmTableMod2Wav[256-32]; // 32.32 fixed-point
 	double dPeriodToDeltaDiv;
 
