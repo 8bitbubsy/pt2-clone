@@ -42,9 +42,6 @@
 */
 #define SCOPE_HZ 64
 
-#define AMIGA_PAL_VBLANK_HZ 49.9204092835
-
-#define FONT_BMP_WIDTH 
 #define FONT_CHAR_W 8 // actual data length is 7, includes right spacing (1px column)
 #define FONT_CHAR_H 5
 
@@ -67,12 +64,16 @@
 
 #define POSED_LIST_SIZE 12
 
-
-// main crystal oscillator
+// main crystal oscillator for PAL Amiga systems
 #define AMIGA_PAL_XTAL_HZ 28375160
 
-#define PAULA_PAL_CLK (AMIGA_PAL_XTAL_HZ / 8)
-#define CIA_PAL_CLK (AMIGA_PAL_XTAL_HZ / 40)
+#define AMIGA_PAL_CCK_HZ (AMIGA_PAL_XTAL_HZ/8.0)
+
+// nominal framerate in normal PAL videomodes (~49.92Hz)
+#define AMIGA_PAL_VBLANK_HZ (AMIGA_PAL_CCK_HZ / (double)(313*227))
+
+#define PAULA_PAL_CLK AMIGA_PAL_CCK_HZ
+#define CIA_PAL_CLK (AMIGA_PAL_CCK_HZ / 5.0)
 
 #define PAL_PAULA_MIN_SAFE_PERIOD 124
 #define PAL_PAULA_MAX_SAFE_HZ (PAULA_PAL_CLK / (double)PAL_PAULA_MIN_SAFE_PERIOD)

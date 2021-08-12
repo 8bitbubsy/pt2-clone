@@ -398,7 +398,7 @@ static void portaUp(moduleChannel_t *ch)
 	ch->n_period -= (ch->n_cmd & 0xFF) & lowMask;
 	lowMask = 0xFF;
 
-	if ((ch->n_period & 0xFFF) < 113)
+	if ((ch->n_period & 0xFFF) < 113) // PT BUG: unsigned comparison, underflow not clamped!
 		ch->n_period = (ch->n_period & 0xF000) | 113;
 
 	paulaSetPeriod(ch->n_chanindex, ch->n_period & 0xFFF);
@@ -542,23 +542,20 @@ static void vibrato2(moduleChannel_t *ch)
 	const uint8_t vibratoPos = (ch->n_vibratopos >> 2) & 0x1F;
 	const uint8_t vibratoType = ch->n_wavecontrol & 3;
 
-	if (vibratoType == 0)
+	if (vibratoType == 0) // sine
 	{
 		vibratoData = vibratoTable[vibratoPos];
 	}
-	else
+	else if (vibratoType == 1) // ramp
 	{
-		if (vibratoType == 1)
-		{
-			if (ch->n_vibratopos < 128)
-				vibratoData = vibratoPos << 3;
-			else
-				vibratoData = 255 - (vibratoPos << 3);
-		}
+		if (ch->n_vibratopos < 128)
+			vibratoData = vibratoPos << 3;
 		else
-		{
-			vibratoData = 255;
-		}
+			vibratoData = 255 - (vibratoPos << 3);
+	}
+	else // square
+	{
+		vibratoData = 255;
 	}
 
 	vibratoData = (vibratoData * (ch->n_vibratocmd & 0xF)) >> 7;
@@ -609,23 +606,20 @@ static void tremolo(moduleChannel_t *ch)
 	const uint8_t tremoloPos = (ch->n_tremolopos >> 2) & 0x1F;
 	const uint8_t tremoloType = (ch->n_wavecontrol >> 4) & 3;
 
-	if (tremoloType == 0)
+	if (tremoloType == 0) // sine
 	{
 		tremoloData = vibratoTable[tremoloPos];
 	}
-	else
+	else if (tremoloType == 1) // ramp
 	{
-		if (tremoloType == 1)
-		{
-			if (ch->n_vibratopos < 128) // PT bug, should've been ch->n_tremolopos
-				tremoloData = tremoloPos << 3;
-			else
-				tremoloData = 255 - (tremoloPos << 3);
-		}
+		if (ch->n_vibratopos < 128) // PT bug, should've been ch->n_tremolopos
+			tremoloData = tremoloPos << 3;
 		else
-		{
-			tremoloData = 255;
-		}
+			tremoloData = 255 - (tremoloPos << 3);
+	}
+	else // square
+	{
+		tremoloData = 255;
 	}
 
 	tremoloData = ((uint16_t)tremoloData * (ch->n_tremolocmd & 0xF)) >> 6;
@@ -909,8 +903,6 @@ static void playVoice(moduleChannel_t *ch)
 	}
 }
 
-static bool firstNextPos = true;
-
 static void updateUIPositions(void)
 {
 	// don't update UI under MOD2WAV/PAT2SMP rendering
@@ -984,8 +976,6 @@ static void nextPosition(void)
 		if (modPattern > MAX_PATTERNS-1)
 			modPattern = MAX_PATTERNS-1;
 	}
-
-	firstNextPos = false;
 }
 
 static void increasePlaybackTimer(void)
