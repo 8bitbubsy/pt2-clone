@@ -43,10 +43,10 @@ static volatile bool ledFilterEnabled;
 static volatile uint8_t filterModel;
 static int8_t defStereoSep;
 static bool amigaPanFlag;
-static int32_t oldPeriod = -1, randSeed = INITIAL_DITHER_SEED;
+static int32_t randSeed = INITIAL_DITHER_SEED;
 static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
-static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned, dOldVoiceDelta, dOldVoiceDeltaMul;
+static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned;
 static double dPrngStateL, dPrngStateR, dLState[2], dRState[2];
 static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
 static rcFilter_t filterLoA500, filterHiA500, filterHiA1200;
@@ -203,7 +203,13 @@ void turnOffVoices(void)
 
 void resetCachedMixerPeriod(void)
 {
-	oldPeriod = -1;
+	paulaVoice_t *v = paula;
+	for (int32_t i = 0; i < AMIGA_VOICES; i++, v++)
+	{
+		v->oldPeriod = -1;
+		v->dOldVoiceDelta = 0.0;
+		v->dOldVoiceDeltaMul = 1.0;
+	}
 }
 
 // the following routines are only called from the mixer thread.
@@ -229,10 +235,10 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		scopeSetPeriod(ch, realPeriod);
 	}
 
-	// if the new period was the same as the previous period, use cached deltas
-	if (realPeriod != oldPeriod)
+	// if the new period was the same as the previous period, use cached delta
+	if (realPeriod != v->oldPeriod)
 	{
-		oldPeriod = realPeriod;
+		v->oldPeriod = realPeriod;
 
 		// this period is not cached, calculate mixer deltas
 
@@ -244,17 +250,23 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		else
 			dPeriodToDeltaDiv = audio.dPeriodToDeltaDiv;
 
-		// cache these
-		dOldVoiceDelta = dPeriodToDeltaDiv / realPeriod;
-		dOldVoiceDeltaMul = 1.0 / dOldVoiceDelta; // for BLEP synthesis
+		v->dOldVoiceDelta = dPeriodToDeltaDiv / realPeriod;
+
+		// for BLEP synthesis (prevents division in inner mix loop)
+		v->dOldVoiceDeltaMul = 1.0 / v->dOldVoiceDelta;
 	}
 
-	v->dDelta = dOldVoiceDelta;
+	v->dDelta = v->dOldVoiceDelta;
 
 	// for BLEP synthesis
-	v->dDeltaMul = dOldVoiceDeltaMul;
-	if (v->dLastDelta == 0.0) v->dLastDelta = v->dDelta;
-	if (v->dLastDeltaMul == 0.0) v->dLastDeltaMul = v->dDeltaMul;
+	v->dDeltaMul = v->dOldVoiceDeltaMul;
+
+	if (v->dLastDelta == 0.0)
+		v->dLastDelta = v->dDelta;
+
+	if (v->dLastDeltaMul == 0.0)
+		v->dLastDeltaMul = v->dDeltaMul;
+	// ------------------
 }
 
 void paulaSetVolume(int32_t ch, uint16_t vol)
@@ -263,10 +275,11 @@ void paulaSetVolume(int32_t ch, uint16_t vol)
 
 	int32_t realVol = vol;
 
-	// confirmed behavior on real Amiga
+	// this is what WinUAE does, so I assume it's what Paula does too
 	realVol &= 127;
 	if (realVol > 64)
 		realVol = 64;
+	// ----------------
 
 	v->dVolume = realVol * (1.0 / 64.0);
 
@@ -283,6 +296,8 @@ void paulaSetVolume(int32_t ch, uint16_t vol)
 
 void paulaSetLength(int32_t ch, uint16_t len)
 {
+	paulaVoice_t *v = &paula[ch];
+
 	int32_t realLength = len;
 	if (realLength == 0)
 	{
@@ -298,52 +313,50 @@ void paulaSetLength(int32_t ch, uint16_t len)
 
 	realLength <<= 1; // we work with bytes, not words
 
-	paula[ch].newLength = realLength;
+	v->newLength = realLength;
 	if (editor.songPlaying)
-		paula[ch].syncFlags |= SET_SCOPE_LENGTH;
+		v->syncFlags |= SET_SCOPE_LENGTH;
 	else
 		scope[ch].newLength = realLength;
 }
 
 void paulaSetData(int32_t ch, const int8_t *src)
 {
+	paulaVoice_t *v = &paula[ch];
+
 	if (src == NULL)
 		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
-	paula[ch].newData = src;
+	v->newData = src;
 	if (editor.songPlaying)
-		paula[ch].syncFlags |= SET_SCOPE_DATA;
+		v->syncFlags |= SET_SCOPE_DATA;
 	else
 		scope[ch].newData = src;
 }
 
 void paulaStopDMA(int32_t ch)
 {
-	paula[ch].active = false;
+	paulaVoice_t *v = &paula[ch];
+
+	v->active = false;
 
 	if (editor.songPlaying)
-		paula[ch].syncFlags |= STOP_SCOPE;
+		v->syncFlags |= STOP_SCOPE;
 	else
 		scope[ch].active = false;
 }
 
 void paulaStartDMA(int32_t ch)
 {
-	const int8_t *dat;
-	int32_t length;
-	paulaVoice_t *v;
+	paulaVoice_t *v = &paula[ch];
 
-	// trigger voice
-
-	v  = &paula[ch];
-
-	dat = v->newData;
+	const int8_t *dat = v->newData;
 	if (dat == NULL)
 		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
-	length = v->newLength; // in bytes, not words
-	if (length < 2)
-		length = 2; // for safety
+	int32_t length = v->newLength; // in bytes, not words
+	if (length == 0)
+		length = 1+65535;
 
 	v->dPhase = 0.0;
 	v->pos = 0;
@@ -359,8 +372,9 @@ void paulaStartDMA(int32_t ch)
 	}
 	else
 	{
-		scope[ch].newData = dat;
-		scope[ch].newLength = length;
+		scope_t *s = &scope[ch];
+		s->newData = dat;
+		s->newLength = length;
 		scopeTrigger(ch);
 	}
 }
@@ -976,6 +990,7 @@ bool setupAudio(void)
 
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
+	resetCachedMixerPeriod();
 	resetAudioDownsamplingStates();
 	audio.resetSyncTickTimeFlag = true;
 	SDL_PauseAudioDevice(dev, false);

@@ -12,6 +12,10 @@ typedef struct scope_t
 	uint8_t volume;
 	int32_t length, pos;
 
+	// cache
+	int32_t oldPeriod;
+	double dOldScopeDelta;
+
 	double dDelta, dPhase;
 	const int8_t *newData;
 	int32_t newLength;

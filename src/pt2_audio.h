@@ -31,6 +31,10 @@ typedef struct voice_t
 	int32_t length, newLength, pos;
 	double dVolume, dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase, dPanL, dPanR;
 
+	// period cache
+	int32_t oldPeriod;
+	double dOldVoiceDelta, dOldVoiceDeltaMul;
+
 	// used for pt2_sync.c
 	uint8_t syncFlags;
 	uint8_t syncVolume;

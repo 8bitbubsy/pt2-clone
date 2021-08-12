@@ -15,18 +15,20 @@
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
 static volatile bool scopesUpdatingFlag, scopesDisplayingFlag;
-static int32_t oldPeriod = -1;
 static uint32_t scopeTimeLen, scopeTimeLenFrac;
 static uint64_t timeNext64, timeNext64Frac;
-static double dOldScopeDelta;
 static SDL_Thread *scopeThread;
 
 scope_t scope[AMIGA_VOICES]; // global
 
 void resetCachedScopePeriod(void)
 {
-	oldPeriod = -1;
-	dOldScopeDelta = 0.0;
+	scope_t *s = scope;
+	for (int32_t i = 0; i < AMIGA_VOICES; i++, s++)
+	{
+		s->oldPeriod = -1;
+		s->dOldScopeDelta = 0.0;
+	}
 }
 
 // this is quite hackish, but fixes sample swapping issues
@@ -95,15 +97,18 @@ int32_t getSampleReadPos(int32_t ch) // used for the sampler screen
 
 void scopeSetPeriod(int32_t ch, int32_t period)
 {
-	// if the new period was the same as the previous period, use cached deltas
-	if (period != oldPeriod)
+	volatile scope_t *s = &scope[ch];
+
+	// if the new period was the same as the previous period, use cached delta
+	if (period != s->oldPeriod)
 	{
-		oldPeriod = period;
+		s->oldPeriod = period;
+
 		const double dPeriodToScopeDeltaDiv = PAULA_PAL_CLK / (double)SCOPE_HZ;
-		dOldScopeDelta = dPeriodToScopeDeltaDiv / period;
+		s->dOldScopeDelta = dPeriodToScopeDeltaDiv / period;
 	}
 
-	scope[ch].dDelta = dOldScopeDelta;
+	s->dDelta = s->dOldScopeDelta;
 }
 
 void scopeTrigger(int32_t ch)
@@ -370,6 +375,8 @@ bool initScopes(void)
 	// fractional part (scaled to 0..2^32-1)
 	dFrac *= UINT32_MAX+1.0;
 	scopeTimeLenFrac = (uint32_t)dFrac;
+
+	resetCachedScopePeriod();
 
 	scopeThread = SDL_CreateThread(scopeThreadFunc, NULL, NULL);
 	if (scopeThread == NULL)
