@@ -354,7 +354,7 @@ module_t *modLoad(UNICHAR *fileName)
 		if (mightBeSTK)
 			s->loopStart /= 2;
 
-		// fix for poorly converted STK (< v2.5) -> PT/NT modules (FIXME: Worth keeping or not?)
+		// fix for poorly converted STK (< v2.5) -> PT/NT modules
 		if (!mightBeSTK && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
 		{
 			if ((s->loopStart/2) + s->loopLength <= s->length)
