@@ -845,7 +845,7 @@ static double ciaBpm2Hz(int32_t bpm)
 		return 0.0;
 
 	const uint32_t ciaPeriod = 1773447 / bpm; // yes, PT truncates here
-	return (double)CIA_PAL_CLK / ciaPeriod;
+	return (double)CIA_PAL_CLK / (ciaPeriod+1); // +1, CIA triggers on underflow
 }
 
 static void generateBpmTables(bool vblankTimingFlag)
