@@ -1,6 +1,10 @@
 /* Experimental audio sampling support.
 ** There may be several bad practices here, as I don't really
 ** have the proper knowledge on this stuff.
+**
+** Some functions like sin() may be different depending on
+** math library implementation, but we don't use pt_math.c
+** replacements for speed reasons.
 */
 
 // for finding memory leaks in debug mode with Visual Studio 
@@ -24,6 +28,7 @@
 #include "pt2_tables.h"
 #include "pt2_config.h"
 #include "pt2_sampling.h"
+#include "pt2_math.h" // PT2_PI
 
 enum
 {
@@ -39,6 +44,7 @@ enum
 #define SINC_TAPS 64
 #define SINC_TAPS_BITS 6 /* log2(SINC_TAPS) */
 #define SINC_PHASES 4096
+#define MID_TAP ((SINC_TAPS/2)*SINC_PHASES)
 
 #define SAMPLE_PREVIEW_WITDH 194
 #define SAMPLE_PREVIEW_HEIGHT 38
@@ -53,7 +59,7 @@ static int16_t displayBuffer[SAMPLING_BUFFER_SIZE];
 static int32_t samplingMode = SAMPLE_MIX, inputFrequency, roundedOutputFrequency;
 static int32_t numAudioInputDevs, audioInputDevListOffset, selectedDev;
 static int32_t bytesSampled, maxSamplingLength, inputBufferSize;
-static double dOutputFrequency, *dSincTable, *dSamplingBuffer, *dSamplingBufferOrig;
+static double dOutputFrequency, *dSincTable, *dKaiserTable, *dSamplingBuffer, *dSamplingBufferOrig;
 static SDL_AudioDeviceID recordDev;
 
 /*
@@ -65,6 +71,7 @@ static SDL_AudioDeviceID recordDev;
 static double Izero(double y) // Compute Bessel function Izero(y) using a series approximation
 {
 	double s = 1.0, ds = 1.0, d = 0.0;
+	const double epsilon = 1E-9; // 8bb: 1E-7 -> 1E-9 for added precision (still fast to calculate)
 
 	do
 	{
@@ -72,26 +79,66 @@ static double Izero(double y) // Compute Bessel function Izero(y) using a series
 		ds = ds * (y * y) / (d * d);
 		s = s + ds;
 	}
-	while (ds > 1E-7 * s);
+	while (ds > epsilon * s);
 
 	return s;
 }
 
+bool initKaiserTable(void) // called once on tracker init
+{
+	dKaiserTable = (double *)malloc(SINC_TAPS * SINC_PHASES * sizeof (double));
+	if (dKaiserTable == NULL)
+	{
+		showErrorMsgBox("Out of memory!");
+		return false;
+	}
+
+	const double beta = 9.6377;
+	const double izeroBeta = Izero(beta);
+
+	for (int32_t i = 0; i < SINC_TAPS*SINC_PHASES; i++)
+	{
+		double fkaiser;
+		int32_t ix = (SINC_TAPS-1) - (i & (SINC_TAPS-1));
+
+		ix = (ix * SINC_PHASES) + (i >> SINC_TAPS_BITS);
+		if (ix == MID_TAP)
+		{
+			fkaiser = 1.0;
+		}
+		else
+		{
+			const double x = (ix - MID_TAP) * (1.0 / SINC_PHASES);
+			const double xMul = 1.0 / ((SINC_TAPS/2) * (SINC_TAPS/2));
+			fkaiser = Izero(beta * sqrt(1.0 - x * x * xMul)) / izeroBeta;
+		}
+
+		dKaiserTable[i] = fkaiser;
+	}
+
+	return true;
+}
+
+void freeKaiserTable(void)
+{
+	if (dKaiserTable != NULL)
+	{
+		free(dKaiserTable);
+		dKaiserTable = NULL;
+	}
+}
+
+// calculated after completion of sampling (before downsampling)
 static bool initSincTable(double cutoff)
 {
-	if (cutoff > 0.999)
-		cutoff = 0.999;
-
 	dSincTable = (double *)malloc(SINC_TAPS * SINC_PHASES * sizeof (double));
 	if (dSincTable == NULL)
 		return false;
 
-	const double beta = 9.6377; // this value can maybe be tweaked (we do downsampling only)
-	const double izeroBeta = Izero(beta);
-	const double kPi = 4.0 * atan(1.0) * cutoff;
+	if (cutoff > 1.0)
+		cutoff = 1.0;
 
-#define MID_TAP ((SINC_TAPS/2)*SINC_PHASES)
-
+	const double kPi = PT2_PI * cutoff;
 	for (int32_t i = 0; i < SINC_TAPS*SINC_PHASES; i++)
 	{
 		double fsinc;
@@ -107,8 +154,7 @@ static bool initSincTable(double cutoff)
 			const double x = (ix - MID_TAP) * (1.0 / SINC_PHASES);
 			const double xPi = x * kPi;
 
-			const double xMul = 1.0 / ((SINC_TAPS/2) * (SINC_TAPS/2));
-			fsinc = sin(xPi) * Izero(beta * sqrt(1.0 - x * x * xMul)) / (izeroBeta * xPi); // Kaiser window
+			fsinc = (sin(xPi) / xPi) * dKaiserTable[i];
 		}
 
 		dSincTable[i] = fsinc * cutoff;
@@ -151,7 +197,7 @@ static void updateOutputFrequency(void)
 		samplingNote = 35;
 
 	int32_t period = periodTable[((samplingFinetune & 0xF) * 37) + samplingNote];
-	if (period < 113) // this happens internally in our Paula mixer
+	if (period < 113) // also happens in our "set period" Paula function
 		period = 113;
 
 	dOutputFrequency = (double)PAULA_PAL_CLK / period;
@@ -167,7 +213,7 @@ static void SDLCALL samplingCallback(void *userdata, Uint8 *stream, int len)
 		if (len > SAMPLING_BUFFER_SIZE)
 			len = SAMPLING_BUFFER_SIZE;
 
-		const int16_t *L = (int16_t *)stream;
+		const int16_t *L =  (int16_t *)stream;
 		const int16_t *R = ((int16_t *)stream) + 1;
 
 		int16_t *dst16 = displayBuffer;
@@ -287,8 +333,6 @@ static void selectAudioDevice(int32_t dev)
 		return;
 
 	listAudioDevices();
-	changeStatusText("PLEASE WAIT ...");
-	flipFrame();
 
 	stopInputAudio();
 	selectedDev = dev;
@@ -432,6 +476,9 @@ static void showCurrSample(void)
 
 void renderSamplingBox(void)
 {
+	changeStatusText("PLEASE WAIT ...");
+	flipFrame();
+
 	editor.sampleZero = false;
 	editor.blockMarkFlag = false;
 
@@ -459,8 +506,8 @@ void renderSamplingBox(void)
 	selectAudioDevice(selectedDev);
 
 	showCurrSample();
-
 	modStop();
+
 	editor.songPlaying = false;
 	editor.playMode = PLAY_MODE_NORMAL;
 	editor.currMode = MODE_IDLE;
@@ -557,9 +604,9 @@ static void startSampling(void)
 
 	assert(roundedOutputFrequency > 0);
 
-	maxSamplingLength = (int32_t)(ceil((65534.0*inputFrequency) / dOutputFrequency)) + 1;
+	maxSamplingLength = (int32_t)(ceil(((double)MAX_SAMPLE_LEN*inputFrequency) / dOutputFrequency)) + 1;
 	
-	int32_t allocLen = (SINC_TAPS/2) + maxSamplingLength + (SINC_TAPS/2);
+	const int32_t allocLen = (SINC_TAPS/2) + maxSamplingLength + (SINC_TAPS/2);
 	dSamplingBufferOrig = (double *)malloc(allocLen * sizeof (double));
 	if (dSamplingBufferOrig == NULL)
 	{
@@ -568,7 +615,7 @@ static void startSampling(void)
 	}
 	dSamplingBuffer = dSamplingBufferOrig + (SINC_TAPS/2); // allow negative look-up for sinc taps
 
-	// clear tap area
+	// clear tap area before sample
 	memset(dSamplingBufferOrig, 0, (SINC_TAPS/2) * sizeof (double));
 
 	bytesSampled = 0;
@@ -583,7 +630,7 @@ static void startSampling(void)
 
 static int32_t downsampleSamplingBuffer(void)
 {
-	// clear tap area
+	// clear tap area after sample
 	memset(&dSamplingBuffer[bytesSampled], 0, (SINC_TAPS/2) * sizeof (double));
 
 	const int32_t readLength = bytesSampled;
@@ -602,7 +649,6 @@ static int32_t downsampleSamplingBuffer(void)
 
 	if (!initSincTable(dRatio))
 	{
-		free(dBuffer);
 		statusOutOfMemory();
 		return -1;
 	}
@@ -612,7 +658,7 @@ static int32_t downsampleSamplingBuffer(void)
 	int8_t *output = &song->sampleData[song->samples[editor.currSample].offset];
 	const double dDelta = inputFrequency / dOutputFrequency;
 
-	// pre-centered (this is safe, look at how fSamplingBufferOrig is alloc'd)
+	// pre-centered (this is safe, look at how dSamplingBufferOrig is alloc'd)
 	const double *dSmpPtr = &dSamplingBuffer[-((SINC_TAPS/2)-1)];
 
 	double dPhase = 0.0;
@@ -622,12 +668,15 @@ static int32_t downsampleSamplingBuffer(void)
 		double dSmp = sinc(dSmpPtr, dPhase);
 		dBuffer[i] = dSmp;
 
-		dSmp = fabs(dSmp);
+		// dSmp = fabs(dSmp)
+		if (dSmp < 0.0)
+			dSmp = -dSmp;
+
 		if (dSmp > dPeakAmp)
 			dPeakAmp = dSmp;
 
 		dPhase += dDelta;
-		const int32_t wholeSamples = (const int32_t)dPhase;
+		const int32_t wholeSamples = (int32_t)dPhase;
 		dPhase -= wholeSamples;
 		dSmpPtr += wholeSamples;
 	}
@@ -647,8 +696,13 @@ static int32_t downsampleSamplingBuffer(void)
 
 	for (int32_t i = 0; i < writeLength; i++)
 	{
-		const int32_t smp32 = (const int32_t)round(dBuffer[i] * dAmp);
-		assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
+		double dSmp = dBuffer[i] * dAmp;
+
+		// faster than calling round()
+		     if (dSmp < 0.0) dSmp -= 0.5;
+		else if (dSmp > 0.0) dSmp += 0.5;
+		const int32_t smp32 = (int32_t)dSmp; // rounded
+
 		output[i] = (int8_t)smp32;
 	}
 

@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+bool initKaiserTable(void); // called once on tracker init
+void freeKaiserTable(void);
+
 void stopSampling(void);
 void freeAudioDeviceList(void);
 void renderSampleMonitor(void);

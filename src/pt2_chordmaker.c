@@ -164,7 +164,7 @@ void mixChordSample(void)
 	s->text[21] = '!'; // chord sample indicator
 	s->text[22] = '\0';
 
-	memset(mixCh, 0, sizeof (mixCh));
+	memset(mixCh, 0, sizeof (mixCh)); // also clears position and frac
 
 	// setup mixing lengths and deltas
 

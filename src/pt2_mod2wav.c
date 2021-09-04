@@ -14,6 +14,7 @@
 #include "pt2_visuals.h"
 #include "pt2_mod2wav.h"
 #include "pt2_structs.h"
+#include "pt2_downsamplers2x.h"
 
 #define TICKS_PER_RENDER_CHUNK 64
 
@@ -36,12 +37,11 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	// skip wav header place, render data first
 	fseek(f, sizeof (wavHeader_t), SEEK_SET);
 
-	if (MOD2WAV_FREQ != audio.outputRate)
-		recalcFilterCoeffs(MOD2WAV_FREQ);
-
 	uint32_t sampleCounter = 0;
 	uint8_t tickCounter = 8;
 	int64_t tickSampleCounter64 = 0;
+
+	clearMixerDownsamplerStates();
 
 	bool renderDone = false;
 	while (!renderDone)
@@ -89,9 +89,6 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 			fwrite(mod2WavBuffer, sizeof (int16_t), samplesInChunk, f);
 	}
 
-	if (MOD2WAV_FREQ != audio.outputRate)
-		recalcFilterCoeffs(audio.outputRate);
-
 	free(mod2WavBuffer);
 
 	if (sampleCounter & 1)
@@ -109,7 +106,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	wavHeader.subchunk1Size = 16;
 	wavHeader.audioFormat = 1;
 	wavHeader.numChannels = 2;
-	wavHeader.sampleRate = MOD2WAV_FREQ;
+	wavHeader.sampleRate = audio.outputRate;
 	wavHeader.bitsPerSample = 16;
 	wavHeader.byteRate = (wavHeader.sampleRate * wavHeader.numChannels * wavHeader.bitsPerSample) / 8;
 	wavHeader.blockAlign = (wavHeader.numChannels * wavHeader.bitsPerSample) / 8;
@@ -120,7 +117,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
 	fclose(f);
 
-	resetAudioDownsamplingStates();
+	clearMixerDownsamplerStates();
 
 	ui.mod2WavFinished = true;
 	ui.updateMod2WavDialog = true;
@@ -164,7 +161,7 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 	}
 
 	const int32_t lowestBPM = 32;
-	const int64_t maxSamplesToMix64 = audio.bpmTableMod2Wav[lowestBPM-32];
+	const int64_t maxSamplesToMix64 = audio.bpmTable[lowestBPM-32];
 	const int32_t maxSamplesToMix = ((TICKS_PER_RENDER_CHUNK * maxSamplesToMix64) + (1LL << 31)) >> 32; // ceil (rounded upwards)
 
 	mod2WavBuffer = (int16_t *)malloc(maxSamplesToMix * (2 * sizeof (int16_t)));

@@ -1,8 +1,3 @@
-#include <stdint.h>
-#include <math.h>
-#include "pt2_rcfilter.h" // DENORMAL_OFFSET definition
-#include "pt2_ledfilter.h"
-
 /* aciddose:
 ** Imperfect Amiga "LED" filter implementation. This may be further improved in the future.
 ** Based upon ideas posted by mystran @ the kvraudio.com forum.
@@ -10,12 +5,14 @@
 ** This filter may not function correctly used outside the fixed-cutoff context here!
 */
 
+#include <stdint.h>
+#include "pt2_math.h"
+#include "pt2_ledfilter.h"
+
 void clearLEDFilterState(ledFilter_t *filterLED)
 {
-	filterLED->buffer[0] = 0.0; // left channel
-	filterLED->buffer[1] = 0.0;
-	filterLED->buffer[2] = 0.0; // right channel
-	filterLED->buffer[3] = 0.0;
+	filterLED->buffer[0] = filterLED->buffer[1] = 0.0; // left channel
+	filterLED->buffer[2] = filterLED->buffer[3] = 0.0; // right channel
 }
 
 static double sigmoid(double x, double coefficient)
@@ -30,14 +27,8 @@ static double sigmoid(double x, double coefficient)
 
 void calcLEDFilterCoeffs(const double sr, const double hz, const double fb, ledFilter_t *filter)
 {
-	/* aciddose:
-	** tan() may produce NaN or other bad results in some cases!
-	** It appears to work correctly with these specific coefficients.
-	*/
-
-	const double pi = 4.0 * atan(1.0); // M_PI can not be trusted
-
-	const double c = (hz < (sr / 2.0)) ? tan((pi * hz) / sr) : 1.0;
+	// 8bitbubsy: the tangent approximation is suitable for these input ranges
+	const double c = (hz < sr/2.0) ? pt2_tan((PT2_PI * hz) / sr) : 1.0;
 	const double g = 1.0 / (1.0 + c);
 
 	// aciddose: dirty compensation

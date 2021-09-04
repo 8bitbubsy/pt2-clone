@@ -8,11 +8,11 @@ typedef struct audio_t
 {
 	volatile bool locked, isSampling;
 
-	bool forceMixerOff;
+	bool forceSoundCardSilence;
 	
 	uint32_t outputRate, audioBufferSize;
 	int64_t tickSampleCounter64, samplesPerTick64;
-	int64_t bpmTable[256-32], bpmTable28kHz[256-32], bpmTable22kHz[256-32], bpmTableMod2Wav[256-32]; // 32.32 fixed-point
+	int64_t bpmTable[256-32], bpmTable28kHz[256-32], bpmTable20kHz[256-32]; // 32.32 fixed-point
 	double dPeriodToDeltaDiv;
 
 	// for audio sampling
@@ -29,7 +29,7 @@ typedef struct voice_t
 
 	const int8_t *data, *newData;
 	int32_t length, newLength, pos;
-	double dVolume, dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase, dPanL, dPanR;
+	double dVolume, dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase;
 
 	// period cache
 	int32_t oldPeriod;
@@ -58,7 +58,6 @@ void normalize32BitTo8Bit(int32_t *sampleData, uint32_t sampleLength);
 void normalizeFloatTo8Bit(float *fSampleData, uint32_t sampleLength);
 void normalizeDoubleTo8Bit(double *dSampleData, uint32_t sampleLength);
 
-void recalcFilterCoeffs(int32_t outputRate); // for MOD2WAV
 void setLEDFilter(bool state, bool doLockAudio);
 void toggleLEDFilter(void);
 void toggleAmigaPanMode(void);
@@ -74,9 +73,8 @@ void unlockAudio(void);
 void mixerUpdateLoops(void);
 void mixerKillVoice(int32_t ch);
 void turnOffVoices(void);
-void mixerCalcVoicePans(uint8_t stereoSeparation);
+void mixerSetStereoSeparation(uint8_t percentage);
 void outputAudio(int16_t *target, int32_t numSamples);
-void resetAudioDownsamplingStates(void);
 
 extern audio_t audio; // pt2_audio.c
 extern paulaVoice_t paula[AMIGA_VOICES]; // pt2_audio.c

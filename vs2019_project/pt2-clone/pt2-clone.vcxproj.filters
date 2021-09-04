@@ -102,6 +102,9 @@
     <ClInclude Include="..\..\src\pt2_downsamplers2x.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_math.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -190,6 +193,7 @@
     <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_chordmaker.c" />
     <ClCompile Include="..\..\src\pt2_downsample2x.c" />
+    <ClCompile Include="..\..\src\pt2_math.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

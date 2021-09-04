@@ -1,73 +1,59 @@
-// 1-pole 6dB/oct RC filters, code by aciddose (I think?)
-
+/* 1-pole 6dB/oct RC filters, from:
+** https://www.musicdsp.org/en/latest/Filters/116-one-pole-lp-and-hp.html
+**
+** There's no frequency pre-warping with tan(), but doing that would
+** result in a cutoff that sounded slightly too low.
+*/
 
 #include <stdint.h>
-#include <math.h>
+#include "pt2_math.h"
 #include "pt2_rcfilter.h"
 
-void calcRCFilterCoeffs(double dSr, double dHz, rcFilter_t *f)
+void calcRCFilterCoeffs(double sr, double hz, rcFilter_t *f)
 {
-	const double pi = 4.0 * atan(1.0); // M_PI can not be trusted
+	const double a = (hz < sr/2.0) ? pt2_cos((PT2_TWO_PI * hz) / sr) : 1.0;
+	const double b = 2.0 - a;
+	const double c = b - pt2_sqrt((b*b)-1.0);
 
-	const double c = (dHz < (dSr / 2.0)) ? tan((pi * dHz) / dSr) : 1.0;
-	f->c = c;
-	f->c2 = f->c * 2.0;
-	f->g = 1.0 / (1.0 + f->c);
-	f->cg = f->c * f->g;
+	f->c1 = 1.0 - c;
+	f->c2 = c;
 }
 
 void clearRCFilterState(rcFilter_t *f)
 {
-	f->buffer[0] = 0.0; // left channel
-	f->buffer[1] = 0.0; // right channel
-}
-
-// aciddose: input 0 is resistor side of capacitor (low-pass), input 1 is reference side (high-pass)
-static inline double getLowpassOutput(rcFilter_t *f, const double input_0, const double input_1, const double buffer)
-{
-	double dOutput = DENORMAL_OFFSET;
-
-	dOutput += buffer * f->g + input_0 * f->cg + input_1 * (1.0 - f->cg);
-
-	return dOutput;
+	f->tmp[0] = f->tmp[1] = 0.0;
 }
 
 void RCLowPassFilterStereo(rcFilter_t *f, const double *in, double *out)
 {
-	double output;
+	// left channel
+	f->tmp[0] = (f->c1*in[0] + f->c2*f->tmp[0]) + DENORMAL_OFFSET;
+	out[0] = f->tmp[0];
 
-	// left channel RC low-pass
-	output = getLowpassOutput(f, in[0], 0.0, f->buffer[0]);
-	f->buffer[0] += (in[0] - output) * f->c2;
-	out[0] = output;
-
-	// right channel RC low-pass
-	output = getLowpassOutput(f, in[1], 0.0, f->buffer[1]);
-	f->buffer[1] += (in[1] - output) * f->c2;
-	out[1] = output;
+	// right channel
+	f->tmp[1] = (f->c1*in[1] + f->c2*f->tmp[1]) + DENORMAL_OFFSET;
+	out[1] = f->tmp[1];
 }
 
 void RCHighPassFilterStereo(rcFilter_t *f, const double *in, double *out)
 {
-	double low[2];
+	// left channel
+	f->tmp[0] = (f->c1*in[0] + f->c2*f->tmp[0]) + DENORMAL_OFFSET;
+	out[0] = in[0]-f->tmp[0];
 
-	RCLowPassFilterStereo(f, in, low);
-
-	out[0] = in[0] - low[0]; // left channel high-pass
-	out[1] = in[1] - low[1]; // right channel high-pass
+	// right channel
+	f->tmp[1] = (f->c1*in[1] + f->c2*f->tmp[1]) + DENORMAL_OFFSET;
+	out[1] = in[1]-f->tmp[1];
 }
 
 void RCLowPassFilter(rcFilter_t *f, const double in, double *out)
 {
-	double output = getLowpassOutput(f, in, 0.0, f->buffer[0]);
-	f->buffer[0] += (in - output) * f->c2;
-	*out = output;
+	f->tmp[0] = (f->c1*in + f->c2*f->tmp[0]) + DENORMAL_OFFSET;
+	*out = f->tmp[0];
 }
 
 void RCHighPassFilter(rcFilter_t *f, const double in, double *out)
 {
-	double low;
-
-	RCLowPassFilter(f, in, &low);
-	*out = in - low; // high-pass
+	f->tmp[0] = (f->c1*in + f->c2*f->tmp[0]) + DENORMAL_OFFSET;
+	*out = in-f->tmp[0];
 }

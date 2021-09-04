@@ -31,7 +31,7 @@ void doPat2Smp(void)
 		return;
 	}
 
-	editor.dPat2SmpBuf = (double *)malloc((MAX_SAMPLE_LEN*2) * sizeof (double));
+	editor.dPat2SmpBuf = (double *)malloc(MAX_SAMPLE_LEN * sizeof (double));
 	if (editor.dPat2SmpBuf == NULL)
 	{
 		statusOutOfMemory();
@@ -54,6 +54,8 @@ void doPat2Smp(void)
 
 	int64_t tickSampleCounter64 = 0;
 
+	clearMixerDownsamplerStates();
+
 	editor.smpRenderingDone = false;
 	while (!editor.smpRenderingDone && editor.songPlaying)
 	{
@@ -71,8 +73,7 @@ void doPat2Smp(void)
 	}
 	editor.isSMPRendering = false;
 
-	//const double dSamplesPerTick = audio.samplesPerTick64 / (UINT32_MAX+1.0);
-
+	clearMixerDownsamplerStates();
 	resetSong();
 
 	int32_t renderLength = editor.pat2SmpPos;
@@ -82,19 +83,12 @@ void doPat2Smp(void)
 	// set back old row
 	song->currRow = song->row = oldRow;
 
-	// downsample oversampled buffer, normalize and quantize to 8-bit
-
-	downsample2xDouble(editor.dPat2SmpBuf, renderLength);
-	renderLength /= 2;
+	// normalize and quantize to 8-bit
 
 	double dAmp = 1.0;
 	const double dPeak = getDoublePeak(editor.dPat2SmpBuf, renderLength);
 	if (dPeak > 0.0)
 		dAmp = INT8_MAX / dPeak;
-
-	double dVol = 64.0 * dPeak;
-	if (dVol > 64.0)
-		dVol = 64.0;
 
 	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (int32_t i = 0; i < renderLength; i++)
@@ -122,7 +116,7 @@ void doPat2Smp(void)
 	}
 
 	s->length = (uint16_t)renderLength;
-	s->volume = (int8_t)round(dVol);
+	s->volume = 64;
 	s->loopStart = 0;
 	s->loopLength = 2;
 

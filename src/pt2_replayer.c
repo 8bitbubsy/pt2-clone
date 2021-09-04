@@ -1206,9 +1206,7 @@ void modSetTempo(int32_t bpm, bool doLockAudio)
 
 	int64_t samplesPerTick64;
 	if (editor.isSMPRendering)
-		samplesPerTick64 = editor.pat2SmpHQ ? audio.bpmTable28kHz[bpm] : audio.bpmTable22kHz[bpm];
-	else if (editor.isWAVRendering)
-		samplesPerTick64 = audio.bpmTableMod2Wav[bpm];
+		samplesPerTick64 = editor.pat2SmpHQ ? audio.bpmTable28kHz[bpm] : audio.bpmTable20kHz[bpm];
 	else
 		samplesPerTick64 = audio.bpmTable[bpm];
 
@@ -1516,7 +1514,7 @@ void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
 
 	editor.playMode = PLAY_MODE_NORMAL;
 	editor.blockMarkFlag = false;
-	audio.forceMixerOff = true;
+	audio.forceSoundCardSilence = true;
 
 	song->row = 0;
 	song->currRow = 0;
@@ -1550,9 +1548,9 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 
 	turnOffVoices();
 
-	memset((int8_t *)editor.vuMeterVolumes,0, sizeof (editor.vuMeterVolumes));
+	memset((int8_t *)editor.vuMeterVolumes,     0, sizeof (editor.vuMeterVolumes));
 	memset((int8_t *)editor.realVuMeterVolumes, 0, sizeof (editor.realVuMeterVolumes));
-	memset((int8_t *)editor.spectrumVolumes, 0, sizeof (editor.spectrumVolumes));
+	memset((int8_t *)editor.spectrumVolumes,    0, sizeof (editor.spectrumVolumes));
 
 	memset(song->channels, 0, sizeof (song->channels));
 	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
@@ -1579,5 +1577,5 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 
 	song->tick = 0;
 	modRenderDone = false;
-	audio.forceMixerOff = false;
+	audio.forceSoundCardSilence = false;
 }
