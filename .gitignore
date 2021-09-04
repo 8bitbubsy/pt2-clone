@@ -26,3 +26,4 @@ vs2019_project/pt2-clone/Release/pt2-clone-win64.exe.recipe
 *.recipe
 vs2019_project/pt2-clone/Release/pt2-clone-win64.iobj
 *.iobj
+vs2019_project/pt2-clone/x64/Debug/pt2_audio.obj.enc
