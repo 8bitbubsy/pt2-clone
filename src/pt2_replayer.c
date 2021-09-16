@@ -143,7 +143,7 @@ static void updateFunk(moduleChannel_t *ch)
 	{
 		ch->n_funkoffset = 0;
 
-		if (ch->n_loopstart != NULL && ch->n_wavestart != NULL) // non-PT2 bug fix
+		if (ch->n_loopstart != NULL && ch->n_wavestart != NULL) // ProTracker bugfix
 		{
 			if (++ch->n_wavestart >= ch->n_loopstart + (ch->n_replen << 1))
 				ch->n_wavestart = ch->n_loopstart;
@@ -203,16 +203,34 @@ static void setTremoloControl(moduleChannel_t *ch)
 	ch->n_wavecontrol = ((ch->n_cmd & 0xF) << 4) | (ch->n_wavecontrol & 0xF);
 }
 
+/* This is a little used effect, despite being present in original ProTracker.
+** E8x was sometimes entirely replaced with code used for demo fx syncing in
+** demo mod players, so it can be turned off by looking at DISABLE_E8X in
+** protracker.ini if you so desire.
+*/
 static void karplusStrong(moduleChannel_t *ch)
 {
-	/* This effect is definitely the least used PT effect there is!
-	** It trashes (filters) the sample data.
-	** The reason I'm not implementing it is because a lot of songs used
-	** E8x for syncing to demos/intros, and because I have never ever
-	** seen this effect being used intentionally.
-	*/
+	int8_t a, b;
 
-	(void)ch;
+	if (config.disableE8xEffect)
+		return;
+
+	if (ch->n_loopstart == NULL)
+		return; // ProTracker bugfix
+
+	int8_t *ptr8 = ch->n_loopstart;
+	int16_t end = ((ch->n_replen * 2) & 0xFFFF) - 2;
+	do
+	{
+		a = ptr8[0];
+		b = ptr8[1];
+		*ptr8++ = (a + b) >> 1;
+	}
+	while (--end >= 0);
+
+	a = ptr8[0];
+	b = ch->n_loopstart[0];
+	*ptr8 = (a + b) >> 1;
 }
 
 static void doRetrg(moduleChannel_t *ch)
@@ -247,17 +265,16 @@ static void retrigNote(moduleChannel_t *ch)
 
 static void volumeSlide(moduleChannel_t *ch)
 {
-	uint8_t cmd = ch->n_cmd & 0xFF;
-
-	if ((cmd & 0xF0) == 0)
+	uint8_t param = ch->n_cmd & 0xFF;
+	if ((param & 0xF0) == 0)
 	{
-		ch->n_volume -= cmd & 0x0F;
+		ch->n_volume -= param & 0x0F;
 		if (ch->n_volume < 0)
 			ch->n_volume = 0;
 	}
 	else
 	{
-		ch->n_volume += cmd >> 4;
+		ch->n_volume += param >> 4;
 		if (ch->n_volume > 64)
 			ch->n_volume = 64;
 	}
@@ -306,6 +323,7 @@ static void funkIt(moduleChannel_t *ch)
 	if (song->tick == 0)
 	{
 		ch->n_glissfunk = ((ch->n_cmd & 0xF) << 4) | (ch->n_glissfunk & 0xF);
+
 		if ((ch->n_glissfunk & 0xF0) > 0)
 			updateFunk(ch);
 	}
@@ -313,7 +331,7 @@ static void funkIt(moduleChannel_t *ch)
 
 static void positionJump(moduleChannel_t *ch)
 {
-	modOrder = (ch->n_cmd & 0xFF) - 1; // 0xFF (B00) jumps to pat 0
+	modOrder = (ch->n_cmd & 0xFF) - 1; // B00 results in -1, but it safely jumps to order 0
 	pBreakPosition = 0;
 	posJumpAssert = true;
 }
@@ -360,9 +378,7 @@ static void arpeggio(moduleChannel_t *ch)
 	uint8_t arpTick, arpNote;
 	const int16_t *periods;
 
-	assert(song->tick < 32);
-	arpTick = arpTickTable[song->tick]; // 0, 1, 2
-
+	arpTick = song->tick % 3; // 0, 1, 2
 	if (arpTick == 1)
 	{
 		arpNote = (uint8_t)(ch->n_cmd >> 4);
@@ -398,7 +414,7 @@ static void portaUp(moduleChannel_t *ch)
 	ch->n_period -= (ch->n_cmd & 0xFF) & lowMask;
 	lowMask = 0xFF;
 
-	if ((ch->n_period & 0xFFF) < 113) // PT BUG: unsigned comparison, underflow not clamped!
+	if ((ch->n_period & 0xFFF) < 113) // PT BUG: sign removed before comparison, underflow not clamped!
 		ch->n_period = (ch->n_period & 0xF000) | 113;
 
 	paulaSetPeriod(ch->n_chanindex, ch->n_period & 0xFFF);
@@ -417,7 +433,11 @@ static void portaDown(moduleChannel_t *ch)
 
 static void filterOnOff(moduleChannel_t *ch)
 {
-	setLEDFilter(!(ch->n_cmd & 1), false);
+	if (song->tick == 0) // added this (just pointless to call this during all ticks!)
+	{
+		const bool filterOn = (ch->n_cmd & 1) ^ 1;
+		setLEDFilter(filterOn, false);
+	}
 }
 
 static void finePortaUp(moduleChannel_t *ch)
@@ -649,6 +669,7 @@ static void sampleOffset(moduleChannel_t *ch)
 
 	uint16_t newOffset = ch->n_sampleoffset << 7;
 
+	// this signed test is the reason for the 9xx "sample >64kB = silence" bug
 	if ((int16_t)newOffset < ch->n_length)
 	{
 		ch->n_length -= newOffset;
@@ -662,62 +683,89 @@ static void sampleOffset(moduleChannel_t *ch)
 
 static void E_Commands(moduleChannel_t *ch)
 {
-	const uint8_t cmd = (ch->n_cmd & 0xF0) >> 4;
-	switch (cmd)
+	const uint8_t ecmd = (ch->n_cmd & 0x00F0) >> 4;
+	switch (ecmd)
 	{
-		case 0x0: filterOnOff(ch);       break;
-		case 0x1: finePortaUp(ch);       break;
-		case 0x2: finePortaDown(ch);     break;
-		case 0x3: setGlissControl(ch);   break;
-		case 0x4: setVibratoControl(ch); break;
-		case 0x5: setFineTune(ch);       break;
-		case 0x6: jumpLoop(ch);          break;
-		case 0x7: setTremoloControl(ch); break;
-		case 0x8: karplusStrong(ch);     break;
+		case 0x0: filterOnOff(ch);       return;
+		case 0x1: finePortaUp(ch);       return;
+		case 0x2: finePortaDown(ch);     return;
+		case 0x3: setGlissControl(ch);   return;
+		case 0x4: setVibratoControl(ch); return;
+		case 0x5: setFineTune(ch);       return;
+		case 0x6: jumpLoop(ch);          return;
+		case 0x7: setTremoloControl(ch); return;
+		case 0x8: karplusStrong(ch);     return;
+		case 0xE: patternDelay(ch);      return;
 		default: break;
 	}
 
 	if (editor.muted[ch->n_chanindex])
 		return;
 
-	switch (cmd)
+	switch (ecmd)
 	{
-		case 0x9: retrigNote(ch);     break;
-		case 0xA: volumeFineUp(ch);   break;
-		case 0xB: volumeFineDown(ch); break;
-		case 0xC: noteCut(ch);        break;
-		case 0xD: noteDelay(ch);      break;
-		case 0xE: patternDelay(ch);   break;
-		case 0xF: funkIt(ch);         break;
+		case 0x9: retrigNote(ch);     return;
+		case 0xA: volumeFineUp(ch);   return;
+		case 0xB: volumeFineDown(ch); return;
+		case 0xC: noteCut(ch);        return;
+		case 0xD: noteDelay(ch);      return;
+		case 0xF: funkIt(ch);         return;
 		default: break;
 	}
 }
 
 static void checkMoreEffects(moduleChannel_t *ch)
 {
-	switch ((ch->n_cmd & 0xF00) >> 8)
+	const uint8_t cmd = (ch->n_cmd & 0x0F00) >> 8;
+	switch (cmd)
 	{
-		case 0x9: sampleOffset(ch); break;
-		case 0xB: positionJump(ch); break;
-
-		case 0xC:
-		{
-			if (!editor.muted[ch->n_chanindex])
-				volumeChange(ch);
-		}
-		break;
-
-		case 0xD: patternBreak(ch); break;
-		case 0xE: E_Commands(ch);   break;
-		case 0xF: setSpeed(ch);     break;
-
-		default:
-		{
-			if (!editor.muted[ch->n_chanindex])
-				paulaSetPeriod(ch->n_chanindex, ch->n_period);
-		}
-		break;
+		case 0x9: sampleOffset(ch); return; // note the returns here, not breaks!
+		case 0xB: positionJump(ch); return; 
+		case 0xD: patternBreak(ch); return;
+		case 0xE: E_Commands(ch);   return;
+		case 0xF: setSpeed(ch);     return;
+		default: break;
 	}
+
+	if (editor.muted[ch->n_chanindex])
+		return;
+
+	if (cmd == 0xC)
+	{
+		volumeChange(ch);
+		return;
+	}
+
+	paulaSetPeriod(ch->n_chanindex, ch->n_period);
+}
+
+static void chkefx2(moduleChannel_t *ch)
+{
+	updateFunk(ch);
+
+	if ((ch->n_cmd & 0xFFF) == 0)
+		return;
+
+	const uint8_t cmd = (ch->n_cmd & 0x0F00) >> 8;
+	switch (cmd)
+	{
+		case 0x0: arpeggio(ch);            return; // note the returns here, not breaks!
+		case 0x1: portaUp(ch);             return;
+		case 0x2: portaDown(ch);           return;
+		case 0x3: tonePortamento(ch);      return;
+		case 0x4: vibrato(ch);             return;
+		case 0x5: tonePlusVolSlide(ch);    return;
+		case 0x6: vibratoPlusVolSlide(ch); return;
+		case 0xE: E_Commands(ch);          return;
+		default: break;
+	}
+
+	paulaSetPeriod(ch->n_chanindex, ch->n_period);
+
+	if (cmd == 0x7)
+		tremolo(ch);
+	else if (cmd == 0xA)
+		volumeSlide(ch);
 }
 
 static void checkEffects(moduleChannel_t *ch)
@@ -725,41 +773,17 @@ static void checkEffects(moduleChannel_t *ch)
 	if (editor.muted[ch->n_chanindex])
 		return;
 
-	updateFunk(ch);
+	chkefx2(ch);
 
-	const uint8_t effect = (ch->n_cmd & 0xF00) >> 8;
-	if ((ch->n_cmd & 0xFFF) > 0)
-	{
-		switch (effect)
-		{
-			case 0x0: arpeggio(ch);            break;
-			case 0x1: portaUp(ch);             break;
-			case 0x2: portaDown(ch);           break;
-			case 0x3: tonePortamento(ch);      break;
-			case 0x4: vibrato(ch);             break;
-			case 0x5: tonePlusVolSlide(ch);    break;
-			case 0x6: vibratoPlusVolSlide(ch); break;
-			case 0xE: E_Commands(ch);          break;
-
-			case 0x7:
-			{
-				paulaSetPeriod(ch->n_chanindex, ch->n_period);
-				tremolo(ch);
-			}
-			break;
-
-			case 0xA:
-			{
-				paulaSetPeriod(ch->n_chanindex, ch->n_period);
-				volumeSlide(ch);
-			}
-			break;
-
-			default: paulaSetPeriod(ch->n_chanindex, ch->n_period); break;
-		}
-	}
-
-	if (effect != 0x7)
+	/* This is not very clear in the original PT replayer code,
+	** but the tremolo effect skips chkefx2()'s return address
+	** in the stack so that it jumps to checkEffects()'s return
+	** address instead of ending up here. In other words, volume
+	** is not updated here after tremolo (it's done inside the
+	** tremolo routine itself).
+	*/
+	const uint8_t cmd = (ch->n_cmd & 0x0F00) >> 8;
+	if (cmd != 0x7)
 		paulaSetVolume(ch->n_chanindex, ch->n_volume);
 }
 
@@ -865,7 +889,7 @@ static void playVoice(moduleChannel_t *ch)
 			ch->n_wavestart = ch->n_start;
 		}
 
-		// non-PT2 quirk
+		// non-PT2 requirement (set safe sample space for uninitialized voices - f.ex. "the ultimate beeper.mod")
 		if (ch->n_length == 0)
 			ch->n_loopstart = ch->n_wavestart = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 	}
@@ -879,7 +903,7 @@ static void playVoice(moduleChannel_t *ch)
 		}
 		else
 		{
-			cmd = (ch->n_cmd & 0xF00) >> 8;
+			cmd = (ch->n_cmd & 0x0F00) >> 8;
 			if (cmd == 3 || cmd == 5)
 			{
 				setVUMeterHeight(ch);
@@ -1032,7 +1056,7 @@ bool intMusic(void) // replayer ticker
 		song->tick++;
 
 	bool readNewNote = false;
-	if ((unsigned)song->tick >= (unsigned)song->speed)
+	if ((uint32_t)song->tick >= (uint32_t)song->speed)
 	{
 		song->tick = 0;
 		readNewNote = true;

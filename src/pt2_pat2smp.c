@@ -16,8 +16,8 @@
 #include "pt2_pat2smp.h"
 #include "pt2_downsamplers2x.h"
 
-bool intMusic(void); // pt_modplayer.c
-void storeTempVariables(void); // pt_modplayer.c
+bool intMusic(void); // pt2_replayer.c
+void storeTempVariables(void); // pt2_replayer.c
 
 void doPat2Smp(void)
 {

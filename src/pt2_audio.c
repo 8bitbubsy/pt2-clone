@@ -49,7 +49,7 @@ static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
 static double *dMixBufferL, *dMixBufferR, *dMixBufferLUnaligned, *dMixBufferRUnaligned;
 static double dPrngStateL, dPrngStateR, dSideFactor;
-static blep_t blep[AMIGA_VOICES], blepVol[AMIGA_VOICES];
+static blep_t blep[AMIGA_VOICES];
 static rcFilter_t filterLoA500, filterHiA500, filterLoA1200, filterHiA1200;
 static ledFilter_t filterLED;
 static SDL_AudioDeviceID dev;
@@ -67,7 +67,7 @@ static uint32_t tickTimeLen, tickTimeLenFrac;
 audio_t audio;
 paulaVoice_t paula[AMIGA_VOICES];
 
-bool intMusic(void); // defined in pt_modplayer.c
+bool intMusic(void); // defined in pt2_replayer.c
 
 static void updateFilterFunc(void)
 {
@@ -89,6 +89,9 @@ static void updateFilterFunc(void)
 
 void setLEDFilter(bool state, bool doLockAudio)
 {
+	if (ledFilterEnabled == state)
+		return; // same state as before!
+
 	const bool audioWasntLocked = !audio.locked;
 	if (doLockAudio && audioWasntLocked)
 		lockAudio();
@@ -189,7 +192,6 @@ void mixerKillVoice(int32_t ch)
 
 	memset(&paula[ch], 0, sizeof (paulaVoice_t));
 	memset(&blep[ch], 0, sizeof (blep_t));
-	memset(&blepVol[ch], 0, sizeof (blep_t));
 
 	stopScope(ch); // it should be safe to clear the scope now
 	memset(&scope[ch], 0, sizeof (scope_t));
@@ -268,23 +270,22 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		else
 			dPeriodToDeltaDiv = audio.dPeriodToDeltaDiv;
 
-		v->dOldVoiceDelta = (dPeriodToDeltaDiv / realPeriod) * 0.5; // /2 since we do 2x oversampling
+		v->dOldVoiceDelta = dPeriodToDeltaDiv / realPeriod;
+
+		if (audio.oversamplingFlag || editor.isSMPRendering)
+			v->dOldVoiceDelta *= 0.5; // /2 since we do 2x oversampling
 
 		// for BLEP synthesis (prevents division in inner mix loop)
 		v->dOldVoiceDeltaMul = 1.0 / v->dOldVoiceDelta;
 	}
 
-	v->dDelta = v->dOldVoiceDelta;
+	v->dNewDelta = v->dOldVoiceDelta;
+	if (v->dLastDelta == 0.0) // for BLEP
+		v->dLastDelta = v->dNewDelta;
 
-	// for BLEP synthesis
-	v->dDeltaMul = v->dOldVoiceDeltaMul;
-
-	if (v->dLastDelta == 0.0)
-		v->dLastDelta = v->dDelta;
-
-	if (v->dLastDeltaMul == 0.0)
-		v->dLastDeltaMul = v->dDeltaMul;
-	// ------------------
+	v->dNewDeltaMul = v->dOldVoiceDeltaMul;
+	if (v->dLastDeltaMul == 0.0) // for BLEP
+		v->dLastDeltaMul = v->dNewDeltaMul;
 }
 
 void paulaSetVolume(int32_t ch, uint16_t vol)
@@ -293,13 +294,14 @@ void paulaSetVolume(int32_t ch, uint16_t vol)
 
 	int32_t realVol = vol;
 
-	// this is what WinUAE does, so I assume it's what Paula does too
+	// this is what WinUAE does
 	realVol &= 127;
 	if (realVol > 64)
 		realVol = 64;
-	// ----------------
+	// ------------------------
 
-	v->dVolume = realVol * (1.0 / 64.0);
+	// multiplying by this also scales the sample from -128..127 -> -1.0 .. ~0.99
+	v->dScaledVolume = realVol * (1.0 / (128.0 * 64.0));
 
 	if (editor.songPlaying)
 	{
@@ -356,7 +358,7 @@ void paulaStopDMA(int32_t ch)
 {
 	paulaVoice_t *v = &paula[ch];
 
-	v->active = false;
+	v->DMA_active = false;
 
 	if (editor.songPlaying)
 		v->syncFlags |= STOP_SCOPE;
@@ -376,11 +378,21 @@ void paulaStartDMA(int32_t ch)
 	if (length == 0)
 		length = 1+65535;
 
-	v->dPhase = 0.0;
+	v->dPhase = v->dLastPhase = 0.0;
 	v->pos = 0;
 	v->data = dat;
 	v->length = length;
-	v->active = true;
+	v->dDelta = v->dLastDelta = v->dNewDelta;
+	v->dDeltaMul = v->dLastDeltaMul = v->dNewDeltaMul;
+
+	/* Read first sample data point into cache now.
+	**
+	** (multiplying by dScaledVolume will also change the scale
+	**  from -128..127 to -1.0 .. ~0.99.)
+	*/
+	v->dCachedSamplePoint = v->data[0] * v->dScaledVolume;
+
+	v->DMA_active = true;
 
 	if (editor.songPlaying)
 	{
@@ -424,55 +436,52 @@ void toggleFilterModel(void)
 void mixChannels(int32_t numSamples)
 {
 	double *dMixBufSelect[AMIGA_VOICES] = { dMixBufferL, dMixBufferR, dMixBufferR, dMixBufferL };
-	double dSmp, dVol;
-	blep_t *bSmp, *bVol;
-	paulaVoice_t *v;
 
 	memset(dMixBufferL, 0, numSamples * sizeof (double));
 	memset(dMixBufferR, 0, numSamples * sizeof (double));
 
-	v = paula;
-	bSmp = blep;
-	bVol = blepVol;
+	paulaVoice_t *v = paula;
+	blep_t *bSmp = blep;
 
-	for (int32_t i = 0; i < AMIGA_VOICES; i++, v++, bSmp++, bVol++)
+	for (int32_t i = 0; i < AMIGA_VOICES; i++, v++, bSmp++)
 	{
-		if (!v->active || v->data == NULL)
+		/* We only need to test for a NULL-pointer once.
+		** When pointers are messed with in the tracker, the mixer
+		** is temporarily forced offline, and its voice pointers are
+		** cleared to prevent expired pointer addresses.
+		*/
+		if (!v->DMA_active || v->data == NULL)
 			continue;
 
-		double *dMixBuf = dMixBufSelect[i];
+		double *dMixBuf = dMixBufSelect[i]; // what output channel to mix into (L, R, R, L)
 		for (int32_t j = 0; j < numSamples; j++)
 		{
-			assert(v->data != NULL);
-			dSmp = v->data[v->pos] * (1.0 / 128.0);
-			dVol = v->dVolume;
-
+			double dSmp = v->dCachedSamplePoint;
 			if (dSmp != bSmp->dLastValue)
 			{
 				if (v->dLastDelta > v->dLastPhase)
 				{
-					// div->mul trick: v->dLastDeltaMul is 1.0 / v->dLastDelta
+					// v->dLastDeltaMul is (1.0 / v->dLastDelta) (pre-computed for speed, div -> mul)
 					blepAdd(bSmp, v->dLastPhase * v->dLastDeltaMul, bSmp->dLastValue - dSmp);
 				}
 
 				bSmp->dLastValue = dSmp;
 			}
 
-			if (dVol != bVol->dLastValue)
-			{
-				blepVolAdd(bVol, bVol->dLastValue - dVol);
-				bVol->dLastValue = dVol;
-			}
+			if (bSmp->samplesLeft > 0)
+				dSmp = blepRun(bSmp, dSmp);
 
-			if (bSmp->samplesLeft > 0) dSmp = blepRun(bSmp, dSmp);
-			if (bVol->samplesLeft > 0) dVol = blepRun(bVol, dVol);
-
-			dMixBuf[j] += dSmp * dVol;
+			dMixBuf[j] += dSmp;
 
 			v->dPhase += v->dDelta;
 			if (v->dPhase >= 1.0) // deltas can't be >= 1.0, so this is safe
 			{
 				v->dPhase -= 1.0;
+
+				// Paula only updates period (delta) during sample fetching
+				v->dDelta = v->dNewDelta;
+				v->dDeltaMul = v->dNewDeltaMul;
+				// --------------------------------------------------------
 
 				v->dLastPhase = v->dPhase;
 				v->dLastDelta = v->dDelta;
@@ -486,6 +495,16 @@ void mixChannels(int32_t numSamples)
 					v->length = v->newLength;
 					v->data = v->newData;
 				}
+
+				/* Read sample into cache now.
+				** Also change volume here as well. It has recently been
+				** discovered that Paula only updates its volume during period
+				** fetching (when it's reading the next sample point).
+				**
+				** (multiplying by dScaledVolume will also change the scale
+				**  from -128..127 to -1.0 .. ~0.99.)
+				*/
+				v->dCachedSamplePoint = v->data[v->pos] * v->dScaledVolume;
 			}
 		}
 	}
@@ -595,7 +614,75 @@ static void processFiltersA500_LED(int32_t numSamples)
 }
 
 #define NORM_FACTOR 2.0 /* nominally correct, but can clip from high-pass filter overshoot */
+
 static inline void processMixedSamplesAmigaPanning(int32_t i, int16_t *out)
+{
+	int32_t smp32;
+	double dPrng;
+
+	double dL = dMixBufferL[i];
+	double dR = dMixBufferR[i];
+
+	// normalize w/ phase-inversion (A500/A1200 has a phase-inverted audio signal)
+	dL *= NORM_FACTOR * (-INT16_MAX / (double)AMIGA_VOICES);
+	dR *= NORM_FACTOR * (-INT16_MAX / (double)AMIGA_VOICES);
+
+	// left channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dL = (dL + dPrng) - dPrngStateL;
+	dPrngStateL = dPrng;
+	smp32 = (int32_t)dL;
+	CLAMP16(smp32);
+	out[0] = (int16_t)smp32;
+
+	// right channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dR = (dR + dPrng) - dPrngStateR;
+	dPrngStateR = dPrng;
+	smp32 = (int32_t)dR;
+	CLAMP16(smp32);
+	out[1] = (int16_t)smp32;
+}
+
+static inline void processMixedSamples(int32_t i, int16_t *out)
+{
+	int32_t smp32;
+	double dPrng;
+
+	double dL = dMixBufferL[i];
+	double dR = dMixBufferR[i];
+
+	// apply stereo separation
+	const double dOldL = dL;
+	const double dOldR = dR;
+	double dMid  = (dOldL + dOldR) * STEREO_NORM_FACTOR;
+	double dSide = (dOldL - dOldR) * dSideFactor;
+	dL = dMid + dSide;
+	dR = dMid - dSide;
+
+	// normalize w/ phase-inversion (A500/A1200 has a phase-inverted audio signal)
+	dL *= NORM_FACTOR * (-INT16_MAX / (double)AMIGA_VOICES);
+	dR *= NORM_FACTOR * (-INT16_MAX / (double)AMIGA_VOICES);
+
+	// left channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dL = (dL + dPrng) - dPrngStateL;
+	dPrngStateL = dPrng;
+	smp32 = (int32_t)dL;
+	CLAMP16(smp32);
+	out[0] = (int16_t)smp32;
+
+	// right channel - 1-bit triangular dithering (high-pass filtered)
+	dPrng = random32() * (0.5 / INT32_MAX); // -0.5..0.5
+	dR = (dR + dPrng) - dPrngStateR;
+	dPrngStateR = dPrng;
+	smp32 = (int32_t)dR;
+	CLAMP16(smp32);
+	out[1] = (int16_t)smp32;
+}
+
+
+static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) // 2x oversampling
 {
 	int32_t smp32;
 	double dPrng, dL, dR;
@@ -627,7 +714,7 @@ static inline void processMixedSamplesAmigaPanning(int32_t i, int16_t *out)
 	out[1] = (int16_t)smp32;
 }
 
-static inline void processMixedSamples(int32_t i, int16_t *out)
+static inline void processMixedSamples_2x(int32_t i, int16_t *out) // 2x oversampling
 {
 	int32_t smp32;
 	double dPrng, dL, dR;
@@ -677,7 +764,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		if (editor.pat2SmpPos+samplesTodo > MAX_SAMPLE_LEN)
 			samplesTodo = MAX_SAMPLE_LEN-editor.pat2SmpPos;
 
-		// mix channels (at 2x rate, we do 2x oversampling)
+		// mix channels (with 2x oversampling, PAT2SMP needs it)
 		mixChannels(samplesTodo*2);
 
 		double *dOutStream = &editor.dPat2SmpBuf[editor.pat2SmpPos];
@@ -702,33 +789,63 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	}
 	else
 	{
-		// mix and filter channels (at 2x rate, we do 2x oversampling)
-		mixChannels(numSamples*2);
-		processFiltersFunc(numSamples*2);
-
-		// downsample, normalize and dither
-		int16_t out[2];
-		int16_t *outStream = target;
-		if (stereoSeparation == 100)
+		if (audio.oversamplingFlag) // 2x oversampling
 		{
-			for (int32_t i = 0; i < numSamples; i++)
-			{
-				processMixedSamplesAmigaPanning(i, out); // also does 2x downsampling
+			// mix and filter channels (at 2x rate)
+			mixChannels(numSamples*2);
+			processFiltersFunc(numSamples*2);
 
-				*outStream++ = out[0];
-				*outStream++ = out[1];
+			// downsample, normalize and dither
+			int16_t out[2];
+			int16_t *outStream = target;
+			if (stereoSeparation == 100)
+			{
+				for (int32_t i = 0; i < numSamples; i++)
+				{
+					processMixedSamplesAmigaPanning_2x(i, out);
+					*outStream++ = out[0];
+					*outStream++ = out[1];
+				}
+			}
+			else
+			{
+				for (int32_t i = 0; i < numSamples; i++)
+				{
+					processMixedSamples_2x(i, out);
+					*outStream++ = out[0];
+					*outStream++ = out[1];
+				}
 			}
 		}
 		else
 		{
-			for (int32_t i = 0; i < numSamples; i++)
-			{
-				processMixedSamples(i, out); // also does 2x downsampling
+			// mix and filter channels
+			mixChannels(numSamples);
+			processFiltersFunc(numSamples);
 
-				*outStream++ = out[0];
-				*outStream++ = out[1];
+			// normalize and dither
+			int16_t out[2];
+			int16_t *outStream = target;
+			if (stereoSeparation == 100)
+			{
+				for (int32_t i = 0; i < numSamples; i++)
+				{
+					processMixedSamplesAmigaPanning(i, out);
+					*outStream++ = out[0];
+					*outStream++ = out[1];
+				}
+			}
+			else
+			{
+				for (int32_t i = 0; i < numSamples; i++)
+				{
+					processMixedSamples(i, out);
+					*outStream++ = out[0];
+					*outStream++ = out[1];
+				}
 			}
 		}
+
 	}
 }
 
@@ -872,8 +989,11 @@ static void calculateFilterCoeffs(void)
 	** - Sallen-key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF (same as A500)
 	** - 1-pole RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22uF
 	*/
-	const double dAudioFreq = audio.outputRate * 2.0; // *2 because we do 2x oversampling
+	double dAudioFreq = audio.outputRate;
 	double R, C, R1, R2, C1, C2, fc, fb;
+
+	if (audio.oversamplingFlag)
+		dAudioFreq *= 2.0; // 2x oversampling
 
 	// A500 1-pole (6db/oct) static RC low-pass filter:
 	R = 360.0; // R321 (360 ohm)
@@ -1021,7 +1141,10 @@ bool setupAudio(void)
 	audio.audioBufferSize = have.samples;
 	audio.dPeriodToDeltaDiv = (double)PAULA_PAL_CLK / audio.outputRate;
 
-	updateReplayerTimingMode();
+	// we do 2x oversampling if the audio output rate is below 96kHz
+	audio.oversamplingFlag = (audio.outputRate < 96000);
+
+	updateReplayerTimingMode(); // also generates the BPM tables used below
 
 	const int32_t lowestBPM = 32;
 	const int32_t pat2SmpMaxSamples = (audio.bpmTable20kHz[lowestBPM-32] + (1LL + 31)) >> 32; // ceil (rounded upwards)

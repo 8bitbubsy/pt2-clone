@@ -43,8 +43,8 @@ void movePatCurLeft(void);
 static bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode);
 bool handleTextEditMode(SDL_Scancode scancode);
 
-void sampleUpButton(void); // pt_mouse.c
-void sampleDownButton(void); // pt_mouse.c
+void sampleUpButton(void); // pt2_mouse.c
+void sampleDownButton(void); // pt2_mouse.c
 
 void gotoNextMulti(void)
 {

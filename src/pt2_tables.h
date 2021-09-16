@@ -14,7 +14,6 @@ extern const char *noteNames2[2+36];
 extern const char *noteNames3[2+36];
 extern const char *noteNames4[2+36];
 extern const uint8_t vibratoTable[32];
-extern const uint8_t arpTickTable[32];
 extern const int16_t periodTable[(37*16)+15];
 extern int8_t pNoteTable[32];
 extern const uint64_t musicTimeTab64[256-32];

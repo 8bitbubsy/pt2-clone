@@ -18,7 +18,7 @@
 
 #define TICKS_PER_RENDER_CHUNK 64
 
-// pt_modplayer.c
+// pt2_replayer.c
 void storeTempVariables(void);
 bool intMusic(void);
 // ---------------------

@@ -42,6 +42,7 @@ void loadConfig(void)
 	FILE *f;
 
 	// set default config values first
+	config.disableE8xEffect = false;
 	config.fullScreenStretch = false;
 	config.pattDots = false;
 	config.waveformCenterLine = true;
@@ -190,6 +191,13 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			configLine = strtok(NULL, "\n");
 			continue;
+		}
+
+		// DISABLE_E8X (Karplus-Strong command)
+		else if (!_strnicmp(configLine, "DISABLE_E8X=", 12))
+		{
+			     if (!_strnicmp(&configLine[12], "TRUE",  4)) config.disableE8xEffect = true;
+			else if (!_strnicmp(&configLine[12], "FALSE", 5)) config.disableE8xEffect = false;
 		}
 
 		// HWMOUSE

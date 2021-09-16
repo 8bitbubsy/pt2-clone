@@ -52,7 +52,7 @@ const int8_t scancode2NoteHi[52] = // "USB usage page standard" order
 	-1, 24, 26, 28
 };
 
-void setPattern(int16_t pattern); // pt_modplayer.c
+void setPattern(int16_t pattern); // pt2_replayer.c
 
 void jamAndPlaceSample(SDL_Scancode scancode,  bool normalMode);
 uint8_t quantizeCheck(uint8_t row);

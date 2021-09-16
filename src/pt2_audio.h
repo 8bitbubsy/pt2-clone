@@ -8,7 +8,7 @@ typedef struct audio_t
 {
 	volatile bool locked, isSampling;
 
-	bool forceSoundCardSilence;
+	bool forceSoundCardSilence, oversamplingFlag;
 	
 	uint32_t outputRate, audioBufferSize;
 	int64_t tickSampleCounter64, samplesPerTick64;
@@ -25,11 +25,13 @@ typedef struct audio_t
 
 typedef struct voice_t
 {
-	volatile bool active;
+	volatile bool DMA_active;
 
 	const int8_t *data, *newData;
 	int32_t length, newLength, pos;
-	double dVolume, dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase;
+
+	double dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase;
+	double dCachedSamplePoint, dScaledVolume, dNewDelta, dNewDeltaMul;
 
 	// period cache
 	int32_t oldPeriod;

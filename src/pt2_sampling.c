@@ -3,7 +3,7 @@
 ** have the proper knowledge on this stuff.
 **
 ** Some functions like sin() may be different depending on
-** math library implementation, but we don't use pt_math.c
+** math library implementation, but we don't use pt2_math.c
 ** replacements for speed reasons.
 */
 
