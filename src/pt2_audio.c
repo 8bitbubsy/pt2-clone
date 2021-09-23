@@ -1,5 +1,3 @@
-// the audio filters and BLEP synthesis were coded by aciddose
-
 // for finding memory leaks in debug mode with Visual Studio 
 #if defined _DEBUG && defined _MSC_VER
 #include <crtdbg.h>
@@ -35,7 +33,7 @@
 #include "pt2_structs.h"
 #include "pt2_rcfilter.h"
 #include "pt2_ledfilter.h"
-#include "pt2_downsamplers2x.h"
+#include "pt2_downsample2x.h"
 
 #define STEREO_NORM_FACTOR 0.5 /* cumulative mid/side normalization factor (1/sqrt(2))*(1/sqrt(2)) */
 
@@ -680,7 +678,6 @@ static inline void processMixedSamples(int32_t i, int16_t *out)
 	CLAMP16(smp32);
 	out[1] = (int16_t)smp32;
 }
-
 
 static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) // 2x oversampling
 {

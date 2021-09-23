@@ -99,7 +99,7 @@
     <ClInclude Include="..\..\src\pt2_chordmaker.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\pt2_downsamplers2x.h">
+    <ClInclude Include="..\..\src\pt2_downsample2x.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_math.h">

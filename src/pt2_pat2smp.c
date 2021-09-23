@@ -14,7 +14,7 @@
 #include "pt2_textout.h"
 #include "pt2_rcfilter.h"
 #include "pt2_pat2smp.h"
-#include "pt2_downsamplers2x.h"
+#include "pt2_downsample2x.h"
 
 bool intMusic(void); // pt2_replayer.c
 void storeTempVariables(void); // pt2_replayer.c

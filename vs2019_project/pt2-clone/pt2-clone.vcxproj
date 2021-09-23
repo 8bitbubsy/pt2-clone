@@ -257,7 +257,7 @@
     <ClInclude Include="..\..\src\pt2_pat2smp.h" />
     <ClInclude Include="..\..\src\pt2_pattern_viewer.h" />
     <ClInclude Include="..\..\src\pt2_rcfilter.h" />
-    <ClInclude Include="..\..\src\pt2_downsamplers2x.h" />
+    <ClInclude Include="..\..\src\pt2_downsample2x.h" />
     <ClInclude Include="..\..\src\pt2_sample_loader.h" />
     <ClInclude Include="..\..\src\pt2_sampler.h" />
     <ClInclude Include="..\..\src\pt2_sample_saver.h" />

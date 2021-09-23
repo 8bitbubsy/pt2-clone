@@ -14,7 +14,7 @@
 #include "pt2_visuals.h"
 #include "pt2_mod2wav.h"
 #include "pt2_structs.h"
-#include "pt2_downsamplers2x.h"
+#include "pt2_downsample2x.h"
 
 #define TICKS_PER_RENDER_CHUNK 64
 

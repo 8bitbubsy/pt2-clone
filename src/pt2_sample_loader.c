@@ -18,7 +18,7 @@
 #include "pt2_unicode.h"
 #include "pt2_config.h"
 #include "pt2_sampling.h"
-#include "pt2_downsamplers2x.h"
+#include "pt2_downsample2x.h"
 
 enum
 {

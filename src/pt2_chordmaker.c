@@ -16,7 +16,7 @@
 #include "pt2_sampler.h"
 #include "pt2_audio.h"
 #include "pt2_blep.h"
-#include "pt2_downsamplers2x.h"
+#include "pt2_downsample2x.h"
 
 #define MAX_NOTES 4
 
