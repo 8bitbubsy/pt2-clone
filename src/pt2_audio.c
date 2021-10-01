@@ -995,13 +995,13 @@ static void calculateFilterCoeffs(void)
 	// A500 1-pole (6db/oct) static RC low-pass filter:
 	R = 360.0; // R321 (360 ohm)
 	C = 1e-7;  // C321 (0.1uF)
-	fc = (1.0 / (PT2_TWO_PI * R * C)); // cutoff = ~4420.97Hz
+	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~4420.97Hz
 	calcRCFilterCoeffs(dAudioFreq, fc, &filterLoA500);
 
 	// A1200 1-pole (6db/oct) static RC low-pass filter:
 	R = 680.0;  // R321 (680 ohm)
 	C = 6.8e-9; // C321 (6800pF)
-	fc = (1.0 / (PT2_TWO_PI * R * C)); // cutoff = ~34419.32Hz
+	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~34419.32Hz
 	calcRCFilterCoeffs(dAudioFreq, fc, &filterLoA1200);
 
 	// Sallen-Key filter ("LED" filter, same values on A500/A1200):
@@ -1146,7 +1146,7 @@ bool setupAudio(void)
 	const int32_t lowestBPM = 32;
 	const int32_t pat2SmpMaxSamples = (audio.bpmTable20kHz[lowestBPM-32] + (1LL + 31)) >> 32; // ceil (rounded upwards)
 	const int32_t renderMaxSamples = (audio.bpmTable[lowestBPM-32] + (1LL + 31)) >> 32; // ceil (rounded upwards)
-	const int32_t maxSamplesToMix = MAX(pat2SmpMaxSamples, renderMaxSamples) * 2; // *2 for headroom (XXX: buggy code somewhere?)
+	const int32_t maxSamplesToMix = MAX(pat2SmpMaxSamples, renderMaxSamples) * 2; // *2 because PAT2SMP uses 2x oversampling all the time
 
 	dMixBufferLUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
 	dMixBufferRUnaligned = (double *)MALLOC_PAD(maxSamplesToMix * sizeof (double), 256);
