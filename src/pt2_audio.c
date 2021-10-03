@@ -41,7 +41,7 @@
 
 static volatile bool ledFilterEnabled;
 static volatile uint8_t filterModel;
-static bool amigaPanFlag;
+static bool amigaPanFlag, useA1200LowPassFilter;
 static int32_t randSeed = INITIAL_DITHER_SEED, stereoSeparation = 100;
 static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
@@ -525,46 +525,85 @@ static inline int32_t random32(void)
 
 static void processFiltersA1200_NoLED(int32_t numSamples)
 {
-	// apply filters
-	for (int32_t i = 0; i < numSamples; i++)
+	if (useA1200LowPassFilter)
 	{
-		double dOut[2];
+		for (int32_t i = 0; i < numSamples; i++)
+		{
+			double dOut[2];
 
-		dOut[0] = dMixBufferL[i];
-		dOut[1] = dMixBufferR[i];
+			dOut[0] = dMixBufferL[i];
+			dOut[1] = dMixBufferR[i];
 
-		// low-pass filter
-		RCLowPassFilterStereo(&filterLoA1200, dOut, dOut);
+			// low-pass filter
+			RCLowPassFilterStereo(&filterLoA1200, dOut, dOut);
 
-		// high-pass RC filter
-		RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
+			// high-pass RC filter
+			RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
 
-		dMixBufferL[i] = dOut[0];
-		dMixBufferR[i] = dOut[1];
+			dMixBufferL[i] = dOut[0];
+			dMixBufferR[i] = dOut[1];
+		}
+	}
+	else
+	{
+		for (int32_t i = 0; i < numSamples; i++)
+		{
+			double dOut[2];
+
+			dOut[0] = dMixBufferL[i];
+			dOut[1] = dMixBufferR[i];
+
+			// high-pass RC filter
+			RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
+
+			dMixBufferL[i] = dOut[0];
+			dMixBufferR[i] = dOut[1];
+		}
 	}
 }
 
 static void processFiltersA1200_LED(int32_t numSamples)
 {
-	// apply filters
-	for (int32_t i = 0; i < numSamples; i++)
+	if (useA1200LowPassFilter)
 	{
-		double dOut[2];
+		for (int32_t i = 0; i < numSamples; i++)
+		{
+			double dOut[2];
 
-		dOut[0] = dMixBufferL[i];
-		dOut[1] = dMixBufferR[i];
+			dOut[0] = dMixBufferL[i];
+			dOut[1] = dMixBufferR[i];
 
-		// low-pass filter
-		RCLowPassFilterStereo(&filterLoA1200, dOut, dOut);
+			// low-pass filter
+			RCLowPassFilterStereo(&filterLoA1200, dOut, dOut);
 
-		// "LED" Sallen-Key filter
-		LEDFilter(&filterLED, dOut, dOut);
+			// "LED" Sallen-Key filter
+			LEDFilter(&filterLED, dOut, dOut);
 
-		// high-pass RC filter
-		RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
+			// high-pass RC filter
+			RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
 
-		dMixBufferL[i] = dOut[0];
-		dMixBufferR[i] = dOut[1];
+			dMixBufferL[i] = dOut[0];
+			dMixBufferR[i] = dOut[1];
+		}
+	}
+	else
+	{
+		for (int32_t i = 0; i < numSamples; i++)
+		{
+			double dOut[2];
+
+			dOut[0] = dMixBufferL[i];
+			dOut[1] = dMixBufferR[i];
+
+			// "LED" Sallen-Key filter
+			LEDFilter(&filterLED, dOut, dOut);
+
+			// high-pass RC filter
+			RCHighPassFilterStereo(&filterHiA1200, dOut, dOut);
+
+			dMixBufferL[i] = dOut[0];
+			dMixBufferR[i] = dOut[1];
+		}
 	}
 }
 
@@ -1002,7 +1041,13 @@ static void calculateFilterCoeffs(void)
 	R = 680.0;  // R321 (680 ohm)
 	C = 6.8e-9; // C321 (6800pF)
 	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~34419.32Hz
-	calcRCFilterCoeffs(dAudioFreq, fc, &filterLoA1200);
+
+	useA1200LowPassFilter = false;
+	if (dAudioFreq/2.0 > fc)
+	{
+		calcRCFilterCoeffs(dAudioFreq, fc, &filterLoA1200);
+		useA1200LowPassFilter = true;
+	}
 
 	// Sallen-Key filter ("LED" filter, same values on A500/A1200):
 	R1 = 10000.0; // R322 (10K ohm)
