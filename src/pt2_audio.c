@@ -373,6 +373,10 @@ void paulaStartDMA(int32_t ch)
 	// set current sample point
 	v->dSample = v->AUD_DAT[0] * v->AUD_VOL;
 
+	// progress AUD_DAT buffer
+	v->AUD_DAT[0] = v->AUD_DAT[1];
+	v->sampleCounter--;
+
 	// set BLEP stuff
 	v->dLastPhase = 0.0;
 	v->dLastDelta = v->dDelta;
