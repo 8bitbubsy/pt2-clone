@@ -366,8 +366,13 @@ void paulaStartDMA(int32_t ch)
 	v->location = v->AUD_LC;
 	v->lengthCounter = v->AUD_LEN;
 
-	v->dSample = 0.0;
-	v->sampleCounter = 0; // read new DMA data samples ASAP
+	// pre-fill AUDxDAT buffer
+	v->AUD_DAT[0] = *v->location++;
+	v->AUD_DAT[1] = *v->location++;
+	v->sampleCounter = 2;
+
+	// set current sample point
+	v->dSample = v->AUD_DAT[0] * v->AUD_VOL;
 
 	// set BLEP stuff
 	v->dLastPhase = 0.0;

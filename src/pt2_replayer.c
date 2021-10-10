@@ -23,6 +23,7 @@
 #include "pt2_sync.h"
 
 static bool posJumpAssert, pBreakFlag, modRenderDone;
+static bool doStopSong; // from F00 (Set Speed)
 static int8_t pBreakPosition, oldRow, modPattern;
 static uint8_t pattDelTime, lowMask = 0xFF, pattDelTime2;
 static int16_t modOrder, oldPattern, oldOrder;
@@ -88,6 +89,8 @@ void doStopIt(bool resetPlayMode)
 			c->n_loopcount = 0;
 		}
 	}
+
+	doStopSong = false; // just in case this flag was stuck from command F00 (stop song)
 }
 
 void setPattern(int16_t pattern)
@@ -364,12 +367,7 @@ static void setSpeed(moduleChannel_t *ch)
 	else
 	{
 		// F00 - stop song
-
-		editor.songPlaying = false;
-		editor.playMode = PLAY_MODE_NORMAL;
-		editor.currMode = MODE_IDLE;
-
-		pointerResetThreadSafe(); // set normal gray mouse pointer
+		doStopSong = true;
 	}
 }
 
@@ -1149,6 +1147,18 @@ bool intMusic(void) // replayer ticker
 			nextPosition();
 	}
 
+	// command F00 = stop song, do it here (so that the scopes are updated properly)
+	if (doStopSong)
+	{
+		doStopSong = false;
+
+		editor.songPlaying = false;
+		editor.playMode = PLAY_MODE_NORMAL;
+		editor.currMode = MODE_IDLE;
+
+		pointerResetThreadSafe(); // set normal gray mouse pointer
+	}
+
 	return renderEndCheck(); // MOD2WAV/PAT2SMP listens to the return value (true = not done yet)
 }
 
@@ -1270,6 +1280,8 @@ void modStop(void)
 	pBreakPosition = 0;
 	posJumpAssert = false;
 	modRenderDone = true;
+
+	doStopSong = false; // just in case this flag was stuck from command F00 (stop song)
 }
 
 void playPattern(int8_t startRow)

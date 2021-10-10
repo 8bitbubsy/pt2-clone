@@ -40,8 +40,10 @@ typedef struct voice_t
 	double AUD_PER_delta; // delta
 	double AUD_VOL; // volume
 
-	double dBlepOffset, dDelta, dPhase, dLastDelta, dLastPhase;
-	double dScaledVolume, dDeltaMul;
+	double dDelta, dPhase;
+
+	// for BLEP synthesis
+	double dLastDelta, dLastPhase, dBlepOffset, dDeltaMul;
 
 	// period cache
 	int32_t oldPeriod;
