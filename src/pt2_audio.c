@@ -354,9 +354,8 @@ void paulaStartDMA(int32_t ch)
 {
 	paulaVoice_t *v = &paula[ch];
 
-	const int8_t *dat = v->AUD_LC;
-	if (dat == NULL)
-		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
+	if (v->AUD_LC == NULL)
+		v->AUD_LC = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
 	/* This is not really accurate to what happens on Paula
 	** during DMA start, but it's good enough.
@@ -384,14 +383,14 @@ void paulaStartDMA(int32_t ch)
 
 	if (editor.songPlaying)
 	{
-		v->syncTriggerData = dat;
+		v->syncTriggerData = v->AUD_LC;
 		v->syncTriggerLength = v->AUD_LEN * 2;
 		v->syncFlags |= TRIGGER_SCOPE;
 	}
 	else
 	{
 		scope_t *s = &scope[ch];
-		s->newData = dat;
+		s->newData = v->AUD_LC;
 		s->newLength = v->AUD_LEN * 2;
 		scopeTrigger(ch);
 	}
