@@ -277,13 +277,12 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		v->dOldVoiceDeltaMul = 1.0 / v->dOldVoiceDelta;
 	}
 
-	v->dNewDelta = v->dOldVoiceDelta;
-	if (v->dLastDelta == 0.0) // for BLEP
-		v->dLastDelta = v->dNewDelta;
-
-	v->dNewDeltaMul = v->dOldVoiceDeltaMul;
-	if (v->dLastDeltaMul == 0.0) // for BLEP
-		v->dLastDeltaMul = v->dNewDeltaMul;
+	v->AUD_PER_delta = v->dOldVoiceDelta;
+	
+	// set BLEP stuff
+	v->dDeltaMul = v->dOldVoiceDeltaMul;
+	if (v->dLastDelta == 0.0)
+		v->dLastDelta = v->AUD_PER_delta;
 }
 
 void paulaSetVolume(int32_t ch, uint16_t vol)
@@ -299,7 +298,7 @@ void paulaSetVolume(int32_t ch, uint16_t vol)
 	// ------------------------
 
 	// multiplying by this also scales the sample from -128..127 -> -1.0 .. ~0.99
-	v->dScaledVolume = realVol * (1.0 / (128.0 * 64.0));
+	v->AUD_VOL = realVol * (1.0 / (128.0 * 64.0));
 
 	if (editor.songPlaying)
 	{
@@ -316,26 +315,12 @@ void paulaSetLength(int32_t ch, uint16_t len)
 {
 	paulaVoice_t *v = &paula[ch];
 
-	int32_t realLength = len;
-	if (realLength == 0)
-	{
-		realLength = 1+65535;
-		/* Confirmed behavior on real Amiga. We have room for this
-		** even at the last sample slot, so it will never overflow!
-		**
-		** PS: I don't really know if it's possible for ProTracker to
-		** set a Paula length of 0, but I fully support this Paula
-		** behavior just in case.
-		*/
-	}
+	v->AUD_LEN = len;
 
-	realLength <<= 1; // we work with bytes, not words
-
-	v->newLength = realLength;
 	if (editor.songPlaying)
 		v->syncFlags |= SET_SCOPE_LENGTH;
 	else
-		scope[ch].newLength = realLength;
+		scope[ch].newLength = len*2;
 }
 
 void paulaSetData(int32_t ch, const int8_t *src)
@@ -345,7 +330,8 @@ void paulaSetData(int32_t ch, const int8_t *src)
 	if (src == NULL)
 		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
-	v->newData = src;
+	v->AUD_LC = src;
+
 	if (editor.songPlaying)
 		v->syncFlags |= SET_SCOPE_DATA;
 	else
@@ -368,41 +354,40 @@ void paulaStartDMA(int32_t ch)
 {
 	paulaVoice_t *v = &paula[ch];
 
-	const int8_t *dat = v->newData;
+	const int8_t *dat = v->AUD_LC;
 	if (dat == NULL)
 		dat = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
 
-	int32_t length = v->newLength; // in bytes, not words
-	if (length == 0)
-		length = 1+65535;
-
-	v->dPhase = v->dLastPhase = 0.0;
-	v->pos = 0;
-	v->data = dat;
-	v->length = length;
-	v->dDelta = v->dLastDelta = v->dNewDelta;
-	v->dDeltaMul = v->dLastDeltaMul = v->dNewDeltaMul;
-
-	/* Read first sample data point into cache now.
-	**
-	** (multiplying by dScaledVolume will also change the scale
-	**  from -128..127 to -1.0 .. ~0.99.)
+	/* This is not really accurate to what happens on Paula
+	** during DMA start, but it's good enough.
 	*/
-	v->dCachedSamplePoint = v->data[0] * v->dScaledVolume;
 
+	v->dDelta = v->AUD_PER_delta;
+	v->location = v->AUD_LC;
+	v->lengthCounter = v->AUD_LEN;
+
+	v->dSample = 0.0;
+	v->sampleCounter = 0; // read new DMA data samples ASAP
+
+	// set BLEP stuff
+	v->dLastPhase = 0.0;
+	v->dLastDelta = v->dDelta;
+	v->dBlepOffset = 0.0;
+
+	v->dPhase = 0.0;
 	v->DMA_active = true;
 
 	if (editor.songPlaying)
 	{
 		v->syncTriggerData = dat;
-		v->syncTriggerLength = length;
+		v->syncTriggerLength = v->AUD_LEN * 2;
 		v->syncFlags |= TRIGGER_SCOPE;
 	}
 	else
 	{
 		scope_t *s = &scope[ch];
 		s->newData = dat;
-		s->newLength = length;
+		s->newLength = v->AUD_LEN * 2;
 		scopeTrigger(ch);
 	}
 }
@@ -448,20 +433,17 @@ void mixChannels(int32_t numSamples)
 		** is temporarily forced offline, and its voice pointers are
 		** cleared to prevent expired pointer addresses.
 		*/
-		if (!v->DMA_active || v->data == NULL)
+		if (!v->DMA_active || v->location == NULL || v->AUD_LC == NULL)
 			continue;
 
 		double *dMixBuf = dMixBufSelect[i]; // what output channel to mix into (L, R, R, L)
 		for (int32_t j = 0; j < numSamples; j++)
 		{
-			double dSmp = v->dCachedSamplePoint;
+			double dSmp = v->dSample;
 			if (dSmp != bSmp->dLastValue)
 			{
 				if (v->dLastDelta > v->dLastPhase)
-				{
-					// v->dLastDeltaMul is (1.0 / v->dLastDelta) (pre-computed for speed, div -> mul)
-					blepAdd(bSmp, v->dLastPhase * v->dLastDeltaMul, bSmp->dLastValue - dSmp);
-				}
+					blepAdd(bSmp, v->dBlepOffset, bSmp->dLastValue - dSmp);
 
 				bSmp->dLastValue = dSmp;
 			}
@@ -476,33 +458,40 @@ void mixChannels(int32_t numSamples)
 			{
 				v->dPhase -= 1.0;
 
-				// Paula only updates period (delta) during sample fetching
-				v->dDelta = v->dNewDelta;
-				v->dDeltaMul = v->dNewDeltaMul;
-				// --------------------------------------------------------
+				// Paula only updates period (delta) during period refetching (this stage)
+				v->dDelta = v->AUD_PER_delta;
 
-				v->dLastPhase = v->dPhase;
-				v->dLastDelta = v->dDelta;
-				v->dLastDeltaMul = v->dDeltaMul;
-
-				if (++v->pos >= v->length)
+				if (v->sampleCounter == 0)
 				{
-					v->pos = 0;
+					// it's time to read new samples from DMA
 
-					// re-fetch new Paula register values now
-					v->length = v->newLength;
-					v->data = v->newData;
+					if (--v->lengthCounter == 0)
+					{
+						v->lengthCounter = v->AUD_LEN;
+						v->location = v->AUD_LC;
+					}
+
+					// fill DMA data buffer
+					v->AUD_DAT[0] = *v->location++;
+					v->AUD_DAT[1] = *v->location++;
+					v->sampleCounter = 2;
 				}
 
-				/* Read sample into cache now.
-				** Also change volume here as well. It has recently been
-				** discovered that Paula only updates its volume during period
-				** fetching (when it's reading the next sample point).
-				**
-				** (multiplying by dScaledVolume will also change the scale
-				**  from -128..127 to -1.0 .. ~0.99.)
+				/* Pre-compute current sample point.
+				** Output volume is only read from AUDxVOL at this stage,
+				** and we don't emulate volume PWM anyway, so we can
+				** pre-multiply by volume at this point.
 				*/
-				v->dCachedSamplePoint = v->data[v->pos] * v->dScaledVolume;
+				v->dSample = v->AUD_DAT[0] * v->AUD_VOL; // -128..127 * 0.0 .. 1.0
+
+				// progress AUD_DAT buffer
+				v->AUD_DAT[0] = v->AUD_DAT[1];
+				v->sampleCounter--;
+
+				// setup BLEP stuff
+				v->dBlepOffset = v->dPhase * v->dDeltaMul;
+				v->dLastPhase = v->dPhase;
+				v->dLastDelta = v->dDelta;
 			}
 		}
 	}
@@ -881,7 +870,6 @@ void outputAudio(int16_t *target, int32_t numSamples)
 				}
 			}
 		}
-
 	}
 }
 
@@ -910,8 +898,8 @@ static void fillVisualsSyncBuffer(void)
 		s->period = v->syncPeriod;
 		s->triggerData = v->syncTriggerData;
 		s->triggerLength = v->syncTriggerLength;
-		s->newData = v->newData;
-		s->newLength = v->newLength;
+		s->newData = v->AUD_LC;
+		s->newLength = v->AUD_LEN * 2;
 		s->vuVolume = c->syncVuVolume;
 		s->analyzerVolume = c->syncAnalyzerVolume;
 		s->analyzerPeriod = c->syncAnalyzerPeriod;

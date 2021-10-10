@@ -342,7 +342,7 @@ void showDownsampleAskDialog(void)
 	renderBigAskDialog();
 
 	textOutTight(133, 49, "THE SAMPLE'S FREQUENCY IS", video.palette[PAL_BACKGRD]);
-	textOutTight(178, 57, "ABOVE 22KHZ.", video.palette[PAL_BACKGRD]);
+	textOutTight(154, 57, "HIGH (ABOVE 22KHZ).", video.palette[PAL_BACKGRD]);
 	textOutTight(133, 65, "DO YOU WANT TO DOWNSAMPLE", video.palette[PAL_BACKGRD]);
 	textOutTight(156, 73, "BEFORE LOADING IT?", video.palette[PAL_BACKGRD]);
 }
@@ -2304,7 +2304,10 @@ void toggleFullScreen(void)
 		SDL_SetWindowFullscreen(video.window, 0);
 		SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
 		SDL_SetWindowSize(video.window, SCREEN_W * config.videoScaleFactor, SCREEN_H * config.videoScaleFactor);
-		SDL_SetWindowPosition(video.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+
+		// this is not sensible on a multi-monitor setup
+		//SDL_SetWindowPosition(video.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+
 		SDL_SetWindowGrab(video.window, SDL_FALSE);
 	}
 

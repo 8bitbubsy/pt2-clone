@@ -239,7 +239,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		return false;
 	}
 
-	if (sampleRate > 22050)
+	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
 	{
 		if (forceDownSampling == -1)
 		{
@@ -884,7 +884,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		return false;
 	}
 
-	if (sampleRate > 22050)
+	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
 	{
 		if (forceDownSampling == -1)
 		{
@@ -1322,7 +1322,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		return false;
 	}
 
-	if (sampleRate > 22050)
+	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
 	{
 		if (forceDownSampling == -1)
 		{

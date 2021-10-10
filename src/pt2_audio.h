@@ -27,11 +27,21 @@ typedef struct voice_t
 {
 	volatile bool DMA_active;
 
-	const int8_t *data, *newData;
-	int32_t length, newLength, pos;
+	// internal values (don't modify directly!)
+	int8_t AUD_DAT[2]; // DMA data buffer
+	const int8_t* location; // current location
+	uint16_t lengthCounter; // current length
+	int32_t sampleCounter; // how many bytes left in AUD_DAT
+	double dSample; // current sample point
 
-	double dDelta, dDeltaMul, dPhase, dLastDelta, dLastDeltaMul, dLastPhase;
-	double dCachedSamplePoint, dScaledVolume, dNewDelta, dNewDeltaMul;
+	// registers modified by Paula functions
+	const int8_t* AUD_LC; // location
+	uint16_t AUD_LEN; // length (in words)
+	double AUD_PER_delta; // delta
+	double AUD_VOL; // volume
+
+	double dBlepOffset, dDelta, dPhase, dLastDelta, dLastPhase;
+	double dScaledVolume, dDeltaMul;
 
 	// period cache
 	int32_t oldPeriod;

@@ -42,6 +42,7 @@ void loadConfig(void)
 	FILE *f;
 
 	// set default config values first
+	config.noDownsampleOnSmpLoad = false;
 	config.disableE8xEffect = false;
 	config.fullScreenStretch = false;
 	config.pattDots = false;
@@ -191,6 +192,13 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			configLine = strtok(NULL, "\n");
 			continue;
+		}
+
+		// NO_DWNSMP_ON_SMP_LOAD (no dialog for 2x downsample after >22kHz sample load)
+		else if (!_strnicmp(configLine, "NO_DWNSMP_ON_SMP_LOAD=", 22))
+		{
+			if (!_strnicmp(&configLine[22], "TRUE", 4)) config.noDownsampleOnSmpLoad = true;
+			else if (!_strnicmp(&configLine[22], "FALSE", 5)) config.noDownsampleOnSmpLoad = false;
 		}
 
 		// DISABLE_E8X (Karplus-Strong command)
