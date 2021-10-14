@@ -57,8 +57,8 @@ HHOOK g_hKeyboardHook;
 static HWND hWnd_to;
 static HANDLE oneInstHandle, hMapFile;
 static LPCTSTR sharedMemBuf;
-static TCHAR sharedHwndName[] = TEXT("Local\\PTCloneHwnd");
-static TCHAR sharedFileName[] = TEXT("Local\\PTCloneFilename");
+static TCHAR sharedHwndName[] = TEXT("Local\\PT2CloneHwnd");
+static TCHAR sharedFileName[] = TEXT("Local\\PT2CloneFilename");
 static bool handleSingleInstancing(int32_t argc, char **argv);
 static void handleSysMsg(SDL_Event inputEvent);
 #endif

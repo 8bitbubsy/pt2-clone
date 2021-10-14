@@ -20,7 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6C633792-F87D-4F1C-AB02-C25202FFEDE6}</ProjectGuid>
-    <RootNamespace>pt-clone</RootNamespace>
+    <RootNamespace>pt2-clone</RootNamespace>
     <ProjectName>pt2-clone</ProjectName>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -289,9 +289,7 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_tracker.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_yes_no_dialog.c" />
-    <ClCompile Include="..\..\src\pt2_audio.c">
-      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
-    </ClCompile>
+    <ClCompile Include="..\..\src\pt2_audio.c" />
     <ClCompile Include="..\..\src\pt2_blep.c" />
     <ClCompile Include="..\..\src\pt2_bmp.c" />
     <ClCompile Include="..\..\src\pt2_chordmaker.c" />
