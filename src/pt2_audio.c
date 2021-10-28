@@ -169,6 +169,10 @@ void unlockAudio(void)
 
 void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 {
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	for (int32_t i = 0; i < AMIGA_VOICES; i++)
 	{
 		const moduleChannel_t *ch = &song->channels[i];
@@ -180,6 +184,9 @@ void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 			paulaSetLength(i, s->loopLength >> 1);
 		}
 	}
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void mixerKillVoice(int32_t ch)

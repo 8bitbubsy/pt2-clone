@@ -917,6 +917,8 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 	if (s->length <= 1)
 		return;
 
+	lockAudio();
+
 	song->channels[ch].n_samplenum = editor.currSample; // needed for sample playback/sampling line
 
 	const int8_t *n_start = &song->sampleData[s->offset];
@@ -937,6 +939,8 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 	// these take effect after the current DMA cycle is done
 	paulaSetData(ch, NULL);
 	paulaSetLength(ch, 1);
+
+	unlockAudio();
 }
 
 void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
@@ -970,6 +974,8 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 		// don't play sample if we quantized to another row (will be played in modplayer instead)
 		if (editor.currMode != MODE_RECORD || !editor.didQuantize)
 		{
+			lockAudio();
+
 			chn->n_samplenum = editor.currSample;
 			chn->n_volume = s->volume;
 			chn->n_period = tempPeriod;
@@ -994,6 +1000,8 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			// these take effect after the current DMA cycle is done
 			paulaSetData(ch, chn->n_loopstart);
 			paulaSetLength(ch, chn->n_replen);
+
+			unlockAudio();
 		}
 
 		// normalMode = normal keys, or else keypad keys (in jam mode)

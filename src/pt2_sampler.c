@@ -1262,6 +1262,8 @@ void toggleTuningTone(void)
 		if (editor.tuningNote > 35)
 			editor.tuningNote = 35;
 
+		lockAudio();
+
 		song->channels[ch].n_volume = 64; // we need this for the scopes
 
 		paulaSetPeriod(ch, periodTable[editor.tuningNote]);
@@ -1269,6 +1271,8 @@ void toggleTuningTone(void)
 		paulaSetData(ch, tuneToneData);
 		paulaSetLength(ch, sizeof (tuneToneData) / 2);
 		paulaStartDMA(ch);
+
+		unlockAudio();
 	}
 	else
 	{
@@ -1770,6 +1774,8 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	assert(chn < AMIGA_VOICES);
 	assert(editor.currPlayNote <= 35);
 
+	lockAudio();
+
 	s = &song->samples[editor.currSample];
 	ch = &song->channels[chn];
 
@@ -1818,6 +1824,8 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	}
 
 	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
+
+	unlockAudio();
 }
 
 void samplerPlayWaveform(void)
