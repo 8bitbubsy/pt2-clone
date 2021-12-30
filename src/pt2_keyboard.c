@@ -3586,22 +3586,22 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 			if (ui.changingChordNote == 1)
 			{
 				editor.note1 = rawKey;
-				ui.updateNote1Text = true;
+				ui.updateChordNote1Text = true;
 			}
 			else if (ui.changingChordNote == 2)
 			{
 				editor.note2 = rawKey;
-				ui.updateNote2Text = true;
+				ui.updateChordNote2Text = true;
 			}
 			else if (ui.changingChordNote == 3)
 			{
 				editor.note3 = rawKey;
-				ui.updateNote3Text = true;
+				ui.updateChordNote3Text = true;
 			}
 			else if (ui.changingChordNote == 4)
 			{
 				editor.note4 = rawKey;
-				ui.updateNote4Text = true;
+				ui.updateChordNote4Text = true;
 			}
 
 			ui.changingChordNote = false;
@@ -4094,15 +4094,28 @@ void handleTextEditInputChar(char textChar)
 				else if (textChar <= 'f')
 					textChar -= 'a'-10;
 
-				if (ui.numBits == 16)
+				if (ui.numBits == 17)
 				{
-					*ui.numPtr16 &= ~(0xF000 >> (ui.dstPos << 2));
-					*ui.numPtr16 |= (textChar << (12 - (ui.dstPos << 2)));
+					*ui.numPtr32 &= ~(0xF0000 >> (ui.dstPos << 2));
+					*ui.numPtr32 |= textChar << (16 - (ui.dstPos << 2));
+				}
+				else if (ui.numBits == 16)
+				{
+					if (ui.force32BitNumPtr)
+					{
+						*ui.numPtr32 &= ~(0xF000 >> (ui.dstPos << 2));
+						*ui.numPtr32 |= textChar << (12 - (ui.dstPos << 2));
+					}
+					else
+					{
+						*ui.numPtr16 &= ~(0xF000 >> (ui.dstPos << 2));
+						*ui.numPtr16 |= textChar << (12 - (ui.dstPos << 2));
+					}
 				}
 				else if (ui.numBits == 8)
 				{
 					*ui.numPtr8 &= ~(0xF0 >> (ui.dstPos << 2));
-					*ui.numPtr8 |= (textChar << (4 - (ui.dstPos << 2)));
+					*ui.numPtr8 |= textChar << (4 - (ui.dstPos << 2));
 				}
 
 				textMarkerMoveRight();

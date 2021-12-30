@@ -34,6 +34,7 @@
 #include "pt2_rcfilter.h"
 #include "pt2_ledfilter.h"
 #include "pt2_downsample2x.h"
+#include "pt2_hpc.h"
 
 #define STEREO_NORM_FACTOR 0.5 /* cumulative mid/side normalization factor (1/sqrt(2))*(1/sqrt(2)) */
 
@@ -129,14 +130,13 @@ static void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq)
 
 	const double dAudioLatencySecs = audioBufferSize / (double)audioFreq;
 
-	dFrac = modf(dAudioLatencySecs * editor.dPerfFreq, &dInt);
+	dFrac = modf(dAudioLatencySecs * hpcFreq.dFreq, &dInt);
 
 	// integer part
-	audLatencyPerfValInt = (int32_t)dInt;
+	audLatencyPerfValInt = (uint32_t)dInt;
 
 	// fractional part (scaled to 0..2^32-1)
-	dFrac *= UINT32_MAX+1.0;
-	audLatencyPerfValFrac = (uint32_t)dFrac;
+	audLatencyPerfValFrac = (uint32_t)((dFrac * (UINT32_MAX+1.0)) + 0.5); // rounded
 }
 
 void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac)
@@ -181,7 +181,7 @@ void mixerUpdateLoops(void) // updates Paula loop (+ scopes)
 			const moduleSample_t *s = &song->samples[editor.currSample];
 
 			paulaSetData(i, ch->n_start + s->loopStart);
-			paulaSetLength(i, s->loopLength >> 1);
+			paulaSetLength(i, (uint16_t)(s->loopLength >> 1));
 		}
 	}
 
@@ -335,7 +335,7 @@ void paulaSetData(int32_t ch, const int8_t *src)
 	paulaVoice_t *v = &paula[ch];
 
 	if (src == NULL)
-		src = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
+		src = &song->sampleData[config.reservedSampleOffset]; // 128K reserved sample
 
 	v->AUD_LC = src;
 
@@ -362,7 +362,7 @@ void paulaStartDMA(int32_t ch)
 	paulaVoice_t *v = &paula[ch];
 
 	if (v->AUD_LC == NULL)
-		v->AUD_LC = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
+		v->AUD_LC = &song->sampleData[config.reservedSampleOffset]; // 128K reserved sample
 
 	/* This is not really accurate to what happens on Paula
 	** during DMA start, but it's good enough.
@@ -801,8 +801,8 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		// render to sample (PAT2SMP)
 
 		int32_t samplesTodo = numSamples;
-		if (editor.pat2SmpPos+samplesTodo > MAX_SAMPLE_LEN)
-			samplesTodo = MAX_SAMPLE_LEN-editor.pat2SmpPos;
+		if (editor.pat2SmpPos+samplesTodo > config.maxSampleLength)
+			samplesTodo = config.maxSampleLength-editor.pat2SmpPos;
 
 		// mix channels (with 2x oversampling, PAT2SMP needs it)
 		mixChannels(samplesTodo*2);
@@ -821,7 +821,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 		}
 
 		editor.pat2SmpPos += samplesTodo;
-		if (editor.pat2SmpPos >= MAX_SAMPLE_LEN)
+		if (editor.pat2SmpPos >= config.maxSampleLength)
 		{
 			editor.smpRenderingDone = true;
 			updateWindowTitle(MOD_IS_MODIFIED);
@@ -1127,10 +1127,10 @@ static void generateTickLengthTable(bool vblankTimingFlag)
 
 		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
 		double dTimeInt;
-		double dTimeFrac = modf(editor.dPerfFreq / dHz, &dTimeInt);
+		double dTimeFrac = modf(hpcFreq.dFreq / dHz, &dTimeInt);
 		const int32_t timeInt = (int32_t)dTimeInt;
 	
-		dTimeFrac = floor((UINT32_MAX+1.0) * dTimeFrac); // fractional part (scaled to 0..2^32-1)
+		dTimeFrac = floor((dTimeFrac * (UINT32_MAX+1.0)) + 0.5); // fractional part (scaled to 0..2^32-1)
 
 		audio.tickLengthTable[bpm-32] = ((uint64_t)timeInt << 32) | (uint32_t)dTimeFrac;
 	}

@@ -161,8 +161,8 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 
 	const int8_t *sampleData = &song->sampleData[s->offset];
 	const uint32_t sampleLength = s->length;
-	const uint32_t loopStart = s->loopStart & 0xFFFE;
-	const uint32_t loopLength = s->loopLength & 0xFFFE;
+	const uint32_t loopStart = s->loopStart & ~1;
+	const uint32_t loopLength = s->loopLength & ~1;
 
 	switch (diskop.smpSaveType)
 	{

@@ -29,6 +29,7 @@
 #include "pt2_config.h"
 #include "pt2_sampling.h"
 #include "pt2_math.h" // PT2_PI
+#include "pt2_hpc.h"
 
 enum
 {
@@ -478,6 +479,7 @@ void renderSamplingBox(void)
 {
 	changeStatusText("PLEASE WAIT ...");
 	flipFrame();
+	hpc_ResetEndTime(&video.vblankHpc);
 
 	editor.sampleZero = false;
 	editor.blockMarkFlag = false;
@@ -604,7 +606,7 @@ static void startSampling(void)
 
 	assert(roundedOutputFrequency > 0);
 
-	maxSamplingLength = (int32_t)(ceil(((double)MAX_SAMPLE_LEN*inputFrequency) / dOutputFrequency)) + 1;
+	maxSamplingLength = (int32_t)(ceil(((double)config.maxSampleLength*inputFrequency) / dOutputFrequency)) + 1;
 	
 	const int32_t allocLen = (SINC_TAPS/2) + maxSamplingLength + (SINC_TAPS/2);
 	dSamplingBufferOrig = (double *)malloc(allocLen * sizeof (double));
@@ -637,8 +639,8 @@ static int32_t downsampleSamplingBuffer(void)
 	const double dRatio = dOutputFrequency / inputFrequency;
 	
 	int32_t writeLength = (int32_t)(readLength * dRatio);
-	if (writeLength > MAX_SAMPLE_LEN)
-		writeLength = MAX_SAMPLE_LEN;
+	if (writeLength > config.maxSampleLength)
+		writeLength = config.maxSampleLength;
 
 	double *dBuffer = (double *)malloc(writeLength * sizeof (double));
 	if (dBuffer == NULL)
@@ -726,7 +728,7 @@ void stopSampling(void)
 	}
 
 	moduleSample_t *s = &song->samples[editor.currSample];
-	s->length = (uint16_t)newLength;
+	s->length = newLength;
 	s->fineTune = samplingFinetune;
 	s->loopStart = 0;
 	s->loopLength = 2;

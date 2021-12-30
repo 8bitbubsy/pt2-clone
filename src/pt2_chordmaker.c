@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_header.h"
+#include "pt2_config.h"
 #include "pt2_mouse.h"
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
@@ -111,10 +112,10 @@ void mixChordSample(void)
 	sortNotes();
 	removeDuplicateNotes();
 
-	ui.updateNote1Text = true;
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote1Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	// setup some variables
 	smpLoopStart = s->loopStart;
@@ -151,14 +152,14 @@ void mixChordSample(void)
 		editor.currSample = (int8_t)i;
 	}
 
-	double *dMixData = (double *)calloc(MAX_SAMPLE_LEN*2, sizeof (double));
+	double *dMixData = (double *)calloc(config.maxSampleLength*2, sizeof (double));
 	if (dMixData == NULL)
 	{
 		statusOutOfMemory();
 		return;
 	}
 
-	s->length = smpLoopFlag ? MAX_SAMPLE_LEN : editor.chordLength; // if sample loops, set max length
+	s->length = smpLoopFlag ? config.maxSampleLength : editor.chordLength; // if sample loops, set max length
 	s->loopLength = 2;
 	s->loopStart = 0;
 	s->text[21] = '!'; // chord sample indicator
@@ -189,7 +190,7 @@ void mixChordSample(void)
 		if (!v->active || v->dDelta == 0.0)
 			continue;
 
-		for (int32_t j = 0; j < MAX_SAMPLE_LEN*2; j++)
+		for (int32_t j = 0; j < config.maxSampleLength*2; j++)
 		{
 			double dSmp = smpData[v->pos] * (1.0 / 128.0);
 
@@ -247,8 +248,8 @@ void mixChordSample(void)
 	free(dMixData);
 
 	// clear unused sample data (if sample is not full already)
-	if (s->length < MAX_SAMPLE_LEN)
-		memset(&song->sampleData[s->offset + s->length], 0, MAX_SAMPLE_LEN - s->length);
+	if (s->length < config.maxSampleLength)
+		memset(&song->sampleData[s->offset + s->length], 0, config.maxSampleLength - s->length);
 
 	// we're done
 
@@ -294,14 +295,14 @@ void recalcChordLength(void)
 	else
 	{
 		len = (s->length * periodTable[(37 * s->fineTune) + note]) / periodTable[24];
-		if (len > MAX_SAMPLE_LEN)
-			len = MAX_SAMPLE_LEN;
+		if (len > config.maxSampleLength)
+			len = config.maxSampleLength;
 
-		editor.chordLength = len & 0xFFFE;
+		editor.chordLength = len & config.maxSampleLength;
 	}
 
 	if (ui.editOpScreenShown && ui.editOpScreen == 3)
-		ui.updateLengthText = true;
+		ui.updateChordLengthText = true;
 }
 
 void resetChord(void)
@@ -313,10 +314,10 @@ void resetChord(void)
 
 	editor.chordLengthMin = false;
 
-	ui.updateNote1Text = true;
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote1Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -328,10 +329,10 @@ void undoChord(void)
 	editor.note3 = editor.oldNote3;
 	editor.note4 = editor.oldNote4;
 
-	ui.updateNote1Text = true;
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote1Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -363,9 +364,9 @@ void setChordMajor(void)
 
 	editor.note4 = 36;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -388,9 +389,9 @@ void setChordMinor(void)
 
 	editor.note4 = 36;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -413,9 +414,9 @@ void setChordSus4(void)
 
 	editor.note4 = 36;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -438,9 +439,9 @@ void setChordMajor6(void)
 	if (editor.note3 >= 36) editor.note3 -= 12;
 	if (editor.note4 >= 36) editor.note4 -= 12;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -463,9 +464,9 @@ void setChordMinor6(void)
 	if (editor.note3 >= 36) editor.note3 -= 12;
 	if (editor.note4 >= 36) editor.note4 -= 12;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -488,9 +489,9 @@ void setChordMajor7(void)
 	if (editor.note3 >= 36) editor.note3 -= 12;
 	if (editor.note4 >= 36) editor.note4 -= 12;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -513,9 +514,9 @@ void setChordMinor7(void)
 	if (editor.note3 >= 36) editor.note3 -= 12;
 	if (editor.note4 >= 36) editor.note4 -= 12;
 
-	ui.updateNote2Text = true;
-	ui.updateNote3Text = true;
-	ui.updateNote4Text = true;
+	ui.updateChordNote2Text = true;
+	ui.updateChordNote3Text = true;
+	ui.updateChordNote4Text = true;
 
 	recalcChordLength();
 }
@@ -533,7 +534,7 @@ void selectChordNote1(void)
 		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	}
 
-	ui.updateNote1Text = true;
+	ui.updateChordNote1Text = true;
 }
 
 void selectChordNote2(void)
@@ -549,7 +550,7 @@ void selectChordNote2(void)
 		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	}
 
-	ui.updateNote2Text = true;
+	ui.updateChordNote2Text = true;
 }
 
 void selectChordNote3(void)
@@ -565,7 +566,7 @@ void selectChordNote3(void)
 		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	}
 
-	ui.updateNote3Text = true;
+	ui.updateChordNote3Text = true;
 }
 
 void selectChordNote4(void)
@@ -581,7 +582,7 @@ void selectChordNote4(void)
 		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
 	}
 
-	ui.updateNote4Text = true;
+	ui.updateChordNote4Text = true;
 }
 
 void makeChord(void)

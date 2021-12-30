@@ -34,11 +34,12 @@ void printFourHex(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printFiveHex(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printOneHexBig(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printTwoHexBig(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
-void printSixDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
+
 void printTwoDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
+void printThreeDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printFourDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printFiveDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
-void printThreeDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
+void printSixDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printTwoDecimalsBig(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor);
 void printOneHexBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 void printTwoHexBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
@@ -49,9 +50,9 @@ void printOneHexBigBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor
 void printTwoHexBigBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 void printSixDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 void printTwoDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
+void printThreeDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 void printFourDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 void printFiveDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
-void printThreeDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 void printTwoDecimalsBigBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor);
 
 void setPrevStatusMessage(void);

@@ -11,12 +11,12 @@
 #include "pt2_tables.h"
 #include "pt2_structs.h"
 #include "pt2_config.h"
+#include "pt2_hpc.h"
 
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
 static volatile bool scopesUpdatingFlag, scopesDisplayingFlag;
-static uint32_t scopeTimeLen, scopeTimeLenFrac;
-static uint64_t timeNext64, timeNext64Frac;
+static hpc_t scopeHpc;
 static SDL_Thread *scopeThread;
 
 scope_t scope[AMIGA_VOICES]; // global
@@ -36,7 +36,7 @@ static int32_t getSampleSlotFromReadAddress(const int8_t *sampleReadAddress)
 {
 	assert(song != NULL);
 	const int8_t *sampleData = song->sampleData;
-	const int32_t sampleSlotSize = MAX_SAMPLE_LEN;
+	const int32_t sampleSlotSize = config.maxSampleLength;
 
 	if (sampleData == NULL) // shouldn't really happen, but just in case
 		return -1;
@@ -118,7 +118,7 @@ void scopeTrigger(int32_t ch)
 
 	const int8_t *newData = tempState.newData;
 	if (newData == NULL)
-		newData = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
+		newData = &song->sampleData[config.reservedSampleOffset]; // 128K reserved sample
 
 	int32_t newLength = tempState.newLength; // in bytes, not words
 	if (newLength < 2)
@@ -320,9 +320,8 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 	// this is needed for scope stability (confirmed)
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 
-	// set next frame time
-	timeNext64 = SDL_GetPerformanceCounter() + scopeTimeLen;
-	timeNext64Frac = scopeTimeLenFrac;
+	hpc_SetDurationInHz(&scopeHpc, SCOPE_HZ);
+	hpc_ResetEndTime(&scopeHpc);
 
 	while (editor.programRunning)
 	{
@@ -331,31 +330,7 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 		updateScopes();
 
-		uint64_t time64 = SDL_GetPerformanceCounter();
-		if (time64 < timeNext64)
-		{
-			time64 = timeNext64 - time64;
-			if (time64 > UINT32_MAX)
-				time64 = UINT32_MAX;
-
-			const uint32_t diff32 = (uint32_t)time64;
-
-			// convert to microseconds and round to integer
-			const int32_t time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
-
-			// delay until we have reached the next frame
-			if (time32 > 0)
-				usleep(time32);
-		}
-
-		// update next tick time
-		timeNext64 += scopeTimeLen;
-		timeNext64Frac += scopeTimeLenFrac;
-		if (timeNext64Frac > 0xFFFFFFFF)
-		{
-			timeNext64Frac &= 0xFFFFFFFF;
-			timeNext64++;
-		}
+		hpc_Wait(&scopeHpc);
 	}
 
 	(void)ptr;
@@ -364,18 +339,6 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 bool initScopes(void)
 {
-	double dInt, dFrac;
-
-	// calculate scope time for performance counters and split into int/frac
-	dFrac = modf(editor.dPerfFreq / SCOPE_HZ, &dInt);
-
-	// integer part
-	scopeTimeLen = (int32_t)dInt;
-
-	// fractional part (scaled to 0..2^32-1)
-	dFrac *= UINT32_MAX+1.0;
-	scopeTimeLenFrac = (uint32_t)dFrac;
-
 	resetCachedScopePeriod();
 
 	scopeThread = SDL_CreateThread(scopeThreadFunc, NULL, NULL);

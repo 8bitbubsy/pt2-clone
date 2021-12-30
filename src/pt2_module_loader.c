@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include "pt2_mouse.h"
 #include "pt2_header.h"
+#include "pt2_config.h"
 #include "pt2_sampler.h"
 #include "pt2_textout.h"
 #include "pt2_audio.h"
@@ -312,7 +313,7 @@ module_t *modLoad(UNICHAR *fileName)
 		}
 
 		realSampleLengths[i] = ((mgetc(m) << 8) | mgetc(m)) * 2;
-		s->length = (realSampleLengths[i] > MAX_SAMPLE_LEN) ? MAX_SAMPLE_LEN : (uint16_t)realSampleLengths[i];
+		s->length = (realSampleLengths[i] > config.maxSampleLength) ? config.maxSampleLength : realSampleLengths[i];
 
 		/* Only late versions of Ultimate SoundTracker could have samples larger than 9999 bytes.
 		** If found, we know for sure that this is a late STK module.
@@ -338,16 +339,16 @@ module_t *modLoad(UNICHAR *fileName)
 		if (loopLength < 2)
 			loopLength = 2; // fixes empty samples in .MODs saved from FT2
 
-		// we don't support samples bigger than 65534 bytes, disable uncompatible loops
-		if (loopStart > MAX_SAMPLE_LEN || loopStart+loopLength > MAX_SAMPLE_LEN)
+		// we don't support samples bigger than 65534 (or 128kB) bytes, disable uncompatible loops
+		if (loopStart > config.maxSampleLength || loopStart+loopLength > config.maxSampleLength)
 		{
 			s->loopStart = 0;
 			s->loopLength = 2;
 		}
 		else
 		{
-			s->loopStart = (uint16_t)loopStart;
-			s->loopLength = (uint16_t)loopLength;
+			s->loopStart = loopStart;
+			s->loopLength = loopLength;
 		}
 
 		// in The Ultimate SoundTracker, sample loop start is in bytes, not words
@@ -596,7 +597,7 @@ module_t *modLoad(UNICHAR *fileName)
 
 	// set sample data offsets (sample data = one huge buffer to rule them all)
 	for (i = 0; i < MOD_SAMPLES; i++)
-		newMod->samples[i].offset = MAX_SAMPLE_LEN * i;
+		newMod->samples[i].offset = config.maxSampleLength * i;
 
 	// load sample data
 	numSamples = (modFormat == FORMAT_STK) ? 15 : 31;
@@ -617,11 +618,11 @@ module_t *modLoad(UNICHAR *fileName)
 		** so skip overflown data in .MOD file if present.
 		*/
 		int32_t bytesToSkip = 0;
-		if (realSampleLengths[i] > MAX_SAMPLE_LEN)
-			bytesToSkip = realSampleLengths[i] - MAX_SAMPLE_LEN;
+		if (realSampleLengths[i] > config.maxSampleLength)
+			bytesToSkip = realSampleLengths[i] - config.maxSampleLength;
 
 		// For Ultimate SoundTracker modules, don't load sample data after loop end
-		uint16_t loopEnd = s->loopStart + s->loopLength;
+		int32_t loopEnd = s->loopStart + s->loopLength;
 		if (modFormat == FORMAT_STK && loopEnd > 2 && s->length > loopEnd)
 		{
 			bytesToSkip += s->length-loopEnd;
@@ -643,9 +644,9 @@ module_t *modLoad(UNICHAR *fileName)
 		if (s->length > 0 && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
 		{
 			loopOverflowVal = (s->loopStart + s->loopLength) - s->length;
-			if (s->length+loopOverflowVal <= MAX_SAMPLE_LEN)
+			if (s->length+loopOverflowVal <= config.maxSampleLength)
 			{
-				s->length = (uint16_t)(s->length + loopOverflowVal); // this is safe, we're allocating 65534 bytes per sample slot
+				s->length += loopOverflowVal; // this is safe, we're allocating 65534 bytes per sample slot
 			}
 			else
 			{
@@ -1205,7 +1206,7 @@ module_t *createEmptyMod(void)
 	moduleSample_t *s = newMod->samples;
 	for (i = 0; i < MOD_SAMPLES; i++, s++)
 	{
-		s->offset = MAX_SAMPLE_LEN * i;
+		s->offset = config.maxSampleLength * i;
 		s->loopLength = 2;
 
 		// setup GUI text pointers

@@ -19,7 +19,8 @@ typedef struct config_t
 	int8_t stereoSeparation, videoScaleFactor, accidental;
 	uint8_t pixelFilter, filterModel;
 	uint16_t quantizeValue;
-	uint32_t soundFrequency, soundBufferSize, audioInputFrequency;
+	int32_t maxSampleLength;
+	uint32_t soundFrequency, soundBufferSize, audioInputFrequency, reservedSampleOffset;
 } config_t;
 
 extern config_t config; // pt2_config.c

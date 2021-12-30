@@ -42,6 +42,7 @@
 #include "pt2_bmp.h"
 #include "pt2_sampling.h"
 #include "pt2_chordmaker.h"
+#include "pt2_hpc.h"
 
 typedef struct sprite_t
 {
@@ -53,7 +54,6 @@ typedef struct sprite_t
 } sprite_t;
 
 static uint32_t vuMetersBg[4 * (10 * 48)];
-static uint64_t timeNext64, timeNext64Frac;
 
 sprite_t sprites[SPRITE_NUM]; // globalized
 
@@ -198,64 +198,6 @@ void statusNotSampleZero(void)
 	** real sample slot).
 	*/
 	displayErrorMsg("NOT SAMPLE 0 !");
-}
-
-void setupPerfFreq(void)
-{
-	uint64_t perfFreq64;
-	double dInt, dFrac;
-
-	perfFreq64 = SDL_GetPerformanceFrequency(); assert(perfFreq64 != 0);
-	editor.dPerfFreq = (double)perfFreq64;
-	editor.dPerfFreqMulMicro = 1000000.0 / editor.dPerfFreq;
-
-	// calculate vblank time for performance counters and split into int/frac
-	dFrac = modf(editor.dPerfFreq / VBLANK_HZ, &dInt);
-
-	// integer part
-	editor.vblankTimeLen = (int32_t)dInt;
-
-	// fractional part (scaled to 0..2^32-1)
-	dFrac *= UINT32_MAX+1.0;
-	editor.vblankTimeLenFrac = (uint32_t)dFrac;
-}
-
-void setupWaitVBL(void)
-{
-	// set next frame time
-	timeNext64 = SDL_GetPerformanceCounter() + editor.vblankTimeLen;
-	timeNext64Frac = editor.vblankTimeLenFrac;
-}
-
-void waitVBL(void)
-{
-	// this routine almost never delays if we have 60Hz vsync, but it's still needed in some occasions
-
-	uint64_t time64 = SDL_GetPerformanceCounter();
-	if (time64 < timeNext64)
-	{
-		time64 = timeNext64 - time64;
-		if (time64 > UINT32_MAX)
-			time64 = UINT32_MAX;
-
-		const uint32_t diff32 = (uint32_t)time64;
-
-		// convert to microseconds and round to integer
-		const int32_t time32 = (int32_t)((diff32 * editor.dPerfFreqMulMicro) + 0.5);
-
-		// delay until we have reached the next frame
-		if (time32 > 0)
-			usleep(time32);
-	}
-
-	// update next tick time
-	timeNext64 += editor.vblankTimeLen;
-	timeNext64Frac += editor.vblankTimeLenFrac;
-	if (timeNext64Frac > 0xFFFFFFFF)
-	{
-		timeNext64Frac &= 0xFFFFFFFF;
-		timeNext64++;
-	}
 }
 
 void renderFrame(void)
@@ -491,19 +433,30 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	{
 		ui.updateCurrSampleLength = false;
 		if (!editor.isWAVRendering)
-			printFourHexBg(64, 69, *currSample->lengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		{
+			if (config.maxSampleLength == 0xFFFE)
+				printFourHexBg(64, 69, *currSample->lengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			else
+				printFiveHexBg(56, 69, *currSample->lengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		}
 	}
 
 	if (ui.updateCurrSampleRepeat)
 	{
 		ui.updateCurrSampleRepeat = false;
-		printFourHexBg(64, 80, *currSample->loopStartDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		if (config.maxSampleLength == 0xFFFE)
+			printFourHexBg(64, 80, *currSample->loopStartDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else
+			printFiveHexBg(56, 80, *currSample->loopStartDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (ui.updateCurrSampleReplen)
 	{
 		ui.updateCurrSampleReplen = false;
-		printFourHexBg(64, 91, *currSample->loopLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		if (config.maxSampleLength == 0xFFFE)
+			printFourHexBg(64, 91, *currSample->loopLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else
+			printFiveHexBg(56, 91, *currSample->loopLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 }
 
@@ -712,9 +665,7 @@ void updateSampler(void)
 	{
 		if (!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown && s->length > 0)
 		{
-			tmpSampleOffset = (scr2SmpPos(mouse.x-3) + (1 << 7)) >> 8; // rounded
-			tmpSampleOffset = 0x900 + CLAMP(tmpSampleOffset, 0x00, 0xFF);
-
+			tmpSampleOffset = 0x900 + (scr2SmpPos(mouse.x-3) >> 8);
 			if (tmpSampleOffset != ui.lastSampleOffset)
 			{
 				ui.lastSampleOffset = (uint16_t)tmpSampleOffset;
@@ -727,7 +678,10 @@ void updateSampler(void)
 	if (ui.update9xxPos)
 	{
 		ui.update9xxPos = false;
-		printThreeHexBg(288, 247, ui.lastSampleOffset, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		if (ui.lastSampleOffset <= 0x900 || ui.lastSampleOffset > 0x9FF)
+			textOutBg(288, 247, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+		else
+			printThreeHexBg(288, 247, ui.lastSampleOffset, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (ui.updateResampleNote)
@@ -1239,6 +1193,15 @@ void renderEditOpScreen(void)
 
 	blit32(120, 44, 200, 55, srcPtr);
 
+	// fix graphics in 128K sample mode
+	if (config.maxSampleLength != 65534)
+	{
+		if (ui.editOpScreen == 2)
+			blit32(213, 55, 32, 11, fix128KPosBMP);
+		else if (ui.editOpScreen == 3)
+			blit32(120, 88, 48, 11, fix128KChordBMP);
+	}
+
 	renderEditOpMode();
 
 	// render text and content
@@ -1271,11 +1234,11 @@ void renderEditOpScreen(void)
 	{
 		textOut(128, 47, " SAMPLE CHORD EDITOR  ", video.palette[PAL_GENTXT]);
 
-		ui.updateLengthText = true;
-		ui.updateNote1Text = true;
-		ui.updateNote2Text = true;
-		ui.updateNote3Text = true;
-		ui.updateNote4Text = true;
+		ui.updateChordLengthText = true;
+		ui.updateChordNote1Text = true;
+		ui.updateChordNote2Text = true;
+		ui.updateChordNote3Text = true;
+		ui.updateChordNote4Text = true;
 	}
 }
 
@@ -1414,7 +1377,10 @@ void updateEditOp(void)
 		if (ui.updatePosText)
 		{
 			ui.updatePosText = false;
-			printFourHexBg(248, 58, *editor.samplePosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			if (config.maxSampleLength == 0xFFFE)
+				printFourHexBg(248, 58, *editor.samplePosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			else
+				printFiveHexBg(240, 58, *editor.samplePosDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
 		if (ui.updateModText)
@@ -1438,13 +1404,17 @@ void updateEditOp(void)
 	}
 	else if (ui.editOpScreen == 3)
 	{
-		if (ui.updateLengthText)
+		if (ui.updateChordLengthText)
 		{
-			ui.updateLengthText = false;
+			ui.updateChordLengthText = false;
 
 			// clear background
-			textOutBg(168, 91, "    ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-			charOut(198, 91,    ':', video.palette[PAL_GENBKG]);
+			if (config.maxSampleLength != 65534)
+				textOutBg(160, 91, "     ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			else
+				textOutBg(168, 91, "    ", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+
+			charOut(198, 91, ':', video.palette[PAL_GENBKG]);
 
 			if (song->samples[editor.currSample].loopLength > 2 || song->samples[editor.currSample].loopStart >= 2)
 			{
@@ -1452,14 +1422,18 @@ void updateEditOp(void)
 			}
 			else
 			{
-				printFourHex(168, 91, *editor.chordLengthDisp, video.palette[PAL_GENTXT]); // chord max length
+				if (config.maxSampleLength == 0xFFFE)
+					printFourHex(168, 91, *editor.chordLengthDisp, video.palette[PAL_GENTXT]); // chord max length
+				else
+					printFiveHex(160, 91, *editor.chordLengthDisp, video.palette[PAL_GENTXT]); // chord max length
+
 				charOut(198, 91, (editor.chordLengthMin) ? '.' : ':', video.palette[PAL_GENTXT]); // min/max flag
 			}
 		}
 
-		if (ui.updateNote1Text)
+		if (ui.updateChordNote1Text)
 		{
-			ui.updateNote1Text = false;
+			ui.updateChordNote1Text = false;
 			if (editor.note1 > 35)
 				textOutBg(256, 58, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1467,9 +1441,9 @@ void updateEditOp(void)
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (ui.updateNote2Text)
+		if (ui.updateChordNote2Text)
 		{
-			ui.updateNote2Text = false;
+			ui.updateChordNote2Text = false;
 			if (editor.note2 > 35)
 				textOutBg(256, 69, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1477,9 +1451,9 @@ void updateEditOp(void)
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 
-		if (ui.updateNote3Text)
+		if (ui.updateChordNote3Text)
 		{
-			ui.updateNote3Text = false;
+			ui.updateChordNote3Text = false;
 			if (editor.note3 > 35)
 				textOutBg(256, 80, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1487,9 +1461,9 @@ void updateEditOp(void)
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 			
-		if (ui.updateNote4Text)
+		if (ui.updateChordNote4Text)
 		{
-			ui.updateNote4Text = false;
+			ui.updateChordNote4Text = false;
 			if (editor.note4 > 35)
 				textOutBg(256, 91, "---", video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 			else
@@ -1524,14 +1498,26 @@ void displayMainScreen(void)
 	if (ui.samplerScreenShown)
 	{
 		if (!ui.diskOpScreenShown)
+		{
 			blit32(0, 0, 320, 121, trackerFrameBMP);
+
+			if (config.maxSampleLength != 65534)
+				blit32(1, 65, 62, 34, fix128KTrackerBMP); // fix for 128kB support mode
+		}
 	}
 	else
 	{
 		if (!ui.diskOpScreenShown)
+		{
 			blit32(0, 0, 320, 255, trackerFrameBMP);
+
+			if (config.maxSampleLength != 65534)
+				blit32(1, 65, 62, 34, fix128KTrackerBMP); // fix for 128kB support mode
+		}
 		else
+		{
 			blit32(0, 121, 320, 134, &trackerFrameBMP[121 * SCREEN_W]);
+		}
 
 		ui.updateSongBPM = true;
 		ui.updateCurrPattText = true;
@@ -1759,7 +1745,7 @@ void handleAskYes(void)
 			s->loopLength = 2;
 
 			memset(s->text, 0, sizeof (s->text));
-			memset(&song->sampleData[(editor.currSample * MAX_SAMPLE_LEN)], 0, MAX_SAMPLE_LEN);
+			memset(&song->sampleData[(editor.currSample * config.maxSampleLength)], 0, config.maxSampleLength);
 
 			editor.samplePos = 0;
 			updateCurrSample();
@@ -2121,7 +2107,8 @@ void flipFrame(void)
 
 	if (!video.vsync60HzPresent)
 	{
-		waitVBL(); // we have no VSync, do crude thread sleeping to sync to ~60Hz
+		// we have no VSync, do crude thread sleeping to sync to ~60Hz
+		hpc_Wait(&video.vblankHpc);
 	}
 	else
 	{
@@ -2131,14 +2118,14 @@ void flipFrame(void)
 #ifdef __APPLE__
 		// macOS: VSync gets disabled if the window is 100% covered by another window. Let's add a (crude) fix:
 		if (minimized || !(windowFlags & SDL_WINDOW_INPUT_FOCUS))
-			waitVBL();
+			hpc_Wait(&video.vblankHpc);
 #elif __unix__
 		// *NIX: VSync gets disabled in fullscreen mode (at least on some distros/systems). Let's add a fix:
 		if (minimized || video.fullscreen)
-			waitVBL();
+			hpc_Wait(&video.vblankHpc);
 #else
 		if (minimized)
-			waitVBL();
+			hpc_Wait(&video.vblankHpc);
 #endif
 	}
 }

@@ -11,8 +11,7 @@ typedef struct sampler_t
 	int16_t loopStartPos, loopEndPos;
 	uint16_t dragStart, dragEnd;
 	int32_t samPointWidth, samOffset, samDisplay, samLength, saveMouseX, lastSamPos;
-	int32_t lastMouseX, lastMouseY, tmpLoopStart, tmpLoopLength;
-	uint32_t copyBufSize;
+	int32_t lastMouseX, lastMouseY, tmpLoopStart, tmpLoopLength, copyBufSize;
 } sampler_t;
 
 extern sampler_t sampler; // pt2_sampler.c

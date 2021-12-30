@@ -21,44 +21,6 @@
 #include "pt2_structs.h"
 #include "pt2_config.h"
 
-// used for Windows usleep() implementation
-#ifdef _WIN32
-static NTSTATUS (__stdcall *NtDelayExecution)(BOOL Alertable, PLARGE_INTEGER DelayInterval);
-#endif
-
-// usleep() implementation for Windows
-#ifdef _WIN32
-void usleep(uint32_t usec)
-{
-	LARGE_INTEGER lpDueTime;
-
-	if (NtDelayExecution == NULL)
-	{
-		// NtDelayExecution() is not available (shouldn't happen), use regular sleep()
-		Sleep(usec / 1000);
-	}
-	else
-	{
-		// this prevents a 64-bit MUL (will not overflow with typical values anyway)
-		lpDueTime.HighPart = 0xFFFFFFFF;
-		lpDueTime.LowPart = (DWORD)(-10 * (int32_t)usec);
-
-		NtDelayExecution(false, &lpDueTime);
-	}
-}
-
-void setupWin32Usleep(void)
-{
-	NtDelayExecution = (NTSTATUS (__stdcall *)(BOOL, PLARGE_INTEGER))GetProcAddress(GetModuleHandle("ntdll.dll"), "NtDelayExecution");
-	timeBeginPeriod(0); // enter highest timer resolution
-}
-
-void freeWin32Usleep(void)
-{
-	timeEndPeriod(0); // exit highest timer resolution
-}
-#endif
-
 void showErrorMsgBox(const char *fmt, ...)
 {
 	char strBuf[1024];

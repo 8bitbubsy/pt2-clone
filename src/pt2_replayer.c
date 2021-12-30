@@ -37,21 +37,10 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 
 int8_t *allocMemForAllSamples(void)
 {
-	/* Allocate memory for all sample data blocks.
-	**
-	** We need three extra sample slots:
-	** The 1st is extra safety padding since setting a Paula length of 0
-	** results in reading (1+65535)*2 bytes. The 2nd and 3rd (64K*2 = 1x 128K)
-	** are reserved for NULL pointers. This is needed for emulating a PT quirk.
-	**
-	** We have a padding of 4 bytes at the end for length=0 quirk safety.
-	**
-	** PS: I don't really know if it's possible for ProTracker to set a Paula
-	** length of 0, but I fully support this Paula behavior just in case.
-	*/
-	const size_t allocLen = ((MOD_SAMPLES + 3) * MAX_SAMPLE_LEN) + 4;
+	// allocate memory for all sample data blocks (+ 2 extra, for quirk + safety)
+	const size_t allocLen = (MOD_SAMPLES + 2) * config.maxSampleLength;
 
-	return (int8_t *)calloc(1, allocLen);
+	return (int8_t *)calloc(allocLen, 1);
 }
 
 void modSetSpeed(int32_t speed)
@@ -668,7 +657,7 @@ static void sampleOffset(moduleChannel_t *ch)
 	uint16_t newOffset = ch->n_sampleoffset << 7;
 
 	// this signed test is the reason for the 9xx "sample >64kB = silence" bug
-	if ((int16_t)newOffset < ch->n_length)
+	if ((int16_t)newOffset < (int16_t)ch->n_length)
 	{
 		ch->n_length -= newOffset;
 		ch->n_start += newOffset << 1;
@@ -871,10 +860,10 @@ static void playVoice(moduleChannel_t *ch)
 		ch->n_start = &song->sampleData[s->offset];
 		ch->n_finetune = s->fineTune & 0xF;
 		ch->n_volume = s->volume;
-		ch->n_length = s->length >> 1;
-		ch->n_replen = s->loopLength >> 1;
+		ch->n_length = (uint16_t)(s->length >> 1);
+		ch->n_replen = (uint16_t)(s->loopLength >> 1);
 
-		const uint16_t repeat = s->loopStart >> 1;
+		const uint16_t repeat = (uint16_t)(s->loopStart >> 1);
 		if (repeat > 0)
 		{
 			ch->n_loopstart = ch->n_start + (repeat << 1);
@@ -889,7 +878,7 @@ static void playVoice(moduleChannel_t *ch)
 
 		// non-PT2 requirement (set safe sample space for uninitialized voices - f.ex. "the ultimate beeper.mod")
 		if (ch->n_length == 0)
-			ch->n_loopstart = ch->n_wavestart = &song->sampleData[RESERVED_SAMPLE_OFFSET]; // 128K reserved sample
+			ch->n_loopstart = ch->n_wavestart = &song->sampleData[config.reservedSampleOffset]; // 128K reserved sample
 	}
 
 	if ((ch->n_note & 0xFFF) > 0)
@@ -1491,7 +1480,7 @@ void clearSamples(void)
 		memset(s->text, 0, sizeof (s->text));
 	}
 
-	memset(song->sampleData, 0, (MOD_SAMPLES + 1) * MAX_SAMPLE_LEN);
+	memset(song->sampleData, 0, (MOD_SAMPLES + 1) * config.maxSampleLength);
 
 	editor.currSample = 0;
 	editor.hiLowInstr = 0;

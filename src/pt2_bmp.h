@@ -21,6 +21,8 @@ extern const uint8_t fontBMP[6096];
 extern const uint8_t aboutScreenPackedBMP[1408];
 extern const uint8_t clearDialogPackedBMP[525];
 extern const uint8_t diskOpScreenPackedBMP[1898];
+extern const uint8_t fix128KChordPackedBMP[110];
+extern const uint8_t fix128KPosPackedBMP[81];
 extern const uint8_t editOpModeCharsPackedBMP[88];
 extern const uint8_t editOpScreen1PackedBMP[1481];
 extern const uint8_t editOpScreen2PackedBMP[1502];
@@ -34,6 +36,7 @@ extern const uint8_t samplerVolumePackedBMP[706];
 extern const uint8_t samplerFiltersPackedBMP[933];
 extern const uint8_t samplerScreenPackedBMP[3076];
 extern const uint8_t spectrumVisualsPackedBMP[2217];
+extern const uint8_t tracker128KFixPackedBMP[363];
 extern const uint8_t trackerFramePackedBMP[8486];
 extern const uint8_t yesNoDialogPackedBMP[476];
 extern const uint8_t bigYesNoDialogPackedBMP[472];
@@ -67,6 +70,11 @@ extern uint32_t *editOpModeCharsBMP;
 extern uint32_t *pat2SmpDialogBMP;
 extern uint32_t *sampleMonitorBMP;
 extern uint32_t *samplingBoxBMP;
+
+// fix-bitmaps for 128K sample mode
+extern uint32_t *fix128KTrackerBMP;
+extern uint32_t *fix128KPosBMP;
+extern uint32_t *fix128KChordBMP;
 
 bool unpackBMPs(void);
 void createBitmaps(void);

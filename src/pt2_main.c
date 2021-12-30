@@ -36,6 +36,7 @@
 #include "pt2_bmp.h"
 #include "pt2_sync.h"
 #include "pt2_sampling.h"
+#include "pt2_hpc.h"
 
 #define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
@@ -181,7 +182,6 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	setupWin32Usleep();
 	disableWasapi(); // disable problematic WASAPI SDL2 audio driver on Windows (causes clicks/pops sometimes...)
 	                 // 13.03.2020: This is still needed with SDL 2.0.12...
 #endif
@@ -233,6 +233,9 @@ int main(int argc, char *argv[])
 	makeSureDirIsProgramDir();
 #endif
 
+	hpc_Init();
+	hpc_SetDurationInHz(&video.vblankHpc, VBLANK_HZ);
+
 	if (!initializeVars() || !initKaiserTable())
 	{
 		cleanUp();
@@ -260,8 +263,6 @@ int main(int argc, char *argv[])
 
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
-
-	setupPerfFreq();
 
 	if (!setupAudio() || !unpackBMPs())
 	{
@@ -329,7 +330,7 @@ int main(int argc, char *argv[])
 
 	SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
-	setupWaitVBL();
+	hpc_ResetEndTime(&video.vblankHpc);
 	while (editor.programRunning)
 	{
 		sinkVisualizerBars();
@@ -370,19 +371,10 @@ static void handleInput(void)
 			else if (event.window.event == SDL_WINDOWEVENT_SHOWN)
 				video.windowHidden = false;
 
-			if (video.vsync60HzPresent)
-			{
-				/* if we minimize the window and vsync is present, vsync is temporarily turned off.
-				** recalc waitVBL() vars so that it can sleep properly in said mode.
-				*/
-				if (event.window.event == SDL_WINDOWEVENT_MINIMIZED ||
-					event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
-				{
-					setupWaitVBL();
-				}
-			}
+			// reset vblank end time if we minimize window
+			if (event.window.event == SDL_WINDOWEVENT_MINIMIZED || event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+				hpc_ResetEndTime(&video.vblankHpc);
 		}
-
 
 #ifdef _WIN32
 		handleSysMsg(event);
@@ -485,13 +477,10 @@ static bool initializeVars(void)
 
 	config.defModulesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
 	config.defSamplesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
-	editor.tempSample = (int8_t *)calloc(MAX_SAMPLE_LEN, 1);
+	editor.tempSample = (int8_t *)calloc(131070, 1);
 
-	if (config.defModulesDir == NULL || config.defSamplesDir == NULL ||
-		editor.tempSample == NULL)
-	{
+	if (config.defModulesDir == NULL || config.defSamplesDir == NULL || editor.tempSample == NULL)
 		goto oom;
-	}
 
 	turnOffVoices();
 
@@ -906,7 +895,6 @@ static void cleanUp(void) // never call this inside the main loop!
 	if (editor.tempSample != NULL) free(editor.tempSample);
 
 #ifdef _WIN32
-	freeWin32Usleep();
 #ifndef _DEBUG
 	UnhookWindowsHookEx(g_hKeyboardHook);
 #endif

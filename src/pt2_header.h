@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.37"
+#define PROG_VER_STR "1.38"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -38,7 +38,7 @@
 
 /* Scopes are clocked at 64Hz instead of 60Hz to prevent the small +/- Hz 
 ** interference from monitors not being exactly 60Hz (and unstable non-vsync mode).
-** Sadly, the scopes might midly flicker from this in some cases.
+** Sadly, the scopes might mildly flicker from this in some cases.
 */
 #define SCOPE_HZ 64
 
@@ -49,11 +49,6 @@
 #define MOD_SAMPLES 31
 #define MOD_ORDERS 128
 #define MAX_PATTERNS 100
-
-#define MAX_SAMPLE_LEN 65534
-
-// for NULL pointers
-#define RESERVED_SAMPLE_OFFSET ((31+1) * MAX_SAMPLE_LEN)
 
 #define AMIGA_VOICES 4
 #define SCOPE_WIDTH 40

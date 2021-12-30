@@ -53,13 +53,6 @@
 
 void showErrorMsgBox(const char *fmt, ...);
 
-#ifdef _WIN32
-// Windows usleep() implementation
-void usleep(uint32_t usec);
-void setupWin32Usleep(void);
-void freeWin32Usleep(void);
-#endif
-
 void sanitizeFilenameChar(char *chr);
 bool sampleNameIsEmpty(char *name);
 bool moduleNameIsEmpty(char *name);

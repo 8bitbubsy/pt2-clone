@@ -42,8 +42,8 @@ bool modSave(char *fileName)
 		fputc(s->fineTune & 0xF, f);
 		fputc(((uint8_t)s->volume > 64) ? 64 : s->volume, f);
 
-		uint16_t loopStart = s->loopStart;
-		uint16_t loopLength = s->loopLength;
+		int32_t loopStart = s->loopStart;
+		int32_t loopLength = s->loopLength;
 
 		if (loopLength < 2)
 			loopLength = 2;
@@ -54,11 +54,11 @@ bool modSave(char *fileName)
 			loopLength = 2;
 		}
 
-		loopLength = SWAP16(loopLength >> 1);
-		loopStart = SWAP16(loopStart >> 1);
+		uint16_t loopStart16 = SWAP16(loopStart >> 1);
+		uint16_t loopLength16 = SWAP16(loopLength >> 1);
 
-		fwrite(&loopStart, sizeof (int16_t), 1, f);
-		fwrite(&loopLength, sizeof (int16_t), 1, f);
+		fwrite(&loopStart16, sizeof (int16_t), 1, f);
+		fwrite(&loopLength16, sizeof (int16_t), 1, f);
 	}
 
 	fputc((uint8_t)song->header.numOrders, f);

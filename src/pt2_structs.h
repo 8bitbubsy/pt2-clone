@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_header.h"
+#include "pt2_hpc.h"
 
 // for .WAV sample loading/saving
 typedef struct wavHeader_t
@@ -57,12 +58,11 @@ typedef struct moduleHeader_t
 typedef struct moduleSample_t
 {
 	volatile int8_t *volumeDisp;
-	volatile uint16_t *lengthDisp, *loopStartDisp, *loopLengthDisp;
+	volatile int32_t *lengthDisp, *loopStartDisp, *loopLengthDisp;
 	char text[22 + 1];
 	int8_t volume;
 	uint8_t fineTune;
-	uint16_t length, loopStart, loopLength;
-	int32_t offset;
+	int32_t offset, length, loopStart, loopLength;
 } moduleSample_t;
 
 typedef struct moduleChannel_t
@@ -131,6 +131,7 @@ typedef struct video_t
 	int32_t renderX, renderY, renderW, renderH, displayW, displayH;
 	int32_t xScale, yScale;
 	float fMouseXMul, fMouseYMul;
+	hpc_t vblankHpc;
 	SDL_PixelFormat *pixelFormat;
 	uint32_t *frameBuffer, *frameBufferUnaligned;
 
@@ -153,7 +154,7 @@ typedef struct editor_t
 	volatile uint16_t *quantizeValueDisp, *metroSpeedDisp, *metroChannelDisp, *sampleVolDisp;
 	volatile uint16_t *vol1Disp, *vol2Disp, *currEditPatternDisp, *currPosDisp, *currPatternDisp;
 	volatile uint16_t *currPosEdPattDisp, *currLengthDisp, *lpCutOffDisp, *hpCutOffDisp;
-	volatile uint16_t *samplePosDisp, *chordLengthDisp;
+	volatile int32_t *samplePosDisp, *chordLengthDisp;
 
 	char mixText[16];
 	char *entryNameTmp, *currPath, *dropTempFileName;
@@ -174,13 +175,12 @@ typedef struct editor_t
 	uint8_t tuningNote, resampleNote, initialTempo, initialSpeed, editMoveAdd;
 
 	int16_t modulateSpeed;
-	uint16_t metroSpeed, metroChannel, sampleVol, samplePos, chordLength;
+	uint16_t metroSpeed, metroChannel, sampleVol;
 	uint16_t effectMacros[10], currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
-	uint16_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
-	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos;
-	uint32_t vblankTimeLen, vblankTimeLenFrac;
+	int32_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
+	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos, samplePos, chordLength;
 	uint64_t musicTime64;
-	double dPerfFreq, dPerfFreqMulMicro, *dPat2SmpBuf;
+	double *dPat2SmpBuf;
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
 	note_t patternBuffer[MOD_ROWS * AMIGA_VOICES], undoBuffer[MOD_ROWS * AMIGA_VOICES];
 	SDL_Thread *mod2WavThread, *pat2SmpThread;
@@ -214,6 +214,7 @@ typedef struct ui_t
 
 	bool changingSamplingNote;
 
+	bool force32BitNumPtr;
 	int8_t *numPtr8, tmpDisp8, pointerMode, editOpScreen, editTextType, askScreenType;
 	int8_t visualizerMode, previousPointerMode, forceVolDrag, changingChordNote;
 	uint8_t numLen, numBits;
@@ -230,10 +231,10 @@ typedef struct ui_t
 	bool updateMixText, updatePosText, updateModText, updateVolText;
 
 	// edit op. #4 (sample chord editor)
-	bool updateLengthText, updateNote1Text, updateNote2Text;
-	bool updateNote3Text, updateNote4Text;
+	bool updateChordLengthText, updateChordNote1Text, updateChordNote2Text;
+	bool updateChordNote3Text, updateChordNote4Text;
 
-	//sampler
+	// sampler
 	bool updateResampleNote, updateVolFromText, updateVolToText, updateLPText;
 	bool updateHPText, updateNormFlag, update9xxPos;
 
@@ -256,7 +257,7 @@ typedef struct ui_t
 	int16_t lineCurX, lineCurY, editObject, sampleMarkingPos;
 	uint16_t *numPtr16, tmpDisp16, *dstOffset, dstPos, textLength, editTextPos;
 	uint16_t dstOffsetEnd, lastSampleOffset, diskOpPathTextOffset;
-	int32_t askTempData;
+	int32_t askTempData, *numPtr32, tmpDisp32;
 } ui_t;
 
 extern keyb_t keyb;

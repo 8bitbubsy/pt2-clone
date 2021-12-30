@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_header.h"
+#include "pt2_config.h"
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
 #include "pt2_mouse.h"
@@ -31,7 +32,7 @@ void doPat2Smp(void)
 		return;
 	}
 
-	editor.dPat2SmpBuf = (double *)malloc(MAX_SAMPLE_LEN * sizeof (double));
+	editor.dPat2SmpBuf = (double *)malloc(config.maxSampleLength * sizeof (double));
 	if (editor.dPat2SmpBuf == NULL)
 	{
 		statusOutOfMemory();
@@ -101,8 +102,8 @@ void doPat2Smp(void)
 	free(editor.dPat2SmpBuf);
 	
 	// clear the rest of the sample (if not full)
-	if (renderLength < MAX_SAMPLE_LEN)
-		memset(&song->sampleData[s->offset+renderLength], 0, MAX_SAMPLE_LEN - renderLength);
+	if (renderLength < config.maxSampleLength)
+		memset(&song->sampleData[s->offset+renderLength], 0, config.maxSampleLength - renderLength);
 
 	if (editor.pat2SmpHQ)
 	{
@@ -115,7 +116,7 @@ void doPat2Smp(void)
 		s->fineTune = 0;
 	}
 
-	s->length = (uint16_t)renderLength;
+	s->length = renderLength;
 	s->volume = 64;
 	s->loopStart = 0;
 	s->loopLength = 2;

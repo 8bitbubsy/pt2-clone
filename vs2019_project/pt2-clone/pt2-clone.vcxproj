@@ -246,6 +246,7 @@
     <ClInclude Include="..\..\src\pt2_edit.h" />
     <ClInclude Include="..\..\src\pt2_header.h" />
     <ClInclude Include="..\..\src\pt2_helpers.h" />
+    <ClInclude Include="..\..\src\pt2_hpc.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
     <ClInclude Include="..\..\src\pt2_ledfilter.h" />
     <ClInclude Include="..\..\src\pt2_math.h" />
@@ -297,6 +298,7 @@
     <ClCompile Include="..\..\src\pt2_diskop.c" />
     <ClCompile Include="..\..\src\pt2_edit.c" />
     <ClCompile Include="..\..\src\pt2_helpers.c" />
+    <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
     <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />

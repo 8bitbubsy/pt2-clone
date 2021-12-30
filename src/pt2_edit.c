@@ -240,7 +240,10 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					editor.samplePos = ui.tmpDisp16;
+					editor.samplePos = ui.tmpDisp32;
+					if (editor.samplePos > config.maxSampleLength)
+						editor.samplePos = config.maxSampleLength;
+
 					if (editor.samplePos > song->samples[editor.currSample].length)
 						editor.samplePos = song->samples[editor.currSample].length;
 
@@ -499,7 +502,9 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp32 = ui.tmpDisp16 & 0xFFFE; // even'ify
+					tmp32 = ui.tmpDisp32 & ~1; // even'ify
+					if (tmp32 > config.maxSampleLength)
+						tmp32 = config.maxSampleLength;
 
 					if (s->loopStart+s->loopLength > 2)
 					{
@@ -507,12 +512,12 @@ void exitGetTextLine(bool updateValue)
 							tmp32 = s->loopStart+s->loopLength;
 					}
 
-					tmp32 &= 0xFFFE;
+					tmp32 &= ~1;
 
 					if (s->length != tmp32)
 					{
 						turnOffVoices();
-						s->length = (uint16_t)tmp32;
+						s->length = tmp32;
 
 						ui.updateCurrSampleLength = true;
 						ui.updateSongSize = true;
@@ -534,7 +539,9 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp32 = ui.tmpDisp16 & 0xFFFE; // even'ify
+					tmp32 = ui.tmpDisp32 & ~1; // even'ify
+					if (tmp32 > config.maxSampleLength)
+						tmp32 = config.maxSampleLength;
 
 					if (s->length >= s->loopLength)
 					{
@@ -546,18 +553,18 @@ void exitGetTextLine(bool updateValue)
 						tmp32 = 0;
 					}
 
-					tmp32 &= 0xFFFE;
+					tmp32 &= ~1;
 
 					if (s->loopStart != tmp32)
 					{
 						turnOffVoices();
-						s->loopStart = (uint16_t)tmp32;
+						s->loopStart = tmp32;
 						mixerUpdateLoops();
 
 						ui.updateCurrSampleRepeat = true;
 
 						if (ui.editOpScreenShown && ui.editOpScreen == 3)
-							ui.updateLengthText = true;
+							ui.updateChordLengthText = true;
 
 						if (ui.samplerScreenShown)
 							setLoopSprites();
@@ -574,7 +581,9 @@ void exitGetTextLine(bool updateValue)
 
 				if (updateValue)
 				{
-					tmp32 = ui.tmpDisp16 & 0xFFFE; // even'ify
+					tmp32 = ui.tmpDisp32 & ~1; // even'ify
+					if (tmp32 > config.maxSampleLength)
+						tmp32 = config.maxSampleLength;
 
 					if (s->length >= s->loopStart)
 					{
@@ -586,7 +595,7 @@ void exitGetTextLine(bool updateValue)
 						tmp32 = 2;
 					}
 
-					tmp32 &= 0xFFFE;
+					tmp32 &= ~1;
 
 					if (tmp32 < 2)
 						tmp32 = 2;
@@ -594,12 +603,12 @@ void exitGetTextLine(bool updateValue)
 					if (s->loopLength != tmp32)
 					{
 						turnOffVoices();
-						s->loopLength = (uint16_t)tmp32;
+						s->loopLength = tmp32;
 						mixerUpdateLoops();
 
 						ui.updateCurrSampleReplen = true;
 						if (ui.editOpScreenShown && ui.editOpScreen == 3)
-							ui.updateLengthText = true;
+							ui.updateChordLengthText = true;
 
 						if (ui.samplerScreenShown)
 							setLoopSprites();
@@ -923,7 +932,7 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 
 	const int8_t *n_start = &song->sampleData[s->offset];
 	const int8_t vol = 64;
-	const uint16_t n_length = s->length >> 1;
+	const uint16_t n_length = (uint16_t)(s->length >> 1);
 	const uint16_t period = periodTable[((s->fineTune & 0xF) * 37) + noteVal];
 
 	paulaSetVolume(ch, vol);
@@ -980,9 +989,9 @@ void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			chn->n_volume = s->volume;
 			chn->n_period = tempPeriod;
 			chn->n_start = &song->sampleData[s->offset];
-			chn->n_length = (s->loopStart > 0) ? (s->loopStart + s->loopLength) >> 1 : s->length >> 1;
+			chn->n_length = (uint16_t)((s->loopStart > 0) ? (s->loopStart + s->loopLength) >> 1 : s->length >> 1);
 			chn->n_loopstart = &song->sampleData[s->offset + s->loopStart];
-			chn->n_replen = s->loopLength >> 1;
+			chn->n_replen = (uint16_t)(s->loopLength >> 1);
 
 			if (chn->n_length == 0)
 				chn->n_length = 1;
@@ -1145,7 +1154,7 @@ void copySampleTrack(void)
 		smpTo->loopLengthDisp = &smpTo->loopLength;
 
 		// copy sample data
-		memcpy(&song->sampleData[smpTo->offset], &song->sampleData[smpFrom->offset], MAX_SAMPLE_LEN);
+		memcpy(&song->sampleData[smpTo->offset], &song->sampleData[smpFrom->offset], config.maxSampleLength);
 
 		updateCurrSample();
 		ui.updateSongSize = true;
@@ -1187,7 +1196,8 @@ void copySampleTrack(void)
 void exchSampleTrack(void)
 {
 	int8_t smp;
-	uint32_t i, tmpOffset;
+	int32_t i;
+	uint32_t tmpOffset;
 	moduleSample_t *smpFrom, *smpTo, smpTmp;
 	note_t *noteSrc;
 
@@ -1228,7 +1238,7 @@ void exchSampleTrack(void)
 		smpTo->loopLengthDisp = &smpTo->loopLength;
 
 		// swap sample data
-		for (i = 0; i < MAX_SAMPLE_LEN; i++)
+		for (i = 0; i < config.maxSampleLength; i++)
 		{
 			smp = song->sampleData[smpFrom->offset+i];
 			song->sampleData[smpFrom->offset+i] = song->sampleData[smpTo->offset+i];

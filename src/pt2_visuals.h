@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_header.h"
+#include "pt2_hpc.h"
 
 enum
 {
@@ -35,9 +36,6 @@ void statusSampleIsEmpty(void);
 void statusNotSampleZero(void);
 void changeStatusText(const char *text);
 
-void setupPerfFreq(void);
-void setupWaitVBL(void);
-void waitVBL(void);
 void resetAllScreens(void);
 void handleAskNo(void);
 void handleAskYes(void);

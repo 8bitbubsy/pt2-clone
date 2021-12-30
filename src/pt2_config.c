@@ -68,6 +68,9 @@ void loadConfig(void)
 	config.integerScaling = true;
 	config.audioInputFrequency = 44100;
 
+	config.maxSampleLength = 65534;
+	config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
+
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
 #endif
@@ -192,6 +195,21 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			configLine = strtok(NULL, "\n");
 			continue;
+		}
+
+		// 64K_LIMIT
+		else if (!_strnicmp(configLine, "64K_LIMIT=", 10))
+		{
+			if (!_strnicmp(&configLine[10], "TRUE", 4))
+			{
+				config.maxSampleLength = 65534;
+				config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
+			}
+			else if (!_strnicmp(&configLine[10], "FALSE", 5))
+			{
+				config.maxSampleLength = 131070;
+				config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
+			}
 		}
 
 		// NO_DWNSMP_ON_SMP_LOAD (no dialog for 2x downsample after >22kHz sample load)

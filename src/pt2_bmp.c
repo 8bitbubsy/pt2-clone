@@ -20,6 +20,11 @@ uint32_t *samplerScreenBMP = NULL, *pat2SmpDialogBMP   = NULL, *trackerFrameBMP 
 uint32_t *yesNoDialogBMP   = NULL, *bigYesNoDialogBMP  = NULL, *sampleMonitorBMP   = NULL;
 uint32_t *samplingBoxBMP   = NULL;
 
+// fix-bitmaps for 128K sample mode
+uint32_t *fix128KTrackerBMP = NULL;
+uint32_t *fix128KPosBMP = NULL;
+uint32_t *fix128KChordBMP = NULL;
+
 void createBitmaps(void)
 {
 	uint8_t r8, g8, b8, r8_2, g8_2, b8_2;
@@ -161,6 +166,9 @@ void createBitmaps(void)
 
 void freeBMPs(void)
 {
+	if (fix128KChordBMP != NULL) free(fix128KChordBMP);
+	if (fix128KPosBMP != NULL) free(fix128KPosBMP);
+	if (fix128KTrackerBMP != NULL) free(fix128KTrackerBMP);
 	if (trackerFrameBMP != NULL) free(trackerFrameBMP);
 	if (samplerScreenBMP != NULL) free(samplerScreenBMP);
 	if (samplerVolumeBMP != NULL) free(samplerVolumeBMP);
@@ -189,27 +197,29 @@ uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
 	const uint8_t *packSrc;
 	uint8_t *tmpBuffer, *packDst, byteIn;
 	int16_t count;
-	uint32_t *dst, decodedLength, i;
+	uint32_t *dst;
+	
+	int32_t decodedLength, i;
 
 	// RLE decode
 	decodedLength = (src[0] << 24) | (src[1] << 16) | (src[2] << 8) | src[3];
 
 	// 2-bit to 8-bit conversion
-	dst = (uint32_t *)malloc((decodedLength * 4) * sizeof (int32_t));
+	dst = (uint32_t *)malloc(((decodedLength * 4) * sizeof (int32_t)) + 8);
 	if (dst == NULL)
 		return NULL;
 
-	tmpBuffer = (uint8_t *)malloc(decodedLength + 512); // some margin is needed, the packer is buggy
+	tmpBuffer = (uint8_t *)malloc(decodedLength + 128); // some margin is needed, the packer is buggy
 	if (tmpBuffer == NULL)
 	{
 		free(dst);
 		return NULL;
 	}
 
-	packSrc = src + 4;
+	packSrc = src + 4; // skip "length" field
 	packDst = tmpBuffer;
 
-	i = packedLen - 4;
+	i = packedLen - 4; // subtract "length" field
 	while (i > 0)
 	{
 		byteIn = *packSrc++;
@@ -256,6 +266,9 @@ uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
 
 bool unpackBMPs(void)
 {
+	fix128KChordBMP = unpackBMP(fix128KChordPackedBMP, sizeof (fix128KChordPackedBMP));
+	fix128KPosBMP = unpackBMP(fix128KPosPackedBMP, sizeof (fix128KPosPackedBMP));
+	fix128KTrackerBMP = unpackBMP(tracker128KFixPackedBMP, sizeof (tracker128KFixPackedBMP));
 	trackerFrameBMP = unpackBMP(trackerFramePackedBMP, sizeof (trackerFramePackedBMP));
 	samplerScreenBMP = unpackBMP(samplerScreenPackedBMP, sizeof (samplerScreenPackedBMP));
 	samplerVolumeBMP = unpackBMP(samplerVolumePackedBMP, sizeof (samplerVolumePackedBMP));
@@ -278,13 +291,14 @@ bool unpackBMPs(void)
 	sampleMonitorBMP = unpackBMP(sampleMonitorPackedBMP, sizeof (sampleMonitorPackedBMP));
 	samplingBoxBMP = unpackBMP(samplingBoxPackedBMP, sizeof (samplingBoxPackedBMP));
 
-	if (trackerFrameBMP    == NULL || samplerScreenBMP   == NULL || samplerVolumeBMP  == NULL ||
-		clearDialogBMP     == NULL || diskOpScreenBMP    == NULL || mod2wavBMP        == NULL ||
-		posEdBMP           == NULL || spectrumVisualsBMP == NULL || yesNoDialogBMP    == NULL ||
-		editOpScreen1BMP   == NULL || editOpScreen2BMP   == NULL || editOpScreen3BMP  == NULL ||
-		editOpScreen4BMP   == NULL || aboutScreenBMP     == NULL || muteButtonsBMP    == NULL ||
-		editOpModeCharsBMP == NULL || samplerFiltersBMP  == NULL || yesNoDialogBMP    == NULL ||
-		bigYesNoDialogBMP  == NULL || sampleMonitorBMP   == NULL || samplingBoxBMP    == NULL)
+	if (fix128KTrackerBMP  == NULL || fix128KPosBMP      == NULL || fix128KChordBMP  == NULL || 
+		trackerFrameBMP    == NULL || samplerScreenBMP   == NULL || samplerVolumeBMP == NULL ||
+		clearDialogBMP     == NULL || diskOpScreenBMP    == NULL || mod2wavBMP       == NULL ||
+		posEdBMP           == NULL || spectrumVisualsBMP == NULL || yesNoDialogBMP   == NULL ||
+		editOpScreen1BMP   == NULL || editOpScreen2BMP   == NULL || editOpScreen3BMP == NULL ||
+		editOpScreen4BMP   == NULL || aboutScreenBMP     == NULL || muteButtonsBMP   == NULL ||
+		editOpModeCharsBMP == NULL || samplerFiltersBMP  == NULL || yesNoDialogBMP   == NULL ||
+		bigYesNoDialogBMP  == NULL || sampleMonitorBMP   == NULL || samplingBoxBMP   == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false; // BMPs are free'd in cleanUp()
