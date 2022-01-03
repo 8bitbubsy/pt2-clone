@@ -2,6 +2,7 @@
 Version=1.0
 Type=Application
 Name=ProTracker 2 clone
+Name[fr]=Clone de ProTracker 2
 Comment=
 Exec=pt2-clone
 Icon=ProTracker 2 clone
