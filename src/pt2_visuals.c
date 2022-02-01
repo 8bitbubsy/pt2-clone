@@ -2332,10 +2332,6 @@ bool setupVideo(void)
 #endif
 #endif
 
-#if SDL_PATCHLEVEL >= 5
-	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
-#endif
-
 	video.vsync60HzPresent = false;
 	if (!config.vsyncOff)
 	{
