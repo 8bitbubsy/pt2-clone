@@ -2133,21 +2133,20 @@ void flipFrame(void)
 void updateSpectrumAnalyzer(int8_t vol, int16_t period)
 {
 	const uint8_t maxHeight = SPECTRUM_BAR_HEIGHT + 1; // +1 because of audio latency - allows full height to be seen
-	int8_t scaledVol;
-	int32_t scaledNote;
+	uint8_t scaledVol;
+	uint32_t scaledNote;
 
 	if (ui.visualizerMode != VISUAL_SPECTRUM || vol <= 0)
 		return;
 
-	scaledVol = (vol * 24600L) >> 16; // scaledVol = (vol << 8) / 682
+	scaledVol = (vol * 24600L) >> 16; // scaledVol = (vol * 256) / 682   = (x / 2.66)
 
 	period = CLAMP(period, 113, 856);
+	period -= 113;
 
-	scaledNote = 856 - period;
+	scaledNote = 743 - period;
 	scaledNote *= scaledNote;
-	scaledNote = ((int64_t)scaledNote * 171162) >> 32; // scaledNote /= 25093
-
-	// scaledNote now ranges 0..22, no need to clamp
+	scaledNote /= 25093; // scaledNote now ranges 0..22, no need to clamp
 
 	// increment main spectrum bar
 	editor.spectrumVolumes[scaledNote] += scaledVol;
