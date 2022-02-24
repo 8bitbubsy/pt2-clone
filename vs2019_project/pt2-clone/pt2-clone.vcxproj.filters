@@ -108,6 +108,9 @@
     <ClInclude Include="..\..\src\pt2_hpc.h">
       <Filter>headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_xpk.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -198,6 +201,7 @@
     <ClCompile Include="..\..\src\pt2_downsample2x.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
+    <ClCompile Include="..\..\src\pt2_xpk.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

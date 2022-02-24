@@ -270,6 +270,7 @@
     <ClInclude Include="..\..\src\pt2_textout.h" />
     <ClInclude Include="..\..\src\pt2_unicode.h" />
     <ClInclude Include="..\..\src\pt2_visuals.h" />
+    <ClInclude Include="..\..\src\pt2_xpk.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c" />
@@ -324,6 +325,7 @@
     <ClCompile Include="..\..\src\pt2_textout.c" />
     <ClCompile Include="..\..\src\pt2_unicode.c" />
     <ClCompile Include="..\..\src\pt2_visuals.c" />
+    <ClCompile Include="..\..\src\pt2_xpk.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc">

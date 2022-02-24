@@ -28,6 +28,7 @@
 #include "pt2_sample_loader.h"
 #include "pt2_config.h"
 #include "pt2_sampling.h"
+#include "pt2_xpk.h"
 
 typedef struct mem_t
 {
@@ -220,16 +221,36 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 	else
 	{
-		modBuffer = (uint8_t *)malloc(filesize);
-		if (modBuffer == NULL)
+		if (DetectXPK(f))
 		{
-			statusOutOfMemory();
-			goto modLoadError;
-		}
+			if (!UnpackXPK(f, &filesize, &modBuffer))
+			{
+				displayErrorMsg("XPK UNPACK ERROR !");
+				goto modLoadError;
+			}
 
-		fseek(f, 0, SEEK_SET);
-		fread(modBuffer, 1, filesize, f);
-		fclose(f);
+			if (modBuffer == NULL)
+			{
+				statusOutOfMemory();
+				goto modLoadError;
+			}
+
+			fclose(f);
+		}
+		else
+		{
+			modBuffer = (uint8_t *)malloc(filesize);
+
+			if (modBuffer == NULL)
+			{
+				statusOutOfMemory();
+				goto modLoadError;
+			}
+
+			fseek(f, 0, SEEK_SET);
+			fread(modBuffer, 1, filesize, f);
+			fclose(f);
+		}
 	}
 
 	// smallest and biggest possible PT .MOD
