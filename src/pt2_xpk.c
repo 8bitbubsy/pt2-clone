@@ -79,7 +79,7 @@ static inline int32_t bfexts(size_t p, int32_t bo, int32_t bc, XPK_BufferBounds 
 
 static inline uint8_t XPK_ReadTable(int32_t index)
 {
-	if (index < 0 || index >= sizeof (xpk_table))
+	if (index < 0 || index >= (int32_t)sizeof (xpk_table))
 		return 0; // this is actually not how to do it, ugh...
 
 	return xpk_table[index];
@@ -95,7 +95,7 @@ static bool XPK_DoUnpack(const uint8_t *src_, uint32_t srcLen, int32_t len, uint
 	int32_t cp, cup1, type;
 	size_t c, src, phist = 0;
 
-	const uint32_t unpackedLen = min((uint32_t)len, min(srcLen, UINT32_MAX / 20) * 20);
+	const uint32_t unpackedLen = MIN((uint32_t)len, MIN(srcLen, UINT32_MAX / 20) * 20);
 
 	uint8_t *unpackedData = (uint8_t *)malloc(unpackedLen);
 	if (unpackedData == NULL)
@@ -367,14 +367,6 @@ bool DetectXPK(FILE *f)
 		return false;
 
 	return ValidateHeader(&header);
-}
-
-static bool ValidateHeaderFileSize(const XPKFILEHEADER *header, uint64_t filesize)
-{
-	if (filesize < header->SrcLen-8)
-		return false;
-
-	return true;
 }
 
 bool UnpackXPK(FILE *f, uint32_t *filesize, uint8_t **out)
