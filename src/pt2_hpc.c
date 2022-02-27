@@ -1,5 +1,5 @@
 /*
-** High Performance Counter delay routines
+** Hardware Performance Counter delay routines
 */
 
 #ifdef _WIN32
@@ -12,6 +12,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_hpc.h"
+
+#define FRAC_BITS 53
+#define FRAC_SCALE (1ULL << FRAC_BITS)
+#define FRAC_MASK (FRAC_SCALE-1)
 
 hpcFreq_t hpcFreq;
 
@@ -68,9 +72,9 @@ void hpc_SetDurationInHz(hpc_t *hpc, const double dHz)
 	double dDurationInt;
 	double dDurationFrac = modf(dDuration, &dDurationInt);
 
-	// set 64:32 values
-	hpc->duration64Int = (uint64_t)floor(dDurationInt);
-	hpc->duration64Frac = (uint64_t)((dDurationFrac * (UINT32_MAX+1.0)) + 0.5); // rounded
+	// set 64:53fp values
+	hpc->duration64Int = (uint64_t)dDurationInt;
+	hpc->duration64Frac = (uint64_t)round(dDurationFrac * FRAC_SCALE);
 }
 
 void hpc_ResetEndTime(hpc_t *hpc)
@@ -113,9 +117,9 @@ void hpc_Wait(hpc_t *hpc)
 	hpc->endTime64Int += hpc->duration64Int;
 
 	hpc->endTime64Frac += hpc->duration64Frac;
-	if (hpc->endTime64Frac > UINT32_MAX)
+	if (hpc->endTime64Frac >= FRAC_SCALE)
 	{
-		hpc->endTime64Frac &= UINT32_MAX;
+		hpc->endTime64Frac &= FRAC_MASK;
 		hpc->endTime64Int++;
 	}
 }
