@@ -102,6 +102,8 @@ void hpc_Wait(hpc_t *hpc)
 	if (currTime64 < hpc->endTime64Int)
 	{
 		uint64_t timeLeft64 = hpc->endTime64Int - currTime64;
+
+		// convert to int32_t for fast SSE2 SIMD usage lateron
 		if (timeLeft64 > INT32_MAX)
 			timeLeft64 = INT32_MAX;
 
