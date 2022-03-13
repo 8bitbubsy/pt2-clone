@@ -37,13 +37,13 @@ typedef struct voice_t
 	// registers modified by Paula functions
 	const int8_t* AUD_LC; // location
 	uint16_t AUD_LEN; // length (in words)
-	double AUD_PER_delta; // delta
+	double AUD_PER_delta, AUD_PER_deltamul; // delta
 	double AUD_VOL; // volume
 
 	double dDelta, dPhase;
 
 	// for BLEP synthesis
-	double dLastDelta, dLastPhase, dBlepOffset, dDeltaMul;
+	double dLastDelta, dLastPhase, dLastDeltaMul, dBlepOffset, dDeltaMul;
 
 	// period cache
 	int32_t oldPeriod;

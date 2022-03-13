@@ -284,12 +284,13 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		v->dOldVoiceDeltaMul = 1.0 / v->dOldVoiceDelta;
 	}
 
+	// to be read on next sampling step
 	v->AUD_PER_delta = v->dOldVoiceDelta;
-	
+	v->AUD_PER_deltamul = v->dOldVoiceDeltaMul;
+
 	// set BLEP stuff
-	v->dDeltaMul = v->dOldVoiceDeltaMul;
-	if (v->dLastDelta == 0.0)
-		v->dLastDelta = v->AUD_PER_delta;
+	if (v->dLastDelta    == 0.0) v->dLastDelta    = v->AUD_PER_delta;
+	if (v->dLastDeltaMul == 0.0) v->dLastDeltaMul = v->AUD_PER_deltamul;
 }
 
 void paulaSetVolume(int32_t ch, uint16_t vol)
@@ -385,8 +386,10 @@ void paulaStartDMA(int32_t ch)
 	v->sampleCounter--;
 
 	// set BLEP stuff
+	v->dDeltaMul = v->AUD_PER_deltamul;
 	v->dLastPhase = 0.0;
 	v->dLastDelta = v->dDelta;
+	v->dLastDeltaMul = v->dDeltaMul;
 	v->dBlepOffset = 0.0;
 
 	v->dPhase = 0.0;
@@ -473,8 +476,15 @@ void mixChannels(int32_t numSamples)
 			{
 				v->dPhase -= 1.0;
 
+				// set BLEP stuff
+				v->dLastPhase = v->dPhase;
+				v->dLastDelta = v->dDelta;
+				v->dLastDeltaMul = v->dDeltaMul;
+				v->dBlepOffset = v->dLastPhase * v->dLastDeltaMul;
+
 				// Paula only updates period (delta) during period refetching (this stage)
 				v->dDelta = v->AUD_PER_delta;
+				v->dDeltaMul = v->AUD_PER_deltamul;
 
 				if (v->sampleCounter == 0)
 				{
@@ -495,18 +505,13 @@ void mixChannels(int32_t numSamples)
 				/* Pre-compute current sample point.
 				** Output volume is only read from AUDxVOL at this stage,
 				** and we don't emulate volume PWM anyway, so we can
-				** pre-multiply by volume at this point.
+				** pre-multiply by volume here.
 				*/
 				v->dSample = v->AUD_DAT[0] * v->AUD_VOL; // -128..127 * 0.0 .. 1.0
 
 				// progress AUD_DAT buffer
 				v->AUD_DAT[0] = v->AUD_DAT[1];
 				v->sampleCounter--;
-
-				// setup BLEP stuff
-				v->dBlepOffset = v->dPhase * v->dDeltaMul;
-				v->dLastPhase = v->dPhase;
-				v->dLastDelta = v->dDelta;
 			}
 		}
 	}
