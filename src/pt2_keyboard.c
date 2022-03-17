@@ -3469,11 +3469,27 @@ void handleKeyRepeat(SDL_Scancode scancode)
 	}
 }
 
+static void swapChannel(uint8_t srcCh, uint8_t dstCh)
+{
+	if (srcCh == dstCh)
+		return;
+
+	for (int32_t i = 0; i < MOD_ROWS; i++)
+	{
+		note_t *noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + dstCh];
+		note_t noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + srcCh];
+
+		song->patterns[song->currPattern][(i * AMIGA_VOICES) + srcCh] = *noteSrc;
+		*noteSrc = noteTmp;
+	}
+
+	updateWindowTitle(MOD_IS_MODIFIED);
+	ui.updatePatternData = true;
+}
+
 bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 {
 	int8_t rawKey;
-	int16_t i;
-	note_t *noteSrc, noteTmp;
 
 	// SAMPLER SCREEN (volume box)
 	if (ui.samplerVolBoxShown && !ui.editTextFlag && scancode == SDL_SCANCODE_ESCAPE)
@@ -3747,15 +3763,7 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 
 			case SDL_SCANCODE_1:
 			{
-				for (i = 0; i < MOD_ROWS; i++)
-				{
-					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = song->patterns[song->currPattern][i * AMIGA_VOICES];
-
-					song->patterns[song->currPattern][i * AMIGA_VOICES] = *noteSrc;
-					*noteSrc = noteTmp;
-				}
-
+				swapChannel(0, cursor.channel);
 				editor.swapChannelFlag = false;
 
 				pointerSetPreviousMode();
@@ -3765,15 +3773,7 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 
 			case SDL_SCANCODE_2:
 			{
-				for (i = 0; i < MOD_ROWS; i++)
-				{
-					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + 1];
-
-					song->patterns[song->currPattern][(i * AMIGA_VOICES) + 1] = *noteSrc;
-					*noteSrc = noteTmp;
-				}
-
+				swapChannel(1, cursor.channel);
 				editor.swapChannelFlag = false;
 
 				pointerSetPreviousMode();
@@ -3783,15 +3783,7 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 
 			case SDL_SCANCODE_3:
 			{
-				for (i = 0; i < MOD_ROWS; i++)
-				{
-					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + 2];
-
-					song->patterns[song->currPattern][(i * AMIGA_VOICES) + 2] = *noteSrc;
-					*noteSrc = noteTmp;
-				}
-
+				swapChannel(2, cursor.channel);
 				editor.swapChannelFlag = false;
 
 				pointerSetPreviousMode();
@@ -3801,15 +3793,7 @@ bool handleGeneralModes(SDL_Keycode keycode, SDL_Scancode scancode)
 
 			case SDL_SCANCODE_4:
 			{
-				for (i = 0; i < MOD_ROWS; i++)
-				{
-					noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
-					noteTmp = song->patterns[song->currPattern][(i * AMIGA_VOICES) + 3];
-
-					song->patterns[song->currPattern][(i * AMIGA_VOICES) + 3] = *noteSrc;
-					*noteSrc = noteTmp;
-				}
-
+				swapChannel(3, cursor.channel);
 				editor.swapChannelFlag = false;
 
 				pointerSetPreviousMode();
