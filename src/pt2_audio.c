@@ -284,7 +284,7 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 		v->dOldVoiceDeltaMul = 1.0 / v->dOldVoiceDelta;
 	}
 
-	// to be read on next sampling step
+	// to be read on next sampling step (or on DMA restart)
 	v->AUD_PER_delta = v->dOldVoiceDelta;
 	v->AUD_PER_deltamul = v->dOldVoiceDeltaMul;
 
