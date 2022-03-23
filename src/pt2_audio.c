@@ -1166,25 +1166,33 @@ bool setupAudio(void)
 	want.callback = audioCallback;
 	want.userdata = NULL;
 
-	dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-	if (dev == 0)
+	if (headless)
 	{
-		showErrorMsgBox("Unable to open audio device: %s", SDL_GetError());
-		return false;
+		dev = 0;
+		have = want;
 	}
-
-	// lower than this is not safe for the BLEP synthesis in the mixer
-	const int32_t minFreq = (int32_t)(PAULA_PAL_CLK / 113.0 / 2.0)+1; // /2 because we do 2x oversampling
-	if (have.freq < minFreq)
+	else
 	{
-		showErrorMsgBox("Unable to open audio: An audio rate below %dHz can't be used!", minFreq);
-		return false;
-	}
+		dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+		if (dev == 0)
+		{
+			showErrorMsgBox("Unable to open audio device: %s", SDL_GetError());
+			return false;
+		}
 
-	if (have.format != want.format)
-	{
-		showErrorMsgBox("Unable to open audio: The sample format (signed 16-bit) couldn't be used!");
-		return false;
+		// lower than this is not safe for the BLEP synthesis in the mixer
+		const int32_t minFreq = (int32_t)(PAULA_PAL_CLK / 113.0 / 2.0)+1; // /2 because we do 2x oversampling
+		if (have.freq < minFreq)
+		{
+			showErrorMsgBox("Unable to open audio: An audio rate below %dHz can't be used!", minFreq);
+			return false;
+		}
+
+		if (have.format != want.format)
+		{
+			showErrorMsgBox("Unable to open audio: The sample format (signed 16-bit) couldn't be used!");
+			return false;
+		}
 	}
 
 	audio.outputRate = have.freq;
@@ -1229,7 +1237,10 @@ bool setupAudio(void)
 	audio.resetSyncTickTimeFlag = true;
 
 	updateFilterFunc();
-	SDL_PauseAudioDevice(dev, false);
+
+	if (!headless)
+		SDL_PauseAudioDevice(dev, false);
+
 	return true;
 }
 

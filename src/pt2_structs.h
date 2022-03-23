@@ -268,4 +268,6 @@ extern diskop_t diskop;
 extern cursor_t cursor;
 extern ui_t ui;
 
+extern bool headless;
+
 extern module_t *song; // pt2_main.c

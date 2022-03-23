@@ -1244,6 +1244,8 @@ void renderEditOpScreen(void)
 
 void renderMOD2WAVDialog(void)
 {
+	if (headless)
+		return;
 	blit32(64, 27, 192, 48, mod2wavBMP);
 }
 

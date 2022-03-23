@@ -79,6 +79,9 @@ bool moduleNameIsEmpty(char *name)
 
 void updateWindowTitle(bool modified)
 {
+	if (headless)
+		return;
+
 	char titleTemp[128];
 
 	if (modified)

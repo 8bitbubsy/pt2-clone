@@ -709,6 +709,12 @@ void displayMsg(const char *msg)
 {
 	assert(msg != NULL);
 
+	if (headless)
+	{
+		printf("%s\n", msg);
+		return;
+	}
+
 	editor.errorMsgActive = true;
 	editor.errorMsgBlock = false;
 	editor.errorMsgCounter = 0;
@@ -720,6 +726,12 @@ void displayMsg(const char *msg)
 void displayErrorMsg(const char *msg)
 {
 	assert(msg != NULL);
+
+	if (headless)
+	{
+		fprintf(stderr, "[ERROR]: %s\n", msg);
+		return;
+	}
 
 	editor.errorMsgActive = true;
 	editor.errorMsgBlock = true;

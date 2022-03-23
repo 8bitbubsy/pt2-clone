@@ -188,24 +188,29 @@ bool renderToWav(char *fileName, bool checkIfFileExist)
 
 	modSetTempo(song->currBPM, true); // update BPM with MOD2WAV audio output rate
 
-	editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, NULL, fOut);
-	if (editor.mod2WavThread != NULL)
+	if (headless)
 	{
-		SDL_DetachThread(editor.mod2WavThread);
+		mod2WavThreadFunc(fOut);
 	}
 	else
 	{
-		free(mod2WavBuffer);
+		editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, NULL, fOut);
+		if (editor.mod2WavThread == NULL)
+		{
+			free(mod2WavBuffer);
 
-		ui.disableVisualizer = false;
-		editor.isWAVRendering = false;
+			ui.disableVisualizer = false;
+			editor.isWAVRendering = false;
 
-		displayErrorMsg("THREAD ERROR");
+			displayErrorMsg("THREAD ERROR");
 
-		pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
-		statusAllRight();
+			pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
+			statusAllRight();
 
-		return false;
+			return false;
+		}
+
+		SDL_DetachThread(editor.mod2WavThread);
 	}
 
 	return true;

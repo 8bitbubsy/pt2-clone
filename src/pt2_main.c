@@ -37,6 +37,7 @@
 #include "pt2_sync.h"
 #include "pt2_sampling.h"
 #include "pt2_hpc.h"
+#include "pt2_mod2wav.h"
 
 #define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
@@ -139,6 +140,50 @@ int main(int argc, char *argv[])
 #endif
 
 	clearStructs();
+
+	// load a .MOD from the command arguments and convert to .WAV in headless mode if desired
+	if (argc == 3 && strcmp(argv[2], "--mod2wav") == 0)
+	{
+		headless = true;
+
+		loadConfig();
+
+		song = createEmptyMod();
+		if (song == NULL)
+		{
+			cleanUp();
+			return 1;
+		}
+
+		loadModFromArg(argv[1]);
+		if (!song->loaded)
+		{
+			cleanUp();
+			return 1;
+		}
+
+		const int len = strlen(argv[1]) + strlen(".wav") + 1;
+		char* fileName = (char*)malloc(len * sizeof(char));
+		if (fileName == NULL)
+		{
+			statusOutOfMemory();
+			cleanUp();
+			return 1;
+		}
+
+		strcpy(fileName, argv[1]);
+		strcat(fileName, ".wav");
+
+		setupAudio();
+
+		renderToWav(fileName, DONT_CHECK_IF_FILE_EXIST);
+
+		free(fileName);
+		cleanUp();
+		return 0;
+	}
+
+	headless = false;
 
 	// on Windows and macOS, test what version SDL2.DLL is (against library version used in compilation)
 #if defined _WIN32 || defined __APPLE__
