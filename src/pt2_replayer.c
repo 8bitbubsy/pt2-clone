@@ -35,6 +35,14 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 	0x10, 0x13, 0x16, 0x1A, 0x20, 0x2B, 0x40, 0x80
 };
 
+void setReplayerPosToTrackerPos(void)
+{
+	modPattern = (int8_t)song->currPattern;
+	modOrder = song->currOrder;
+	song->row = song->currRow;
+	song->tick = 0;
+}
+
 int8_t *allocMemForAllSamples(void)
 {
 	// allocate memory for all sample data blocks (+ 2 extra, for quirk + safety)
@@ -707,7 +715,7 @@ static void checkMoreEffects(moduleChannel_t *ch)
 	switch (cmd)
 	{
 		case 0x9: sampleOffset(ch); return; // note the returns here, not breaks!
-		case 0xB: positionJump(ch); return; 
+		case 0xB: positionJump(ch); return;
 		case 0xD: patternBreak(ch); return;
 		case 0xE: E_Commands(ch);   return;
 		case 0xF: setSpeed(ch);     return;
@@ -1270,6 +1278,13 @@ void modStop(void)
 	posJumpAssert = false;
 	modRenderDone = true;
 
+	/* The replayer is one tick ahead (unfortunately), so if the user was to stop the mod at the previous tick
+	** before a position jump (pattern loop, pattern break, position jump, row 63->0 transition, etc),
+	** it would be possible for the replayer to be at another order/pattern than the tracker.
+	** Let's set the replayer state to the tracker state on mod stop, to fix possible confusion.
+	*/
+	setReplayerPosToTrackerPos();
+
 	doStopSong = false; // just in case this flag was stuck from command F00 (stop song)
 }
 
@@ -1280,8 +1295,9 @@ void playPattern(int8_t startRow)
 
 	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
 	song->currRow = song->row = startRow & 0x3F;
-	song->tick = song->speed;
-	ciaSetBPM = -1;
+
+	song->tick = song->speed-1;
+	ciaSetBPM = -1; // fix possibly stuck "set BPM" flag
 
 	editor.playMode = PLAY_MODE_PATTERN;
 	editor.currMode = MODE_PLAY;
@@ -1323,8 +1339,6 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 
 	doStopIt(false);
 	turnOffVoices();
-	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
-	ciaSetBPM = -1;
 
 	if (row != -1)
 	{
@@ -1376,12 +1390,16 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	editor.currMode = oldMode;
 
 	song->tick = song->speed-1;
+	ciaSetBPM = -1; // fix possibly stuck "set BPM" flag
+
 	modRenderDone = false;
 	editor.songPlaying = true;
 	editor.didQuantize = false;
 
 	if (editor.playMode != PLAY_MODE_PATTERN)
 		editor.musicTime64 = 0; // don't reset playback counter in "play/rec pattern" mode
+
+	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
 
 	if (audioWasntLocked)
 		unlockAudio();

@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.43"
+#define PROG_VER_STR "1.44"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -210,7 +210,10 @@ enum
 	TEXT_EDIT_HEX = 2
 };
 
-int8_t *allocMemForAllSamples(void); // pt2_replayer.c
+// pt2_replayer.c
+int8_t *allocMemForAllSamples(void);
+void setReplayerPosToTrackerPos(void);
+// -------------------------
 
 void restartSong(void);
 void resetSong(void);
