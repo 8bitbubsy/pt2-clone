@@ -170,7 +170,7 @@ const int16_t periodTable[(37*16)+15] = // contains 16 finetuned period sections
 
 	/* Arpeggio on -1 finetuned samples can do an out-of-bounds read from
 	** this table. Here's the correct overflow values from the
-	** "CursorPosTable" and "UnshiftedKeymap" table in the PTcode, which are
+	** "CursorPosTable" and "UnshiftedKeymap" table in the PT code, which are
 	** located right after the period table. These tables and their order didn't
 	** seem to change in the different PT1.x/PT2.x versions (I checked the
 	** source codes).
