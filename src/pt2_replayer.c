@@ -37,6 +37,9 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 
 void setReplayerPosToTrackerPos(void)
 {
+	if (song == NULL)
+		return;
+
 	modPattern = (int8_t)song->currPattern;
 	modOrder = song->currOrder;
 	song->row = song->currRow;

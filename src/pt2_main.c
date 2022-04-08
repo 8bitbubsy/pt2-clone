@@ -61,6 +61,7 @@ static LPCTSTR sharedMemBuf;
 static TCHAR sharedHwndName[] = TEXT("Local\\PT2CloneHwnd");
 static TCHAR sharedFileName[] = TEXT("Local\\PT2CloneFilename");
 static bool handleSingleInstancing(int32_t argc, char **argv);
+static void closeSingleInstancing(void);
 static void handleSysMsg(SDL_Event inputEvent);
 #endif
 
@@ -233,10 +234,7 @@ int main(int argc, char *argv[])
 	makeSureDirIsProgramDir();
 #endif
 
-	hpc_Init();
-	hpc_SetDurationInHz(&video.vblankHpc, VBLANK_HZ);
-
-	if (!initializeVars() || !initKaiserTable())
+	if (!initializeVars())
 	{
 		cleanUp();
 		SDL_Quit();
@@ -264,7 +262,10 @@ int main(int argc, char *argv[])
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
 
-	if (!setupAudio() || !unpackBMPs())
+	hpc_Init();
+	hpc_SetDurationInHz(&video.vblankHpc, VBLANK_HZ);
+
+	if (!initKaiserTable() || !setupAudio() || !unpackBMPs())
 	{
 		cleanUp();
 		SDL_Quit();
@@ -772,6 +773,7 @@ static bool handleSingleInstancing(int32_t argc, char **argv)
 		if (sharedMemBuf != NULL)
 		{
 			memcpy(&hWnd_to, sharedMemBuf, sizeof (HWND));
+
 			UnmapViewOfFile(sharedMemBuf);
 			sharedMemBuf = NULL;
 			CloseHandle(hMapFile);
@@ -784,11 +786,12 @@ static bool handleSingleInstancing(int32_t argc, char **argv)
 				if (sharedMemBuf != NULL)
 				{
 					strcpy((char *)sharedMemBuf, argv[1]);
+
 					UnmapViewOfFile(sharedMemBuf);
 					sharedMemBuf = NULL;
 
 					SendMessage(hWnd_to, SYSMSG_FILE_ARG, 0, 0);
-					SDL_Delay(80); // wait a bit to make sure first instance received msg
+					Sleep(80); // wait a bit to make sure first instance received msg
 
 					CloseHandle(hMapFile);
 					hMapFile = NULL;
@@ -809,28 +812,36 @@ static bool handleSingleInstancing(int32_t argc, char **argv)
 
 static void handleSysMsg(SDL_Event inputEvent)
 {
-	SDL_SysWMmsg *wmMsg;
+	if (inputEvent.type != SDL_SYSWMEVENT)
+		return;
 
-	if (inputEvent.type == SDL_SYSWMEVENT)
+	SDL_SysWMmsg *wmMsg = inputEvent.syswm.msg;
+	if (wmMsg->subsystem == SDL_SYSWM_WINDOWS && wmMsg->msg.win.msg == SYSMSG_FILE_ARG)
 	{
-		wmMsg = inputEvent.syswm.msg;
-		if (wmMsg->subsystem == SDL_SYSWM_WINDOWS && wmMsg->msg.win.msg == SYSMSG_FILE_ARG)
+		hMapFile = OpenFileMapping(FILE_MAP_READ, FALSE, sharedFileName);
+		if (hMapFile != NULL)
 		{
-			hMapFile = OpenFileMapping(FILE_MAP_READ, FALSE, sharedFileName);
-			if (hMapFile != NULL)
+			sharedMemBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, ARGV_SHARED_MEM_MAX_LEN);
+			if (sharedMemBuf != NULL)
 			{
-				sharedMemBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, ARGV_SHARED_MEM_MAX_LEN);
-				if (sharedMemBuf != NULL)
-				{
-					loadDroppedFile((char *)sharedMemBuf, (uint32_t)strlen(sharedMemBuf), true, true);
-					UnmapViewOfFile(sharedMemBuf);
-					sharedMemBuf = NULL;
-				}
+				loadDroppedFile((char *)sharedMemBuf, (uint32_t)strlen(sharedMemBuf), true, true);
 
-				CloseHandle(hMapFile);
-				hMapFile = NULL;
+				UnmapViewOfFile(sharedMemBuf);
+				sharedMemBuf = NULL;
 			}
+
+			CloseHandle(hMapFile);
+			hMapFile = NULL;
 		}
+	}
+}
+
+void closeSingleInstancing(void)
+{
+	if (oneInstHandle != NULL)
+	{
+		CloseHandle(oneInstHandle);
+		oneInstHandle = NULL;
 	}
 }
 
@@ -898,6 +909,10 @@ static void cleanUp(void) // never call this inside the main loop!
 #ifndef _DEBUG
 	UnhookWindowsHookEx(g_hKeyboardHook);
 #endif
-	if (oneInstHandle != NULL) CloseHandle(oneInstHandle);
+	if (oneInstHandle != NULL)
+	{
+		CloseHandle(oneInstHandle);
+		oneInstHandle = NULL;
+	}
 #endif
 }
