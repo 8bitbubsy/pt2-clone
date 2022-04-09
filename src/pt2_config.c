@@ -67,6 +67,7 @@ void loadConfig(void)
 	config.pixelFilter = PIXELFILTER_NEAREST;
 	config.integerScaling = true;
 	config.audioInputFrequency = 44100;
+	config.keepEditModeAfterStepPlay = false;
 
 	config.maxSampleLength = 65534;
 	config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
@@ -195,6 +196,15 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			configLine = strtok(NULL, "\n");
 			continue;
+		}
+
+		// STEPPLAY_KEEP_EDITMODE
+		else if (!_strnicmp(configLine, "STEPPLAY_KEEP_EDITMODE=", 23))
+		{
+			if (!_strnicmp(&configLine[23], "TRUE", 4))
+				config.keepEditModeAfterStepPlay = true;
+			else if (!_strnicmp(&configLine[23], "FALSE", 5))
+				config.keepEditModeAfterStepPlay = false;
 		}
 
 		// 64K_LIMIT

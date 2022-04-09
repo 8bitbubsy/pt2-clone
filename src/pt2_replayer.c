@@ -964,12 +964,34 @@ static void nextPosition(void)
 	{
 		if (editor.stepPlayEnabled)
 		{
-			doStopIt(true);
+			if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
+			{
+				doStopIt(false);
+
+				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
+				editor.playMode = PLAY_MODE_NORMAL;
+				editor.currMode = MODE_EDIT;
+			}
+			else
+			{
+				doStopIt(true);
+			}
 
 			editor.stepPlayEnabled = false;
 			editor.stepPlayBackwards = false;
 
-			song->currRow = song->row;
+			if (editor.stepPlayLastMode == MODE_EDIT || editor.stepPlayLastMode == MODE_IDLE)
+			{
+				song->row &= 0x3F;
+				song->currRow = song->row;
+			}
+			else
+			{
+				// if we were playing, set replayer row to tracker row (stay in sync)
+				song->currRow &= 0x3F;
+				song->row = song->currRow;
+			}
+
 			return;
 		}
 
@@ -1120,9 +1142,31 @@ bool intMusic(void) // replayer ticker
 		// step-play handling
 		if (editor.stepPlayEnabled)
 		{
-			doStopIt(true);
+			if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
+			{
+				doStopIt(false);
 
-			song->currRow = song->row & 0x3F;
+				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
+				editor.playMode = PLAY_MODE_NORMAL;
+				editor.currMode = MODE_EDIT;
+			}
+			else
+			{
+				doStopIt(true);
+			}
+
+			if (editor.stepPlayLastMode == MODE_EDIT || editor.stepPlayLastMode == MODE_IDLE)
+			{
+				song->row &= 0x3F;
+				song->currRow = song->row;
+			}
+			else
+			{
+				// if we were playing, set replayer row to tracker row (stay in sync)
+				song->currRow &= 0x3F;
+				song->row = song->currRow;
+			}
+
 			editor.stepPlayEnabled = false;
 			editor.stepPlayBackwards = false;
 

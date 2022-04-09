@@ -15,7 +15,7 @@ typedef struct config_t
 	char *defModulesDir, *defSamplesDir;
 	bool waveformCenterLine, pattDots, compoMode, autoCloseDiskOp, hideDiskOpDates, hwMouse;
 	bool transDel, fullScreenStretch, vsyncOff, modDot, blankZeroFlag, realVuMeters, rememberPlayMode;
-	bool startInFullscreen, integerScaling, disableE8xEffect, noDownsampleOnSmpLoad;
+	bool startInFullscreen, integerScaling, disableE8xEffect, noDownsampleOnSmpLoad, keepEditModeAfterStepPlay;
 	int8_t stereoSeparation, videoScaleFactor, accidental;
 	uint8_t pixelFilter, filterModel;
 	uint16_t quantizeValue;

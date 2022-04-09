@@ -816,8 +816,21 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					editor.stepPlayEnabled = true;
 					editor.stepPlayBackwards = false;
 
-					doStopIt(true);
+					editor.stepPlayLastMode = editor.currMode;
+
+					if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
+						doStopIt(false);
+					else
+						doStopIt(true);
+
 					playPattern(song->currRow);
+
+					if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
+					{
+						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
+						editor.playMode = PLAY_MODE_NORMAL;
+						editor.currMode = MODE_EDIT;
+					}
 				}
 			}
 		}
@@ -4334,8 +4347,21 @@ bool handleTextEditMode(SDL_Scancode scancode)
 					editor.stepPlayEnabled = true;
 					editor.stepPlayBackwards = true;
 
-					doStopIt(true);
+					editor.stepPlayLastMode = editor.currMode;
+
+					if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
+						doStopIt(false);
+					else
+						doStopIt(true);
+
 					playPattern((song->currRow - 1) & 0x3F);
+
+					if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
+					{
+						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
+						editor.playMode = PLAY_MODE_NORMAL;
+						editor.currMode = MODE_EDIT;
+					}
 				}
 			}
 		}
