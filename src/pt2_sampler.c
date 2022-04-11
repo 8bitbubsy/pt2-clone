@@ -1560,7 +1560,7 @@ void samplerSamDelete(uint8_t cut)
 		updateSamOffset();
 	}
 
-	if (s->loopLength > 2) // loop enabled?
+	if (s->loopStart+s->loopLength > 2) // loop enabled?
 	{
 		if (markEnd > s->loopStart)
 		{
@@ -1593,6 +1593,13 @@ void samplerSamDelete(uint8_t cut)
 	}
 
 	s->length = copyLength & ~1;
+
+	// disable loop if invalid
+	if (s->loopStart+s->loopLength > s->length)
+	{
+		s->loopStart = 0;
+		s->loopLength = 2;
+	}
 
 	if (sampler.samDisplay <= 2)
 	{
