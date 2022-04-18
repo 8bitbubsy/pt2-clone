@@ -142,7 +142,6 @@ static int8_t findFirst(fileEntry_t *searchRec)
 #else
 	struct dirent *fData;
 	struct stat st;
-	int64_t fSize;
 #endif
 
 	searchRec->nameU = NULL; // this one must be initialized
@@ -172,26 +171,12 @@ static int8_t findFirst(fileEntry_t *searchRec)
 		return LFF_SKIP;
 
 	searchRec->filesize = 0;
-	searchRec->isDir = (fData->d_type == DT_DIR) ? true : false;
+	searchRec->isDir = false;
 
-	if (fData->d_type == DT_UNKNOWN || fData->d_type == DT_LNK)
+	if (stat(fData->d_name, &st) == 0)
 	{
-		if (stat(fData->d_name, &st) == 0)
-		{
-			fSize = (int64_t)st.st_size;
-			searchRec->filesize = (fSize > INT32_MAX) ? -1 : (fSize & 0xFFFFFFFF);
-
-			if ((st.st_mode & S_IFMT) == S_IFDIR)
-				searchRec->isDir = true;
-		}
-	}
-	else if (!searchRec->isDir)
-	{
-		if (stat(fData->d_name, &st) == 0)
-		{
-			fSize = (int64_t)st.st_size;
-			searchRec->filesize = (fSize > INT32_MAX) ? -1 : (fSize & 0xFFFFFFFF);
-		}
+		searchRec->isDir = !!(st.st_mode & S_IFDIR);
+		searchRec->filesize = ((int64_t)st.st_size > INT32_MAX) ? -1 : (int32_t)st.st_size;
 	}
 #endif
 
@@ -226,7 +211,6 @@ static int8_t findNext(fileEntry_t *searchRec)
 #else
 	struct dirent *fData;
 	struct stat st;
-	int64_t fSize;
 #endif
 
 	searchRec->nameU = NULL; // important
@@ -252,26 +236,12 @@ static int8_t findNext(fileEntry_t *searchRec)
 		return LFF_SKIP;
 
 	searchRec->filesize = 0;
-	searchRec->isDir = (fData->d_type == DT_DIR) ? true : false;
+	searchRec->isDir = false;
 
-	if (fData->d_type == DT_UNKNOWN || fData->d_type == DT_LNK)
+	if (stat(fData->d_name, &st) == 0)
 	{
-		if (stat(fData->d_name, &st) == 0)
-		{
-			fSize = (int64_t)st.st_size;
-			searchRec->filesize = (fSize > INT32_MAX) ? -1 : (fSize & 0xFFFFFFFF);
-
-			if ((st.st_mode & S_IFMT) == S_IFDIR)
-				searchRec->isDir = true;
-		}
-	}
-	else if (!searchRec->isDir)
-	{
-		if (stat(fData->d_name, &st) == 0)
-		{
-			fSize = (int64_t)st.st_size;
-			searchRec->filesize = (fSize > INT32_MAX) ? -1 : (fSize & 0xFFFFFFFF);
-		}
+		searchRec->isDir = !!(st.st_mode & S_IFDIR);
+		searchRec->filesize = ((int64_t)st.st_size > INT32_MAX) ? -1 : (int32_t)st.st_size;
 	}
 #endif
 
