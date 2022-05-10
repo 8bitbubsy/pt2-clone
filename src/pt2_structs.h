@@ -120,7 +120,7 @@ typedef struct mouse_t
 	volatile bool setPosFlag, resetCursorColorFlag;
 	bool buttonWaiting, leftButtonPressed, rightButtonPressed;
 	uint8_t repeatCounter, buttonWaitCounter;
-	int32_t x, y, lastMouseX, setPosX, setPosY, lastGUIButton, prevX, prevY;
+	int32_t rawX, rawY, x, y, lastMouseX, setPosX, setPosY, lastGUIButton, prevX, prevY;
 	int32_t lastSmpFilterButton, lastSamplingButton;
 	uint32_t buttonState;
 } mouse_t;

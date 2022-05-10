@@ -280,6 +280,9 @@ void readMouseXY(void)
 		mouse.buttonState = SDL_GetMouseState(&mx, &my);
 	}
 
+	mouse.rawX = mx;
+	mouse.rawY = my;
+
 	if (video.fullscreen)
 	{
 		// centered fullscreen mode (not stretched) needs further coord translation
@@ -2206,6 +2209,10 @@ bool handleRightMouseButton(void)
 bool handleLeftMouseButton(void)
 {
 	int32_t guiButton;
+
+	// if in fullscreen mode and the image isn't filling the whole screen, handle top left corner as quit
+	if (video.fullscreen && (video.renderX > 0 || video.renderY > 0) && (mouse.rawX == 0 && mouse.rawY == 0))
+		return handleGUIButtons(PTB_QUIT);
 
 	if (editor.swapChannelFlag || ui.editTextFlag)
 		return false;
