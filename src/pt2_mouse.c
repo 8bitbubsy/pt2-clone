@@ -2210,10 +2210,6 @@ bool handleLeftMouseButton(void)
 {
 	int32_t guiButton;
 
-	// if in fullscreen mode and the image isn't filling the whole screen, handle top left corner as quit
-	if (video.fullscreen && (video.renderX > 0 || video.renderY > 0) && (mouse.rawX == 0 && mouse.rawY == 0))
-		return handleGUIButtons(PTB_QUIT);
-
 	if (editor.swapChannelFlag || ui.editTextFlag)
 		return false;
 
@@ -2357,6 +2353,10 @@ bool handleLeftMouseButton(void)
 
 		return true;
 	}
+
+	// if in fullscreen mode and the image isn't filling the whole screen, handle top left corner as quit
+	if (video.fullscreen && (video.renderX > 0 || video.renderY > 0) && (mouse.rawX == 0 && mouse.rawY == 0))
+		return handleGUIButtons(PTB_QUIT);
 
 	guiButton = checkGUIButtons();
 	if (guiButton == -1)
