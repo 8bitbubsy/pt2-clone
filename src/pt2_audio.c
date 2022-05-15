@@ -1034,7 +1034,7 @@ static void calculateFilterCoeffs(void)
 	** - 1-pole RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22uF
 	*/
 	double dAudioFreq = audio.outputRate;
-	double R, C, R1, R2, C1, C2, fc, fb;
+	double R, C, R1, R2, C1, C2, cutoff, qfactor;
 
 	if (audio.oversamplingFlag)
 		dAudioFreq *= 2.0; // 2x oversampling
@@ -1042,41 +1042,41 @@ static void calculateFilterCoeffs(void)
 	// A500 1-pole (6db/oct) static RC low-pass filter:
 	R = 360.0; // R321 (360 ohm)
 	C = 1e-7;  // C321 (0.1uF)
-	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~4420.97Hz
-	calcRCFilterCoeffs(dAudioFreq, fc, &filterLoA500);
+	cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~4420.971Hz
+	calcRCFilterCoeffs(dAudioFreq, cutoff, &filterLoA500);
 
-	// A1200 1-pole (6db/oct) static RC low-pass filter:
+	// (optional) A1200 1-pole (6db/oct) static RC low-pass filter:
 	R = 680.0;  // R321 (680 ohm)
 	C = 6.8e-9; // C321 (6800pF)
-	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~34419.32Hz
+	cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~34419.322Hz
 
 	useA1200LowPassFilter = false;
-	if (dAudioFreq/2.0 > fc)
+	if (dAudioFreq/2.0 > cutoff)
 	{
-		calcRCFilterCoeffs(dAudioFreq, fc, &filterLoA1200);
+		calcRCFilterCoeffs(dAudioFreq, cutoff, &filterLoA1200);
 		useA1200LowPassFilter = true;
 	}
 
-	// Sallen-Key filter ("LED" filter, same values on A500/A1200):
+	// Sallen-Key low-pass filter ("LED" filter, same values on A500/A1200):
 	R1 = 10000.0; // R322 (10K ohm)
 	R2 = 10000.0; // R323 (10K ohm)
 	C1 = 6.8e-9;  // C322 (6800pF)
 	C2 = 3.9e-9;  // C323 (3900pF)
-	fc = 1.0 / (PT2_TWO_PI * pt2_sqrt(R1 * R2 * C1 * C2)); // cutoff = ~3090.53Hz
-	fb = 0.125/2.0; // Fb = 0.125 : Q ~= 1/sqrt(2) (Butterworth) (8bb: was 0.125, but /2 gives a closer gain!)
-	calcLEDFilterCoeffs(dAudioFreq, fc, fb, &filterLED);
+	cutoff = 1.0 / (PT2_TWO_PI * pt2_sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
+	qfactor = pt2_sqrt(R1 * R2 * C1 * C2) / (C2 * (R1 + R2)); // ~0.660225
+	calcLEDFilterCoeffs(dAudioFreq, cutoff, qfactor, &filterLED);
 
 	// A500 1-pole (6dB/oct) static RC high-pass filter:
 	R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
 	C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
-	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~5.13Hz
-	calcRCFilterCoeffs(dAudioFreq, fc, &filterHiA500);
+	cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.128Hz
+	calcRCFilterCoeffs(dAudioFreq, cutoff, &filterHiA500);
 
 	// A1200 1-pole (6dB/oct) static RC high-pass filter:
 	R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
 	C = 2.2e-5; // C334 (22uF capacitor)
-	fc = 1.0 / (PT2_TWO_PI * R * C); // cutoff = ~5.20Hz
-	calcRCFilterCoeffs(dAudioFreq, fc, &filterHiA1200);
+	cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.205Hz
+	calcRCFilterCoeffs(dAudioFreq, cutoff, &filterHiA1200);
 }
 
 void mixerSetStereoSeparation(uint8_t percentage) // 0..100 (percentage)

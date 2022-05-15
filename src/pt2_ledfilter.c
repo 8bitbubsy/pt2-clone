@@ -1,79 +1,46 @@
-/* aciddose:
-** Imperfect Amiga "LED" filter implementation. This may be further improved in the future.
-** Based upon ideas posted by mystran @ the kvraudio.com forum.
-**
-** This filter may not function correctly used outside the fixed-cutoff context here!
+/* Fast and approximated implementation of the Amiga "LED" filter.
+** Based on https://www.musicdsp.org/en/latest/Filters/38-lp-and-hp-filter.html
 */
 
-#include <stdint.h>
 #include "pt2_math.h"
 #include "pt2_ledfilter.h"
 
-void clearLEDFilterState(ledFilter_t *filterLED)
+void clearLEDFilterState(ledFilter_t *f)
 {
-	filterLED->buffer[0] = filterLED->buffer[1] = 0.0; // left channel
-	filterLED->buffer[2] = filterLED->buffer[3] = 0.0; // right channel
+	f->LIn1 = f->LIn2 = f->LOut1 = f->LOut2 = 0.0;
+	f->RIn1 = f->RIn2 = f->ROut1 = f->ROut2 = 0.0;
 }
 
-static double sigmoid(double x, double coefficient)
+void calcLEDFilterCoeffs(double sr, double hz, double qfactor, ledFilter_t *filter)
 {
-	/* aciddose:
-	** Coefficient from:
-	**   0.0 to  inf (linear)
-	**  -1.0 to -inf (linear)
-	*/
-	return x / (x + coefficient) * (coefficient + 1.0);
-}
+	const double c = 1.0 / pt2_tan((PT2_PI * hz) / sr);
+	const double r = 1.0 / qfactor;
 
-void calcLEDFilterCoeffs(const double sr, const double hz, const double fb, ledFilter_t *filter)
-{
-	// 8bitbubsy: the tangent approximation is suitable for these input ranges
-	const double c = (hz < sr/2.0) ? pt2_tan((PT2_PI * hz) / sr) : 1.0;
-	const double g = 1.0 / (1.0 + c);
-
-	// aciddose: dirty compensation
-	const double s = 0.5;
-	const double t = 0.5;
-	const double ic = c > t ? 1.0 / ((1.0 - s*t) + s*c) : 1.0;
-	const double cg = c * g;
-	const double fbg = 1.0 / (1.0 + fb * cg*cg);
-
-	filter->c = c;
-	filter->ci = g;
-	filter->feedback = 2.0 * sigmoid(fb, 0.5);
-	filter->bg = fbg * filter->feedback * ic;
-	filter->cg = cg;
-	filter->c2 = c * 2.0;
+	filter->a1 = 1.0 / (1.0 + r * c + c * c);
+	filter->a2 = 2.0 * filter->a1;
+	filter->a3 = filter->a1;
+	filter->b1 = 2.0 * (1.0 - c*c) * filter->a1;
+	filter->b2 = (1.0 - r * c + c * c) * filter->a1;
 }
 
 void LEDFilter(ledFilter_t *f, const double *in, double *out)
 {
-	const double in_1 = DENORMAL_OFFSET;
-	const double in_2 = DENORMAL_OFFSET;
+	const double LOut = (f->a1 * in[0]) + (f->a2 * f->LIn1) + (f->a3 * f->LIn2) - (f->b1 * f->LOut1) - (f->b2 * f->LOut2);
+	const double ROut = (f->a1 * in[1]) + (f->a2 * f->RIn1) + (f->a3 * f->RIn2) - (f->b1 * f->ROut1) - (f->b2 * f->ROut2);
 
-	const double c = f->c;
-	const double g = f->ci;
-	const double cg = f->cg;
-	const double bg = f->bg;
-	const double c2 = f->c2;
+	// shift states
 
-	double *v = f->buffer;
+	f->LIn2 = f->LIn1;
+	f->LIn1 = in[0];
+	f->LOut2 = f->LOut1;
+	f->LOut1 = LOut;
 
-	// left channel
-	const double estimate_L = in_2 + g*(v[1] + c*(in_1 + g*(v[0] + c*in[0])));
-	const double y0_L = v[0]*g + in[0]*cg + in_1 + estimate_L * bg;
-	const double y1_L = v[1]*g + y0_L*cg + in_2;
+	f->RIn2 = f->RIn1;
+	f->RIn1 = in[1];
+	f->ROut2 = f->ROut1;
+	f->ROut1 = ROut;
 
-	v[0] += c2 * (in[0] - y0_L);
-	v[1] += c2 * (y0_L - y1_L);
-	out[0] = y1_L;
-
-	// right channel
-	const double estimate_R = in_2 + g*(v[3] + c*(in_1 + g*(v[2] + c*in[1])));
-	const double y0_R = v[2]*g + in[1]*cg + in_1 + estimate_R * bg;
-	const double y1_R = v[3]*g + y0_R*cg + in_2;
-
-	v[2] += c2 * (in[1] - y0_R);
-	v[3] += c2 * (y0_R - y1_R);
-	out[1] = y1_R;
+	// set output
+	out[0] = LOut;
+	out[1] = ROut;
 }

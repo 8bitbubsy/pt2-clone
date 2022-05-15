@@ -1,14 +1,12 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
-
 typedef struct ledFilter_t
 {
-	double buffer[4];
-	double c, ci, feedback, bg, cg, c2;
+	double LIn1, LIn2, LOut1, LOut2;
+	double RIn1, RIn2, ROut1, ROut2;
+	double a1, a2, a3, b1, b2;
 } ledFilter_t;
 
-void clearLEDFilterState(ledFilter_t *filterLED);
-void calcLEDFilterCoeffs(const double sr, const double hz, const double fb, ledFilter_t *filter);
+void clearLEDFilterState(ledFilter_t *f);
+void calcLEDFilterCoeffs(double sr, double hz, double qfactor, ledFilter_t *filter);
 void LEDFilter(ledFilter_t *f, const double *in, double *out);

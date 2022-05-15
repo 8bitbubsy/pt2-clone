@@ -1,4 +1,4 @@
-/* Quite accurate approximation routines for sin/cos/sqrt/tan.
+/* Approximation routines for sin/cos/sqrt/tan.
 ** These should not be used in realtime, as they are too slow.
 */
 
