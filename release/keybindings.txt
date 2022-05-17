@@ -24,8 +24,13 @@
    shift+F12   - Toggle Amiga panning (100% stereo separation)
    ctrl+F12    - Toggle CIA/VBLANK timing for tempo/speed effect (Fxx)
    alt+1/2/3/4 - Increase Multi ordering (when in idle, not play/edit/rec.)
+   home        - Go to row 0
+   end         - Go to row 63
+   page up     - Go 16 rows up
+   page down   - Go 16 rows down
+   ctrl+del    - Delete note+sample from pattern data
  -------------------------------------------------
- 
+                  (US keyboard layout)
  High note keys:  2 3   5 6 7   9 0   =
                  Q W E R T Y U I O P [ ]
                    
@@ -35,6 +40,13 @@
  F1 - Choose low octave (from C-1 to G-3)
  F2 - Choose high octave (from C-2 to B-3)
 
+ up         - Go one row up
+ shift+up   - Go one row up (faster) 
+ alt+up     - Go one row up (fastest) 
+ down       - Go one row down
+ shift+down - Go one row down (faster) 
+ alt+down   - Go one row down (fastest) 
+ 
  shift+F3 - Cut channel to buffer
  shift+F4 - Copy channel to buffer
  shift+F5 - Paste channel buffer to channel
@@ -85,7 +97,7 @@
  right ctrl (cmd on Mac) - Play Pattern
              right shift - Record
         
- caps lock - Toggle Keyrepeat on/off (will use the OS settings for repeat/delay)
+ caps lock - Toggle Keyrepeat on/off (will use the OS settings for key repeat speed)
 
       del - Delete note under cursor
   alt+del - Delete command only 

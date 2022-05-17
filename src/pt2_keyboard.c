@@ -341,11 +341,21 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		return;
 	}
 
+	// kludge: allow certain specific key combos to be repeated with the ctrl key
+	const bool nonRepeatAltKeys = keyb.leftAltPressed && scancode != SDL_SCANCODE_DELETE    && scancode != SDL_SCANCODE_RETURN
+	                                                  && scancode != SDL_SCANCODE_BACKSPACE && scancode != SDL_SCANCODE_BACKSLASH
+	                                                  && scancode != SDL_SCANCODE_EQUALS    && scancode != SDL_SCANCODE_MINUS
+	                                                  && scancode <  SDL_SCANCODE_1         && scancode >  SDL_SCANCODE_0;
+
+	// kludge: allow certain specific key combos to be repeated with the alt key
+	const bool nonRepeatCtrlKeys = keyb.leftCtrlPressed && scancode != SDL_SCANCODE_DELETE && scancode != SDL_SCANCODE_RETURN
+	                                                    && scancode != SDL_SCANCODE_BACKSPACE;
+
 	// these keys should not allow to be repeated in keyrepeat mode (caps lock)
-	const bool illegalKeys = keyb.leftAltPressed || keyb.leftAmigaPressed || keyb.leftCtrlPressed
+	const bool nonRepeatKeys = keyb.leftAmigaPressed || nonRepeatAltKeys || nonRepeatCtrlKeys
 		|| scancode == SDL_SCANCODE_LEFT || scancode == SDL_SCANCODE_RIGHT
 		|| scancode == SDL_SCANCODE_UP   || scancode == SDL_SCANCODE_DOWN;
-	if (editor.repeatKeyFlag && keyb.repeatKey && scancode == keyb.lastRepKey && illegalKeys)
+	if (editor.repeatKeyFlag && keyb.repeatKey && scancode == keyb.lastRepKey && nonRepeatKeys)
 		return;
 
 	if (scancode == SDL_SCANCODE_KP_PLUS)

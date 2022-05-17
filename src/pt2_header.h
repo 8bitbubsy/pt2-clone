@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.47"
+#define PROG_VER_STR "1.48"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -36,7 +36,7 @@
 */
 #define VBLANK_HZ 60
 
-/* Scopes are clocked at 64Hz instead of 60Hz to prevent the small +/- Hz 
+/* Scopes are clocked at 64Hz instead of 60Hz to prevent the small +/- Hz
 ** interference from monitors not being exactly 60Hz (and unstable non-vsync mode).
 ** Sadly, the scopes might mildly flicker from this in some cases.
 */
@@ -75,6 +75,7 @@
 
 #define FILTERS_BASE_FREQ (PAULA_PAL_CLK / 214.0)
 
+// Amount of video frames. 14 (PT on Amiga) -> 17 (converted from 49.92Hz to 60Hz)
 #define KEYB_REPEAT_DELAY 17
 
 // .MOD types
