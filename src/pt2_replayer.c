@@ -334,7 +334,10 @@ static void funkIt(moduleChannel_t *ch)
 
 static void positionJump(moduleChannel_t *ch)
 {
-	modOrder = (ch->n_cmd & 0xFF) - 1; // B00 results in -1, but it safely jumps to order 0
+	// original PT doesn't do this check, but we have to
+	if (editor.playMode != PLAY_MODE_PATTERN || (editor.currMode == MODE_RECORD && editor.recordMode != RECORD_PATT))
+		modOrder = (ch->n_cmd & 0xFF) - 1; // B00 results in -1, but it safely jumps to order 0
+
 	pBreakPosition = 0;
 	posJumpAssert = true;
 }
