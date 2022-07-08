@@ -2271,6 +2271,8 @@ void toggleFullScreen(void)
 	video.fullscreen ^= 1;
 	if (video.fullscreen)
 	{
+		SDL_SetWindowFullscreen(video.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+
 		if (config.fullScreenStretch)
 		{
 			SDL_GetDesktopDisplayMode(0, &dm);
@@ -2282,7 +2284,6 @@ void toggleFullScreen(void)
 		}
 
 		SDL_SetWindowSize(video.window, SCREEN_W, SCREEN_H);
-		SDL_SetWindowFullscreen(video.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
 		SDL_SetWindowGrab(video.window, SDL_TRUE);
 	}
 	else
