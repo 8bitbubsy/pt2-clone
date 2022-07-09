@@ -283,47 +283,40 @@ void readMouseXY(void)
 	mouse.rawX = mx;
 	mouse.rawY = my;
 
-	if (video.fullscreen)
+	// if software mouse is enabled, warp mouse inside render space
+	if (!config.hwMouse)
 	{
-		// centered fullscreen mode (not stretched) needs further coord translation
-		if (!config.fullScreenStretch)
+		bool warpMouse = false;
+
+		if (mx < video.renderX)
 		{
-			// if software mouse is enabled, warp mouse inside render space
-			if (!config.hwMouse)
-			{
-				bool warpMouse = false;
-
-				if (mx < video.renderX)
-				{
-					mx = video.renderX;
-					warpMouse = true;
-				}
-				else if (mx >= video.renderX+video.renderW)
-				{
-					mx = (video.renderX + video.renderW) - 1;
-					warpMouse = true;
-				}
-
-				if (my < video.renderY)
-				{
-					my = video.renderY;
-					warpMouse = true;
-				}
-				else if (my >= video.renderY+video.renderH)
-				{
-					my = (video.renderY + video.renderH) - 1;
-					warpMouse = true;
-				}
-
-				if (warpMouse)
-					SDL_WarpMouseInWindow(video.window, mx, my);
-			}
-
-			// convert fullscreen coords to window (centered image) coords
-			mx -= video.renderX;
-			my -= video.renderY;
+			mx = video.renderX;
+			warpMouse = true;
 		}
+		else if (mx >= video.renderX+video.renderW)
+		{
+			mx = (video.renderX + video.renderW) - 1;
+			warpMouse = true;
+		}
+
+		if (my < video.renderY)
+		{
+			my = video.renderY;
+			warpMouse = true;
+		}
+		else if (my >= video.renderY+video.renderH)
+		{
+			my = (video.renderY + video.renderH) - 1;
+			warpMouse = true;
+		}
+
+		if (warpMouse)
+			SDL_WarpMouseInWindow(video.window, mx, my);
 	}
+
+	// convert fullscreen coords to window (centered image) coords
+	mx -= video.renderX;
+	my -= video.renderY;
 
 	// multiply coords by video upscaling factors (don't round)
 	mouse.x = (int32_t)(mx * video.fMouseXMul);
@@ -2355,7 +2348,7 @@ bool handleLeftMouseButton(void)
 	}
 
 	// if in fullscreen mode and the image isn't filling the whole screen, handle top left corner as quit
-	if (video.fullscreen && (video.renderX > 0 || video.renderY > 0) && (mouse.rawX == 0 && mouse.rawY == 0))
+	if ((video.renderX > 0 || video.renderY > 0) && (mouse.rawX == 0 && mouse.rawY == 0))
 		return handleGUIButtons(PTB_QUIT);
 
 	guiButton = checkGUIButtons();

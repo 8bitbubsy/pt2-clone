@@ -2202,60 +2202,42 @@ void sinkVisualizerBars(void)
 
 void updateRenderSizeVars(void)
 {
-	int32_t di;
 #ifdef __APPLE__
 	int32_t actualScreenW, actualScreenH;
 	double dXUpscale, dYUpscale;
 #endif
 	float fXScale, fYScale;
-	SDL_DisplayMode dm;
 
-	di = SDL_GetWindowDisplayIndex(video.window);
-	if (di < 0)
-		di = 0; // return display index 0 (default) on error
-
-	SDL_GetDesktopDisplayMode(di, &dm);
-	video.displayW = dm.w;
-	video.displayH = dm.h;
-
-	if (video.fullscreen)
+	SDL_GetWindowSize(video.window, &video.displayW, &video.displayH);
+	if (config.fullScreenStretch)
 	{
-		if (config.fullScreenStretch)
-		{
-			video.renderW = video.displayW;
-			video.renderH = video.displayH;
-			video.renderX = 0;
-			video.renderY = 0;
-		}
-		else
-		{
-			SDL_RenderGetScale(video.renderer, &fXScale, &fYScale);
-
-			video.renderW = (int32_t)(SCREEN_W * fXScale);
-			video.renderH = (int32_t)(SCREEN_H * fYScale);
-
-#ifdef __APPLE__
-			// retina high-DPI hackery (SDL2 is bad at reporting actual rendering sizes on macOS w/ high-DPI)
-			SDL_GL_GetDrawableSize(video.window, &actualScreenW, &actualScreenH);
-			SDL_GetDesktopDisplayMode(0, &dm);
-
-			dXUpscale = (double)actualScreenW / video.displayW;
-			dYUpscale = (double)actualScreenH / video.displayH;
-
-			// downscale back to correct sizes
-			if (dXUpscale != 0.0) video.renderW = (int32_t)(video.renderW / dXUpscale);
-			if (dYUpscale != 0.0) video.renderH = (int32_t)(video.renderH / dYUpscale);
-#endif
-			video.renderX = (video.displayW - video.renderW) >> 1;
-			video.renderY = (video.displayH - video.renderH) >> 1;
-		}
+		SDL_RenderSetLogicalSize(video.renderer, video.displayW, video.displayH);
+		video.renderW = video.displayW;
+		video.renderH = video.displayH;
+		video.renderX = 0;
+		video.renderY = 0;
 	}
 	else
 	{
-		SDL_GetWindowSize(video.window, &video.renderW, &video.renderH);
+		SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
+		SDL_RenderGetScale(video.renderer, &fXScale, &fYScale);
 
-		video.renderX = 0;
-		video.renderY = 0;
+		video.renderW = (int32_t)(SCREEN_W * fXScale);
+		video.renderH = (int32_t)(SCREEN_H * fYScale);
+
+#ifdef __APPLE__
+		// retina high-DPI hackery (SDL2 is bad at reporting actual rendering sizes on macOS w/ high-DPI)
+		SDL_GL_GetDrawableSize(video.window, &actualScreenW, &actualScreenH);
+
+		dXUpscale = (double)actualScreenW / video.displayW;
+		dYUpscale = (double)actualScreenH / video.displayH;
+
+		// downscale back to correct sizes
+		if (dXUpscale != 0.0) video.renderW = (int32_t)(video.renderW / dXUpscale);
+		if (dYUpscale != 0.0) video.renderH = (int32_t)(video.renderH / dYUpscale);
+#endif
+		video.renderX = (video.displayW - video.renderW) >> 1;
+		video.renderY = (video.displayH - video.renderH) >> 1;
 	}
 
 	// for mouse cursor creation
@@ -2344,6 +2326,9 @@ bool setupVideo(void)
 	}
 
 	uint32_t windowFlags = SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI;
+
+	if (config.resizable)
+		windowFlags |= SDL_WINDOW_RESIZABLE;
 
 	video.window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED, screenW, screenH, windowFlags);

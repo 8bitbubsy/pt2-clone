@@ -68,6 +68,7 @@ void loadConfig(void)
 	config.integerScaling = true;
 	config.audioInputFrequency = 44100;
 	config.keepEditModeAfterStepPlay = false;
+	config.resizable = false;
 
 	config.maxSampleLength = 65534;
 	config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
@@ -471,6 +472,12 @@ static bool loadProTrackerDotIni(FILE *f)
 			}
 		}
 
+		// WINDOW RESIZABLE
+		else if (!_strnicmp(configLine, "RESIZABLE=", 10))
+		{
+			if (!_strnicmp(&configLine[10], "TRUE",  4)) config.resizable = true;
+			else if (!_strnicmp(&configLine[10], "FALSE", 5)) config.resizable = false;
+		}
 		configLine = strtok(NULL, "\n");
 	}
 
