@@ -272,11 +272,13 @@ void readMouseXY(void)
 
 		// convert desktop coords to window coords
 		SDL_GetWindowPosition(video.window, &windowX, &windowY);
+
 		mx -= windowX;
 		my -= windowY;
 	}
 	else
 	{
+		// special mode for KMSDRM (XXX: Confirm that this still works...)
 		mouse.buttonState = SDL_GetMouseState(&mx, &my);
 	}
 

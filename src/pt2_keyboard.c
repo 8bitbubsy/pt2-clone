@@ -364,7 +364,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 	// TOGGLE FULLSCREEN (should always react)
 	if (scancode == SDL_SCANCODE_F11 && !keyb.leftAltPressed)
 	{
-		toggleFullScreen();
+		toggleFullscreen();
 
 		// prevent fullscreen toggle from firing twice on certain SDL2 Linux ports
 #ifdef __unix__
@@ -2289,7 +2289,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 #ifdef __APPLE__
 			if (keyb.leftCommandPressed && keyb.leftCtrlPressed)
 			{
-				toggleFullScreen();
+				toggleFullscreen();
 			}
 			else
 #endif

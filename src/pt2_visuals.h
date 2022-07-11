@@ -47,7 +47,7 @@ void sinkVisualizerBars(void);
 void updatePosEd(void);
 void updateVisualizer(void);
 void updateEditOp(void);
-void toggleFullScreen(void);
+void toggleFullscreen(void);
 void videoClose(void);
 
 void displayMainScreen(void);

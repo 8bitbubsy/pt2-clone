@@ -44,7 +44,7 @@
 
 module_t *song = NULL; // globalized
 
-static bool backupMadeAfterCrash;
+static bool backupMadeAfterCrash, didDropFile;
 
 #ifdef _WIN32
 #define SYSMSG_FILE_ARG (WM_USER + 1)
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
 	SDL_ShowWindow(video.window);
 
 	if (config.startInFullscreen)
-		toggleFullScreen();
+		toggleFullscreen();
 
 	changePathToHome(); // set path to home/user-dir now
 	diskOpSetInitPath(); // set path to custom path in config (if present)
@@ -400,7 +400,10 @@ static void handleInput(void)
 		{
 			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
 			SDL_free(event.drop.file);
-			SDL_RaiseWindow(video.window); // set window focus
+
+			// kludge: allow focus-clickthrough after drag-n-drop
+			SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+			didDropFile = true;
 		}
 		if (event.type == SDL_QUIT)
 		{
@@ -426,15 +429,18 @@ static void handleInput(void)
 
 				ui.introScreenShown = false;
 			}
+
+			// kludge: we drag-n-dropped a file before this mouse click release, restore focus-clickthrough mode
+			if (didDropFile)
+			{
+				didDropFile = false;
+				SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "0");
+			}
 		}
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
 		{
-			if (ui.sampleMarkingPos == -1 &&
-				!ui.forceSampleDrag && !ui.forceVolDrag &&
-				!ui.forceSampleEdit)
-			{
+			if (ui.sampleMarkingPos == -1 && !ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
 				mouseButtonDownHandler(event.button.button);
-			}
 		}
 
 		if (ui.throwExit)

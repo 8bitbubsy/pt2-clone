@@ -29,13 +29,13 @@ typedef struct voice_t
 
 	// internal values (don't modify directly!)
 	int8_t AUD_DAT[2]; // DMA data buffer
-	const int8_t* location; // current location
+	const int8_t *location; // current location
 	uint16_t lengthCounter; // current length
 	int32_t sampleCounter; // how many bytes left in AUD_DAT
 	double dSample; // current sample point
 
 	// registers modified by Paula functions
-	const int8_t* AUD_LC; // location
+	const int8_t *AUD_LC; // location
 	uint16_t AUD_LEN; // length (in words)
 	double AUD_PER_delta, AUD_PER_deltamul; // delta
 	double AUD_VOL; // volume
