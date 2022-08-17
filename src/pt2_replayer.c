@@ -1346,7 +1346,11 @@ void playPattern(int8_t startRow)
 	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
 	song->currRow = song->row = startRow & 0x3F;
 
-	song->tick = song->speed-1;
+	if (!editor.stepPlayEnabled)
+		song->tick = song->speed-1;
+	else
+		song->tick = 0;
+
 	ciaSetBPM = -1; // fix possibly stuck "set BPM" flag
 
 	editor.playMode = PLAY_MODE_PATTERN;
