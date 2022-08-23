@@ -2343,7 +2343,7 @@ bool setupVideo(void)
 	uint32_t rendererFlags = 0;
 
 #ifdef _WIN32
-#if SDL_PATCHLEVEL >= 4
+#if SDL_MAJOR_VERSION == 2 && SDL_MINOR_VESRION >= 0 && SDL_PATCHLEVEL >= 4
 	SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "1"); // this is for Windows only
 #endif
 #endif
