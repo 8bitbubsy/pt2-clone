@@ -118,9 +118,15 @@ int main(int argc, char *argv[])
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-#if SDL_PATCHLEVEL < 5
-	#pragma message("WARNING: The SDL2 dev lib is older than ver 2.0.5. You'll get fullscreen mode issues.")
+#if SDL_MAJOR_VERSION == 2 && SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL < 5
+#pragma message("WARNING: The SDL2 dev lib is older than ver 2.0.5. You'll get fullscreen mode issues and no audio input sampling.")
+#pragma message("At least version 2.0.7 is recommended.")
 #endif
+
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+	SDL_EnableScreenSaver(); // allow screensaver to activate
+
+	clearStructs();
 
 	// set up crash handler
 #ifndef _DEBUG
@@ -138,8 +144,6 @@ int main(int argc, char *argv[])
 	sigaction(SIGSEGV, &act, &oldAct);
 #endif
 #endif
-
-	clearStructs();
 
 	// on Windows and macOS, test what version SDL2.DLL is (against library version used in compilation)
 #if defined _WIN32 || defined __APPLE__
@@ -165,13 +169,18 @@ int main(int argc, char *argv[])
 
 #ifdef _WIN32
 
+	// ALT+F4 is used in ProTracker, but is "close program" in Windows...
+#if SDL_MAJOR_VERSION == 2 && SDL_MINOR_VERSION >= 0 && SDL_PATCHLEVEL >= 4
+	SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "1");
+#endif
+
 #ifndef _MSC_VER
 	SetProcessDPIAware();
 #endif
 
 	if (!SDL_HasSSE())
 	{
-		showErrorMsgBox("Your computer's processor doesn't have the SSE+SSE2 instruction set\n" \
+		showErrorMsgBox("Your computer's processor doesn't have the SSE instruction set\n" \
 		                "which is needed for this program to run. Sorry!");
 		return 0;
 	}
@@ -192,7 +201,7 @@ int main(int argc, char *argv[])
 	** reinitialized in Windows and what not.
 	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4391
 	*/
-#if defined _WIN32 && SDL_PATCHLEVEL == 9
+#if defined _WIN32 && SDL_MAJOR_VERSION == 2 && SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL == 9
 	if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0)
 #else
 	if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO) != 0)
@@ -201,9 +210,6 @@ int main(int argc, char *argv[])
 		showErrorMsgBox("Couldn't initialize SDL: %s", SDL_GetError());
 		return 0;
 	}
-
-	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
-	SDL_EnableScreenSaver(); // allow screensaver to activate
 
 	/* Text input is started by default in SDL2, turn it off to remove ~2ms spikes per key press.
 	** We manuallay start it again when someone clicks on a text edit box, and stop it when done.
