@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
 
-#if SDL_MAJOR_VERISON == 2 && SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL < 5
+#if SDL_PATCHLEVEL < 5
 	#pragma message("WARNING: The SDL2 dev lib is older than ver 2.0.5. You'll get fullscreen mode issues.")
 #endif
 
