@@ -7,18 +7,16 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_header.h"
 #include "pt2_textout.h"
-#include "pt2_mouse.h"
-#include "pt2_structs.h"
 #include "pt2_sampler.h" // fixSampleBeep()
 #include "pt2_audio.h"
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"
-#include "pt2_unicode.h"
 #include "pt2_config.h"
 #include "pt2_sampling.h"
 #include "pt2_downsample2x.h"
+#include "pt2_askbox.h"
+#include "pt2_replayer.h"
 
 enum
 {
@@ -33,64 +31,23 @@ enum
 	SAMPLE_WAV = 2
 };
 
-
-static int8_t loadedSampleType;
-
-static bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling);
-static bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling);
-static bool loadRAWSample(UNICHAR *fileName, char *entryName);
-static bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling);
-
-void extLoadWAVOrAIFFSampleCallback(bool downsample)
+static bool loadWAVSample(UNICHAR *fileName, char *entryName)
 {
-	switch (loadedSampleType)
-	{
-		case SAMPLE_IFF:   loadIFFSample(editor.fileNameTmpU, editor.entryNameTmp, downsample); break;
-		case SAMPLE_AIFF: loadAIFFSample(editor.fileNameTmpU, editor.entryNameTmp, downsample); break;
-		case SAMPLE_WAV:   loadWAVSample(editor.fileNameTmpU, editor.entryNameTmp, downsample); break;
-		default: break;
-	}
-}
-
-bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
-{
-	bool wavSampleNameFound;
-	uint8_t *audioDataU8;
-	int16_t *audioDataS16, tempVol;
 	uint16_t audioFormat, numChannels, bitsPerSample;
-	int32_t *audioDataS32, smp32, sampleLength, loopStart, loopEnd, inamLen, nameLen, i;
-	uint32_t *audioDataU32, chunkID, chunkSize;
-	uint32_t sampleRate, filesize, loopFlags;
-	uint32_t dataPtr, dataLen, fmtPtr, endOfChunk, bytesRead;
-	uint32_t fmtLen, inamPtr, smplPtr, smplLen, xtraPtr, xtraLen;
-	float *fAudioDataFloat;
-	double *dAudioDataDouble;
-	FILE *f;
-	moduleSample_t *s;
-
-	loadedSampleType = SAMPLE_WAV;
+	uint32_t sampleRate;
 
 	// zero out chunk pointers and lengths
-	fmtPtr  = 0; fmtLen = 0;
-	dataPtr = 0; dataLen = 0;
-	inamPtr = 0; inamLen = 0;
-	xtraPtr = 0; xtraLen = 0;
-	smplPtr = 0; smplLen = 0;
+	uint32_t fmtPtr  = 0; uint32_t fmtLen = 0;
+	uint32_t dataPtr = 0; uint32_t dataLen = 0;
+	uint32_t inamPtr = 0;  int32_t inamLen = 0;
+	uint32_t xtraPtr = 0; uint32_t xtraLen = 0;
+	uint32_t smplPtr = 0; uint32_t smplLen = 0;
 
-	wavSampleNameFound = false;
+	bool wavSampleNameFound = false;
 
-	s = &song->samples[editor.currSample];
+	moduleSample_t *s = &song->samples[editor.currSample];
 
-	if (forceDownSampling == -1)
-	{
-		// these two *must* be fully wiped, for outputting reasons
-		memset(editor.fileNameTmpU, 0, PATH_MAX);
-		memset(editor.entryNameTmp, 0, PATH_MAX);
-		UNICHAR_STRCPY(editor.fileNameTmpU, fileName);
-		strcpy(editor.entryNameTmp, entryName);
-	}
-
-	f = UNICHAR_FOPEN(fileName, "rb");
+	FILE *f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
@@ -98,8 +55,8 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	}
 
 	fseek(f, 0, SEEK_END);
-	filesize = ftell(f);
-	if (filesize == 0)
+	uint32_t fileSize = ftell(f);
+	if (fileSize == 0)
 	{
 		fclose(f);
 
@@ -110,13 +67,15 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	// look for wanted chunks and set up pointers + lengths
 	fseek(f, 12, SEEK_SET);
 
-	bytesRead = 0;
-	while (!feof(f) && bytesRead < filesize-12)
+	uint32_t bytesRead = 0;
+	while (!feof(f) && bytesRead < fileSize-12)
 	{
+		uint32_t chunkID, chunkSize;
+
 		fread(&chunkID, 4, 1, f); if (feof(f)) break;
 		fread(&chunkSize, 4, 1, f); if (feof(f)) break;
 
-		endOfChunk = (ftell(f) + chunkSize) + (chunkSize & 1);
+		uint32_t endOfChunk = (ftell(f) + chunkSize) + (chunkSize & 1);
 		switch (chunkID)
 		{
 			case 0x20746D66: // "fmt "
@@ -201,10 +160,10 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	fread(&sampleRate,  4, 1, f);
 	fseek(f, 6, SEEK_CUR);
 	fread(&bitsPerSample, 2, 1, f);
-	sampleLength = dataLen;
+	int32_t sampleLength = dataLen;
 	// ---------------------------
 
-	if (sampleRate == 0 || sampleLength == 0 || sampleLength >= (int32_t)filesize*(bitsPerSample/8))
+	if (sampleRate == 0 || sampleLength == 0 || sampleLength >= (int32_t)fileSize*(bitsPerSample/8))
 	{
 		fclose(f);
 		displayErrorMsg("WAV CORRUPT !");
@@ -239,18 +198,11 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		return false;
 	}
 
+	bool forceDownSampling = false;
 	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
 	{
-		if (forceDownSampling == -1)
-		{
-			showDownsampleAskDialog();
-			fclose(f);
-			return true;
-		}
-	}
-	else
-	{
-		forceDownSampling = false;
+		if (askBox(ASKBOX_DOWNSAMPLE, "DOWNSAMPLE ?"))
+			forceDownSampling = true;
 	}
 
 	// ---- READ SAMPLE DATA ----
@@ -263,7 +215,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataU8 = (uint8_t *)malloc(sampleLength * sizeof (uint8_t));
+		uint8_t *audioDataU8 = (uint8_t *)malloc(sampleLength * sizeof (uint8_t));
 		if (audioDataU8 == NULL)
 		{
 			fclose(f);
@@ -284,9 +236,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 			{
-				smp32 = (audioDataU8[(i << 1) + 0] - 128) + (audioDataU8[(i << 1) + 1] - 128);
+				int32_t smp32 = (audioDataU8[(i << 1) + 0] - 128) + (audioDataU8[(i << 1) + 1] - 128);
 				smp32 = 128 + (smp32 >> 1);
 				audioDataU8[i] = (uint8_t)smp32;
 			}
@@ -303,7 +255,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			sampleLength = config.maxSampleLength;
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 			smpPtr[i] = audioDataU8[i] - 128;
 
 		free(audioDataU8);
@@ -314,7 +266,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS16 = (int16_t *)malloc(sampleLength * sizeof (int16_t));
+		int16_t *audioDataS16 = (int16_t *)malloc(sampleLength * sizeof (int16_t));
 		if (audioDataS16 == NULL)
 		{
 			fclose(f);
@@ -335,7 +287,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 				audioDataS16[i] = (audioDataS16[(i << 1) + 0] + audioDataS16[(i << 1) + 1]) >> 1;;
 		}
 
@@ -362,9 +314,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		}
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(audioDataS16[i] * dAmp);
+			int32_t smp32 = (int32_t)round(audioDataS16[i] * dAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -377,7 +329,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
+		int32_t *audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
 		if (audioDataS32 == NULL)
 		{
 			fclose(f);
@@ -386,8 +338,8 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		}
 
 		// read sample data
-		audioDataU8 = (uint8_t *)audioDataS32;
-		for (i = 0; i < sampleLength; i++)
+		uint8_t *audioDataU8 = (uint8_t *)audioDataS32;
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
 			audioDataU8[0] = 0;
 			fread(&audioDataU8[1], 3, 1, f);
@@ -398,7 +350,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 			{
 				int64_t smp = ((int64_t)audioDataS32[(i << 1) + 0] + audioDataS32[(i << 1) + 1]) >> 1;
 				audioDataS32[i] = (int32_t)smp;
@@ -428,9 +380,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		}
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(audioDataS32[i] * dAmp);
+			int32_t smp32 = (int32_t)round(audioDataS32[i] * dAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -443,7 +395,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
+		int32_t *audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
 		if (audioDataS32 == NULL)
 		{
 			fclose(f);
@@ -464,7 +416,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 			{
 				int64_t smp = ((int64_t)audioDataS32[(i << 1) + 0] + audioDataS32[(i << 1) + 1]) >> 1;
 				audioDataS32[i] = (int32_t)smp;
@@ -494,9 +446,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		}
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(audioDataS32[i] * dAmp);
+			int32_t smp32 = (int32_t)round(audioDataS32[i] * dAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -509,7 +461,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataU32 = (uint32_t *)malloc(sampleLength * sizeof (uint32_t));
+		uint32_t *audioDataU32 = (uint32_t *)malloc(sampleLength * sizeof (uint32_t));
 		if (audioDataU32 == NULL)
 		{
 			fclose(f);
@@ -526,13 +478,13 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			return false;
 		}
 
-		fAudioDataFloat = (float *)audioDataU32;
+		float *fAudioDataFloat = (float *)audioDataU32;
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 				fAudioDataFloat[i] = (fAudioDataFloat[(i * 2) + 0] + fAudioDataFloat[(i * 2) + 1]) * 0.5f;
 		}
 
@@ -552,9 +504,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			fAmp = INT8_MAX / fPeak;
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)roundf(fAudioDataFloat[i] * fAmp);
+			int32_t smp32 = (int32_t)roundf(fAudioDataFloat[i] * fAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -567,7 +519,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataU32 = (uint32_t *)malloc(sampleLength * (sizeof (uint32_t) * 2));
+		uint32_t *audioDataU32 = (uint32_t *)malloc(sampleLength * (sizeof (uint32_t) * 2));
 		if (audioDataU32 == NULL)
 		{
 			fclose(f);
@@ -584,13 +536,13 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			return false;
 		}
 
-		dAudioDataDouble = (double *)audioDataU32;
+		double *dAudioDataDouble = (double *)audioDataU32;
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 				dAudioDataDouble[i] = (dAudioDataDouble[(i * 2) + 0] + dAudioDataDouble[(i * 2) + 1]) * 0.5;
 		}
 
@@ -610,9 +562,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 			dAmp = INT8_MAX / dPeak;
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(dAudioDataDouble[i] * dAmp);
+			int32_t smp32 = (int32_t)round(dAudioDataDouble[i] * dAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -639,6 +591,9 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	// ---- READ "smpl" chunk ----
 	if (smplPtr != 0 && smplLen > 52)
 	{
+		int32_t loopStart, loopEnd;
+		uint32_t loopFlags;
+
 		fseek(f, smplPtr + 28, SEEK_SET); // seek to first wanted byte
 
 		fread(&loopFlags, 4, 1, f);
@@ -677,6 +632,8 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	// ---- READ "xtra" chunk ----
 	if (xtraPtr != 0 && xtraLen >= 8)
 	{
+		int16_t tempVol;
+
 		fseek(f, xtraPtr + 4, SEEK_SET); // seek to first wanted byte
 
 		// volume (0..256)
@@ -696,7 +653,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	{
 		fseek(f, inamPtr, SEEK_SET); // seek to first wanted byte
 
-		for (i = 0; i < 21; i++)
+		for (int32_t i = 0; i < 21; i++)
 		{
 			if (i < inamLen)
 				s->text[i] = (char)fgetc(f);
@@ -716,8 +673,8 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	// copy over sample name
 	if (!wavSampleNameFound)
 	{
-		nameLen = (int32_t)strlen(entryName);
-		for (i = 0; i < 21; i++)
+		int32_t nameLen = (int32_t)strlen(entryName);
+		for (int32_t i = 0; i < 21; i++)
 			s->text[i] = (i < nameLen) ? (char)entryName[i] : '\0';
 
 		s->text[21] = '\0';
@@ -725,7 +682,7 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	}
 
 	// remove .wav from end of sample name (if present)
-	nameLen = (uint32_t)strlen(s->text);
+	int32_t nameLen = (uint32_t)strlen(s->text);
 	if (nameLen >= 4 && !_strnicmp(&s->text[nameLen-4], ".WAV", 4))
 		 memset(&s->text[nameLen-4], '\0', 4);
 
@@ -747,38 +704,20 @@ bool loadWAVSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	return true;
 }
 
-bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
+static bool loadIFFSample(UNICHAR *fileName, char *entryName)
 {
-	bool nameFound, is16Bit;
 	char tmpCharBuf[23];
-	int8_t *sampleData;
-	int16_t *ptr16;
-	int32_t filesize, smp32;
 	uint16_t sampleRate;
-	int32_t i, sampleLength, sampleLoopStart, sampleLoopLength, nameLen;
-	uint32_t sampleVolume, blockName, blockSize;
-	uint32_t vhdrPtr, vhdrLen, bodyPtr, bodyLen, namePtr;
-	FILE *f;
-	moduleSample_t *s;
+	int32_t sampleLoopStart, sampleLoopLength;
 
-	loadedSampleType = SAMPLE_IFF;
+	// zero out chunk pointers and lengths
+	uint32_t vhdrPtr = 0; uint32_t vhdrLen = 0;
+	uint32_t bodyPtr = 0; uint32_t bodyLen = 0;
+	uint32_t namePtr = 0;  int32_t nameLen = 0;
 
-	s = &song->samples[editor.currSample];
+	moduleSample_t *s = &song->samples[editor.currSample];
 
-	vhdrPtr = 0; vhdrLen = 0;
-	bodyPtr = 0; bodyLen = 0;
-	namePtr = 0; nameLen = 0;
-
-	if (forceDownSampling == -1)
-	{
-		// these two *must* be fully wiped, for outputting reasons
-		memset(editor.fileNameTmpU, 0, PATH_MAX);
-		memset(editor.entryNameTmp, 0, PATH_MAX);
-		UNICHAR_STRCPY(editor.fileNameTmpU, fileName);
-		strcpy(editor.entryNameTmp, entryName);
-	}
-
-	f = UNICHAR_FOPEN(fileName, "rb");
+	FILE *f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
@@ -786,8 +725,8 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	}
 
 	fseek(f, 0, SEEK_END);
-	filesize = ftell(f);
-	if (filesize == 0)
+	int32_t fileSize = ftell(f);
+	if (fileSize == 0)
 	{
 		displayErrorMsg("IFF IS CORRUPT !");
 		return false;
@@ -795,15 +734,17 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 
 	fseek(f, 8, SEEK_SET);
 	fread(tmpCharBuf, 1, 4, f);
-	is16Bit = !strncmp(tmpCharBuf, "16SV", 4);
+	bool is16Bit = !strncmp(tmpCharBuf, "16SV", 4);
 
-	sampleLength = 0;
-	nameFound = false;
-	sampleVolume = 65536; // max volume
+	int32_t sampleLength = 0;
+	bool nameFound = false;
+	uint32_t sampleVolume = 65536; // max volume
 
 	fseek(f, 12, SEEK_SET);
-	while (!feof(f) && ftell(f) < filesize-12)
+	while (!feof(f) && ftell(f) < fileSize-12)
 	{
+		uint32_t blockName, blockSize;
+
 		fread(&blockName, 4, 1, f); if (feof(f)) break;
 		fread(&blockSize, 4, 1, f); if (feof(f)) break;
 
@@ -848,10 +789,10 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 
 	// kludge for some really strange IFFs
 	if (bodyLen == 0)
-		bodyLen = filesize - bodyPtr;
+		bodyLen = fileSize - bodyPtr;
 
-	if (bodyPtr+bodyLen > (uint32_t)filesize)
-		bodyLen = filesize - bodyPtr;
+	if (bodyPtr+bodyLen > (uint32_t)fileSize)
+		bodyLen = fileSize - bodyPtr;
 
 	fseek(f, vhdrPtr, SEEK_SET);
 	fread(&sampleLoopStart,  4, 1, f); sampleLoopStart  = SWAP32(sampleLoopStart);
@@ -884,18 +825,11 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		return false;
 	}
 
+	bool forceDownSampling = false;
 	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
 	{
-		if (forceDownSampling == -1)
-		{
-			showDownsampleAskDialog();
-			fclose(f);
-			return true;
-		}
-	}
-	else
-	{
-		forceDownSampling = false;
+		if (askBox(ASKBOX_DOWNSAMPLE, "DOWNSAMPLE ?"))
+			forceDownSampling = true;
 	}
 
 	int32_t maxSampleLength = config.maxSampleLength;
@@ -908,7 +842,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	if (sampleLength > maxSampleLength)
 		sampleLength = maxSampleLength;
 
-	sampleData = (int8_t *)malloc(sampleLength);
+	int8_t *sampleData = (int8_t *)malloc(sampleLength);
 	if (sampleData == NULL)
 	{
 		fclose(f);
@@ -935,7 +869,7 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	if (is16Bit) // FT2-specific 16SV format (little-endian samples)
 	{
 		fread(sampleData, 1, sampleLength << 1, f);
-		ptr16 = (int16_t *)sampleData;
+		int16_t *ptr16 = (int16_t *)sampleData;
 
 		// 2x downsampling
 		if (forceDownSampling)
@@ -960,9 +894,9 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 		}
 
 		int8_t *smpPtr = &song->sampleData[s->offset];
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(ptr16[i] * dAmp);
+			int32_t smp32 = (int32_t)round(ptr16[i] * dAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -1087,16 +1021,11 @@ bool loadIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
 	return false;
 }
 
-bool loadRAWSample(UNICHAR *fileName, char *entryName)
+static bool loadRAWSample(UNICHAR *fileName, char *entryName)
 {
-	uint8_t i;
-	int32_t nameLen, fileSize;
-	FILE *f;
-	moduleSample_t *s;
+	moduleSample_t *s = &song->samples[editor.currSample];
 
-	s = &song->samples[editor.currSample];
-
-	f = UNICHAR_FOPEN(fileName, "rb");
+	FILE *f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
@@ -1104,7 +1033,7 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 	}
 
 	fseek(f, 0, SEEK_END);
-	fileSize = ftell(f);
+	int32_t fileSize = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
 	fileSize &= ~1;
@@ -1127,8 +1056,8 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 	s->loopLength = 2;
 
 	// copy over sample name
-	nameLen = (uint32_t)strlen(entryName);
-	for (i = 0; i < 21; i++)
+	int32_t nameLen = (uint32_t)strlen(entryName);
+	for (int32_t i = 0; i < 21; i++)
 		s->text[i] = (i < nameLen) ? (char)entryName[i] : '\0';
 
 	s->text[21] = '\0';
@@ -1154,55 +1083,34 @@ bool loadRAWSample(UNICHAR *fileName, char *entryName)
 
 static int32_t getAIFFRate(uint8_t *in)
 {
-	int32_t exp;
-	uint32_t lo, hi;
-	double dOut;
-
-	exp = (int32_t)(((in[0] & 0x7F) << 8) | in[1]);
-	lo  = (in[2] << 24) | (in[3] << 16) | (in[4] << 8) | in[5];
-	hi  = (in[6] << 24) | (in[7] << 16) | (in[8] << 8) | in[9];
+	int32_t exp = (int32_t)(((in[0] & 0x7F) << 8) | in[1]);
+	uint32_t lo = (in[2] << 24) | (in[3] << 16) | (in[4] << 8) | in[5];
+	uint32_t hi = (in[6] << 24) | (in[7] << 16) | (in[8] << 8) | in[9];
 
 	if (exp == 0 && lo == 0 && hi == 0)
 		return 0;
 
 	exp -= 16383;
 
-	dOut = ldexp(lo, -31 + exp) + ldexp(hi, -63 + exp);
+	double dOut = ldexp(lo, -31 + exp) + ldexp(hi, -63 + exp);
 	return (int32_t)(dOut + 0.5);
 }
 
-bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling)
+static bool loadAIFFSample(UNICHAR *fileName, char *entryName)
 {
-	bool unsigned8bit;
-	char compType[4];
-	int8_t *audioDataS8;
-	uint8_t *audioDataU8, sampleRateBytes[10];
-	int16_t *audioDataS16;
+	uint8_t sampleRateBytes[10];
 	uint16_t bitDepth, numChannels;
-	int32_t i, filesize, *audioDataS32, smp32, sampleLength, nameLen;
-	uint32_t offset, sampleRate, blockName, blockSize;
-	uint32_t commPtr, commLen, ssndPtr, ssndLen;
-	FILE *f;
-	moduleSample_t *s;
+	uint32_t offset, sampleRate;
 
-	unsigned8bit = false;
-	loadedSampleType = SAMPLE_AIFF;
+	// zero out chunk pointers and lengths
+	uint32_t commPtr = 0; uint32_t commLen = 0;
+	uint32_t ssndPtr = 0; uint32_t ssndLen = 0;
 
-	if (forceDownSampling == -1)
-	{
-		// these two *must* be fully wiped, for outputting reasons
-		memset(editor.fileNameTmpU, 0, PATH_MAX);
-		memset(editor.entryNameTmp, 0, PATH_MAX);
-		UNICHAR_STRCPY(editor.fileNameTmpU, fileName);
-		strcpy(editor.entryNameTmp, entryName);
-	}
+	bool unsigned8bit = false;
 
-	s = &song->samples[editor.currSample];
+	moduleSample_t *s = &song->samples[editor.currSample];
 
-	commPtr = 0; commLen = 0;
-	ssndPtr = 0; ssndLen = 0;
-
-	f = UNICHAR_FOPEN(fileName, "rb");
+	FILE *f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
@@ -1210,16 +1118,18 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	}
 
 	fseek(f, 0, SEEK_END);
-	filesize = ftell(f);
-	if (filesize == 0)
+	int32_t fileSize = ftell(f);
+	if (fileSize == 0)
 	{
 		displayErrorMsg("AIFF IS CORRUPT !");
 		return false;
 	}
 
 	fseek(f, 12, SEEK_SET);
-	while (!feof(f) && ftell(f) < filesize-12)
+	while (!feof(f) && ftell(f) < fileSize-12)
 	{
+		uint32_t blockName, blockSize;
+
 		fread(&blockName, 4, 1, f); if (feof(f)) break;
 		fread(&blockSize, 4, 1, f); if (feof(f)) break;
 
@@ -1257,10 +1167,10 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 
 	// kludge for some really strange AIFFs
 	if (ssndLen == 0)
-		ssndLen = filesize - ssndPtr;
+		ssndLen = fileSize - ssndPtr;
 
-	if (ssndPtr+ssndLen > (uint32_t)filesize)
-		ssndLen = filesize - ssndPtr;
+	if (ssndPtr+ssndLen > (uint32_t)fileSize)
+		ssndLen = fileSize - ssndPtr;
 
 	fseek(f, commPtr, SEEK_SET);
 	fread(&numChannels, 2, 1, f); numChannels = SWAP16(numChannels);
@@ -1287,6 +1197,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	// read compression type (if present)
 	if (commLen > 18)
 	{
+		char compType[4];
 		fread(&compType, 1, 4, f);
 		if (memcmp(compType, "NONE", 4))
 		{
@@ -1314,7 +1225,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 
 	ssndLen -= 8; // don't include offset and blockSize datas
 
-	sampleLength = ssndLen;
+	int32_t sampleLength = ssndLen;
 	if (sampleLength == 0)
 	{
 		fclose(f);
@@ -1322,18 +1233,11 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		return false;
 	}
 
+	bool forceDownSampling = false;
 	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
 	{
-		if (forceDownSampling == -1)
-		{
-			showDownsampleAskDialog();
-			fclose(f);
-			return true;
-		}
-	}
-	else
-	{
-		forceDownSampling = false;
+		if (askBox(ASKBOX_DOWNSAMPLE, "DOWNSAMPLE ?"))
+			forceDownSampling = true;
 	}
 
 	int8_t *smpPtr = &song->sampleData[editor.currSample * config.maxSampleLength];
@@ -1343,7 +1247,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS8 = (int8_t *)malloc(sampleLength * sizeof (int8_t));
+		int8_t *audioDataS8 = (int8_t *)malloc(sampleLength * sizeof (int8_t));
 		if (audioDataS8 == NULL)
 		{
 			fclose(f);
@@ -1362,7 +1266,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 
 		if (unsigned8bit)
 		{
-			for (i = 0; i < sampleLength; i++)
+			for (int32_t i = 0; i < sampleLength; i++)
 				audioDataS8[i] ^= 0x80;
 		}
 
@@ -1370,7 +1274,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 				audioDataS8[i] = (audioDataS8[(i * 2) + 0] + audioDataS8[(i * 2) + 1]) >> 1;;
 		}
 
@@ -1385,7 +1289,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 			sampleLength = config.maxSampleLength;
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 			smpPtr[i] = audioDataS8[i];
 
 		free(audioDataS8);
@@ -1396,7 +1300,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS16 = (int16_t *)malloc(sampleLength * sizeof (int16_t));
+		int16_t *audioDataS16 = (int16_t *)malloc(sampleLength * sizeof (int16_t));
 		if (audioDataS16 == NULL)
 		{
 			fclose(f);
@@ -1414,14 +1318,14 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		}
 
 		// fix endianness
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 			audioDataS16[i] = SWAP16(audioDataS16[i]);
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 				audioDataS16[i] = (audioDataS16[(i << 1) + 0] + audioDataS16[(i << 1) + 1]) >> 1;
 		}
 
@@ -1448,9 +1352,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		}
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(audioDataS16[i] * dAmp);
+			int32_t smp32 = (int32_t)round(audioDataS16[i] * dAmp);
 			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpPtr[i] = (int8_t)smp32;
 		}
@@ -1463,7 +1367,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
+		int32_t *audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
 		if (audioDataS32 == NULL)
 		{
 			fclose(f);
@@ -1481,8 +1385,8 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		}
 
 		// convert to 32-bit
-		audioDataU8 = (uint8_t *)audioDataS32 + sampleLength;
-		for (i = 0; i < sampleLength; i++)
+		uint8_t *audioDataU8 = (uint8_t *)audioDataS32 + sampleLength;
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
 			audioDataS32[i] = (audioDataU8[0] << 24) | (audioDataU8[1] << 16) | (audioDataU8[2] << 8);
 			audioDataU8 += 3;
@@ -1492,7 +1396,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 			{
 				int64_t smp = ((int64_t)audioDataS32[(i << 1) + 0] + audioDataS32[(i << 1) + 1]) >> 1;
 				audioDataS32[i] = (int32_t)smp;
@@ -1522,9 +1426,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		}
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(audioDataS32[i] * dAmp);
+			int32_t smp32 = (int32_t)round(audioDataS32[i] * dAmp);
 			smpPtr[i] = (int8_t)smp32;
 		}
 
@@ -1536,7 +1440,7 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		if (sampleLength > config.maxSampleLength*4)
 			sampleLength = config.maxSampleLength*4;
 
-		audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
+		int32_t *audioDataS32 = (int32_t *)malloc(sampleLength * sizeof (int32_t));
 		if (audioDataS32 == NULL)
 		{
 			fclose(f);
@@ -1554,14 +1458,14 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		}
 
 		// fix endianness
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 			audioDataS32[i] = SWAP32(audioDataS32[i]);
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
 			{
 				int64_t smp = ((int64_t)audioDataS32[(i << 1) + 0] + audioDataS32[(i << 1) + 1]) >> 1;
 				audioDataS32[i] = (int32_t)smp;
@@ -1591,9 +1495,9 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 		}
 
 		turnOffVoices();
-		for (i = 0; i < sampleLength; i++)
+		for (int32_t i = 0; i < sampleLength; i++)
 		{
-			smp32 = (int32_t)round(audioDataS32[i] * dAmp);
+			int32_t smp32 = (int32_t)round(audioDataS32[i] * dAmp);
 			smpPtr[i] = (int8_t)smp32;
 		}
 
@@ -1619,8 +1523,8 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 	fclose(f);
 
 	// copy over sample name
-	nameLen = (int32_t)strlen(entryName);
-	for (i = 0; i < 21; i++)
+	int32_t nameLen = (int32_t)strlen(entryName);
+	for (int32_t i = 0; i < 21; i++)
 		s->text[i] = (i < nameLen) ? (char)entryName[i] : '\0';
 
 	s->text[21] = '\0';
@@ -1651,16 +1555,13 @@ bool loadAIFFSample(UNICHAR *fileName, char *entryName, int8_t forceDownSampling
 
 bool loadSample(UNICHAR *fileName, char *entryName)
 {
-	uint32_t fileSize, ID;
-	FILE *f;
-
 	if (editor.sampleZero)
 	{
 		statusNotSampleZero();
 		return false;
 	}
 
-	f = UNICHAR_FOPEN(fileName, "rb");
+	FILE *f = UNICHAR_FOPEN(fileName, "rb");
 	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
@@ -1668,12 +1569,13 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 	}
 
 	fseek(f, 0, SEEK_END);
-	fileSize = ftell(f);
+	uint32_t fileSize = ftell(f);
 	fseek(f, 0, SEEK_SET);
 
 	// first, check heades before we eventually load as RAW
 	if (fileSize > 16)
 	{
+		uint32_t ID;
 		fread(&ID, 4, 1, f);
 
 		/* Reject FLAC files, since they are not supported.
@@ -1695,9 +1597,9 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 			if (ID == 0x45564157) // "WAVE"
 			{
 				fclose(f);
-				return loadWAVSample(fileName, entryName, -1);
+				return loadWAVSample(fileName, entryName);
 			}
-		}	
+		}
 		else if (ID == 0x4D524F46) // "FORM"
 		{
 			fseek(f, 4, SEEK_CUR);
@@ -1707,14 +1609,14 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 			if (ID == 0x58565338 || ID == 0x56533631) // "8SVX" (normal) and "16SV" (FT2 sample)
 			{
 				fclose(f);
-				return loadIFFSample(fileName, entryName, -1);
+				return loadIFFSample(fileName, entryName);
 			}
 
 			// check if it's an AIFF sample
 			else if (ID == 0x46464941) // "AIFF"
 			{
 				fclose(f);
-				return loadAIFFSample(fileName, entryName, -1);
+				return loadAIFFSample(fileName, entryName);
 			}
 
 			else if (ID == 0x43464941) // "AIFC" (compressed AIFF)

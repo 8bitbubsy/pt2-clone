@@ -1,5 +1,6 @@
 #pragma once
 
+void mixChordSample(void);
 void recalcChordLength(void);
 void resetChord(void);
 void undoChord(void);
@@ -15,4 +16,3 @@ void selectChordNote1(void);
 void selectChordNote2(void);
 void selectChordNote3(void);
 void selectChordNote4(void);
-void makeChord(void);

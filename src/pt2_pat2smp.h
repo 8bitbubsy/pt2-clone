@@ -1,11 +1,21 @@
 #pragma once
 
-#include "pt2_header.h"
+#include <stdint.h>
 
-#define PAT2SMP_HI_PERIOD 124 /* A-3 finetune +4, 28603.99Hz */
-#define PAT2SMP_LO_PERIOD 170 /* E-3 finetune  0, 20864.08Hz */
-
-#define PAT2SMP_HI_FREQ ((double)PAULA_PAL_CLK / PAT2SMP_HI_PERIOD)
-#define PAT2SMP_LO_FREQ ((double)PAULA_PAL_CLK / PAT2SMP_LO_PERIOD)
-
-void doPat2Smp(void);
+void pat2SmpDrawNote(void);
+void pat2SmpDrawFinetune(void);
+void pat2SmpDrawFrequency(void);
+void pat2SmpDrawFinetune(void);
+void pat2SmpDrawStartRow(void);
+void pat2SmpDrawRows(void);
+void pat2SmpCalculateFreq(void);
+void pat2SmpNoteUp(void);
+void pat2SmpNoteDown(void);
+void pat2SmpSetFinetune(uint8_t finetune);
+void pat2SmpFinetuneUp(void);
+void pat2SmpFinetuneDown(void);
+void pat2SmpStartRowUp(void);
+void pat2SmpStartRowDown(void);
+void pat2SmpRowsUp(void);
+void pat2SmpRowsDown(void);
+void pat2SmpRender(void);

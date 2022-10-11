@@ -1,9 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_header.h"
 #include "pt2_sync.h"
 #include "pt2_scopes.h"
-#include "pt2_audio.h"
 #include "pt2_visuals.h"
 #include "pt2_tables.h"
 
@@ -109,7 +107,7 @@ static uint64_t getChQueueTimestamp(void)
 
 void updateChannelSyncBuffer(void)
 {
-	uint8_t updateFlags[AMIGA_VOICES];
+	uint8_t updateFlags[PAULA_VOICES];
 
 	chSyncEntry = NULL;
 
@@ -129,7 +127,7 @@ void updateChannelSyncBuffer(void)
 		if (chSyncEntry == NULL)
 			break;
 
-		for (int32_t i = 0; i < AMIGA_VOICES; i++)
+		for (int32_t i = 0; i < PAULA_VOICES; i++)
 			updateFlags[i] |= chSyncEntry->channels[i].flags; // yes, OR the status
 
 		if (!chQueuePop())
@@ -147,7 +145,7 @@ void updateChannelSyncBuffer(void)
 	{
 		scope_t *s = scope;
 		syncedChannel_t *c = chSyncEntry->channels;
-		for (int32_t ch = 0; ch < AMIGA_VOICES; ch++, s++, c++)
+		for (int32_t ch = 0; ch < PAULA_VOICES; ch++, s++, c++)
 		{
 			const uint8_t flags = updateFlags[ch];
 			if (flags == 0)
@@ -159,21 +157,21 @@ void updateChannelSyncBuffer(void)
 			if (flags & SET_SCOPE_PERIOD)
 				scopeSetPeriod(ch, c->period);
 
-			if (flags & TRIGGER_SCOPE)
-			{
-				s->newData = c->triggerData;
-				s->newLength = c->triggerLength;
-				scopeTrigger(ch);
-			}
-
 			if (flags & SET_SCOPE_DATA)
 				scope[ch].newData = c->newData;
 
 			if (flags & SET_SCOPE_LENGTH)
 				scope[ch].newLength = c->newLength;
 
-			if (flags & STOP_SCOPE)
+			if (flags & STOP_SCOPE) // this must be handled *before* TRIGGER_SCOPE
 				scope[ch].active = false;
+
+			if (flags & TRIGGER_SCOPE)
+			{
+				s->newData = c->triggerData;
+				s->newLength = c->triggerLength;
+				scopeTrigger(ch);
+			}
 
 			if (flags & UPDATE_ANALYZER)
 				updateSpectrumAnalyzer(c->analyzerVolume, c ->analyzerPeriod);

@@ -15,21 +15,17 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_header.h"
 #include "pt2_textout.h"
-#include "pt2_mouse.h"
-#include "pt2_structs.h"
-#include "pt2_sampler.h" // fixSampleBeep() / sampleLine()
+#include "pt2_sampler.h"
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"
 #include "pt2_bmp.h"
-#include "pt2_unicode.h"
 #include "pt2_audio.h"
 #include "pt2_tables.h"
 #include "pt2_config.h"
 #include "pt2_sampling.h"
 #include "pt2_math.h" // PT2_PI
-#include "pt2_hpc.h"
+#include "pt2_replayer.h"
 
 enum
 {
@@ -542,7 +538,7 @@ static uint8_t getDispBuffPeak(const int16_t *smpData, int32_t smpNum)
 
 void writeSampleMonitorWaveform(void) // called every frame
 {
-	if (!ui.samplingBoxShown || ui.askScreenShown)
+	if (!ui.samplingBoxShown || ui.askBoxShown)
 		return;
 
 	if (samplingEnded)

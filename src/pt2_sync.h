@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_header.h" // AMIGA_VOICES
+#include "pt2_paula.h"
 
 enum // flags
 {
@@ -32,7 +32,7 @@ typedef struct syncedChannel_t
 
 typedef struct chSyncData_t
 {
-	syncedChannel_t channels[AMIGA_VOICES];
+	syncedChannel_t channels[PAULA_VOICES];
 	uint64_t timestamp;
 } chSyncData_t;
 

@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "pt2_helpers.h"
 
 typedef struct XPKFILEHEADER
@@ -46,10 +47,9 @@ static inline uint8_t SrcRead(size_t index, XPK_BufferBounds *bufs)
 
 static inline int32_t bfextu(size_t p, int32_t bo, int32_t bc, XPK_BufferBounds *bufs)
 {
-	uint32_t r;
-
 	p += (uint32_t)bo >> 3;
-	r = SrcRead(p, bufs); p++;
+
+	uint32_t r = SrcRead(p, bufs); p++;
 	r <<= 8;
 	r |= SrcRead(p, bufs); p++;
 	r <<= 8;
@@ -63,10 +63,9 @@ static inline int32_t bfextu(size_t p, int32_t bo, int32_t bc, XPK_BufferBounds 
 
 static inline int32_t bfexts(size_t p, int32_t bo, int32_t bc, XPK_BufferBounds *bufs)
 {
-	uint32_t r;
-
 	p += (uint32_t)bo >> 3;
-	r = SrcRead(p, bufs); p++;
+
+	uint32_t r = SrcRead(p, bufs); p++;
 	r <<= 8;
 	r |= SrcRead(p, bufs); p++;
 	r <<= 8;
@@ -91,9 +90,8 @@ static bool XPK_DoUnpack(const uint8_t *src_, uint32_t srcLen, int32_t len, uint
 	if (len <= 0)
 		return false;
 
-	int32_t d0,d1,d2,d3,d4,d5,d6,a2,a5;
-	int32_t cp, cup1, type;
-	size_t c, src, phist = 0;
+	int32_t d0, d1, d2, d3, d4, d5, d6, a2, a5, cup1;
+	size_t phist = 0;
 
 	const uint32_t unpackedLen = MIN((uint32_t)len, MIN(srcLen, UINT32_MAX / 20) * 20);
 
@@ -108,12 +106,12 @@ static bool XPK_DoUnpack(const uint8_t *src_, uint32_t srcLen, int32_t len, uint
 	bufs.pSrcBeg = src_;
 	bufs.SrcSize = srcLen;
 
-	src = 0;
-	c = src;
+	size_t src = 0;
+	size_t c = src;
 	while (len > 0)
 	{
-		type = SrcRead(c+0, &bufs);
-		cp = (SrcRead(c+4, &bufs)<<8) | (SrcRead(c+5, &bufs)); // packed
+		int32_t type = SrcRead(c+0, &bufs);
+		int32_t cp = (SrcRead(c+4, &bufs)<<8) | (SrcRead(c+5, &bufs)); // packed
 		cup1 = (SrcRead(c+6, &bufs)<<8) | (SrcRead(c+7, &bufs)); // unpacked
 
 		c += 8;

@@ -6,18 +6,16 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_header.h"
 #include "pt2_config.h"
-#include "pt2_mouse.h"
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
-#include "pt2_structs.h"
 #include "pt2_helpers.h"
 #include "pt2_tables.h"
 #include "pt2_sampler.h"
 #include "pt2_audio.h"
 #include "pt2_blep.h"
 #include "pt2_downsample2x.h"
+#include "pt2_replayer.h"
 
 #define MAX_NOTES 4
 
@@ -69,14 +67,10 @@ static void setupMixVoice(sampleMixer_t *v, int32_t length, double dDelta)
 // this has 2x oversampling for BLEP to function properly with all pitches
 void mixChordSample(void)
 {
-	bool smpLoopFlag;
 	char smpText[22+1];
-	int8_t *smpData, sameNotes, smpVolume;
-	uint8_t smpFinetune, finetune;
-	int32_t i, smpLoopStart, smpLoopLength, smpEnd;
+	int32_t i;
 	sampleMixer_t mixCh[MAX_NOTES];
-	moduleSample_t *s;
-	blep_t blep[MAX_NOTES];
+	blep_t bleps[MAX_NOTES];
 
 	if (editor.sampleZero)
 	{
@@ -90,7 +84,7 @@ void mixChordSample(void)
 		return;
 	}
 
-	s = &song->samples[editor.currSample];
+	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
 	{
 		statusSampleIsEmpty();
@@ -98,7 +92,7 @@ void mixChordSample(void)
 	}
 
 	// check if all notes are the same (illegal)
-	sameNotes = true;
+	bool sameNotes = true;
 	if (editor.note2 != 36 && editor.note2 != editor.note1) sameNotes = false; else editor.note2 = 36;
 	if (editor.note3 != 36 && editor.note3 != editor.note1) sameNotes = false; else editor.note3 = 36;
 	if (editor.note4 != 36 && editor.note4 != editor.note1) sameNotes = false; else editor.note4 = 36;
@@ -118,11 +112,11 @@ void mixChordSample(void)
 	ui.updateChordNote4Text = true;
 
 	// setup some variables
-	smpLoopStart = s->loopStart;
-	smpLoopLength = s->loopLength;
-	smpLoopFlag = (smpLoopStart + smpLoopLength) > 2;
-	smpEnd = smpLoopFlag ? (smpLoopStart + smpLoopLength) : s->length;
-	smpData = &song->sampleData[s->offset];
+	int32_t smpLoopStart = s->loopStart;
+	int32_t smpLoopLength = s->loopLength;
+	bool smpLoopFlag = (smpLoopStart + smpLoopLength) > 2;
+	int32_t smpEnd = smpLoopFlag ? (smpLoopStart + smpLoopLength) : s->length;
+	int8_t *smpData = &song->sampleData[s->offset];
 
 	if (editor.newOldFlag == 0)
 	{
@@ -140,8 +134,8 @@ void mixChordSample(void)
 			return;
 		}
 
-		smpFinetune = s->fineTune;
-		smpVolume = s->volume;
+		uint8_t smpFinetune = s->fineTune;
+		int8_t smpVolume = s->volume;
 		memcpy(smpText, s->text, sizeof (smpText));
 
 		s = &song->samples[i];
@@ -169,7 +163,7 @@ void mixChordSample(void)
 
 	// setup mixing lengths and deltas
 
-	finetune = s->fineTune & 0xF;
+	uint8_t finetune = s->fineTune & 0xF;
 	const double dOutputHz = ((double)PAULA_PAL_CLK / periodTable[24]) * 2.0;
 
 	const double dClk = PAULA_PAL_CLK / dOutputHz;
@@ -179,11 +173,11 @@ void mixChordSample(void)
 	if (editor.note4 < 36) setupMixVoice(&mixCh[3], smpEnd, dClk / periodTable[(finetune * 37) + editor.note4]);
 
 	// start mixing
-	memset(blep, 0, sizeof (blep));
+	memset(bleps, 0, sizeof (bleps));
 	turnOffVoices();
 
 	sampleMixer_t *v = mixCh;
-	blep_t *bSmp = blep;
+	blep_t *bSmp = bleps;
 
 	for (i = 0; i < MAX_NOTES; i++, v++, bSmp++)
 	{
@@ -212,7 +206,8 @@ void mixChordSample(void)
 				v->dPhase -= 1.0;
 				v->dLastPhase = v->dPhase;
 
-				if (++v->pos >= smpEnd)
+				v->pos++;
+				if (v->pos >= smpEnd)
 				{
 					if (smpLoopFlag)
 					{
@@ -222,7 +217,10 @@ void mixChordSample(void)
 						}
 						while (v->pos >= smpEnd);
 					}
-					else break; // we should insert an ending blep here, but I lost that code ages ago...
+					else
+					{
+						break;
+					}
 				}
 			}
 		}
@@ -270,11 +268,9 @@ static void backupChord(void)
 
 void recalcChordLength(void)
 {
-	int8_t note;
-	int32_t len;
-	moduleSample_t *s;
+	int32_t note;
 
-	s = &song->samples[editor.currSample];
+	moduleSample_t *s = &song->samples[editor.currSample];
 
 	if (editor.chordLengthMin)
 	{
@@ -294,7 +290,7 @@ void recalcChordLength(void)
 	}
 	else
 	{
-		len = (s->length * periodTable[(37 * s->fineTune) + note]) / periodTable[24];
+		int32_t len = (s->length * periodTable[(37 * s->fineTune) + note]) / periodTable[24];
 		if (len > config.maxSampleLength)
 			len = config.maxSampleLength;
 
@@ -583,13 +579,4 @@ void selectChordNote4(void)
 	}
 
 	ui.updateChordNote4Text = true;
-}
-
-void makeChord(void)
-{
-	ui.askScreenShown = true;
-	ui.askScreenType = ASK_MAKE_CHORD;
-	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-	setStatusMessage("MAKE CHORD?", NO_CARRY);
-	renderAskDialog();
 }

@@ -1,18 +1,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-#include "pt2_header.h"
-#include "pt2_helpers.h"
 #include "pt2_tables.h"
-#include "pt2_visuals.h"
 #include "pt2_structs.h"
 #include "pt2_bmp.h"
 
 void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 {
-	const uint8_t *srcPtr;
-	uint32_t *dstPtr;
-
 	if (ch == '\0' || ch == ' ')
 		return;
 
@@ -20,8 +14,8 @@ void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
 		h++;
 	
-	srcPtr = &fontBMP[(ch & 0x7F) << 3];
-	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	const uint8_t *srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	uint32_t *dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
 	for (int32_t y = 0; y < h; y++)
 	{
@@ -38,9 +32,6 @@ void charOut(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 
 void charOut2(uint32_t xPos, uint32_t yPos, char ch) // for static GUI text
 {
-	const uint8_t *srcPtr;
-	uint32_t *dstPtr;
-
 	if (ch == '\0' || ch == ' ')
 		return;
 
@@ -48,8 +39,8 @@ void charOut2(uint32_t xPos, uint32_t yPos, char ch) // for static GUI text
 	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
 		h++;
 	
-	srcPtr = &fontBMP[(ch & 0x7F) << 3];
-	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	const uint8_t *srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	uint32_t *dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
 	const uint32_t fgColor = video.palette[PAL_BORDER];
 	const uint32_t bgColor = video.palette[PAL_GENBKG2];
@@ -72,8 +63,7 @@ void charOut2(uint32_t xPos, uint32_t yPos, char ch) // for static GUI text
 
 void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t bgColor)
 {
-	const uint8_t *srcPtr;
-	uint32_t *dstPtr, colors[2];
+	uint32_t colors[2];
 
 	if (ch == '\0')
 		return;
@@ -82,8 +72,8 @@ void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t
 	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
 		h++;
 
-	srcPtr = &fontBMP[(ch & 0x7F) << 3];
-	dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	const uint8_t *srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	uint32_t *dstPtr = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
 
 	colors[0] = bgColor;
 	colors[1] = fgColor;
@@ -100,9 +90,6 @@ void charOutBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t
 
 void charOutBig(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 {
-	const uint8_t *srcPtr;
-	uint32_t *dstPtr1, *dstPtr2;
-
 	if (ch == '\0' || ch == ' ')
 		return;
 
@@ -110,9 +97,9 @@ void charOutBig(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 	if (ch == 5 || ch == 6) // arrow up/down has 1 more scanline
 		h++;
 
-	srcPtr = &fontBMP[(ch & 0x7F) << 3];
-	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
-	dstPtr2 = dstPtr1 + SCREEN_W;
+	const uint8_t *srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	uint32_t *dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	uint32_t *dstPtr2 = dstPtr1 + SCREEN_W;
 
 	for (int32_t y = 0; y < h; y++)
 	{
@@ -133,15 +120,14 @@ void charOutBig(uint32_t xPos, uint32_t yPos, char ch, uint32_t color)
 
 void charOutBigBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint32_t bgColor)
 {
-	const uint8_t *srcPtr;
-	uint32_t *dstPtr1, *dstPtr2, colors[2];
+	uint32_t colors[2];
 
 	if (ch == '\0')
 		return;
 
-	srcPtr = &fontBMP[(ch & 0x7F) << 3];
-	dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
-	dstPtr2 = dstPtr1 + SCREEN_W;
+	const uint8_t *srcPtr = &fontBMP[(ch & 0x7F) << 3];
+	uint32_t *dstPtr1 = &video.frameBuffer[(yPos * SCREEN_W) + xPos];
+	uint32_t *dstPtr2 = dstPtr1 + SCREEN_W;
 
 	colors[0] = bgColor;
 	colors[1] = fgColor;
@@ -351,7 +337,6 @@ void printFiveDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColo
 void printSixDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor)
 {
 	char numberText[7];
-	uint8_t i;
 
 	if (value == 0)
 	{
@@ -370,7 +355,7 @@ void printSixDecimals(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor
 		numberText[1] = '0' + (value % 10); value /= 10;
 		numberText[0] = '0' + (value % 10);
 
-		i = 0;
+		int32_t i = 0;
 		while (numberText[i] == '0')
 			numberText[i++] = ' ';
 
@@ -461,7 +446,7 @@ void printFiveHex(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor)
 	{
 		value &= 0xFFFFF;
 
-		charOut(x + (FONT_CHAR_W * 0), y, hexTable[value  >> 16], fontColor);
+		charOut(x + (FONT_CHAR_W * 0), y, hexTable[value >> 16], fontColor);
 		charOut(x + (FONT_CHAR_W * 1), y, hexTable[(value & (15 << 12)) >> 12], fontColor);
 		charOut(x + (FONT_CHAR_W * 2), y, hexTable[(value & (15 << 8)) >> 8], fontColor);
 		charOut(x + (FONT_CHAR_W * 3), y, hexTable[(value & (15 << 4)) >> 4], fontColor);
@@ -540,7 +525,6 @@ void printFourDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontCo
 void printFiveDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor)
 {
 	char numberText[6];
-	uint8_t i;
 
 	if (value == 0)
 	{
@@ -558,7 +542,7 @@ void printFiveDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontCo
 		numberText[1] = '0' + (value % 10); value /= 10;
 		numberText[0] = '0' + (value % 10);
 
-		i = 0;
+		int32_t i = 0;
 		while (numberText[i] == '0')
 			numberText[i++] = ' ';
 
@@ -570,7 +554,6 @@ void printFiveDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontCo
 void printSixDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontColor, uint32_t backColor)
 {
 	char numberText[7];
-	uint8_t i;
 
 	if (value == 0)
 	{
@@ -589,7 +572,7 @@ void printSixDecimalsBg(uint32_t x, uint32_t y, uint32_t value, uint32_t fontCol
 		numberText[1] = '0' + (value % 10); value /= 10;
 		numberText[0] = '0' + (value % 10);
 
-		i = 0;
+		int32_t i = 0;
 		while (numberText[i] == '0')
 			numberText[i++] = ' ';
 

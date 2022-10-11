@@ -5,28 +5,23 @@
 #include <crtdbg.h>
 #endif
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h>
-#include "pt2_header.h"
 #include "pt2_audio.h"
 #include "pt2_helpers.h"
 #include "pt2_tables.h"
-#include "pt2_module_loader.h"
 #include "pt2_config.h"
-#include "pt2_sampler.h"
 #include "pt2_visuals.h"
-#include "pt2_textout.h"
 #include "pt2_scopes.h"
 #include "pt2_sync.h"
+#include "pt2_amigafilters.h"
 
 static bool posJumpAssert, pBreakFlag, modRenderDone;
 static bool doStopSong; // from F00 (Set Speed)
 static int8_t pBreakPosition, oldRow, modPattern;
 static uint8_t pattDelTime, lowMask = 0xFF, pattDelTime2;
 static int16_t modOrder, oldPattern, oldOrder;
+static uint16_t DMACONtemp;
 static int32_t modBPM, oldBPM, oldSpeed, ciaSetBPM;
 
 static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
@@ -34,6 +29,72 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 	0x00, 0x05, 0x06, 0x07, 0x08, 0x0A, 0x0B, 0x0D,
 	0x10, 0x13, 0x16, 0x1A, 0x20, 0x2B, 0x40, 0x80
 };
+
+double ciaBpm2Hz(int32_t bpm)
+{
+	if (bpm == 0)
+		return 0.0;
+
+	const uint32_t ciaPeriod = 1773447 / bpm; // yes, PT truncates here
+	return (double)CIA_PAL_CLK / (ciaPeriod+1); // +1, CIA triggers on underflow
+}
+
+void updatePaulaLoops(void) // used after manipulating sample loop points while Paula is live
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
+	{
+		const moduleChannel_t *ch = &song->channels[i];
+		if (ch->n_samplenum == editor.currSample) // selected sample matches channel's sample?
+		{
+			const moduleSample_t *s = &song->samples[editor.currSample];
+
+			paulaSetData(i, ch->n_start + s->loopStart);
+			paulaSetLength(i, (uint16_t)(s->loopLength >> 1));
+		}
+	}
+
+	if (audioWasntLocked)
+		unlockAudio();
+}
+
+void turnOffVoices(void)
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	paulaSetDMACON(0x000F); // turn off all voice DMAs
+
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
+		paulaSetVolume(i, 0);
+
+	// reset dithering/filter states (so that every playback session is identical)
+	resetAmigaFilterStates();
+	resetAudioDithering();
+
+	if (audioWasntLocked)
+		unlockAudio();
+
+	editor.tuningToneFlag = false;
+}
+
+void initializeModuleChannels(module_t *s)
+{
+	assert(s != NULL);
+
+	memset(s->channels, 0, sizeof (s->channels));
+
+	moduleChannel_t *ch = s->channels;
+	for (uint8_t i = 0; i < PAULA_VOICES; i++, ch++)
+	{
+		ch->n_chanindex = i;
+		ch->n_dmabit = 1 << i;
+	}
+}
 
 void setReplayerPosToTrackerPos(void)
 {
@@ -50,7 +111,6 @@ int8_t *allocMemForAllSamples(void)
 {
 	// allocate memory for all sample data blocks (+ 2 extra, for quirk + safety)
 	const size_t allocLen = (MOD_SAMPLES + 2) * config.maxSampleLength;
-
 	return (int8_t *)calloc(allocLen, 1);
 }
 
@@ -64,11 +124,7 @@ void doStopIt(bool resetPlayMode)
 {
 	editor.songPlaying = false;
 
-	resetCachedMixerPeriod();
-	resetCachedScopePeriod();
-
-	pattDelTime = 0;
-	pattDelTime2 = 0;
+	pattDelTime = pattDelTime2 = 0;
 
 	if (resetPlayMode)
 	{
@@ -80,13 +136,13 @@ void doStopIt(bool resetPlayMode)
 
 	if (song != NULL)
 	{
-		moduleChannel_t *c = song->channels;
-		for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
+		moduleChannel_t *ch = song->channels;
+		for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 		{
-			c->n_wavecontrol = 0;
-			c->n_glissfunk = 0;
-			c->n_finetune = 0;
-			c->n_loopcount = 0;
+			ch->n_wavecontrol = 0;
+			ch->n_glissfunk = 0;
+			ch->n_finetune = 0;
+			ch->n_loopcount = 0;
 		}
 	}
 
@@ -112,12 +168,10 @@ void storeTempVariables(void) // this one is accessed in other files, so non-sta
 
 static void setVUMeterHeight(moduleChannel_t *ch)
 {
-	uint8_t vol;
-
 	if (editor.muted[ch->n_chanindex])
 		return;
 
-	vol = ch->n_volume;
+	uint8_t vol = ch->n_volume;
 	if ((ch->n_cmd & 0xF00) == 0xC00) // handle Cxx effect
 		vol = ch->n_cmd & 0xFF;
 
@@ -173,8 +227,6 @@ static void setFineTune(moduleChannel_t *ch)
 
 static void jumpLoop(moduleChannel_t *ch)
 {
-	uint8_t tempParam;
-
 	if (song->tick != 0)
 		return;
 
@@ -193,9 +245,9 @@ static void jumpLoop(moduleChannel_t *ch)
 		pBreakFlag = true;
 
 		// stuff used for MOD2WAV to determine if the song has reached its end
-		if (editor.isWAVRendering)
+		if (editor.mod2WavOngoing)
 		{
-			for (tempParam = pBreakPosition; tempParam <= song->row; tempParam++)
+			for (int32_t tempParam = pBreakPosition; tempParam <= song->row; tempParam++)
 				editor.rowVisitTable[(modOrder * MOD_ROWS) + tempParam] = false;
 		}
 	}
@@ -238,14 +290,19 @@ static void karplusStrong(moduleChannel_t *ch)
 
 static void doRetrg(moduleChannel_t *ch)
 {
+	paulaSetDMACON(ch->n_dmabit); // voice DMA off
+
 	paulaSetData(ch->n_chanindex, ch->n_start); // n_start is increased on 9xx
 	paulaSetLength(ch->n_chanindex, ch->n_length);
 	paulaSetPeriod(ch->n_chanindex, ch->n_period);
-	paulaStartDMA(ch->n_chanindex);
+
+	paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
 
 	// these take effect after the current DMA cycle is done
 	paulaSetData(ch->n_chanindex, ch->n_loopstart);
 	paulaSetLength(ch->n_chanindex, ch->n_replen);
+
+	// set visuals
 
 	ch->syncAnalyzerVolume = ch->n_volume;
 	ch->syncAnalyzerPeriod = ch->n_period;
@@ -376,13 +433,12 @@ static void setSpeed(moduleChannel_t *ch)
 
 static void arpeggio(moduleChannel_t *ch)
 {
-	uint8_t arpTick, arpNote;
-	const int16_t *periods;
+	int32_t arpNote;
 
-	arpTick = song->tick % 3; // 0, 1, 2
+	int32_t arpTick = song->tick % 3; // 0, 1, 2
 	if (arpTick == 1)
 	{
-		arpNote = (uint8_t)(ch->n_cmd >> 4);
+		arpNote = ch->n_cmd >> 4;
 	}
 	else if (arpTick == 2)
 	{
@@ -399,7 +455,7 @@ static void arpeggio(moduleChannel_t *ch)
 	** the correct overflow values to allow this to safely happen
 	** and sound correct at the same time.
 	*/
-	periods = &periodTable[ch->n_finetune * 37];
+	const int16_t *periods = &periodTable[ch->n_finetune * 37];
 	for (int32_t baseNote = 0; baseNote < 37; baseNote++)
 	{
 		if (ch->n_period >= periods[baseNote])
@@ -437,7 +493,16 @@ static void filterOnOff(moduleChannel_t *ch)
 	if (song->tick == 0) // added this (just pointless to call this during all ticks!)
 	{
 		const bool filterOn = (ch->n_cmd & 1) ^ 1;
-		setLEDFilter(filterOn, false);
+		if (filterOn)
+		{
+			editor.useLEDFilter = true;
+			setLEDFilter(true);
+		}
+		else
+		{
+			editor.useLEDFilter = false;
+			setLEDFilter(false);
+		}
 	}
 }
 
@@ -461,14 +526,10 @@ static void finePortaDown(moduleChannel_t *ch)
 
 static void setTonePorta(moduleChannel_t *ch)
 {
-	uint8_t i;
-	const int16_t *portaPointer;
-	uint16_t note;
+	uint16_t note = ch->n_note & 0xFFF;
+	const int16_t *portaPointer = &periodTable[ch->n_finetune * 37];
 
-	note = ch->n_note & 0xFFF;
-	portaPointer = &periodTable[ch->n_finetune * 37];
-
-	i = 0;
+	int32_t i = 0;
 	while (true)
 	{
 		// portaPointer[36] = 0, so i=36 is safe
@@ -494,9 +555,6 @@ static void setTonePorta(moduleChannel_t *ch)
 
 static void tonePortNoChange(moduleChannel_t *ch)
 {
-	uint8_t i;
-	const int16_t *portaPointer;
-
 	if (ch->n_wantedperiod <= 0)
 		return;
 
@@ -525,9 +583,9 @@ static void tonePortNoChange(moduleChannel_t *ch)
 	}
 	else
 	{
-		portaPointer = &periodTable[ch->n_finetune * 37];
+		const int16_t *portaPointer = &periodTable[ch->n_finetune * 37];
 
-		i = 0;
+		int32_t i = 0;
 		while (true)
 		{
 			// portaPointer[36] = 0, so i=36 is safe
@@ -805,6 +863,8 @@ static void setPeriod(moduleChannel_t *ch)
 
 	if ((ch->n_cmd & 0xFF0) != 0xED0) // no note delay
 	{
+		paulaSetDMACON(ch->n_dmabit); // voice DMA off (turned on in setDMA() later)
+
 		if ((ch->n_wavecontrol & 0x04) == 0) ch->n_vibratopos = 0;
 		if ((ch->n_wavecontrol & 0x40) == 0) ch->n_tremolopos = 0;
 
@@ -820,20 +880,7 @@ static void setPeriod(moduleChannel_t *ch)
 
 		paulaSetPeriod(ch->n_chanindex, ch->n_period);
 
-		if (!editor.muted[ch->n_chanindex])
-		{
-			paulaStartDMA(ch->n_chanindex);
-
-			ch->syncAnalyzerVolume = ch->n_volume;
-			ch->syncAnalyzerPeriod = ch->n_period;
-			ch->syncFlags |= UPDATE_ANALYZER;
-
-			setVUMeterHeight(ch);
-		}
-		else
-		{
-			paulaStopDMA(ch->n_chanindex);
-		}
+		DMACONtemp |= ch->n_dmabit;
 	}
 
 	checkMoreEffects(ch);
@@ -845,7 +892,7 @@ static void checkMetronome(moduleChannel_t *ch, note_t *note)
 	{
 		if (ch->n_chanindex == editor.metroChannel-1 && (song->row % editor.metroSpeed) == 0)
 		{
-			note->sample = 0x1F;
+			note->sample = 31;
 			note->period = (((song->row / editor.metroSpeed) % editor.metroSpeed) == 0) ? 160 : 214;
 		}
 	}
@@ -853,14 +900,11 @@ static void checkMetronome(moduleChannel_t *ch, note_t *note)
 
 static void playVoice(moduleChannel_t *ch)
 {
-	uint8_t cmd;
-	moduleSample_t *s;
-	note_t note;
-
-	if (ch->n_note == 0 && ch->n_cmd == 0)
+	if (ch->n_note == 0 && ch->n_cmd == 0) // test period, command and command parameter
 		paulaSetPeriod(ch->n_chanindex, ch->n_period);
 
-	note = song->patterns[modPattern][(song->row * AMIGA_VOICES) + ch->n_chanindex];
+	note_t note = song->patterns[modPattern][(song->row * PAULA_VOICES) + ch->n_chanindex];
+
 	checkMetronome(ch, &note);
 
 	ch->n_note = note.period;
@@ -869,7 +913,7 @@ static void playVoice(moduleChannel_t *ch)
 	if (note.sample >= 1 && note.sample <= 31) // SAFETY BUG FIX: don't handle sample-numbers >31
 	{
 		ch->n_samplenum = note.sample - 1;
-		s = &song->samples[ch->n_samplenum];
+		moduleSample_t *s = &song->samples[ch->n_samplenum];
 
 		ch->n_start = &song->sampleData[s->offset];
 		ch->n_finetune = s->fineTune & 0xF;
@@ -904,7 +948,7 @@ static void playVoice(moduleChannel_t *ch)
 		}
 		else
 		{
-			cmd = (ch->n_cmd & 0x0F00) >> 8;
+			uint8_t cmd = (ch->n_cmd & 0x0F00) >> 8;
 			if (cmd == 3 || cmd == 5)
 			{
 				setVUMeterHeight(ch);
@@ -930,9 +974,8 @@ static void playVoice(moduleChannel_t *ch)
 
 static void updateUIPositions(void)
 {
-	// don't update UI under MOD2WAV/PAT2SMP rendering
-	if (editor.isWAVRendering || editor.isSMPRendering)
-		return;
+	if (editor.mod2WavOngoing || editor.pat2SmpOngoing)
+		return; // don't update UI under MOD2WAV/PAT2SMP rendering
 
 	song->currRow = song->row;
 	song->currOrder = modOrder;
@@ -955,7 +998,7 @@ static void updateUIPositions(void)
 
 static void nextPosition(void)
 {
-	if (editor.isSMPRendering)
+	if (editor.pat2SmpOngoing)
 		modRenderDone = true;
 
 	song->row = pBreakPosition;
@@ -985,20 +1028,20 @@ static void nextPosition(void)
 
 			if (editor.stepPlayLastMode == MODE_EDIT || editor.stepPlayLastMode == MODE_IDLE)
 			{
-				song->row &= 0x3F;
+				song->row &= 63;
 				song->currRow = song->row;
 			}
 			else
 			{
 				// if we were playing, set replayer row to tracker row (stay in sync)
-				song->currRow &= 0x3F;
+				song->currRow &= 63;
 				song->row = song->currRow;
 			}
 
 			return;
 		}
 
-		modOrder = (modOrder + 1) & 0x7F;
+		modOrder = (modOrder + 1) & 127;
 		if (modOrder >= song->header.numOrders)
 		{
 			modOrder = 0;
@@ -1015,7 +1058,7 @@ static void nextPosition(void)
 				updateUIPositions();
 			}
 
-			if (editor.isWAVRendering)
+			if (editor.mod2WavOngoing)
 				modRenderDone = true;
 		}
 
@@ -1029,38 +1072,106 @@ static void increasePlaybackTimer(void)
 {
 	// the timer is not counting in "play pattern" mode
 	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= 32 && modBPM <= 255)
-		editor.musicTime64 += musicTimeTab64[modBPM-32];
+	{
+		if (editor.timingMode == TEMPO_MODE_CIA)
+			editor.musicTime64 += musicTimeTab64[modBPM-32];
+		else
+			editor.musicTime64 += musicTimeTab64[(255-32)+1]; // vblank tempo mode
+	}
 }
 
 static void setCurrRowToVisited(void) // for MOD2WAV
 {
-	if (editor.isWAVRendering)
+	if (editor.mod2WavOngoing)
 		editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row] = true;
 }
 
 static bool renderEndCheck(void) // for MOD2WAV/PAT2SMP
 {
-	if (!editor.isWAVRendering && !editor.isSMPRendering)
+	if (!editor.mod2WavOngoing && !editor.pat2SmpOngoing)
 		return true; // we're not doing MOD2WAV/PAT2SMP
 
-	bool noPatternDelay = pattDelTime2 == 0;
-	if (noPatternDelay && song->tick == song->speed-1)
+	bool noPatternDelay = (pattDelTime2 == 0);
+	if (noPatternDelay)
 	{
-		if (editor.isSMPRendering)
+		if (editor.pat2SmpOngoing)
 		{
 			if (modRenderDone)
 				return false; // we're done rendering
 		}
-		
-		if (editor.isWAVRendering)
+
+		if (editor.mod2WavOngoing && song->tick == song->speed-1)
 		{
 			bool rowVisited = editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row];
 			if (rowVisited || modRenderDone)
+			{
+				modRenderDone = false;
 				return false; // we're done rendering
+			}
 		}
 	}
 
 	return true;
+}
+
+static void setDMA(void)
+{
+	if (editor.muted[0]) DMACONtemp &= ~1;
+	if (editor.muted[1]) DMACONtemp &= ~2;
+	if (editor.muted[2]) DMACONtemp &= ~4;
+	if (editor.muted[3]) DMACONtemp &= ~8;
+
+	paulaSetDMACON(0x8000 | DMACONtemp);
+
+	moduleChannel_t *ch = song->channels;
+	for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
+	{
+		if (DMACONtemp & ch->n_dmabit) // sample trigger
+		{
+			ch->syncAnalyzerVolume = ch->n_volume;
+			ch->syncAnalyzerPeriod = ch->n_period;
+			ch->syncFlags |= UPDATE_ANALYZER;
+
+			setVUMeterHeight(ch);
+		}
+
+		// these take effect after the current DMA cycle is done
+		paulaSetData(i, ch->n_loopstart);
+		paulaSetLength(i, ch->n_replen);
+	}
+}
+
+void modSetTempo(int32_t bpm, bool doLockAudio)
+{
+	if (bpm < 32 || bpm > 255)
+		return;
+
+	const bool audioWasntLocked = !audio.locked;
+	if (doLockAudio && audioWasntLocked)
+		lockAudio();
+	
+	modBPM = bpm;
+	if (!editor.pat2SmpOngoing && !editor.mod2WavOngoing)
+	{
+		song->currBPM = bpm;
+		ui.updateSongBPM = true;
+	}
+
+	bpm -= 32; // 32..255 -> 0..223
+	audio.samplesPerTick64 = audio.samplesPerTickTable[bpm];
+
+	// calculate tick time length for audio/video sync timestamp (visualizers)
+	if (!editor.pat2SmpOngoing && !editor.mod2WavOngoing)
+	{
+		const uint64_t tickTimeLen64 = audio.tickLengthTable[bpm];
+		const uint32_t tickTimeLen = tickTimeLen64 >> 32;
+		const uint32_t tickTimeLenFrac = (uint32_t)tickTimeLen64;
+
+		setSyncTickTimeLen(tickTimeLen, tickTimeLenFrac);
+	}
+
+	if (doLockAudio && audioWasntLocked)
+		unlockAudio();
 }
 
 bool intMusic(void) // replayer ticker
@@ -1089,26 +1200,26 @@ bool intMusic(void) // replayer ticker
 	{
 		if (pattDelTime2 == 0) // no pattern delay, time to read note data
 		{
-			setCurrRowToVisited(); // for MOD2WAV/PAT2SMP
+			DMACONtemp = 0; // reset Paula DMA trigger states
+
+			setCurrRowToVisited(); // for MOD2WAV
 			updateUIPositions(); // update current song positions in UI
 
 			// read note data and trigger voices
-			moduleChannel_t *c = song->channels;
-			for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
+			moduleChannel_t *ch = song->channels;
+			for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 			{
-				playVoice(c);
-				paulaSetVolume(i, c->n_volume);
-
-				// these take effect after the current DMA cycle is done
-				paulaSetData(i, c->n_loopstart);
-				paulaSetLength(i, c->n_replen);
+				playVoice(ch);
+				paulaSetVolume(i, ch->n_volume);
 			}
+
+			setDMA();
 		}
 		else // pattern delay is on-going
 		{
-			moduleChannel_t *c = song->channels;
-			for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
-				checkEffects(c);
+			moduleChannel_t *ch = song->channels;
+			for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
+				checkEffects(ch);
 		}
 
 		// increase row
@@ -1186,9 +1297,9 @@ bool intMusic(void) // replayer ticker
 	}
 	else // tick > 0 (handle effects)
 	{
-		moduleChannel_t *c = song->channels;
-		for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
-			checkEffects(c);
+		moduleChannel_t *ch = song->channels;
+		for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
+			checkEffects(ch);
 
 		if (posJumpAssert)
 			nextPosition();
@@ -1218,8 +1329,6 @@ void modSetPattern(uint8_t pattern)
 
 void modSetPos(int16_t order, int16_t row)
 {
-	int16_t posEdPos;
-
 	if (row != -1)
 	{
 		row = CLAMP(row, 0, 63);
@@ -1250,7 +1359,7 @@ void modSetPos(int16_t order, int16_t row)
 			ui.updateSongPattern = true;
 			editor.currPatternDisp = &song->header.order[modOrder];
 
-			posEdPos = song->currOrder;
+			int16_t posEdPos = song->currOrder;
 			if (posEdPos > song->header.numOrders-1)
 				posEdPos = song->header.numOrders-1;
 
@@ -1267,43 +1376,6 @@ void modSetPos(int16_t order, int16_t row)
 		ui.updateStatusText = true;
 }
 
-void modSetTempo(int32_t bpm, bool doLockAudio)
-{
-	if (bpm < 32 || bpm > 255)
-		return;
-
-	const bool audioWasntLocked = !audio.locked;
-	if (doLockAudio && audioWasntLocked)
-		lockAudio();
-	
-	modBPM = bpm;
-	if (!editor.isSMPRendering && !editor.isWAVRendering)
-	{
-		song->currBPM = bpm;
-		ui.updateSongBPM = true;
-	}
-
-	bpm -= 32; // 32..255 -> 0..223
-
-	int64_t samplesPerTick64;
-	if (editor.isSMPRendering)
-		samplesPerTick64 = editor.pat2SmpHQ ? audio.bpmTable28kHz[bpm] : audio.bpmTable20kHz[bpm];
-	else
-		samplesPerTick64 = audio.bpmTable[bpm];
-
-	audio.samplesPerTick64 = samplesPerTick64;
-
-	// calculate tick time length for audio/video sync timestamp
-	const uint64_t tickTimeLen64 = audio.tickLengthTable[bpm];
-	const uint32_t tickTimeLen = tickTimeLen64 >> 32;
-	const uint32_t tickTimeLenFrac = (uint32_t)tickTimeLen64;
-
-	setSyncTickTimeLen(tickTimeLen, tickTimeLenFrac);
-
-	if (doLockAudio && audioWasntLocked)
-		unlockAudio();
-}
-
 void modStop(void)
 {
 	editor.songPlaying = false;
@@ -1311,13 +1383,13 @@ void modStop(void)
 
 	if (song != NULL)
 	{
-		moduleChannel_t *c = song->channels;
-		for (int32_t i = 0; i < AMIGA_VOICES; i++, c++)
+		moduleChannel_t *ch = song->channels;
+		for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 		{
-			c->n_wavecontrol = 0;
-			c->n_glissfunk = 0;
-			c->n_finetune = 0;
-			c->n_loopcount = 0;
+			ch->n_wavecontrol = 0;
+			ch->n_glissfunk = 0;
+			ch->n_finetune = 0;
+			ch->n_loopcount = 0;
 		}
 	}
 
@@ -1385,8 +1457,6 @@ void decPatt(void)
 
 void modPlay(int16_t patt, int16_t order, int8_t row)
 {
-	uint8_t oldPlayMode, oldMode;
-
 	const bool audioWasntLocked = !audio.locked;
 	if (audioWasntLocked)
 		lockAudio();
@@ -1437,12 +1507,6 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	editor.currPatternDisp = &song->header.order[modOrder];
 	editor.currPosEdPattDisp = &song->header.order[modOrder];
 
-	oldPlayMode = editor.playMode;
-	oldMode = editor.currMode;
-
-	editor.playMode = oldPlayMode;
-	editor.currMode = oldMode;
-
 	song->tick = song->speed-1;
 	ciaSetBPM = -1; // fix possibly stuck "set BPM" flag
 
@@ -1458,7 +1522,7 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	if (audioWasntLocked)
 		unlockAudio();
 
-	if (!editor.isSMPRendering && !editor.isWAVRendering)
+	if (!editor.pat2SmpOngoing && !editor.mod2WavOngoing)
 	{
 		ui.updateSongPos = true;
 		ui.updatePatternData = true;
@@ -1469,9 +1533,6 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 
 void clearSong(void)
 {
-	uint8_t i;
-	moduleChannel_t *ch;
-
 	assert(song != NULL);
 	if (song == NULL)
 		return;
@@ -1500,13 +1561,12 @@ void clearSong(void)
 
 	song->header.numOrders = 1;
 
-	for (i = 0; i < MAX_PATTERNS; i++)
-		memset(song->patterns[i], 0, (MOD_ROWS * AMIGA_VOICES) * sizeof (note_t));
+	for (int32_t i = 0; i < MAX_PATTERNS; i++)
+		memset(song->patterns[i], 0, (MOD_ROWS * PAULA_VOICES) * sizeof (note_t));
 
-	for (i = 0; i < AMIGA_VOICES; i++)
+	moduleChannel_t *ch = song->channels;
+	for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
-		ch = &song->channels[i];
-
 		ch->n_wavecontrol = 0;
 		ch->n_glissfunk = 0;
 		ch->n_finetune = 0;
@@ -1523,26 +1583,27 @@ void clearSong(void)
 	modSetTempo(editor.initialTempo, true);
 	modSetSpeed(editor.initialSpeed);
 
-	setLEDFilter(false, true); // real PT doesn't do this there, but that's insane
+	// disable the LED filter after clearing the song (real PT2 doesn't do this)
+	editor.useLEDFilter = false;
+	setLEDFilter(false);
+
 	updateCurrSample();
 
 	ui.updateSongSize = true;
+	ui.updateSongLength = true;
+	ui.updateSongName = true;
 	renderMuteButtons();
-	updateWindowTitle(MOD_IS_MODIFIED);
 }
 
 void clearSamples(void)
 {
-	moduleSample_t *s;
-
 	assert(song != NULL);
 	if (song == NULL)
 		return;
 
-	for (uint8_t i = 0; i < MOD_SAMPLES; i++)
+	moduleSample_t *s = song->samples;
+	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)
 	{
-		s = &song->samples[i];
-
 		s->fineTune = 0;
 		s->length = 0;
 		s->loopLength = 2;
@@ -1563,22 +1624,10 @@ void clearSamples(void)
 
 	editor.samplePos = 0;
 	updateCurrSample();
-
-	updateWindowTitle(MOD_IS_MODIFIED);
-}
-
-void clearAll(void)
-{
-	clearSamples();
-	clearSong();
-
-	updateWindowTitle(MOD_NOT_MODIFIED);
 }
 
 void modFree(void)
 {
-	uint8_t i;
-
 	if (song == NULL)
 		return; // not allocated
 
@@ -1588,7 +1637,7 @@ void modFree(void)
 
 	turnOffVoices();
 
-	for (i = 0; i < MAX_PATTERNS; i++)
+	for (int32_t i = 0; i < MAX_PATTERNS; i++)
 	{
 		if (song->patterns[i] != NULL)
 			free(song->patterns[i]);
@@ -1611,7 +1660,6 @@ void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
 
 	editor.playMode = PLAY_MODE_NORMAL;
 	editor.blockMarkFlag = false;
-	audio.forceSoundCardSilence = true;
 
 	song->row = 0;
 	song->currRow = 0;
@@ -1619,16 +1667,18 @@ void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
 
 	memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS); // for MOD2WAV
 
-	if (editor.isSMPRendering)
+	if (editor.pat2SmpOngoing)
 	{
-		modPlay(DONT_SET_PATTERN, DONT_SET_ORDER, DONT_SET_ROW);
+		modSetSpeed(song->currSpeed);
+		modSetTempo(song->currBPM, true);
+		modPlay(DONT_SET_PATTERN, DONT_SET_ORDER, 0);
 	}
 	else
 	{
 		song->currSpeed = 6;
 		song->currBPM = 125;
-		modSetSpeed(6);
-		modSetTempo(125, true);
+		modSetSpeed(song->currSpeed);
+		modSetTempo(song->currBPM, true);
 
 		modPlay(DONT_SET_PATTERN, 0, 0);
 	}
@@ -1649,9 +1699,7 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 	memset((int8_t *)editor.realVuMeterVolumes, 0, sizeof (editor.realVuMeterVolumes));
 	memset((int8_t *)editor.spectrumVolumes,    0, sizeof (editor.spectrumVolumes));
 
-	memset(song->channels, 0, sizeof (song->channels));
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
-		song->channels[i].n_chanindex = i;
+	initializeModuleChannels(song);
 
 	modOrder = oldOrder;
 	modPattern = (int8_t)oldPattern;
@@ -1674,5 +1722,4 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 
 	song->tick = 0;
 	modRenderDone = false;
-	audio.forceSoundCardSilence = false;
 }

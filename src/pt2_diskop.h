@@ -15,7 +15,6 @@ enum
 void addSampleFileExt(char *fileName);
 void diskOpShowSelectText(void);
 void diskOpLoadFile(uint32_t fileEntryRow, bool songModifiedCheck);
-void diskOpLoadFile2(void);
 void handleEntryJumping(SDL_Keycode jumpToChar);
 bool diskOpEntryIsEmpty(int32_t fileIndex);
 bool diskOpEntryIsDir(int32_t fileIndex);
@@ -28,6 +27,6 @@ bool allocDiskOpVars(void);
 void freeDiskOpMem(void);
 void freeDiskOpEntryMem(void);
 void setPathFromDiskOpMode(void);
-bool changePathToHome(void);
+bool changePathToDesktop(void);
 void renderDiskOpScreen(void);
 void updateDiskOp(void);

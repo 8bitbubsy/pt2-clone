@@ -3,6 +3,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "pt2_paula.h" // PAULA_VOICES
 
 /* aciddose:
 ** information on blep variables

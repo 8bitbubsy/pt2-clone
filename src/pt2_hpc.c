@@ -1,6 +1,4 @@
-/*
-** Hardware Performance Counter delay routines
-*/
+// Hardware Performance Counter delay routines, by 8bitbubsy
 
 #ifdef _WIN32
 #define WIN32_MEAN_AND_LEAN
@@ -13,6 +11,7 @@
 #include <stdbool.h>
 #include "pt2_hpc.h"
 
+// more bits than this makes little sense (double -> uint64_t precision)
 #define FRAC_BITS 53
 #define FRAC_SCALE (1ULL << FRAC_BITS)
 #define FRAC_MASK (FRAC_SCALE-1)
@@ -103,7 +102,7 @@ void hpc_Wait(hpc_t *hpc)
 	{
 		uint64_t timeLeft64 = hpc->endTime64Int - currTime64;
 
-		// convert to int32_t for fast SSE2 SIMD usage lateron
+		// limit (and cast to) int32_t for fast SSE2 SIMD usage
 		if (timeLeft64 > INT32_MAX)
 			timeLeft64 = INT32_MAX;
 

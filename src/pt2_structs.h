@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include "pt2_header.h"
 #include "pt2_hpc.h"
+#include "pt2_paula.h"
 
 // for .WAV sample loading/saving
 typedef struct wavHeader_t
@@ -67,7 +68,7 @@ typedef struct moduleSample_t
 
 typedef struct moduleChannel_t
 {
-	int8_t *n_start, *n_wavestart, *n_loopstart, n_chanindex, n_volume;
+	int8_t *n_start, *n_wavestart, *n_loopstart, n_chanindex, n_volume, n_dmabit;
 	int8_t n_toneportdirec, n_pattpos, n_loopcount;
 	uint8_t n_wavecontrol, n_glissfunk, n_sampleoffset, n_toneportspeed;
 	uint8_t n_vibratocmd, n_tremolocmd, n_finetune, n_funkoffset, n_samplenum;
@@ -93,7 +94,7 @@ typedef struct module_t
 
 	moduleHeader_t header;
 	moduleSample_t samples[MOD_SAMPLES];
-	moduleChannel_t channels[AMIGA_VOICES];
+	moduleChannel_t channels[PAULA_VOICES];
 	note_t *patterns[MAX_PATTERNS];
 
 	// for pattern viewer
@@ -133,7 +134,7 @@ typedef struct video_t
 	float fMouseXMul, fMouseYMul;
 	hpc_t vblankHpc;
 	SDL_PixelFormat *pixelFormat;
-	uint32_t *frameBuffer, *frameBufferUnaligned;
+	uint32_t *frameBuffer;
 
 	SDL_Window *window;
 	SDL_Renderer *renderer;
@@ -148,9 +149,9 @@ typedef struct video_t
 
 typedef struct editor_t
 {
-	volatile int8_t vuMeterVolumes[AMIGA_VOICES], spectrumVolumes[SPECTRUM_BAR_NUM];
-	volatile int8_t *sampleFromDisp, *sampleToDisp, *currSampleDisp, realVuMeterVolumes[AMIGA_VOICES];
-	volatile bool songPlaying, programRunning, isWAVRendering, isSMPRendering, smpRenderingDone;
+	volatile int8_t vuMeterVolumes[PAULA_VOICES], spectrumVolumes[SPECTRUM_BAR_NUM];
+	volatile int8_t *sampleFromDisp, *sampleToDisp, *currSampleDisp, realVuMeterVolumes[PAULA_VOICES], mod2WavNumLoops, mod2WavFadeOutSeconds;
+	volatile bool songPlaying, programRunning, mod2WavOngoing, pat2SmpOngoing, mainLoopOngoing, abortMod2Wav, mod2WavFadeOut;
 	volatile uint16_t *quantizeValueDisp, *metroSpeedDisp, *metroChannelDisp, *sampleVolDisp;
 	volatile uint16_t *vol1Disp, *vol2Disp, *currEditPatternDisp, *currPosDisp, *currPatternDisp;
 	volatile uint16_t *currPosEdPattDisp, *currLengthDisp, *lpCutOffDisp, *hpCutOffDisp;
@@ -162,10 +163,10 @@ typedef struct editor_t
 
 	bool errorMsgActive, errorMsgBlock, multiFlag, metroFlag, keypadToggle8CFlag, normalizeFiltersFlag;
 	bool sampleAllFlag, halfClipFlag, newOldFlag, pat2SmpHQ, mixFlag, useLEDFilter;
-	bool modLoaded, autoInsFlag, repeatKeyFlag, sampleZero, tuningFlag;
+	bool modLoaded, autoInsFlag, repeatKeyFlag, sampleZero, tuningToneFlag;
 	bool stepPlayEnabled, stepPlayBackwards, blockBufferFlag, blockMarkFlag, didQuantize;
-	bool swapChannelFlag, configFound, abortMod2Wav, chordLengthMin, rowVisitTable[MOD_ORDERS * MOD_ROWS];
-	bool muted[AMIGA_VOICES];
+	bool swapChannelFlag, configFound, chordLengthMin, rowVisitTable[MOD_ORDERS * MOD_ROWS];
+	bool muted[PAULA_VOICES];
 
 	int8_t smpRedoFinetunes[MOD_SAMPLES], smpRedoVolumes[MOD_SAMPLES], multiModeNext[4], trackPattFlag;
 	int8_t *smpRedoBuffer[MOD_SAMPLES], *tempSample, currSample, recordMode, sampleFrom, sampleTo, autoInsSlot;
@@ -178,11 +179,10 @@ typedef struct editor_t
 	uint16_t metroSpeed, metroChannel, sampleVol;
 	uint16_t effectMacros[10], currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	int32_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
-	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, pat2SmpPos, samplePos, chordLength;
+	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, samplePos, chordLength;
 	uint64_t musicTime64;
-	double *dPat2SmpBuf;
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
-	note_t patternBuffer[MOD_ROWS * AMIGA_VOICES], undoBuffer[MOD_ROWS * AMIGA_VOICES];
+	note_t patternBuffer[MOD_ROWS * PAULA_VOICES], undoBuffer[MOD_ROWS * PAULA_VOICES];
 	SDL_Thread *mod2WavThread, *pat2SmpThread;
 } editor_t;
 
@@ -206,16 +206,16 @@ typedef struct ui_t
 	char statusMessage[18], prevStatusMessage[18];
 	char *dstPtr, *editPos, *textEndPtr, *showTextPtr;
 
-	bool answerNo, answerYes, throwExit, editTextFlag, askScreenShown, samplerScreenShown;
+	volatile bool askBoxShown, throwExit;
+
+	bool editTextFlag, samplerScreenShown;
 	bool leftLoopPinMoving, rightLoopPinMoving, changingSmpResample, changingDrumPadNote;
-	bool forceSampleDrag, forceSampleEdit, introScreenShown;
-	bool aboutScreenShown, clearScreenShown, posEdScreenShown, diskOpScreenShown;
+	bool forceSampleDrag, forceSampleEdit, introTextShown;
+	bool aboutScreenShown, posEdScreenShown, diskOpScreenShown;
 	bool samplerVolBoxShown, samplerFiltersBoxShown, samplingBoxShown, editOpScreenShown;
+	bool changingSamplingNote, force32BitNumPtr;
 
-	bool changingSamplingNote;
-
-	bool force32BitNumPtr;
-	int8_t *numPtr8, tmpDisp8, pointerMode, editOpScreen, editTextType, askScreenType;
+	int8_t *numPtr8, tmpDisp8, pointerMode, editOpScreen, editTextType;
 	int8_t visualizerMode, previousPointerMode, forceVolDrag, changingChordNote;
 	uint8_t numLen, numBits;
 
@@ -243,7 +243,7 @@ typedef struct ui_t
 	bool updateCurrSampleNum, updateCurrSampleVolume, updateCurrSampleLength;
 	bool updateCurrSampleRepeat, updateCurrSampleReplen, updateCurrSampleName;
 	bool updateSongSize, updateSongTiming, updateSongBPM;
-	bool updateCurrPattText, updateTrackerFlags, pat2SmpDialogShown;
+	bool updateCurrPattText, updateTrackerFlags;
 
 	// disk op.
 	bool updateLoadMode, updatePackText, updateSaveFormatText, updateDiskOpPathText;
@@ -251,13 +251,12 @@ typedef struct ui_t
 	// pos ed.
 	bool updatePosEd, updateDiskOpFileList;
 
-	// these are used when things are drawn on top, for example clear/ask dialogs
-	bool disablePosEd, disableVisualizer;
+	bool disableVisualizer; // ask boxes (f.ex. MOD2WAV)
 
 	int16_t lineCurX, lineCurY, editObject, sampleMarkingPos;
 	uint16_t *numPtr16, tmpDisp16, *dstOffset, dstPos, textLength, editTextPos;
 	uint16_t dstOffsetEnd, lastSampleOffset, diskOpPathTextOffset;
-	int32_t askTempData, *numPtr32, tmpDisp32;
+	int32_t *numPtr32, tmpDisp32;
 } ui_t;
 
 extern keyb_t keyb;

@@ -18,6 +18,7 @@ extern sampler_t sampler; // pt2_sampler.c
 
 void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_y2);
 
+void killSample(void);
 void downSample(void);
 void upSample(void);
 void createSampleMarkTable(void);
@@ -27,7 +28,6 @@ void fixSampleBeep(moduleSample_t *s);
 void highPassSample(int32_t cutOff);
 void lowPassSample(int32_t cutOff);
 void samplerRemoveDcOffset(void);
-void mixChordSample(void);
 void samplerResample(void);
 void doMix(void);
 void boostSample(int32_t sample, bool ignoreMark);

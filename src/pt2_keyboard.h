@@ -13,7 +13,7 @@ void textCharPrevious(void);
 void textCharNext(void);
 void readKeyModifiers(void);
 void handleKeyRepeat(SDL_Scancode scancode);
-void keyUpHandler(SDL_Scancode scancode, SDL_Keycode keycode);
+void keyUpHandler(SDL_Scancode scancode);
 void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode);
 void handleTextEditInputChar(char textChar);
 

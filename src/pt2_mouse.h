@@ -14,15 +14,6 @@ enum ptbuttons
 	PTB_SAMPLENAME,
 	PTB_LOADSAMPLE,
 
-	// ASK DIALOG
-	PTB_SUREY,
-	PTB_SUREN,
-
-	// PAT2SMP ASK DIALOG
-	PTB_PAT2SMP_HI,
-	PTB_PAT2SMP_LO,
-	PTB_PAT2SMP_ABORT,
-
 	// POS ED. SCREEN
 	PTB_PE_BADGE,
 	PTB_PE_PATT,
@@ -138,12 +129,6 @@ enum ptbuttons
 	PTB_DO_SCROLLBOT,
 	PTB_DO_FILEAREA,
 
-	// CLEAR
-	PTB_CLEARSONG,
-	PTB_CLEARSAMPLES,
-	PTB_CLEARALL,
-	PTB_CLEARCANCEL,
-
 	// MAIN SCREEN
 	PTB_QUIT,
 	PTB_PLAY,
@@ -257,8 +242,8 @@ enum
 
 #define NUM_CURSORS 6
 
-extern SDL_Cursor *cursors[NUM_CURSORS];
-
+void sampleUpButton(void);
+void sampleDownButton(void);
 void setMsgPointer(void);
 void setErrPointer(void);
 void pointerSetMode(uint8_t pointerMode, bool carry);
@@ -267,7 +252,6 @@ void pointerSetPreviousMode(void);
 bool setSystemCursor(SDL_Cursor *cur);
 void freeMouseCursors(void);
 bool createMouseCursors(void);
-
 void readMouseXY(void);
 void updateMouseScaling(void);
 void mouseWheelUpHandler(void);
@@ -276,3 +260,5 @@ void mouseButtonUpHandler(uint8_t mouseButton);
 void mouseButtonDownHandler(uint8_t mouseButton);
 void handleGUIButtonRepeat(void);
 void updateMouseCounters(void);
+
+extern SDL_Cursor *cursors[NUM_CURSORS];

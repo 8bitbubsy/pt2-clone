@@ -4,14 +4,10 @@
 #ifndef _WIN32
 #include <unistd.h> // usleep()
 #endif
-#include "pt2_header.h"
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
-#include "pt2_tables.h"
-#include "pt2_structs.h"
 #include "pt2_config.h"
-#include "pt2_hpc.h"
 
 // this uses code that is not entirely thread safe, but I have never had any issues so far...
 
@@ -19,17 +15,7 @@ static volatile bool scopesUpdatingFlag, scopesDisplayingFlag;
 static hpc_t scopeHpc;
 static SDL_Thread *scopeThread;
 
-scope_t scope[AMIGA_VOICES]; // global
-
-void resetCachedScopePeriod(void)
-{
-	scope_t *s = scope;
-	for (int32_t i = 0; i < AMIGA_VOICES; i++, s++)
-	{
-		s->oldPeriod = -1;
-		s->dOldScopeDelta = 0.0;
-	}
-}
+scope_t scope[PAULA_VOICES]; // global
 
 // this is quite hackish, but fixes sample swapping issues
 static int32_t getSampleSlotFromReadAddress(const int8_t *sampleReadAddress)
@@ -97,18 +83,7 @@ int32_t getSampleReadPos(int32_t ch) // used for the sampler screen
 
 void scopeSetPeriod(int32_t ch, int32_t period)
 {
-	volatile scope_t *s = &scope[ch];
-
-	// if the new period was the same as the previous period, use cached delta
-	if (period != s->oldPeriod)
-	{
-		s->oldPeriod = period;
-
-		const double dPeriodToScopeDeltaDiv = PAULA_PAL_CLK / (double)SCOPE_HZ;
-		s->dOldScopeDelta = dPeriodToScopeDeltaDiv / period;
-	}
-
-	s->dDelta = s->dOldScopeDelta;
+	scope[ch].dDelta = (PAULA_PAL_CLK / (double)SCOPE_HZ) / period;
 }
 
 void scopeTrigger(int32_t ch)
@@ -143,13 +118,13 @@ void updateScopes(void)
 {
 	scope_t tempState;
 
-	if (editor.isWAVRendering)
+	if (editor.mod2WavOngoing)
 		return;
 
 	volatile scope_t *sc = scope;
 
 	scopesUpdatingFlag = true;
-	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++, sc++)
 	{
 		tempState = *sc; // cache it
 		if (!tempState.active)
@@ -191,7 +166,7 @@ static void updateRealVuMeters(void)
 	scope_t tmpScope, *sc;
 
 	// sink VU-meters first
-	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
 		editor.realVuMeterVolumes[i] -= 4;
 		if (editor.realVuMeterVolumes[i] < 0)
@@ -200,7 +175,7 @@ static void updateRealVuMeters(void)
 
 	// get peak sample data from running scope voices
 	sc = scope;
-	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++, sc++)
 	{
 		tmpScope = *sc; // cache it
 
@@ -259,7 +234,7 @@ void drawScopes(void)
 	const uint32_t fgColor = video.palette[PAL_QADSCP];
 
 	scopesDisplayingFlag = true;
-	for (int32_t i = 0; i < AMIGA_VOICES; i++, sc++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++, sc++)
 	{
 		scope_t tmpScope = *sc; // cache it
 
@@ -287,7 +262,8 @@ void drawScopes(void)
 
 				scopeDrawPtr[(scopeData * SCREEN_W) + x] = fgColor;
 
-				if (++pos >= length)
+				pos++;
+				if (pos >= length)
 				{
 					pos = 0;
 
@@ -339,8 +315,6 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 bool initScopes(void)
 {
-	resetCachedScopePeriod();
-
 	scopeThread = SDL_CreateThread(scopeThreadFunc, NULL, NULL);
 	if (scopeThread == NULL)
 	{
@@ -368,7 +342,7 @@ void stopAllScopes(void)
 	// wait for scopes to finish updating
 	while (scopesUpdatingFlag);
 
-	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 		scope[i].active = false;
 
 	// wait for scope displaying to be done (safety)

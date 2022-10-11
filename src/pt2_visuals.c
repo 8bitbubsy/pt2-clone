@@ -19,30 +19,20 @@
 #include <unistd.h> // usleep()
 #endif
 #include <ctype.h> // tolower()
-#include "pt2_header.h"
-#include "pt2_keyboard.h"
-#include "pt2_mouse.h"
-#include "pt2_audio.h"
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
 #include "pt2_tables.h"
-#include "pt2_module_loader.h"
-#include "pt2_module_saver.h"
-#include "pt2_sample_loader.h"
-#include "pt2_sample_saver.h"
 #include "pt2_pattern_viewer.h"
 #include "pt2_sampler.h"
 #include "pt2_diskop.h"
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
 #include "pt2_edit.h"
-#include "pt2_pat2smp.h"
-#include "pt2_mod2wav.h"
 #include "pt2_config.h"
 #include "pt2_bmp.h"
 #include "pt2_sampling.h"
 #include "pt2_chordmaker.h"
-#include "pt2_hpc.h"
+#include "pt2_mod2wav.h"
 
 typedef struct sprite_t
 {
@@ -53,6 +43,7 @@ typedef struct sprite_t
 	const void *data;
 } sprite_t;
 
+static int32_t oldCurrMode = -1;
 static uint32_t vuMetersBg[4 * (10 * 48)];
 
 sprite_t sprites[SPRITE_NUM]; // globalized
@@ -69,7 +60,6 @@ void updateSongInfo1(void);
 void updateSongInfo2(void);
 void updateSampler(void);
 void updatePatternData(void);
-void updateMOD2WAVDialog(void);
 
 void blit32(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *src)
 {
@@ -130,7 +120,21 @@ void drawFramework2(int32_t x, int32_t y, int32_t w, int32_t h)
 	putPixel(x, y+h-1, video.palette[PAL_GENBKG]);
 	putPixel(x+w-1, y, video.palette[PAL_GENBKG]);
 
-	fillRect(x+1, y+1, w-2, h-2, video.palette[PAL_BACKGRD]);
+	fillRect(x+1, y+1, w-2, h-2, video.palette[PAL_GENBKG]);
+}
+
+void drawFramework3(int32_t x, int32_t y, int32_t w, int32_t h)
+{
+	fillRect(x, y, w, h, video.palette[PAL_GENBKG]);
+
+	vLine(x,     y,     h-1, video.palette[PAL_BORDER]);
+	vLine(x+1,   y,     h-2, video.palette[PAL_BORDER]);
+	hLine(x+2,   y,     w-3, video.palette[PAL_BORDER]);
+	hLine(x+2,   y+1,   w-4, video.palette[PAL_BORDER]);
+	hLine(x+1,   y+h-1, w-1, video.palette[PAL_GENBKG2]);
+	hLine(x+2,   y+h-2, w-2, video.palette[PAL_GENBKG2]);
+	vLine(x+w-2, y+2,   h-4, video.palette[PAL_GENBKG2]);
+	vLine(x+w-1, y+1,   h-3, video.palette[PAL_GENBKG2]);
 }
 
 void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t pixelColor)
@@ -146,16 +150,42 @@ void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t pixelCo
 	}
 }
 
-void drawButton(int32_t x, int32_t y, int32_t w, const char *text)
+void drawButton1(int32_t x, int32_t y, int32_t w, int32_t h, const char *text)
 {
-	if (w < 2)
-		return;
+	const int32_t textW = (int32_t)strlen(text) * (FONT_CHAR_W - 1);
 
-	const int32_t textW = (int32_t)strlen(text) * (FONT_CHAR_W-1);
-	const int32_t textX = x + (((w - 2) - textW) >> 1);
+	drawFramework1(x, y, w, h);
 
-	drawFramework1(x, y, w, 11);
-	textOut2(textX, y+3, text);
+	int32_t textX = x + ((w - textW) / 2);
+	int32_t textY = y + ((h - FONT_CHAR_H) / 2);
+
+	// kludge
+	if (!strcmp(text, ARROW_UP_STR) || !strcmp(text, ARROW_DOWN_STR))
+	{
+		textX--;
+		textY--;
+	}
+
+	textOut2(textX, textY, text);
+}
+
+void drawButton2(int32_t x, int32_t y, int32_t w, int32_t h, const char *text)
+{
+	const int32_t textW = (int32_t)strlen(text) * (FONT_CHAR_W - 1);
+
+	drawFramework2(x, y, w, h);
+
+	int32_t textX = x + ((w - textW) / 2);
+	int32_t textY = y + ((h - FONT_CHAR_H) / 2);
+
+	// kludge
+	if (!strcmp(text, ARROW_UP_STR) || !strcmp(text, ARROW_DOWN_STR))
+	{
+		textX--;
+		textY--;
+	}
+
+	textOut2(textX, textY, text);
 }
 
 void drawUpButton(int32_t x, int32_t y)
@@ -200,36 +230,47 @@ void statusNotSampleZero(void)
 	displayErrorMsg("NOT SAMPLE 0 !");
 }
 
-void renderFrame(void)
+void renderFrame2(void) // use this in askBox()
 {
-	updateMOD2WAVDialog(); // must be first to avoid flickering issues
+	updateMod2WavDialog(); // must be first to avoid flickering issues
 
 	updateSongInfo1(); // top left side of screen, when "disk op"/"pos ed" is hidden
 	updateSongInfo2(); // two middle rows of screen, always visible
-	updateEditOp();
 	updatePatternData();
-	updateDiskOp();
 	updateSampler();
+	handleLastGUIObjectDown(); // XXX
+	drawSamplerLine();
+	writeSampleMonitorWaveform(); // XXX
+}
+
+void renderFrame(void)
+{
+	renderFrame2();
+
+	updateEditOp();
+	updateDiskOp();
 	updatePosEd();
 	updateVisualizer();
-	handleLastGUIObjectDown();
-	drawSamplerLine();
-	writeSampleMonitorWaveform();
+
+	// show [EDITING] in window title if in edit mode
+	if (oldCurrMode != editor.currMode)
+	{
+		oldCurrMode = editor.currMode;
+		if (song != NULL)
+			updateWindowTitle(song->modified);
+	}
 }
 
 void resetAllScreens(void) // prepare GUI for "really quit?" dialog
 {
 	editor.mixFlag = false;
 	editor.swapChannelFlag = false;
-	ui.clearScreenShown = false;
 
 	ui.changingChordNote = false;
 	ui.changingSmpResample = false;
 	ui.changingSamplingNote = false;
 	ui.changingDrumPadNote = false;
 
-	ui.pat2SmpDialogShown = false;
-	ui.disablePosEd = false;
 	ui.disableVisualizer = false;
 	
 	if (ui.samplerScreenShown)
@@ -249,58 +290,15 @@ void resetAllScreens(void) // prepare GUI for "really quit?" dialog
 		exitGetTextLine(EDIT_TEXT_NO_UPDATE);
 }
 
-void removeAskDialog(void)
-{
-	if (!ui.askScreenShown && !editor.isWAVRendering)
-		displayMainScreen();
-
-	ui.disablePosEd = false;
-	ui.disableVisualizer = false;
-}
-
-void renderAskDialog(void)
-{
-	ui.disablePosEd = true;
-	ui.disableVisualizer = true;
-
-	const uint32_t *srcPtr = ui.pat2SmpDialogShown ? pat2SmpDialogBMP : yesNoDialogBMP;
-	blit32(160, 51, 104, 39, srcPtr);
-}
-
-void renderBigAskDialog(void)
-{
-	ui.disablePosEd = true;
-	ui.disableVisualizer = true;
-
-	blit32(120, 44, 200, 55, bigYesNoDialogBMP);
-}
-
-void showDownsampleAskDialog(void)
-{
-	ui.askScreenShown = true;
-	ui.askScreenType = ASK_LOAD_DOWNSAMPLE;
-	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-	setStatusMessage("PLEASE SELECT", NO_CARRY);
-	renderBigAskDialog();
-
-	textOutTight(133, 49, "THE SAMPLE'S FREQUENCY IS", video.palette[PAL_BACKGRD]);
-	textOutTight(154, 57, "HIGH (ABOVE 22KHZ).", video.palette[PAL_BACKGRD]);
-	textOutTight(133, 65, "DO YOU WANT TO DOWNSAMPLE", video.palette[PAL_BACKGRD]);
-	textOutTight(156, 73, "BEFORE LOADING IT?", video.palette[PAL_BACKGRD]);
-}
-
 static void fillFromVuMetersBgBuffer(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	if (ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
+	if (ui.samplerScreenShown || editor.mod2WavOngoing || editor.pat2SmpOngoing)
 		return;
 
-	srcPtr = vuMetersBg;
-	dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
+	const uint32_t *srcPtr = vuMetersBg;
+	uint32_t *dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
 
-	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
+	for (uint32_t i = 0; i < PAULA_VOICES; i++)
 	{
 		for (uint32_t y = 0; y < 48; y++)
 		{
@@ -317,16 +315,13 @@ static void fillFromVuMetersBgBuffer(void)
 
 void fillToVuMetersBgBuffer(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	if (ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
+	if (ui.samplerScreenShown || editor.mod2WavOngoing || editor.pat2SmpOngoing)
 		return;
 
-	srcPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
-	dstPtr = vuMetersBg;
+	const uint32_t *srcPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
+	uint32_t *dstPtr = vuMetersBg;
 
-	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
+	for (uint32_t i = 0; i < PAULA_VOICES; i++)
 	{
 		for (uint32_t y = 0; y < 48; y++)
 		{
@@ -343,17 +338,15 @@ void fillToVuMetersBgBuffer(void)
 
 void renderVuMeters(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t h, *dstPtr;
-
-	if (ui.samplerScreenShown || editor.isWAVRendering || editor.isSMPRendering)
+	if (ui.samplerScreenShown || editor.mod2WavOngoing || editor.pat2SmpOngoing)
 		return;
 
 	fillToVuMetersBgBuffer();
 	
-	dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
-	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
+	uint32_t *dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
+	for (uint32_t i = 0; i < PAULA_VOICES; i++)
 	{
+		uint32_t h;
 		if (config.realVuMeters)
 			h = editor.realVuMeterVolumes[i];
 		else
@@ -362,7 +355,7 @@ void renderVuMeters(void)
 		if (h > 48)
 			h = 48;
 
-		srcPtr = vuMeterBMP;
+		const uint32_t *srcPtr = vuMeterBMP;
 		for (uint32_t y = 0; y < h; y++)
 		{
 			for (uint32_t x = 0; x < 10; x++)
@@ -378,12 +371,10 @@ void renderVuMeters(void)
 
 void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 {
-	moduleSample_t *currSample;
-
 	if (ui.diskOpScreenShown)
 		return;
 
-	currSample = &song->samples[editor.currSample];
+	moduleSample_t *currSample = &song->samples[editor.currSample];
 
 	if (ui.updateSongPos)
 	{
@@ -400,7 +391,7 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	if (ui.updateSongLength)
 	{
 		ui.updateSongLength = false;
-		if (!editor.isWAVRendering)
+		if (!editor.mod2WavOngoing)
 			printThreeDecimalsBg(72, 25, *editor.currLengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
@@ -408,14 +399,14 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	{
 		ui.updateCurrSampleFineTune = false;
 
-		if (!editor.isWAVRendering)
+		if (!editor.mod2WavOngoing)
 			textOutBg(80, 36, ftuneStrTab[currSample->fineTune & 0xF], video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (ui.updateCurrSampleNum)
 	{
 		ui.updateCurrSampleNum = false;
-		if (!editor.isWAVRendering)
+		if (!editor.mod2WavOngoing)
 		{
 			printTwoHexBg(80, 47,
 				editor.sampleZero ? 0 : ((*editor.currSampleDisp) + 1), video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -425,14 +416,14 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 	if (ui.updateCurrSampleVolume)
 	{
 		ui.updateCurrSampleVolume = false;
-		if (!editor.isWAVRendering)
+		if (!editor.mod2WavOngoing)
 			printTwoHexBg(80, 58, *currSample->volumeDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 	}
 
 	if (ui.updateCurrSampleLength)
 	{
 		ui.updateCurrSampleLength = false;
-		if (!editor.isWAVRendering)
+		if (!editor.mod2WavOngoing)
 		{
 			if (config.maxSampleLength == 0xFFFE)
 				printFourHexBg(64, 69, *currSample->lengthDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -462,10 +453,6 @@ void updateSongInfo1(void) // left side of screen, when Disk Op. is hidden
 
 void updateSongInfo2(void) // two middle rows of screen, always present
 {
-	char tempChar;
-	int32_t x, i;
-	moduleSample_t *currSample;
-
 	if (ui.updateStatusText)
 	{
 		ui.updateStatusText = false;
@@ -474,8 +461,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		fillRect(88, 127, 17*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_GENBKG]);
 
 		// render status text
-		if (!editor.errorMsgActive && editor.blockMarkFlag && !ui.askScreenShown
-			&& !ui.clearScreenShown && !editor.swapChannelFlag)
+		if (!editor.errorMsgActive && editor.blockMarkFlag && !ui.askBoxShown && !editor.swapChannelFlag)
 		{
 			textOut(88, 127, "MARK BLOCK", video.palette[PAL_GENTXT]);
 			charOut(192, 127, '-', video.palette[PAL_GENTXT]);
@@ -579,9 +565,9 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	if (ui.updateSongName)
 	{
 		ui.updateSongName = false;
-		for (x = 0; x < 20; x++)
+		for (int32_t x = 0; x < 20; x++)
 		{
-			tempChar = song->header.name[x];
+			char tempChar = song->header.name[x];
 			if (tempChar == '\0')
 				tempChar = '_';
 
@@ -592,11 +578,11 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	if (ui.updateCurrSampleName)
 	{
 		ui.updateCurrSampleName = false;
-		currSample = &song->samples[editor.currSample];
+		moduleSample_t *currSample = &song->samples[editor.currSample];
 
-		for (x = 0; x < 22; x++)
+		for (int32_t x = 0; x < 22; x++)
 		{
-			tempChar = currSample->text[x];
+			char tempChar = currSample->text[x];
 			if (tempChar == '\0')
 				tempChar = '_';
 
@@ -614,11 +600,11 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		// calculate module length
 
 		uint32_t totalSampleDataSize = 0;
-		for (i = 0; i < MOD_SAMPLES; i++)
+		for (int32_t i = 0; i < MOD_SAMPLES; i++)
 			totalSampleDataSize += song->samples[i].length;
 
 		uint32_t totalPatterns = 0;
-		for (i = 0; i < MOD_ORDERS; i++)
+		for (int32_t i = 0; i < MOD_ORDERS; i++)
 		{
 			if (song->header.order[i] > totalPatterns)
 				totalPatterns = song->header.order[i];
@@ -651,21 +637,18 @@ void updateCursorPos(void)
 
 void updateSampler(void)
 {
-	int32_t tmpSampleOffset;
-	moduleSample_t *s;
-
 	if (!ui.samplerScreenShown || ui.samplingBoxShown)
 		return;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	s = &song->samples[editor.currSample];
+	moduleSample_t *s = &song->samples[editor.currSample];
 
 	// update 9xx offset
 	if (mouse.y >= 138 && mouse.y <= 201 && mouse.x >= 3 && mouse.x <= 316)
 	{
 		if (!ui.samplerVolBoxShown && !ui.samplerFiltersBoxShown && s->length > 0)
 		{
-			tmpSampleOffset = 0x900 + (scr2SmpPos(mouse.x-3) >> 8);
+			int32_t tmpSampleOffset = 0x900 + (scr2SmpPos(mouse.x-3) >> 8);
 			if (tmpSampleOffset != ui.lastSampleOffset)
 			{
 				ui.lastSampleOffset = (uint16_t)tmpSampleOffset;
@@ -744,13 +727,11 @@ void updateSampler(void)
 
 void showVolFromSlider(void)
 {
-	uint32_t *dstPtr, pixel, bgPixel, sliderStart, sliderEnd;
-
-	sliderStart = ((editor.vol1 * 3) + 5) / 10;
-	sliderEnd  = sliderStart + 4;
-	pixel = video.palette[PAL_QADSCP];
-	bgPixel = video.palette[PAL_BACKGRD];
-	dstPtr = &video.frameBuffer[(158 * SCREEN_W) + 105];
+	uint32_t sliderStart = ((editor.vol1 * 3) + 5) / 10;
+	uint32_t sliderEnd  = sliderStart + 4;
+	uint32_t pixel = video.palette[PAL_QADSCP];
+	uint32_t bgPixel = video.palette[PAL_BACKGRD];
+	uint32_t *dstPtr = &video.frameBuffer[(158 * SCREEN_W) + 105];
 
 	for (uint32_t y = 0; y < 3; y++)
 	{
@@ -768,13 +749,11 @@ void showVolFromSlider(void)
 
 void showVolToSlider(void)
 {
-	uint32_t *dstPtr, pixel, bgPixel, sliderStart, sliderEnd;
-
-	sliderStart = ((editor.vol2 * 3) + 5) / 10;
-	sliderEnd = sliderStart + 4;
-	pixel = video.palette[PAL_QADSCP];
-	bgPixel = video.palette[PAL_BACKGRD];
-	dstPtr = &video.frameBuffer[(169 * SCREEN_W) + 105];
+	uint32_t sliderStart = ((editor.vol2 * 3) + 5) / 10;
+	uint32_t sliderEnd = sliderStart + 4;
+	uint32_t pixel = video.palette[PAL_QADSCP];
+	uint32_t bgPixel = video.palette[PAL_BACKGRD];
+	uint32_t *dstPtr = &video.frameBuffer[(169 * SCREEN_W) + 105];
 
 	for (uint32_t y = 0; y < 3; y++)
 	{
@@ -832,53 +811,50 @@ void removeSamplerFiltersBox(void)
 
 void updatePosEd(void)
 {
-	if (!ui.posEdScreenShown || !ui.updatePosEd)
+	if (!ui.posEdScreenShown || ui.askBoxShown || !ui.updatePosEd)
 		return;
 
 	ui.updatePosEd = false;
 
-	if (!ui.disablePosEd)
+	int32_t posEdPosition = song->currOrder;
+	if (posEdPosition > song->header.numOrders-1)
+		posEdPosition = song->header.numOrders-1;
+
+	// top five
+	for (int32_t y = 0; y < 5; y++)
 	{
-		int32_t posEdPosition = song->currOrder;
-		if (posEdPosition > song->header.numOrders-1)
-			posEdPosition = song->header.numOrders-1;
-
-		// top five
-		for (int32_t y = 0; y < 5; y++)
+		if (posEdPosition-(5-y) >= 0)
 		{
-			if (posEdPosition-(5-y) >= 0)
-			{
-				printThreeDecimalsBg(128, 23+(y*6), posEdPosition-(5-y), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-				printTwoDecimalsBg(160, 23+(y*6), song->header.order[posEdPosition-(5-y)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-			}
-			else
-			{
-				fillRect(128, 23+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
-			}
+			printThreeDecimalsBg(128, 23+(y*6), posEdPosition-(5-y), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+			printTwoDecimalsBg(160, 23+(y*6), song->header.order[posEdPosition-(5-y)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
 		}
-
-		// middle
-		printThreeDecimalsBg(128, 53, posEdPosition, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		printTwoDecimalsBg(160, 53, *editor.currPosEdPattDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-
-		// bottom six
-		for (int32_t y = 0; y < 6; y++)
+		else
 		{
-			if (posEdPosition+y < song->header.numOrders-1)
-			{
-				printThreeDecimalsBg(128, 59+(y*6), posEdPosition+(y+1), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-				printTwoDecimalsBg(160, 59+(y*6), song->header.order[posEdPosition+(y+1)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-			}
-			else
-			{
-				fillRect(128, 59+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
-			}
+			fillRect(128, 23+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
 		}
-
-		// kludge to fix bottom part of text edit marker in pos ed
-		if (ui.editTextFlag && ui.editObject == PTB_PE_PATT)
-			renderTextEditMarker();
 	}
+
+	// middle
+	printThreeDecimalsBg(128, 53, posEdPosition, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+	printTwoDecimalsBg(160, 53, *editor.currPosEdPattDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+
+	// bottom six
+	for (int32_t y = 0; y < 6; y++)
+	{
+		if (posEdPosition+y < song->header.numOrders-1)
+		{
+			printThreeDecimalsBg(128, 59+(y*6), posEdPosition+(y+1), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+			printTwoDecimalsBg(160, 59+(y*6), song->header.order[posEdPosition+(y+1)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
+		}
+		else
+		{
+			fillRect(128, 59+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
+		}
+	}
+
+	// kludge to fix bottom part of text edit marker in pos ed
+	if (ui.editTextFlag && ui.editObject == PTB_PE_PATT)
+		renderTextEditMarker();
 }
 
 void renderPosEdScreen(void)
@@ -888,15 +864,15 @@ void renderPosEdScreen(void)
 
 void renderMuteButtons(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr, srcPitch;
-
 	if (ui.diskOpScreenShown || ui.posEdScreenShown)
 		return;
 
-	dstPtr = &video.frameBuffer[(3 * SCREEN_W) + 310];
-	for (uint32_t i = 0; i < AMIGA_VOICES; i++)
+	uint32_t *dstPtr = &video.frameBuffer[(3 * SCREEN_W) + 310];
+	for (uint32_t i = 0; i < PAULA_VOICES; i++)
 	{
+		const uint32_t *srcPtr;
+		uint32_t srcPitch;
+
 		if (editor.muted[i])
 		{
 			srcPtr = &muteButtonsBMP[i * (6 * 7)];
@@ -919,22 +895,6 @@ void renderMuteButtons(void)
 
 		dstPtr += SCREEN_W * 5;
 	}
-}
-
-void renderClearScreen(void)
-{
-	ui.disablePosEd = true;
-	ui.disableVisualizer = true;
-
-	blit32(160, 51, 104, 39, clearDialogBMP);
-}
-
-void removeClearScreen(void)
-{
-	displayMainScreen();
-
-	ui.disablePosEd = false;
-	ui.disableVisualizer = false;
 }
 
 void updateCurrSample(void)
@@ -1060,9 +1020,9 @@ void handleLastGUIObjectDown(void)
 void updateVisualizer(void)
 {
 	if (ui.disableVisualizer || ui.diskOpScreenShown ||
-		ui.posEdScreenShown  || ui.editOpScreenShown ||
-		ui.aboutScreenShown  || ui.askScreenShown    ||
-		editor.isWAVRendering || ui.samplingBoxShown)
+		ui.posEdScreenShown || ui.editOpScreenShown ||
+		ui.aboutScreenShown || ui.askBoxShown ||
+		editor.mod2WavOngoing || ui.samplingBoxShown)
 	{
 		return;
 	}
@@ -1103,11 +1063,8 @@ void updateVisualizer(void)
 
 void renderQuadrascopeBg(void)
 {
-	const uint32_t *srcPtr;
-	uint32_t *dstPtr;
-
-	srcPtr = &trackerFrameBMP[(44 * SCREEN_W) + 120];
-	dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
+	const uint32_t *srcPtr = &trackerFrameBMP[(44 * SCREEN_W) + 120];
+	uint32_t *dstPtr = &video.frameBuffer[(44 * SCREEN_W) + 120];
 
 	for (uint32_t y = 0; y < 55; y++)
 	{
@@ -1117,7 +1074,7 @@ void renderQuadrascopeBg(void)
 		dstPtr += SCREEN_W;
 	}
 
-	for (int32_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 		scope[i].emptyScopeDrawn = false;
 }
 
@@ -1129,7 +1086,6 @@ void renderSpectrumAnalyzerBg(void)
 void renderAboutScreen(void)
 {
 	char verString[16];
-	uint32_t verStringX;
 
 	if (!ui.aboutScreenShown || ui.diskOpScreenShown || ui.posEdScreenShown || ui.editOpScreenShown)
 		return;
@@ -1139,7 +1095,7 @@ void renderAboutScreen(void)
 	// draw version string
 
 	sprintf(verString, "v%s", PROG_VER_STR);
-	verStringX = 260 + (((63 - ((uint32_t)strlen(verString) * (FONT_CHAR_W - 1))) + 1) / 2);
+	uint32_t verStringX = 260 + (((63 - ((uint32_t)strlen(verString) * (FONT_CHAR_W - 1))) + 1) / 2);
 	textOutTight(verStringX, 67, verString, video.palette[PAL_GENBKG2]);
 }
 
@@ -1148,7 +1104,6 @@ void renderEditOpMode(void)
 	const uint32_t *srcPtr;
 
 	// select what character box to render
-
 	switch (ui.editOpScreen)
 	{
 		default:
@@ -1158,9 +1113,12 @@ void renderEditOpMode(void)
 
 		case 1:
 		{
-			     if (editor.trackPattFlag == 0) srcPtr = &editOpModeCharsBMP[EDOP_MODE_BMP_T_OFS];
-			else if (editor.trackPattFlag == 1) srcPtr = &editOpModeCharsBMP[EDOP_MODE_BMP_P_OFS];
-			else srcPtr = &editOpModeCharsBMP[EDOP_MODE_BMP_S_OFS];
+			if (editor.trackPattFlag == 0)
+				srcPtr = &editOpModeCharsBMP[EDOP_MODE_BMP_T_OFS];
+			else if (editor.trackPattFlag == 1)
+				srcPtr = &editOpModeCharsBMP[EDOP_MODE_BMP_P_OFS];
+			else
+				srcPtr = &editOpModeCharsBMP[EDOP_MODE_BMP_S_OFS];
 		}
 		break;
 
@@ -1173,7 +1131,6 @@ void renderEditOpMode(void)
 		break;
 	}
 
-	// render it...
 	blit32(310, 47, 7, 6, srcPtr);
 }
 
@@ -1239,73 +1196,6 @@ void renderEditOpScreen(void)
 		ui.updateChordNote2Text = true;
 		ui.updateChordNote3Text = true;
 		ui.updateChordNote4Text = true;
-	}
-}
-
-void renderMOD2WAVDialog(void)
-{
-	blit32(64, 27, 192, 48, mod2wavBMP);
-}
-
-void updateMOD2WAVDialog(void)
-{
-	if (!ui.updateMod2WavDialog)
-		return;
-
-	ui.updateMod2WavDialog = false;
-
-	if (editor.isWAVRendering)
-	{
-		if (ui.mod2WavFinished)
-		{
-			ui.mod2WavFinished = false;
-
-			resetSong();
-			pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
-
-			if (editor.abortMod2Wav)
-			{
-				displayErrorMsg("MOD2WAV ABORTED !");
-			}
-			else
-			{
-				displayMsg("MOD RENDERED !");
-				setMsgPointer();
-			}
-
-			editor.isWAVRendering = false;
-			modSetTempo(song->currBPM, true); // update BPM with normal audio output rate
-			displayMainScreen();
-		}
-		else
-		{
-			if (song->rowsInTotal == 0)
-				return;
-
-			// render progress bar
-
-			int32_t percent = (song->rowsCounter * 100) / song->rowsInTotal;
-			if (percent > 100)
-				percent = 100;
-
-			// foreground (progress)
-			const int32_t progressBarWidth = ((percent * 180) + 50) / 100;
-			if (progressBarWidth > 0)
-				fillRect(70, 42, progressBarWidth, 11, video.palette[PAL_GENBKG2]); // foreground (progress)
-
-			// background
-			int32_t bgWidth = 180 - progressBarWidth;
-			if (bgWidth > 0)
-				fillRect(70+progressBarWidth, 42, bgWidth, 11, video.palette[PAL_BORDER]);
-
-			// draw percentage text
-			if (percent > 99)
-				printThreeDecimals(144, 45, percent, video.palette[PAL_GENTXT]);
-			else
-				printTwoDecimals(152, 45, percent, video.palette[PAL_GENTXT]);
-
-			charOut(168, 45, '%', video.palette[PAL_GENTXT]);
-		}
 	}
 }
 
@@ -1539,7 +1429,7 @@ void displayMainScreen(void)
 		charOut(64,  3, '0', video.palette[PAL_GENTXT]);
 		textOut(64, 14, "00", video.palette[PAL_GENTXT]);
 
-		if (!editor.isWAVRendering)
+		if (!editor.mod2WavOngoing)
 		{
 			charOut(64, 25, '0', video.palette[PAL_GENTXT]);
 			textOut(64, 47, "00", video.palette[PAL_GENTXT]);
@@ -1575,296 +1465,12 @@ void displayMainScreen(void)
 	}
 }
 
-static void restoreStatusAndMousePointer(void)
-{
-	editor.errorMsgActive = false;
-	editor.errorMsgBlock = false;
-	editor.errorMsgCounter = 0;
-	pointerSetPreviousMode();
-	setPrevStatusMessage();
-}
-
-void handleAskNo(void)
-{
-	ui.pat2SmpDialogShown = false;
-
-	switch (ui.askScreenType)
-	{
-		case ASK_SAVEMOD_OVERWRITE:
-		{
-			restoreStatusAndMousePointer();
-			saveModule(DONT_CHECK_IF_FILE_EXIST, GIVE_NEW_FILENAME);
-		}
-		break;
-
-		case ASK_SAVESMP_OVERWRITE:
-		{
-			restoreStatusAndMousePointer();
-			saveSample(DONT_CHECK_IF_FILE_EXIST, GIVE_NEW_FILENAME);
-		}
-		break;
-
-		case ASK_LOAD_DOWNSAMPLE:
-		{
-			restoreStatusAndMousePointer();
-			extLoadWAVOrAIFFSampleCallback(DONT_DOWNSAMPLE);
-		}
-		break;
-
-		default:
-			restoreStatusAndMousePointer();
-		break;
-	}
-
-	removeAskDialog();
-}
-
-void handleAskYes(void)
-{
-	char fileName[20 + 4 + 1];
-	int8_t oldSample;
-	uint32_t i;
-	moduleSample_t *s;
-
-	switch (ui.askScreenType)
-	{
-		case ASK_DISCARD_SONG:
-		{
-			restoreStatusAndMousePointer();
-			diskOpLoadFile2();
-		}
-		break;
-
-		case ASK_DISCARD_SONG_DRAGNDROP:
-		{
-			restoreStatusAndMousePointer();
-			loadDroppedFile2();
-		}
-		break;
-
-		case ASK_RESTORE_SAMPLE:
-		{
-			restoreStatusAndMousePointer();
-			redoSampleData(editor.currSample);
-		}
-		break;
-
-		case ASK_PAT2SMP:
-		{
-			restoreStatusAndMousePointer();
-			doPat2Smp();
-		}
-		break;
-
-		case ASK_SAVE_ALL_SAMPLES:
-		{
-			editor.errorMsgActive = false;
-			editor.errorMsgBlock = false;
-			editor.errorMsgCounter = 0;
-
-			oldSample = editor.currSample;
-			for (i = 0; i < MOD_SAMPLES; i++)
-			{
-				editor.currSample = (int8_t)i;
-				if (song->samples[i].length > 2)
-					saveSample(DONT_CHECK_IF_FILE_EXIST, GIVE_NEW_FILENAME);
-			}
-			editor.currSample = oldSample;
-
-			displayMsg("SAMPLES SAVED !");
-			setMsgPointer();
-		}
-		break;
-
-		case ASK_MAKE_CHORD:
-		{
-			restoreStatusAndMousePointer();
-			mixChordSample();
-		}
-		break;
-
-		case ASK_BOOST_ALL_SAMPLES:
-		{
-			restoreStatusAndMousePointer();
-
-			for (i = 0; i < MOD_SAMPLES; i++)
-				boostSample(i, true);
-
-			if (ui.samplerScreenShown)
-				redrawSample();
-
-			updateWindowTitle(MOD_IS_MODIFIED);
-		}
-		break;
-
-		case ASK_FILTER_ALL_SAMPLES:
-		{
-			restoreStatusAndMousePointer();
-
-			for (i = 0; i < MOD_SAMPLES; i++)
-				filterSample(i, true);
-
-			if (ui.samplerScreenShown)
-				redrawSample();
-
-			updateWindowTitle(MOD_IS_MODIFIED);
-		}
-		break;
-
-		case ASK_UPSAMPLE:
-		{
-			restoreStatusAndMousePointer();
-			upSample();
-		}
-		break;
-
-		case ASK_DOWNSAMPLE:
-		{
-			restoreStatusAndMousePointer();
-			downSample();
-		}
-		break;
-
-		case ASK_KILL_SAMPLE:
-		{
-			restoreStatusAndMousePointer();
-
-			if (editor.sampleZero)
-			{
-				statusNotSampleZero();
-				break;
-			}
-
-			turnOffVoices();
-			s = &song->samples[editor.currSample];
-
-			s->fineTune = 0;
-			s->volume = 0;
-			s->length = 0;
-			s->loopStart = 0;
-			s->loopLength = 2;
-
-			memset(s->text, 0, sizeof (s->text));
-			memset(&song->sampleData[(editor.currSample * config.maxSampleLength)], 0, config.maxSampleLength);
-
-			editor.samplePos = 0;
-			updateCurrSample();
-
-			ui.updateSongSize = true;
-			updateWindowTitle(MOD_IS_MODIFIED);
-		}
-		break;
-
-		case ASK_RESAMPLE:
-		{
-			restoreStatusAndMousePointer();
-			samplerResample();
-		}
-		break;
-
-		case ASK_LOAD_DOWNSAMPLE:
-		{
-			// for WAV and AIFF sample loader
-			restoreStatusAndMousePointer();
-			extLoadWAVOrAIFFSampleCallback(DO_DOWNSAMPLE);
-		}
-		break;
-
-		case ASK_MOD2WAV_OVERWRITE:
-		{
-			memset(fileName, 0, sizeof (fileName));
-
-			if (song->header.name[0] != '\0')
-			{
-				for (i = 0; i < 20; i++)
-				{
-					fileName[i] = (char)tolower(song->header.name[i]);
-					if (fileName[i] == '\0') break;
-					sanitizeFilenameChar(&fileName[i]);
-				}
-
-				strcat(fileName, ".wav");
-			}
-			else
-			{
-				strcpy(fileName, "untitled.wav");
-			}
-
-			renderToWav(fileName, DONT_CHECK_IF_FILE_EXIST);
-		}
-		break;
-
-		case ASK_MOD2WAV:
-		{
-			memset(fileName, 0, sizeof (fileName));
-
-			if (song->header.name[0] != '\0')
-			{
-				for (i = 0; i < 20; i++)
-				{
-					fileName[i] = (char)tolower(song->header.name[i]);
-					if (fileName[i] == '\0') break;
-					sanitizeFilenameChar(&fileName[i]);
-				}
-
-				strcat(fileName, ".wav");
-			}
-			else
-			{
-				strcpy(fileName, "untitled.wav");
-			}
-
-			renderToWav(fileName, CHECK_IF_FILE_EXIST);
-		}
-		break;
-
-		case ASK_QUIT:
-		{
-			restoreStatusAndMousePointer();
-			ui.throwExit = true;
-		}
-		break;
-
-		case ASK_SAVE_SAMPLE:
-		{
-			restoreStatusAndMousePointer();
-			saveSample(CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME);
-		}
-		break;
-
-		case ASK_SAVESMP_OVERWRITE:
-		{
-			restoreStatusAndMousePointer();
-			saveSample(DONT_CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME);
-		}
-		break;
-
-		case ASK_SAVE_MODULE:
-		{
-			restoreStatusAndMousePointer();
-			saveModule(CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME);
-		}
-		break;
-
-		case ASK_SAVEMOD_OVERWRITE:
-		{
-			restoreStatusAndMousePointer();
-			saveModule(DONT_CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME);
-		}
-		break;
-
-		default: break;
-	}
-
-	removeAskDialog();
-}
-
 void videoClose(void)
 {
-	SDL_DestroyTexture(video.texture);
-	SDL_DestroyRenderer(video.renderer);
-	SDL_DestroyWindow(video.window);
-	free(video.frameBufferUnaligned);
+	if (video.texture     != NULL) SDL_DestroyTexture(video.texture);
+	if (video.renderer    != NULL) SDL_DestroyRenderer(video.renderer);
+	if (video.window      != NULL) SDL_DestroyWindow(video.window);
+	if (video.frameBuffer != NULL) free(video.frameBuffer);
 }
 
 void setupSprites(void)
@@ -1930,23 +1536,18 @@ void hideSprite(int32_t sprite)
 
 void eraseSprites(void)
 {
-	int32_t sx, sy, x, y, sw, sh, srcPitch, dstPitch;
-	const uint32_t *src32;
-	uint32_t *dst32;
-	sprite_t *s;
-
 	for (int32_t i = SPRITE_NUM-1; i >= 0; i--) // erasing must be done in reverse order
 	{
-		s = &sprites[i];
+		sprite_t *s = &sprites[i];
 		if (s->x >= SCREEN_W || s->y >= SCREEN_H) // sprite is hidden, don't draw nor fill clear buffer
 			continue;
 
 		assert(s->refreshBuffer != NULL);
 
-		sw = s->w;
-		sh = s->h;
-		sx = s->x;
-		sy = s->y;
+		int32_t sw = s->w;
+		int32_t sh = s->h;
+		int32_t sx = s->x;
+		int32_t sy = s->y;
 
 		// if x is negative, adjust variables
 		if (sx < 0)
@@ -1962,19 +1563,19 @@ void eraseSprites(void)
 			sy = 0;
 		}
 
-		dst32 = &video.frameBuffer[(sy * SCREEN_W) + sx];
-		src32 = s->refreshBuffer;
+		uint32_t *dst32 = &video.frameBuffer[(sy * SCREEN_W) + sx];
+		const uint32_t *src32 = s->refreshBuffer;
 
 		// handle x/y clipping
 		if (sx+sw >= SCREEN_W) sw = SCREEN_W - sx;
 		if (sy+sh >= SCREEN_H) sh = SCREEN_H - sy;
 
-		srcPitch = s->w - sw;
-		dstPitch = SCREEN_W - sw;
+		int32_t srcPitch = s->w - sw;
+		int32_t dstPitch = SCREEN_W - sw;
 
-		for (y = 0; y < sh; y++)
+		for (int32_t y = 0; y < sh; y++)
 		{
-			for (x = 0; x < sw; x++)
+			for (int32_t x = 0; x < sw; x++)
 				*dst32++ = *src32++;
 
 			src32 += srcPitch;
@@ -1987,17 +1588,11 @@ void eraseSprites(void)
 
 void renderSprites(void)
 {
-	const uint8_t *src8;
-	int32_t sx, sy, x, y, srcPtrBias, sw, sh, srcPitch, dstPitch;
-	const uint32_t *src32;
-	uint32_t *dst32, *clr32, colorKey;
-	sprite_t *s;
-
 	renderVuMeters(); // let's put it here even though it's not sprite-based
 
 	for (int32_t i = 0; i < SPRITE_NUM; i++)
 	{
-		s = &sprites[i];
+		sprite_t *s = &sprites[i];
 
 		// set new sprite position
 		s->x = s->newX;
@@ -2008,11 +1603,11 @@ void renderSprites(void)
 
 		assert(s->data != NULL && s->refreshBuffer != NULL);
 
-		sw = s->w;
-		sh = s->h;
-		sx = s->x;
-		sy = s->y;
-		srcPtrBias = 0;
+		int32_t sw = s->w;
+		int32_t sh = s->h;
+		int32_t sx = s->x;
+		int32_t sy = s->y;
+		int32_t srcPtrBias = 0;
 
 		// if x is negative, adjust variables
 		if (sx < 0)
@@ -2030,24 +1625,24 @@ void renderSprites(void)
 			sy = 0;
 		}
 
-		dst32 = &video.frameBuffer[(sy * SCREEN_W) + sx];
-		clr32 = s->refreshBuffer;
+		uint32_t *dst32 = &video.frameBuffer[(sy * SCREEN_W) + sx];
+		uint32_t *clr32 = s->refreshBuffer;
 
 		// handle x/y clipping
 		if (sx+sw >= SCREEN_W) sw = SCREEN_W - sx;
 		if (sy+sh >= SCREEN_H) sh = SCREEN_H - sy;
 
-		srcPitch = s->w - sw;
-		dstPitch = SCREEN_W - sw;
+		int32_t srcPitch = s->w - sw;
+		int32_t dstPitch = SCREEN_W - sw;
 
-		colorKey = sprites[i].colorKey;
+		uint32_t colorKey = sprites[i].colorKey;
 		if (sprites[i].pixelType == SPRITE_TYPE_RGB)
 		{
 			// 24-bit RGB sprite
-			src32 = ((uint32_t *)sprites[i].data) + srcPtrBias;
-			for (y = 0; y < sh; y++)
+			const uint32_t *src32 = ((uint32_t *)sprites[i].data) + srcPtrBias;
+			for (int32_t y = 0; y < sh; y++)
 			{
-				for (x = 0; x < sw; x++)
+				for (int32_t x = 0; x < sw; x++)
 				{
 					*clr32++ = *dst32; // fill clear buffer
 					if (*src32 != colorKey)
@@ -2065,10 +1660,10 @@ void renderSprites(void)
 		else
 		{
 			// 8-bit paletted sprite
-			src8 = ((uint8_t *)sprites[i].data) + srcPtrBias;
-			for (y = 0; y < sh; y++)
+			const uint8_t *src8 = ((uint8_t *)sprites[i].data) + srcPtrBias;
+			for (int32_t y = 0; y < sh; y++)
 			{
-				for (x = 0; x < sw; x++)
+				for (int32_t x = 0; x < sw; x++)
 				{
 					*clr32++ = *dst32; // fill clear buffer
 					if (*src8 != colorKey)
@@ -2133,18 +1728,16 @@ void flipFrame(void)
 void updateSpectrumAnalyzer(int8_t vol, int16_t period)
 {
 	const uint8_t maxHeight = SPECTRUM_BAR_HEIGHT + 1; // +1 because of audio latency - allows full height to be seen
-	uint16_t scaledVol;
-	uint32_t scaledNote;
 
 	if (ui.visualizerMode != VISUAL_SPECTRUM || vol <= 0)
 		return;
 
-	scaledVol = ((uint16_t)vol * 24576) >> 16; // scaledVol = vol / 2.66667 (0..64 -> 0..24)
+	uint16_t scaledVol = ((uint16_t)vol * 24576) >> 16; // scaledVol = vol / 2.66667 (0..64 -> 0..24)
 
 	period = CLAMP(period, 113, 856);
 	period -= 113;
 
-	scaledNote = 743 - period;
+	uint32_t scaledNote = 743 - period;
 	scaledNote *= scaledNote;
 	scaledNote /= 25093; // scaledNote now ranges 0..22, no need to clamp
 
@@ -2172,27 +1765,25 @@ void updateSpectrumAnalyzer(int8_t vol, int16_t period)
 
 void sinkVisualizerBars(void)
 {
-	int32_t i;
-
-	// sink stuff @ 49.92Hz (Amiga PAL) rate
+	// sink visualizer bars @ 49.92Hz (Amiga PAL) rate
 
 	static uint64_t counter50Hz;
 	const uint64_t counter50HzDelta = (uint64_t)(((UINT32_MAX+1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
 
 	counter50Hz += counter50HzDelta; // 32.32 fixed-point counter
-	if (counter50Hz > 0xFFFFFFFF)
+	if (counter50Hz > UINT32_MAX)
 	{
-		counter50Hz &= 0xFFFFFFFF;
+		counter50Hz &= UINT32_MAX;
 
 		// sink VU-meters
-		for (i = 0; i < AMIGA_VOICES; i++)
+		for (int32_t i = 0; i < PAULA_VOICES; i++)
 		{
 			if (editor.vuMeterVolumes[i] > 0)
 				editor.vuMeterVolumes[i]--;
 		}
 
 		// sink "spectrum analyzer" bars
-		for (i = 0; i < SPECTRUM_BAR_NUM; i++)
+		for (int32_t i = 0; i < SPECTRUM_BAR_NUM; i++)
 		{
 			if (editor.spectrumVolumes[i] > 0)
 				editor.spectrumVolumes[i]--;
@@ -2202,8 +1793,6 @@ void sinkVisualizerBars(void)
 
 void updateRenderSizeVars(void)
 {
-	float fXScale, fYScale;
-
 	if (video.useDesktopMouseCoords)
 	{
 		SDL_DisplayMode dm;
@@ -2232,6 +1821,7 @@ void updateRenderSizeVars(void)
 		}
 		else
 		{
+			float fXScale, fYScale;
 			SDL_RenderGetScale(video.renderer, &fXScale, &fYScale);
 
 			video.renderW = (int32_t)(SCREEN_W * fXScale);
@@ -2390,7 +1980,7 @@ bool setupVideo(void)
 
 	SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
 
-#if SDL_PATCHLEVEL >= 5
+#if SDL_MINOR_VERSION >= 24 || (SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL >= 5)
 	SDL_RenderSetIntegerScale(video.renderer, config.integerScaling ? SDL_TRUE : SDL_FALSE);
 #endif
 
@@ -2414,15 +2004,12 @@ bool setupVideo(void)
 	SDL_SetTextureBlendMode(video.texture, SDL_BLENDMODE_NONE);
 
 	// frame buffer used by SDL (for texture)
-	video.frameBufferUnaligned = (uint32_t *)MALLOC_PAD(SCREEN_W * SCREEN_H * sizeof (int32_t), 256);
-	if (video.frameBufferUnaligned == NULL)
+	video.frameBuffer = (uint32_t *)malloc(SCREEN_W * SCREEN_H * sizeof (int32_t));
+	if (video.frameBuffer == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
-
-	// we want an aligned pointer
-	video.frameBuffer = (uint32_t *)ALIGN_PTR(video.frameBufferUnaligned, 256);
 
 	// Workaround: SDL_GetGlobalMouseState() doesn't work with KMSDRM/Wayland
 	video.useDesktopMouseCoords = true;

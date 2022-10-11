@@ -21,7 +21,7 @@
    alt+F11     - Toggle between real/fake VU-Meters
    F11         - Toggle fullscreen
    F12         - Toggle Amiga model (for low-pass filter)
-   shift+F12   - Toggle Amiga panning (100% stereo separation)
+   shift+F12   - Toggle audio panning between mono/custom/Amiga
    ctrl+F12    - Toggle CIA/VBLANK timing for tempo/speed effect (Fxx)
    alt+1/2/3/4 - Increase Multi ordering (when in idle, not play/edit/rec.)
    home        - Go to row 0

@@ -4,30 +4,27 @@
 #include <stdbool.h>
 #include <ctype.h> // tolower()
 #include <sys/stat.h>
-#include "pt2_header.h"
 #include "pt2_structs.h"
 #include "pt2_textout.h"
 #include "pt2_mouse.h"
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"
 #include "pt2_diskop.h"
+#include "pt2_askbox.h"
 
 #define PLAYBACK_FREQ 16574 /* C-3, period 214 */
 
 static void removeSampleFileExt(char *text) // for sample saver
 {
-	uint32_t fileExtPos;
-	uint32_t filenameLength;
-
 	if (text == NULL || text[0] == '\0')
 		return;
 	
-	filenameLength = (uint32_t)strlen(text);
+	uint32_t filenameLength = (uint32_t)strlen(text);
 	if (filenameLength < 5)
 		return;
 
 	// remove .wav/.iff/from end of sample name (if present)
-	fileExtPos = filenameLength - 4;
+	uint32_t fileExtPos = filenameLength - 4;
 	if (fileExtPos > 0 && (!strncmp(&text[fileExtPos], ".wav", 4) || !strncmp(&text[fileExtPos], ".iff", 4)))
 		text[fileExtPos] = '\0';
 }
@@ -66,8 +63,6 @@ static void iffWriteChunkData(FILE *f, const void *data, size_t length)
 bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 {
 	char fileName[128], tmpBuffer[64];
-	uint32_t i, j, chunkLen;
-	FILE *f;
 	struct stat statBuffer;
 	wavHeader_t wavHeader;
 	samplerChunk_t samplerChunk;
@@ -91,7 +86,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 	}
 	else
 	{
-		for (i = 0; i < 22; i++)
+		for (int32_t i = 0; i < 22; i++)
 		{
 			tmpBuffer[i] = (char)tolower(song->samples[editor.currSample].text[i]);
 			if (tmpBuffer[i] == '\0') break;
@@ -107,7 +102,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 	// if the user picked "no" to overwriting the file, generate a new filename
 	if (giveNewFreeFilename && stat(fileName, &statBuffer) == 0)
 	{
-		for (j = 1; j <= 999; j++)
+		for (int32_t j = 1; j <= 999; j++)
 		{
 			if (s->text[0] == '\0')
 			{
@@ -115,7 +110,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 			}
 			else
 			{
-				for (i = 0; i < 22; i++)
+				for (int32_t i = 0; i < 22; i++)
 				{
 					tmpBuffer[i] = (char)tolower(song->samples[editor.currSample].text[i]);
 					if (tmpBuffer[i] == '\0') break;
@@ -133,26 +128,13 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 		}
 	}
 
-	// check if we need to overwrite file...
-
 	if (checkIfFileExist && stat(fileName, &statBuffer) == 0)
 	{
-		ui.askScreenShown = true;
-		ui.askScreenType = ASK_SAVESMP_OVERWRITE;
-		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-		setStatusMessage("OVERWRITE FILE ?", NO_CARRY);
-		renderAskDialog();
-		return -1;
+		if (!askBox(ASKBOX_YES_NO, "OVERWRITE FILE ?"))
+			return false;
 	}
 
-	if (ui.askScreenShown)
-	{
-		ui.answerNo = false;
-		ui.answerYes = false;
-		ui.askScreenShown = false;
-	}
-
-	f = fopen(fileName, "wb");
+	FILE *f = fopen(fileName, "wb");
 	if (f == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR !");
@@ -208,7 +190,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 
 			fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
 
-			for (i = 0; i < sampleLength; i++)
+			for (uint32_t i = 0; i < sampleLength; i++)
 				fputc((uint8_t)(sampleData[i] + 128), f);
 
 			if (sampleLength & 1)
@@ -248,7 +230,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 			iffWriteUint32(f, s->volume * 1024); // volume (max: 65536/0x10000)
 
 			// "NAME" chunk
-			chunkLen = (uint32_t)strlen(s->text);
+			uint32_t chunkLen = (uint32_t)strlen(s->text);
 			if (chunkLen > 0)
 			{
 				iffWriteChunkHeader(f, "NAME", chunkLen);

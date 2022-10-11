@@ -21,8 +21,7 @@ void exitGetTextLine(bool updateValue);
 void getTextLine(int16_t editObject);
 void getNumLine(uint8_t type, int16_t editObject);
 void handleEditKeys(SDL_Scancode scancode, bool normalMode);
-uint8_t handleSpecialKeys(SDL_Scancode scancode);
+bool handleSpecialKeys(SDL_Scancode scancode);
 int8_t keyToNote(SDL_Scancode scancode);
 void updateTextObject(int16_t editObject);
-
 void handleSampleJamming(SDL_Scancode scancode);

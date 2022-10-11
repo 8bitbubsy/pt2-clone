@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h> // round()
+#include <stdlib.h>
 #include "pt2_helpers.h" // ABS()
 
 // ----------------------------------------------------------
@@ -131,6 +131,7 @@ void downsample2xDouble(double *buffer, uint32_t originalLength)
 
 	const double *input = buffer;
 	const uint32_t length = originalLength / 2;
+
 	for (uint32_t i = 0; i < length; i++, input += 2)
 		buffer[i] = decimate2x(input[0], input[1]);
 }
@@ -141,6 +142,7 @@ void downsample2xFloat(float *buffer, uint32_t originalLength)
 
 	const float *input = buffer;
 	const uint32_t length = originalLength / 2;
+
 	for (uint32_t i = 0; i < length; i++, input += 2)
 		buffer[i] = (float)decimate2x(input[0], input[1]);
 }
@@ -189,7 +191,6 @@ bool downsample2x8BitU(uint8_t *buffer, uint32_t originalLength)
 	}
 
 	free(dBuffer);
-
 	return true;
 }
 
@@ -235,7 +236,6 @@ bool downsample2x8Bit(int8_t *buffer, uint32_t originalLength)
 	}
 
 	free(dBuffer);
-
 	return true;
 }
 
@@ -281,7 +281,6 @@ bool downsample2x16Bit(int16_t *buffer, uint32_t originalLength)
 	}
 
 	free(dBuffer);
-
 	return true;
 }
 
@@ -327,6 +326,5 @@ bool downsample2x32Bit(int32_t *buffer, uint32_t originalLength)
 	}
 
 	free(dBuffer);
-
 	return true;
 }

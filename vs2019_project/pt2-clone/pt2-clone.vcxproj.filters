@@ -93,9 +93,6 @@
     <ClInclude Include="..\..\src\pt2_rcfilter.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\pt2_ledfilter.h">
-      <Filter>headers</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\pt2_chordmaker.h">
       <Filter>headers</Filter>
     </ClInclude>
@@ -109,6 +106,18 @@
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_xpk.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_askbox.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_replayer.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_paula.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_amigafilters.h">
       <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>
@@ -132,9 +141,6 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c">
       <Filter>gfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_clear.c">
-      <Filter>gfx</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_diskop.c">
       <Filter>gfx</Filter>
     </ClCompile>
@@ -150,13 +156,7 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_loop_pins.c">
       <Filter>gfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_mod2wav.c">
-      <Filter>gfx</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_mute_buttons.c">
-      <Filter>gfx</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_pat2smp_dialog.c">
       <Filter>gfx</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_patcursor.c">
@@ -180,9 +180,6 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c">
       <Filter>gfx</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_yes_no_dialog.c">
-      <Filter>gfx</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_pat2smp.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
@@ -196,12 +193,14 @@
     <ClCompile Include="..\..\src\pt2_sampling.c" />
     <ClCompile Include="..\..\src\pt2_sync.c" />
     <ClCompile Include="..\..\src\pt2_rcfilter.c" />
-    <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_chordmaker.c" />
     <ClCompile Include="..\..\src\pt2_downsample2x.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_xpk.c" />
+    <ClCompile Include="..\..\src\pt2_askbox.c" />
+    <ClCompile Include="..\..\src\pt2_paula.c" />
+    <ClCompile Include="..\..\src\pt2_amigafilters.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

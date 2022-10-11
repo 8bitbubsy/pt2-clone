@@ -17,7 +17,6 @@
 #include <unistd.h> // chdir()
 #endif
 #include <sys/stat.h>
-#include "pt2_header.h"
 #include "pt2_helpers.h"
 #include "pt2_keyboard.h"
 #include "pt2_textout.h"
@@ -29,14 +28,13 @@
 #include "pt2_edit.h"
 #include "pt2_module_loader.h"
 #include "pt2_module_saver.h"
-#include "pt2_sample_loader.h"
-#include "pt2_unicode.h"
 #include "pt2_scopes.h"
 #include "pt2_audio.h"
 #include "pt2_bmp.h"
 #include "pt2_sync.h"
 #include "pt2_sampling.h"
-#include "pt2_hpc.h"
+#include "pt2_askbox.h"
+#include "pt2_replayer.h"
 
 #define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
@@ -170,7 +168,7 @@ int main(int argc, char *argv[])
 #ifdef _WIN32
 
 	// ALT+F4 is used in ProTracker, but is "close program" in Windows...
-#if SDL_MAJOR_VERSION == 2 && SDL_MINOR_VERSION >= 0 && SDL_PATCHLEVEL >= 4
+#if SDL_MINOR_VERSION >= 24 || (SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL >= 4)
 	SDL_SetHint(SDL_HINT_WINDOWS_NO_CLOSE_ON_ALT_F4, "1");
 #endif
 
@@ -332,14 +330,18 @@ int main(int argc, char *argv[])
 	if (config.startInFullscreen)
 		toggleFullscreen();
 
-	changePathToHome(); // set path to home/user-dir now
+	changePathToDesktop(); // change path to desktop now
 	diskOpSetInitPath(); // set path to custom path in config (if present)
 
 	SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
-	hpc_ResetEndTime(&video.vblankHpc);
+	editor.mainLoopOngoing = true;
+	hpc_ResetEndTime(&video.vblankHpc); // this must be the very last thing done before entering the main loop
+
+	// XXX: if you change anything in the main loop, make sure it goes in the askBox()(pt2_askbox.c) loop too, if needed
 	while (editor.programRunning)
 	{
+		handleThreadedAskBox();
 		sinkVisualizerBars();
 		updateChannelSyncBuffer();
 		readMouseXY();
@@ -348,11 +350,8 @@ int main(int argc, char *argv[])
 		updateMouseCounters();
 		handleKeyRepeat(keyb.lastRepKey);
 
-		if (!mouse.buttonWaiting && ui.sampleMarkingPos == -1 &&
-			!ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
-		{
+		if (!mouse.buttonWaiting && ui.sampleMarkingPos == -1 && !ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
 			handleGUIButtonRepeat();
-		}
 
 		renderFrame();
 		flipFrame();
@@ -366,9 +365,7 @@ int main(int argc, char *argv[])
 
 static void handleInput(void)
 {
-	char inputChar;
 	SDL_Event event;
-
 	while (SDL_PollEvent(&event))
 	{
 		if (event.type == SDL_WINDOWEVENT)
@@ -390,7 +387,7 @@ static void handleInput(void)
 		{
 			// text input when editing texts/numbers
 
-			inputChar = event.text.text[0];
+			char inputChar = event.text.text[0];
 			if (inputChar == '\0')
 				continue;
 
@@ -404,12 +401,12 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_DROPFILE)
 		{
-			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
-			SDL_free(event.drop.file);
-
 			// kludge: allow focus-clickthrough after drag-n-drop
 			SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 			didDropFile = true;
+
+			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
+			SDL_free(event.drop.file);
 		}
 		if (event.type == SDL_QUIT)
 		{
@@ -417,7 +414,7 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_KEYUP)
 		{
-			keyUpHandler(event.key.keysym.scancode, event.key.keysym.sym);
+			keyUpHandler(event.key.keysym.scancode);
 		}
 		else if (event.type == SDL_KEYDOWN)
 		{
@@ -428,12 +425,12 @@ static void handleInput(void)
 		{
 			mouseButtonUpHandler(event.button.button);
 
-			if (!ui.askScreenShown && ui.introScreenShown)
+			if (ui.introTextShown)
 			{
-				if (!ui.clearScreenShown && !ui.diskOpScreenShown && !editor.errorMsgActive)
+				if (!ui.diskOpScreenShown && !editor.errorMsgActive && !ui.askBoxShown)
 					statusAllRight();
 
-				ui.introScreenShown = false;
+				ui.introTextShown = false;
 			}
 
 			// kludge: we drag-n-dropped a file before this mouse click release, restore focus-clickthrough mode
@@ -461,9 +458,10 @@ static void handleInput(void)
 				SDL_WaitThread(diskop.fillThread, NULL);
 			}
 
-			if (editor.isWAVRendering)
+			if (editor.mod2WavOngoing)
 			{
-				editor.isWAVRendering = false;
+				editor.mod2WavOngoing = false;
+
 				editor.abortMod2Wav = true;
 				SDL_WaitThread(editor.mod2WavThread, NULL);
 			}
@@ -536,7 +534,7 @@ static bool initializeVars(void)
 	editor.multiModeNext[1] = 3;
 	editor.multiModeNext[2] = 4;
 	editor.multiModeNext[3] = 1;
-	ui.introScreenShown = true;
+	ui.introTextShown = true;
 	editor.normalizeFiltersFlag = true;
 	editor.markStartOfs = -1;
 	ui.sampleMarkingPos = -1;
@@ -557,6 +555,8 @@ static bool initializeVars(void)
 	editor.metroChannelDisp = &editor.metroChannel;
 	editor.quantizeValueDisp = &config.quantizeValue;
 
+	editor.mod2WavFadeOutSeconds = 6;
+
 	editor.programRunning = true;
 	return true;
 
@@ -567,6 +567,15 @@ oom:
 
 static void handleSigTerm(void)
 {
+	if (editor.mod2WavOngoing)
+	{
+		editor.mod2WavOngoing = false;
+
+		editor.abortMod2Wav = true;
+		SDL_WaitThread(editor.mod2WavThread, NULL);
+		removeAskBox();
+	}
+
 	if (song->modified)
 	{
 		resetAllScreens();
@@ -578,12 +587,8 @@ static void handleSigTerm(void)
 			SDL_RaiseWindow(video.window);
 		}
 
-		ui.askScreenShown = true;
-		ui.askScreenType = ASK_QUIT;
-
-		pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-		setStatusMessage("REALLY QUIT ?", NO_CARRY);
-		renderAskDialog();
+		if (askBox(ASKBOX_YES_NO, "REALLY QUIT ?"))
+			ui.throwExit = true;
 	}
 	else
 	{
@@ -595,21 +600,19 @@ static void handleSigTerm(void)
 #ifdef __APPLE__
 static void osxSetDirToProgramDirFromArgs(char **argv)
 {
-	char *tmpPath;
-	int32_t i, tmpPathLen;
-
 	/* OS X/macOS: hackish way of setting the current working directory to the place where we double clicked
-	** on the icon (for protracker.ini loading) */
+	** on the icon (for protracker.ini loading)
+	*/
 
 	// if we launched from the terminal, argv[0][0] would be '.'
 	if (argv[0] != NULL && argv[0][0] == DIR_DELIMITER) // don't do the hack if we launched from the terminal
 	{
-		tmpPath = strdup(argv[0]);
+		char *tmpPath = strdup(argv[0]);
 		if (tmpPath != NULL)
 		{
 			// cut off program filename
-			tmpPathLen = strlen(tmpPath);
-			for (i = tmpPathLen-1; i >= 0; i--)
+			int32_t tmpPathLen = strlen(tmpPath);
+			for (int32_t i = tmpPathLen-1; i >= 0; i--)
 			{
 				if (tmpPath[i] == DIR_DELIMITER)
 				{
@@ -690,20 +693,20 @@ static void disableWasapi(void)
 static void makeSureDirIsProgramDir(void)
 {
 #ifndef _DEBUG
-	UNICHAR *allocPtr, *path;
-	int32_t i, pathLen;
+	int32_t i;
 
 	// this can return two paths in Windows, but first one is .exe path
-	path = GetCommandLineW();
+	UNICHAR *path = GetCommandLineW();
 	if (path == NULL)
 		return;
 
-	allocPtr = UNICHAR_STRDUP(path);
+	UNICHAR *allocPtr = UNICHAR_STRDUP(path);
 	if (allocPtr == NULL)
 		return; // out of memory (but it doesn't matter)
 
 	path = allocPtr;
-	pathLen = (int32_t)UNICHAR_STRLEN(path);
+
+	int32_t pathLen = (int32_t)UNICHAR_STRLEN(path);
 
 	// remove first "
 	if (path[0] == L'\"')

@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stdbool.h>
 #include "pt2_mouse.h"
 
 const char *ftuneStrTab[16] =
@@ -180,10 +179,18 @@ const int16_t periodTable[(37*16)+15] = // contains 16 finetuned period sections
 };
 
 /*
-** const double dBpmMs1024 = 1024.0 / (bpm / 2.5); // milliseconds (scaled from 1000 to 1024)
-** x = (uint64_t)floor((UINT32_MAX + 1.0) * dBpmMs1024);
+** Formula:
+** for (int32_t i = 32; i <= 255; i++)
+** {
+**     double dBpmMs1024 = 1024.0 / (i / 2.5); // binary ms (1000->1024)
+**     musicTimeTab64[i-32] = (uint64_t)floor((UINT32_MAX + 1.0) * dBpmMs1024);
+** }
+**
+** // vblank mode (~49.92Hz)
+** double dBpmMs1024 = 1024.0 / 49.920409283472; // binary ms (1000->1024)
+** musicTimeTab64[256] =  (uint64_t)floor((UINT32_MAX + 1.0) * dBpmMs1024);
 */
-const uint64_t musicTimeTab64[256-32] =
+const uint64_t musicTimeTab64[(256-32) + 1] =
 {
 	0x5000000000,0x4D9364D936,0x4B4B4B4B4B,0x4924924924,0x471C71C71C,0x45306EB3E4,
 	0x435E50D794,0x41A41A41A4,0x4000000000,0x3E7063E706,0x3CF3CF3CF3,0x3B88EE23B8,
@@ -222,32 +229,12 @@ const uint64_t musicTimeTab64[256-32] =
 	0x0AD8F2FBA9,0x0ACD3B68C6,0x0AC19D0AC1,0x0AB617909A,0x0AAAAAAAAA,0x0A9F560A9F,
 	0x0A94196370,0x0A88F46959,0x0A7DE6D1D6,0x0A72F05397,0x0A6810A681,0x0A5D4783A0,
 	0x0A5294A529,0x0A47F7C66C,0x0A3D70A3D7,0x0A32FEFAE6,0x0A28A28A28,0x0A1E5B1133,
-	0x0A142850A1,0x0A0A0A0A0A
+	0x0A142850A1,0x0A0A0A0A0A,
+
+	0x14833D2EF0 // ~49.92Hz (vblank tempo mode)
 };
 
 // button tables taken from the ptplay project + modified
-
-const guiButton_t bAsk[] =
-{
-	{171, 71,196, 81, PTB_SUREY},
-	{234, 71,252, 81, PTB_SUREN}
-};
-
-const guiButton_t bPat2SmpAsk[] =
-{
-	{168, 71,185, 81, PTB_PAT2SMP_HI},
-	{192, 71,210, 81, PTB_PAT2SMP_LO},
-	{217, 71,256, 81, PTB_PAT2SMP_ABORT}
-};
-
-const guiButton_t bClear[] =
-{
-	{166, 57,198, 67, PTB_CLEARSONG},
-	{204, 57,257, 67, PTB_CLEARSAMPLES},
-
-	{166, 73,198, 83, PTB_CLEARALL},
-	{204, 73,257, 83, PTB_CLEARCANCEL}
-};
 
 const guiButton_t bTopScreen[] =
 {
@@ -351,21 +338,21 @@ const guiButton_t bDiskOp[] =
 
 const guiButton_t bPosEd[] =
 {
-	{ 120,  0,171, 10, PTB_POSINS},
-	{ 172,  0,267, 21, PTB_STOP},
-	{ 268,  0,319, 10, PTB_PLAY},
+	{120,  0,171, 10, PTB_POSINS},
+	{172,  0,267, 21, PTB_STOP},
+	{268,  0,319, 10, PTB_PLAY},
 
-	{ 120, 11,171, 21, PTB_POSDEL},
-	{ 178, 22,307, 98, PTB_DUMMY},
-	{ 268, 11,319, 21, PTB_PATTERN},
+	{120, 11,171, 21, PTB_POSDEL},
+	{178, 22,307, 98, PTB_DUMMY},
+	{268, 11,319, 21, PTB_PATTERN},
 
-	{ 120, 22,177, 98, PTB_PE_PATT},
-	{ 308, 22,319, 32, PTB_PE_SCROLLTOP},
+	{120, 22,177, 98, PTB_PE_PATT},
+	{308, 22,319, 32, PTB_PE_SCROLLTOP},
 
-	{ 308, 33,319, 43, PTB_PE_SCROLLUP},
-	{ 308, 44,319, 76, PTB_PE_EXIT},
-	{ 308, 77,319, 87, PTB_PE_SCROLLDOWN},
-	{ 308, 88,319, 98, PTB_PE_SCROLLBOT}
+	{308, 33,319, 43, PTB_PE_SCROLLUP},
+	{308, 44,319, 76, PTB_PE_EXIT},
+	{308, 77,319, 87, PTB_PE_SCROLLDOWN},
+	{308, 88,319, 98, PTB_PE_SCROLLBOT}
 };
 
 const guiButton_t bEditOp1[] =

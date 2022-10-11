@@ -2,17 +2,12 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h>
-#include "pt2_header.h"
 
 // fast 32-bit -> 16-bit clamp
 #define CLAMP16(i) if ((int16_t)(i) != i) i = 0x7FFF ^ (i >> 31)
 
 // fast 16-bit -> 8-bit clamp
 #define CLAMP8(i) if ((int8_t)(i) != i) i = 0x7F ^ (i >> 15)
-
-#define ALIGN_PTR(p, x) (((uintptr_t)(p) + ((x)-1)) & ~((x)-1))
-#define MALLOC_PAD(size, pad) (malloc((size) + (pad)))
 
 #define SWAP16(value) \
 ( \

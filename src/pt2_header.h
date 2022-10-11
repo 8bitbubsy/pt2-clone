@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.51"
+#define PROG_VER_STR "1.52"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -30,6 +30,14 @@
 
 #define SCREEN_W 320
 #define SCREEN_H 255
+
+// main crystal oscillator for PAL Amiga systems
+#define AMIGA_PAL_XTAL_HZ 28375160
+#define AMIGA_PAL_CCK_HZ (AMIGA_PAL_XTAL_HZ/8.0)
+#define CIA_PAL_CLK (AMIGA_PAL_CCK_HZ / 5.0)
+
+// nominal framerate in normal PAL videomodes (~49.92Hz)
+#define AMIGA_PAL_VBLANK_HZ (AMIGA_PAL_CCK_HZ / (double)(313*227))
 
 /* "60Hz" ranges everywhere from 59..61Hz depending on the monitor, so with
 ** no vsync we will get stuttering because the rate is not perfect...
@@ -50,7 +58,6 @@
 #define MOD_ORDERS 128
 #define MAX_PATTERNS 100
 
-#define AMIGA_VOICES 4
 #define SCOPE_WIDTH 40
 #define SCOPE_HEIGHT 33
 #define SPECTRUM_BAR_NUM 23
@@ -58,22 +65,6 @@
 #define SPECTRUM_BAR_WIDTH 6
 
 #define POSED_LIST_SIZE 12
-
-// main crystal oscillator for PAL Amiga systems
-#define AMIGA_PAL_XTAL_HZ 28375160
-
-#define AMIGA_PAL_CCK_HZ (AMIGA_PAL_XTAL_HZ/8.0)
-
-// nominal framerate in normal PAL videomodes (~49.92Hz)
-#define AMIGA_PAL_VBLANK_HZ (AMIGA_PAL_CCK_HZ / (double)(313*227))
-
-#define PAULA_PAL_CLK AMIGA_PAL_CCK_HZ
-#define CIA_PAL_CLK (AMIGA_PAL_CCK_HZ / 5.0)
-
-#define PAL_PAULA_MIN_SAFE_PERIOD 124
-#define PAL_PAULA_MAX_SAFE_HZ (PAULA_PAL_CLK / (double)PAL_PAULA_MIN_SAFE_PERIOD)
-
-#define FILTERS_BASE_FREQ (PAULA_PAL_CLK / 214.0)
 
 // Amount of video frames. 14 (PT on Amiga) -> 17 (converted from 49.92Hz to 60Hz)
 #define KEYB_REPEAT_DELAY 17
@@ -181,28 +172,6 @@ enum
 	DISKOP_SMP_IFF = 1,
 	DISKOP_SMP_RAW = 2,
 
-	ASK_QUIT = 0,
-	ASK_SAVE_MODULE = 1,
-	ASK_SAVE_SONG = 2,
-	ASK_SAVE_SAMPLE = 3,
-	ASK_MOD2WAV = 4,
-	ASK_MOD2WAV_OVERWRITE = 5,
-	ASK_SAVEMOD_OVERWRITE = 6,
-	ASK_SAVESMP_OVERWRITE = 7,
-	ASK_LOAD_DOWNSAMPLE = 8,
-	ASK_RESAMPLE = 9,
-	ASK_KILL_SAMPLE = 10,
-	ASK_UPSAMPLE = 11,
-	ASK_DOWNSAMPLE = 12,
-	ASK_FILTER_ALL_SAMPLES = 13,
-	ASK_BOOST_ALL_SAMPLES = 14,
-	ASK_MAKE_CHORD = 15,
-	ASK_SAVE_ALL_SAMPLES = 16,
-	ASK_PAT2SMP = 17,
-	ASK_RESTORE_SAMPLE = 18,
-	ASK_DISCARD_SONG = 19,
-	ASK_DISCARD_SONG_DRAGNDROP = 20,
-
 	TEMPO_MODE_CIA = 0,
 	TEMPO_MODE_VBLANK = 1,
 
@@ -210,27 +179,3 @@ enum
 	TEXT_EDIT_DECIMAL = 1,
 	TEXT_EDIT_HEX = 2
 };
-
-// pt2_replayer.c
-int8_t *allocMemForAllSamples(void);
-void setReplayerPosToTrackerPos(void);
-// -------------------------
-
-void restartSong(void);
-void resetSong(void);
-void incPatt(void);
-void decPatt(void);
-void modSetPos(int16_t order, int16_t row);
-void modStop(void);
-void doStopIt(bool resetPlayMode);
-void playPattern(int8_t startRow);
-void modPlay(int16_t patt, int16_t order, int8_t row);
-void modSetSpeed(int32_t speed);
-void modSetTempo(int32_t bpm, bool doLockAudio);
-void modFree(void);
-bool setupAudio(void);
-void audioClose(void);
-void clearSong(void);
-void clearSamples(void);
-void clearAll(void);
-void modSetPattern(uint8_t pattern);

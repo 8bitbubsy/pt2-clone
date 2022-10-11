@@ -28,7 +28,8 @@ https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-d
  - Adjust the STEREOSEPARATION setting in protracker.ini. It's a percentage
    value ranging from 0 to 100. 0 being mono and 100 being 100% separated like
    the audio output from an Amiga.
-   Pressing SHIFT+F12 will toggle between STEREOSEPARATION and 100% (hard pan).
+   Pressing SHIFT+F12 toggles between centered (0%), Amiga (100%) and
+   custom (STEREOSEPARATION %).
 
  * How do I change the Multi channel ordering?
  - When in idle mode (not edit/play etc), press ALT+1/2/3/4 to increase

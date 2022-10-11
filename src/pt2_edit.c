@@ -13,24 +13,20 @@
 #else
 #include <unistd.h>
 #endif
-#include "pt2_header.h"
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
 #include "pt2_tables.h"
-#include "pt2_audio.h"
 #include "pt2_diskop.h"
-#include "pt2_mouse.h"
 #include "pt2_sampler.h"
 #include "pt2_visuals.h"
 #include "pt2_keyboard.h"
-#include "pt2_scopes.h"
-#include "pt2_structs.h"
 #include "pt2_config.h"
 #include "pt2_audio.h"
-#include "pt2_sync.h"
 #include "pt2_chordmaker.h"
+#include "pt2_edit.h"
+#include "pt2_replayer.h"
 
-const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
+static const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
 {
 	 7,  4,  3, 16, -1,  6,  8, 24,
 	10, -1, 13, 11,  9, 26, 28, 12,
@@ -41,7 +37,7 @@ const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
 	-1, 12, 14, 16
 };
 
-const int8_t scancode2NoteHi[52] = // "USB usage page standard" order
+static const int8_t scancode2NoteHi[52] = // "USB usage page standard" order
 {
 	19, 16, 15, 28, -1, 18, 20, -2,
 	22, -1, 25, 23, 21, -2, -2, 24,
@@ -51,13 +47,6 @@ const int8_t scancode2NoteHi[52] = // "USB usage page standard" order
 	-1, -2, -2, -2, -2, -1, 27, -1,
 	-1, 24, 26, 28
 };
-
-void setPattern(int16_t pattern); // pt2_replayer.c
-
-void jamAndPlaceSample(SDL_Scancode scancode,  bool normalMode);
-uint8_t quantizeCheck(uint8_t row);
-bool handleSpecialKeys(SDL_Scancode scancode);
-int8_t keyToNote(SDL_Scancode scancode);
 
 // used for re-rendering text object while editing it
 void updateTextObject(int16_t editObject)
@@ -97,17 +86,15 @@ void updateTextObject(int16_t editObject)
 void exitGetTextLine(bool updateValue)
 {
 	int8_t tmp8;
-	int16_t posEdPos, tmp16;
+	int16_t tmp16;
 	int32_t tmp32;
-	UNICHAR *pathU;
-	moduleSample_t *s;
 
 	SDL_StopTextInput();
 
 	// if user updated the disk op path text
 	if (ui.diskOpScreenShown && ui.editObject == PTB_DO_DATAPATH)
 	{
-		pathU = (UNICHAR *)calloc(PATH_MAX + 2, sizeof (UNICHAR));
+		UNICHAR *pathU = (UNICHAR *)calloc(PATH_MAX + 2, sizeof (UNICHAR));
 		if (pathU != NULL)
 		{
 #ifdef _WIN32
@@ -157,7 +144,7 @@ void exitGetTextLine(bool updateValue)
 	{
 		// set back GUI text pointers and update values (if requested)
 
-		s = &song->samples[editor.currSample];
+		moduleSample_t *s = &song->samples[editor.currSample];
 		switch (ui.editObject)
 		{
 			case PTB_SA_FIL_LP_CUTOFF:
@@ -333,7 +320,7 @@ void exitGetTextLine(bool updateValue)
 
 			case PTB_PE_PATT:
 			{
-				posEdPos = song->currOrder;
+				int16_t posEdPos = song->currOrder;
 				if (posEdPos > song->header.numOrders-1)
 					posEdPos = song->header.numOrders-1;
 
@@ -420,7 +407,7 @@ void exitGetTextLine(bool updateValue)
 					{
 						song->header.numOrders = tmp16;
 
-						posEdPos = song->currOrder;
+						int16_t posEdPos = song->currOrder;
 						if (posEdPos > song->header.numOrders-1)
 							posEdPos = song->header.numOrders-1;
 
@@ -559,7 +546,7 @@ void exitGetTextLine(bool updateValue)
 					{
 						turnOffVoices();
 						s->loopStart = tmp32;
-						mixerUpdateLoops();
+						updatePaulaLoops();
 
 						ui.updateCurrSampleRepeat = true;
 
@@ -604,7 +591,7 @@ void exitGetTextLine(bool updateValue)
 					{
 						turnOffVoices();
 						s->loopLength = tmp32;
-						mixerUpdateLoops();
+						updatePaulaLoops();
 
 						ui.updateCurrSampleReplen = true;
 						if (ui.editOpScreenShown && ui.editOpScreen == 3)
@@ -672,11 +659,147 @@ void getNumLine(uint8_t type, int16_t editObject)
 	SDL_StartTextInput();
 }
 
+static uint8_t quantizeCheck(uint8_t row)
+{
+	assert(song != NULL);
+	if (song == NULL)
+		return row;
+
+	const uint8_t quantize = (uint8_t)config.quantizeValue;
+
+	editor.didQuantize = false;
+	if (editor.currMode == MODE_RECORD)
+	{
+		if (quantize == 0)
+		{
+			return row;
+		}
+		else if (quantize == 1)
+		{
+			if (song->tick > song->speed>>1)
+			{
+				row = (row + 1) & 0x3F;
+				editor.didQuantize = true;
+			}
+		}
+		else
+		{
+			uint8_t tempRow = ((((quantize >> 1) + row) & 63) / quantize) * quantize;
+			if (tempRow > row)
+				editor.didQuantize = true;
+
+			return tempRow;
+		}
+	}
+
+	return row;
+}
+
+static void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
+{
+	uint8_t chNum = cursor.channel;
+	assert(chNum < PAULA_VOICES);
+
+	moduleChannel_t *ch = &song->channels[chNum];
+	note_t *note = &song->patterns[song->currPattern][(quantizeCheck(song->currRow) * PAULA_VOICES) + chNum];
+
+	int8_t noteVal = normalMode ? keyToNote(scancode) : pNoteTable[editor.currSample];
+	if (noteVal >= 0)
+	{
+		moduleSample_t *s = &song->samples[editor.currSample];
+
+		int16_t tempPeriod  = periodTable[((s->fineTune & 0xF) * 37) + noteVal];
+		uint16_t cleanPeriod = periodTable[noteVal];
+
+		editor.currPlayNote = noteVal;
+
+		// play current sample
+
+		// don't play sample if we quantized to another row (will be played in modplayer instead)
+		if (editor.currMode != MODE_RECORD || !editor.didQuantize)
+		{
+			lockAudio();
+
+			ch->n_samplenum = editor.currSample;
+			ch->n_volume = s->volume;
+			ch->n_period = tempPeriod;
+			ch->n_start = &song->sampleData[s->offset];
+			ch->n_length = (uint16_t)((s->loopStart > 0) ? (s->loopStart + s->loopLength) >> 1 : s->length >> 1);
+			ch->n_loopstart = &song->sampleData[s->offset + s->loopStart];
+			ch->n_replen = (uint16_t)(s->loopLength >> 1);
+
+			if (ch->n_length == 0)
+				ch->n_length = 1;
+
+			paulaSetVolume(chNum, ch->n_volume);
+			paulaSetPeriod(chNum, ch->n_period);
+			paulaSetData(chNum, ch->n_start);
+			paulaSetLength(chNum, ch->n_length);
+
+			if (!editor.muted[chNum])
+				paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
+			else
+				paulaSetDMACON(ch->n_dmabit); // voice DMA off
+
+			// these take effect after the current DMA cycle is done
+			paulaSetData(chNum, ch->n_loopstart);
+			paulaSetLength(chNum, ch->n_replen);
+
+			unlockAudio();
+		}
+
+		// normalMode = normal keys, or else keypad keys (in jam mode)
+		if (normalMode || editor.pNoteFlag != 0)
+		{
+			if (normalMode || editor.pNoteFlag == 2)
+			{
+				// insert note and sample number
+				if (!ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
+				{
+					note->sample = editor.sampleZero ? 0 : (editor.currSample + 1);
+					note->period = cleanPeriod;
+
+					if (editor.autoInsFlag)
+					{
+						note->command = editor.effectMacros[editor.autoInsSlot] >> 8;
+						note->param = editor.effectMacros[editor.autoInsSlot] & 0xFF;
+					}
+
+					if (editor.currMode != MODE_RECORD)
+						modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
+
+					updateWindowTitle(MOD_IS_MODIFIED);
+				}
+			}
+
+			if (editor.multiFlag)
+				gotoNextMulti();
+		}
+
+		updateSpectrumAnalyzer(s->volume, tempPeriod);
+	}
+	else if (noteVal == -2)
+	{
+		// delete note and sample if illegal note (= -2, -1 = ignore) key was entered
+
+		if (normalMode || editor.pNoteFlag == 2)
+		{
+			if (!ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
+			{
+				note->period = 0;
+				note->sample = 0;
+
+				if (editor.currMode != MODE_RECORD)
+					modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
+
+				updateWindowTitle(MOD_IS_MODIFIED);
+			}
+		}
+	}
+}
+
 void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 {
-	int8_t key, hexKey, numberKey;
-	note_t *note;
-
 	if (ui.editTextFlag)
 		return;
 
@@ -695,7 +818,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 		if (handleSpecialKeys(scancode))
 		{
 			if (editor.currMode != MODE_RECORD)
-				modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+				modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 			return;
 		}
@@ -710,6 +833,8 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 
 		if (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD)
 		{
+			int8_t hexKey, numberKey;
+
 			if (scancode == SDL_SCANCODE_0)
 				numberKey = 0;
 			else if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_9)
@@ -722,7 +847,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 			else
 				hexKey = -1;
 
-			key = -1;
+			int8_t key = -1;
 			if (numberKey != -1)
 			{
 				if (key == -1)
@@ -739,18 +864,17 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 				key += hexKey;
 			}
 
-			note = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
-
+			note_t *note = &song->patterns[song->currPattern][(song->currRow * PAULA_VOICES) + cursor.channel];
 			switch (cursor.mode)
 			{
 				case CURSOR_SAMPLE1:
 				{
 					if (key != -1 && key < 2)
 					{
-						note->sample = (uint8_t)((note->sample % 0x10) | (key << 4));
+						note->sample = (uint8_t)((note->sample & 0x0F) | (key << 4));
 
 						if (editor.currMode != MODE_RECORD)
-							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
@@ -761,10 +885,10 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 				{
 					if (key != -1 && key < 16)
 					{
-						note->sample = (uint8_t)((note->sample & 16) | key);
+						note->sample = (uint8_t)((note->sample & 0xF0) | key);
 
 						if (editor.currMode != MODE_RECORD)
-							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
@@ -778,7 +902,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 						note->command = (uint8_t)key;
 
 						if (editor.currMode != MODE_RECORD)
-							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
@@ -789,10 +913,10 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 				{
 					if (key != -1 && key < 16)
 					{
-						note->param = (uint8_t)((note->param % 0x10) | (key << 4));
+						note->param = (uint8_t)((note->param & 0x0F) | (key << 4));
 
 						if (editor.currMode != MODE_RECORD)
-							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
@@ -806,7 +930,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 						note->param = (uint8_t)((note->param & 0xF0) | key);
 
 						if (editor.currMode != MODE_RECORD)
-							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+							modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 						updateWindowTitle(MOD_IS_MODIFIED);
 					}
@@ -823,7 +947,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 		{
 			if (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD)
 			{
-				note = &song->patterns[song->currPattern][(song->currRow * AMIGA_VOICES) + cursor.channel];
+				note_t *note = &song->patterns[song->currPattern][(song->currRow * PAULA_VOICES) + cursor.channel];
 
 				if (!keyb.leftAltPressed)
 				{
@@ -838,7 +962,7 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 				}
 
 				if (editor.currMode != MODE_RECORD)
-					modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
+					modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 63);
 
 				updateWindowTitle(MOD_IS_MODIFIED);
 			}
@@ -856,14 +980,12 @@ void handleEditKeys(SDL_Scancode scancode, bool normalMode)
 
 bool handleSpecialKeys(SDL_Scancode scancode)
 {
-	note_t *patt, *note, *prevNote;
-
 	if (!keyb.leftAltPressed)
 		return false;
 
-	patt = song->patterns[song->currPattern];
-	note = &patt[(song->currRow * AMIGA_VOICES) + cursor.channel];
-	prevNote = &patt[(((song->currRow - 1) & 0x3F) * AMIGA_VOICES) + cursor.channel];
+	note_t *patt = song->patterns[song->currPattern];
+	note_t *note = &patt[(song->currRow * PAULA_VOICES) + cursor.channel];
+	note_t *prevNote = &patt[(((song->currRow - 1) & 63) * PAULA_VOICES) + cursor.channel];
 
 	if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0)
 	{
@@ -910,7 +1032,7 @@ bool handleSpecialKeys(SDL_Scancode scancode)
 
 void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature (in SAMPLER)
 {
-	const int32_t ch = cursor.channel;
+	const int32_t chNum = cursor.channel;
 
 	if (scancode == SDL_SCANCODE_NONUSBACKSLASH)
 	{
@@ -918,7 +1040,7 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 		return;
 	}
 
-	const int8_t noteVal = keyToNote(scancode);
+	int8_t noteVal = keyToNote(scancode);
 	if (noteVal < 0 || noteVal > 35)
 		return;
 
@@ -926,191 +1048,44 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 	if (s->length <= 1)
 		return;
 
+	moduleChannel_t *ch = &song->channels[chNum];
+
+	int8_t *n_start = &song->sampleData[s->offset];
+	int8_t vol = 64;
+	uint16_t n_length = (uint16_t)(s->length >> 1);
+	uint16_t period = periodTable[((s->fineTune & 0xF) * 37) + noteVal];
+
 	lockAudio();
 
-	song->channels[ch].n_samplenum = editor.currSample; // needed for sample playback/sampling line
+	ch->n_samplenum = editor.currSample; // needed for sample playback/sampling line
 
-	const int8_t *n_start = &song->sampleData[s->offset];
-	const int8_t vol = 64;
-	const uint16_t n_length = (uint16_t)(s->length >> 1);
-	const uint16_t period = periodTable[((s->fineTune & 0xF) * 37) + noteVal];
+	paulaSetVolume(chNum, vol);
+	paulaSetPeriod(chNum, period);
+	paulaSetData(chNum, n_start);
+	paulaSetLength(chNum, n_length);
 
-	paulaSetVolume(ch, vol);
-	paulaSetPeriod(ch, period);
-	paulaSetData(ch, n_start);
-	paulaSetLength(ch, n_length);
-
-	if (!editor.muted[ch])
-		paulaStartDMA(ch);
+	if (!editor.muted[chNum])
+		paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
 	else
-		paulaStopDMA(ch);
+		paulaSetDMACON(ch->n_dmabit); // voice DMA off
 
 	// these take effect after the current DMA cycle is done
-	paulaSetData(ch, NULL);
-	paulaSetLength(ch, 1);
+	paulaSetData(chNum, NULL); // NULL = reserved buffer (empty)
+	paulaSetLength(chNum, 1);
 
 	unlockAudio();
 }
 
-void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
-{
-	int8_t noteVal;
-	uint8_t ch;
-	int16_t tempPeriod;
-	uint16_t cleanPeriod;
-	moduleChannel_t *chn;
-	moduleSample_t *s;
-	note_t *note;
-
-	ch = cursor.channel;
-	assert(ch < AMIGA_VOICES);
-
-	chn = &song->channels[ch];
-	note = &song->patterns[song->currPattern][(quantizeCheck(song->currRow) * AMIGA_VOICES) + ch];
-
-	noteVal = normalMode ? keyToNote(scancode) : pNoteTable[editor.currSample];
-	if (noteVal >= 0)
-	{
-		s = &song->samples[editor.currSample];
-
-		tempPeriod  = periodTable[((s->fineTune & 0xF) * 37) + noteVal];
-		cleanPeriod = periodTable[noteVal];
-
-		editor.currPlayNote = noteVal;
-
-		// play current sample
-
-		// don't play sample if we quantized to another row (will be played in modplayer instead)
-		if (editor.currMode != MODE_RECORD || !editor.didQuantize)
-		{
-			lockAudio();
-
-			chn->n_samplenum = editor.currSample;
-			chn->n_volume = s->volume;
-			chn->n_period = tempPeriod;
-			chn->n_start = &song->sampleData[s->offset];
-			chn->n_length = (uint16_t)((s->loopStart > 0) ? (s->loopStart + s->loopLength) >> 1 : s->length >> 1);
-			chn->n_loopstart = &song->sampleData[s->offset + s->loopStart];
-			chn->n_replen = (uint16_t)(s->loopLength >> 1);
-
-			if (chn->n_length == 0)
-				chn->n_length = 1;
-
-			paulaSetVolume(ch, chn->n_volume);
-			paulaSetPeriod(ch, chn->n_period);
-			paulaSetData(ch, chn->n_start);
-			paulaSetLength(ch, chn->n_length);
-
-			if (!editor.muted[ch])
-				paulaStartDMA(ch);
-			else
-				paulaStopDMA(ch);
-
-			// these take effect after the current DMA cycle is done
-			paulaSetData(ch, chn->n_loopstart);
-			paulaSetLength(ch, chn->n_replen);
-
-			unlockAudio();
-		}
-
-		// normalMode = normal keys, or else keypad keys (in jam mode)
-		if (normalMode || editor.pNoteFlag != 0)
-		{
-			if (normalMode || editor.pNoteFlag == 2)
-			{
-				// insert note and sample number
-				if (!ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
-				{
-					note->sample = editor.sampleZero ? 0 : (editor.currSample + 1);
-					note->period = cleanPeriod;
-
-					if (editor.autoInsFlag)
-					{
-						note->command = editor.effectMacros[editor.autoInsSlot] >> 8;
-						note->param = editor.effectMacros[editor.autoInsSlot] & 0xFF;
-					}
-
-					if (editor.currMode != MODE_RECORD)
-						modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
-
-					updateWindowTitle(MOD_IS_MODIFIED);
-				}
-			}
-
-			if (editor.multiFlag)
-				gotoNextMulti();
-		}
-
-		updateSpectrumAnalyzer(s->volume, tempPeriod);
-	}
-	else if (noteVal == -2)
-	{
-		// delete note and sample if illegal note (= -2, -1 = ignore) key was entered
-
-		if (normalMode || editor.pNoteFlag == 2)
-		{
-			if (!ui.samplerScreenShown && (editor.currMode == MODE_EDIT || editor.currMode == MODE_RECORD))
-			{
-				note->period = 0;
-				note->sample = 0;
-
-				if (editor.currMode != MODE_RECORD)
-					modSetPos(DONT_SET_ORDER, (song->currRow + editor.editMoveAdd) & 0x3F);
-
-				updateWindowTitle(MOD_IS_MODIFIED);
-			}
-		}
-	}
-}
-
-uint8_t quantizeCheck(uint8_t row)
-{
-	assert(song != NULL);
-	if (song == NULL)
-		return row;
-
-	const uint8_t quantize = (uint8_t)config.quantizeValue;
-
-	editor.didQuantize = false;
-	if (editor.currMode == MODE_RECORD)
-	{
-		if (quantize == 0)
-		{
-			return row;
-		}
-		else if (quantize == 1)
-		{
-			if (song->tick > song->speed>>1)
-			{
-				row = (row + 1) & 0x3F;
-				editor.didQuantize = true;
-			}
-		}
-		else
-		{
-			uint8_t tempRow = ((((quantize >> 1) + row) & 0x3F) / quantize) * quantize;
-			if (tempRow > row)
-				editor.didQuantize = true;
-
-			return tempRow;
-		}
-	}
-
-	return row;
-}
-
 void saveUndo(void)
 {
-	memcpy(editor.undoBuffer, song->patterns[song->currPattern], sizeof (note_t) * (AMIGA_VOICES * MOD_ROWS));
+	memcpy(editor.undoBuffer, song->patterns[song->currPattern], sizeof (note_t) * (PAULA_VOICES * MOD_ROWS));
 }
 
 void undoLastChange(void)
 {
-	note_t data;
-
-	for (uint16_t i = 0; i < MOD_ROWS*AMIGA_VOICES; i++)
+	for (uint16_t i = 0; i < MOD_ROWS * PAULA_VOICES; i++)
 	{
-		data = editor.undoBuffer[i];
+		note_t data = editor.undoBuffer[i];
 		editor.undoBuffer[i] = song->patterns[song->currPattern][i];
 		song->patterns[song->currPattern][i] = data;
 	}
@@ -1121,11 +1096,6 @@ void undoLastChange(void)
 
 void copySampleTrack(void)
 {
-	uint8_t i;
-	uint32_t tmpOffset;
-	note_t *noteSrc;
-	moduleSample_t *smpFrom, *smpTo;
-
 	if (editor.trackPattFlag == 2)
 	{
 		// copy from one sample slot to another
@@ -1137,13 +1107,13 @@ void copySampleTrack(void)
 			return;
 		}
 
-		smpTo = &song->samples[editor.sampleTo - 1];
-		smpFrom = &song->samples[editor.sampleFrom - 1];
+		moduleSample_t *smpTo = &song->samples[editor.sampleTo - 1];
+		moduleSample_t *smpFrom = &song->samples[editor.sampleFrom - 1];
 
 		turnOffVoices();
 
 		// copy
-		tmpOffset = smpTo->offset;
+		uint32_t tmpOffset = smpTo->offset;
 		*smpTo = *smpFrom;
 		smpTo->offset = tmpOffset;
 
@@ -1164,20 +1134,20 @@ void copySampleTrack(void)
 		// copy sample number in track/pattern
 		if (editor.trackPattFlag == 0)
 		{
-			for (i = 0; i < MOD_ROWS; i++)
+			for (int32_t i = 0; i < MOD_ROWS; i++)
 			{
-				noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+				note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 				if (noteSrc->sample == editor.sampleFrom)
 					noteSrc->sample = editor.sampleTo;
 			}
 		}
 		else
 		{
-			for (i = 0; i < AMIGA_VOICES; i++)
+			for (int32_t i = 0; i < PAULA_VOICES; i++)
 			{
-				for (uint8_t j = 0; j < MOD_ROWS; j++)
+				for (int32_t j = 0; j < MOD_ROWS; j++)
 				{
-					noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+					note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 					if (noteSrc->sample == editor.sampleFrom)
 						noteSrc->sample = editor.sampleTo;
 				}
@@ -1195,12 +1165,6 @@ void copySampleTrack(void)
 
 void exchSampleTrack(void)
 {
-	int8_t smp;
-	int32_t i;
-	uint32_t tmpOffset;
-	moduleSample_t *smpFrom, *smpTo, smpTmp;
-	note_t *noteSrc;
-
 	if (editor.trackPattFlag == 2)
 	{
 		// exchange sample slots
@@ -1212,18 +1176,18 @@ void exchSampleTrack(void)
 			return;
 		}
 
-		smpTo = &song->samples[editor.sampleTo-1];
-		smpFrom = &song->samples[editor.sampleFrom-1];
+		moduleSample_t *smpTo = &song->samples[editor.sampleTo-1];
+		moduleSample_t *smpFrom = &song->samples[editor.sampleFrom-1];
 
 		turnOffVoices();
 
 		// swap offsets first so that the next swap will leave offsets intact
-		tmpOffset = smpFrom->offset;
+		uint32_t tmpOffset = smpFrom->offset;
 		smpFrom->offset = smpTo->offset;
 		smpTo->offset = tmpOffset;
 
 		// swap sample (now offsets are left as before)
-		smpTmp = *smpFrom;
+		moduleSample_t smpTmp = *smpFrom;
 		*smpFrom = *smpTo;
 		*smpTo = smpTmp;
 
@@ -1238,9 +1202,9 @@ void exchSampleTrack(void)
 		smpTo->loopLengthDisp = &smpTo->loopLength;
 
 		// swap sample data
-		for (i = 0; i < config.maxSampleLength; i++)
+		for (int32_t i = 0; i < config.maxSampleLength; i++)
 		{
-			smp = song->sampleData[smpFrom->offset+i];
+			int8_t smp = song->sampleData[smpFrom->offset+i];
 			song->sampleData[smpFrom->offset+i] = song->sampleData[smpTo->offset+i];
 			song->sampleData[smpTo->offset+i] = smp;
 		}
@@ -1254,9 +1218,9 @@ void exchSampleTrack(void)
 		// exchange sample number in track/pattern
 		if (editor.trackPattFlag == 0)
 		{
-			for (i = 0; i < MOD_ROWS; i++)
+			for (int32_t i = 0; i < MOD_ROWS; i++)
 			{
-				noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+				note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
 				     if (noteSrc->sample == editor.sampleFrom) noteSrc->sample = editor.sampleTo;
 				else if (noteSrc->sample == editor.sampleTo) noteSrc->sample = editor.sampleFrom;
@@ -1264,11 +1228,11 @@ void exchSampleTrack(void)
 		}
 		else
 		{
-			for (i = 0; i < AMIGA_VOICES; i++)
+			for (int32_t i = 0; i < PAULA_VOICES; i++)
 			{
-				for (uint8_t j = 0; j < MOD_ROWS; j++)
+				for (int32_t j = 0; j < MOD_ROWS; j++)
 				{
-					noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+					note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
 					     if (noteSrc->sample == editor.sampleFrom) noteSrc->sample = editor.sampleTo;
 					else if (noteSrc->sample == editor.sampleTo) noteSrc->sample = editor.sampleFrom;
@@ -1287,15 +1251,13 @@ void exchSampleTrack(void)
 
 void delSampleTrack(void)
 {
-	uint8_t i;
-	note_t *noteSrc;
-
 	saveUndo();
+
 	if (editor.trackPattFlag == 0)
 	{
-		for (i = 0; i < MOD_ROWS; i++)
+		for (int32_t i = 0; i < MOD_ROWS; i++)
 		{
-			noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+			note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 			if (noteSrc->sample == editor.currSample+1)
 			{
 				noteSrc->period = 0;
@@ -1307,11 +1269,11 @@ void delSampleTrack(void)
 	}
 	else
 	{
-		for (i = 0; i < AMIGA_VOICES; i++)
+		for (int32_t i = 0; i < PAULA_VOICES; i++)
 		{
-			for (uint8_t j = 0; j < MOD_ROWS; j++)
+			for (int32_t j = 0; j < MOD_ROWS; j++)
 			{
-				noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+				note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 				if (noteSrc->sample == editor.currSample+1)
 				{
 					noteSrc->period = 0;
@@ -1329,21 +1291,17 @@ void delSampleTrack(void)
 
 void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
-	bool noteDeleted;
-	uint8_t j;
-	note_t *noteSrc;
-
 	if (from > to)
 	{
-		j = from;
+		uint8_t old = from;
 		from = to;
-		to = j;
+		to = old;
 	}
 
 	saveUndo();
-	for (uint8_t i = from; i <= to; i++)
+	for (int32_t i = from; i <= to; i++)
 	{
-		noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1351,13 +1309,14 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 		if (noteSrc->period)
 		{
 			// period -> note
+			int32_t j;
 			for (j = 0; j < 36; j++)
 			{
 				if (noteSrc->period >= periodTable[j])
 					break;
 			}
 
-			noteDeleted = false;
+			bool noteDeleted = false;
 			if (++j > 35)
 			{
 				j = 35;
@@ -1382,21 +1341,17 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
-	bool noteDeleted;
-	int8_t j;
-	note_t *noteSrc;
-
 	if (from > to)
 	{
-		j = from;
+		uint8_t old = from;
 		from = to;
-		to = j;
+		to = old;
 	}
 
 	saveUndo();
-	for (uint8_t i = from; i <= to; i++)
+	for (int32_t i = from; i <= to; i++)
 	{
-		noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1404,13 +1359,14 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 		if (noteSrc->period)
 		{
 			// period -> note
+			int32_t j;
 			for (j = 0; j < 36; j++)
 			{
 				if (noteSrc->period >= periodTable[j])
 					break;
 			}
 
-			noteDeleted = false;
+			bool noteDeleted = false;
 			if (--j < 0)
 			{
 				j = 0;
@@ -1435,23 +1391,19 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
-	bool noteDeleted, noteChanged;
-	uint8_t j;
-	note_t *noteSrc;
-
 	if (from > to)
 	{
-		j = from;
+		uint8_t old = from;
 		from = to;
-		to = j;
+		to = old;
 	}
 
-	noteChanged = false;
+	bool noteChanged = false;
 
 	saveUndo();
-	for (uint8_t i = from; i <= to; i++)
+	for (int32_t i = from; i <= to; i++)
 	{
-		noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1461,13 +1413,14 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 			uint16_t oldPeriod = noteSrc->period;
 
 			// period -> note
+			int32_t j;
 			for (j = 0; j < 36; j++)
 			{
 				if (noteSrc->period >= periodTable[j])
 					break;
 			}
 
-			noteDeleted = false;
+			bool noteDeleted = false;
 			if (j+12 > 35 && config.transDel)
 			{
 				noteSrc->period = 0;
@@ -1496,21 +1449,17 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
-	bool noteDeleted;
-	int8_t j;
-	note_t *noteSrc;
-
 	if (from > to)
 	{
-		j = from;
+		uint8_t old = from;
 		from = to;
-		to = j;
+		to = old;
 	}
 
 	saveUndo();
-	for (uint8_t i = from; i <= to; i++)
+	for (int32_t i = from; i <= to; i++)
 	{
-		noteSrc = &song->patterns[song->currPattern][(i * AMIGA_VOICES) + cursor.channel];
+		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
 		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 			continue;
@@ -1518,13 +1467,14 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 		if (noteSrc->period)
 		{
 			// period -> note
+			int32_t j;
 			for (j = 0; j < 36; j++)
 			{
 				if (noteSrc->period >= periodTable[j])
 					break;
 			}
 
-			noteDeleted = false;
+			bool noteDeleted = false;
 			if (j-12 < 0 && config.transDel)
 			{
 				noteSrc->period = 0;
@@ -1547,16 +1497,12 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void pattNoteUp(bool sampleAllFlag)
 {
-	bool noteDeleted;
-	uint8_t k;
-	note_t *noteSrc;
-
 	saveUndo();
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
-		for (uint8_t j = 0; j < MOD_ROWS; j++)
+		for (int32_t j = 0; j < MOD_ROWS; j++)
 		{
-			noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
 			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 				continue;
@@ -1564,13 +1510,14 @@ void pattNoteUp(bool sampleAllFlag)
 			if (noteSrc->period)
 			{
 				// period -> note
+				int32_t k;
 				for (k = 0; k < 36; k++)
 				{
 					if (noteSrc->period >= periodTable[k])
 						break;
 				}
 
-				noteDeleted = false;
+				bool noteDeleted = false;
 				if (++k > 35)
 				{
 					k = 35;
@@ -1596,16 +1543,12 @@ void pattNoteUp(bool sampleAllFlag)
 
 void pattNoteDown(bool sampleAllFlag)
 {
-	bool noteDeleted;
-	int8_t k;
-	note_t *noteSrc;
-
 	saveUndo();
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
-		for (uint8_t j = 0; j < MOD_ROWS; j++)
+		for (int32_t j = 0; j < MOD_ROWS; j++)
 		{
-			noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
 			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 				continue;
@@ -1613,13 +1556,14 @@ void pattNoteDown(bool sampleAllFlag)
 			if (noteSrc->period)
 			{
 				// period -> note
+				int32_t k;
 				for (k = 0; k < 36; k++)
 				{
 					if (noteSrc->period >= periodTable[k])
 						break;
 				}
 
-				noteDeleted = false;
+				bool noteDeleted = false;
 				if (--k < 0)
 				{
 					k = 0;
@@ -1645,16 +1589,12 @@ void pattNoteDown(bool sampleAllFlag)
 
 void pattOctaUp(bool sampleAllFlag)
 {
-	bool noteDeleted;
-	uint8_t k;
-	note_t *noteSrc;
-
 	saveUndo();
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
-		for (uint8_t j = 0; j < MOD_ROWS; j++)
+		for (int32_t j = 0; j < MOD_ROWS; j++)
 		{
-			noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
 			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 				continue;
@@ -1662,13 +1602,14 @@ void pattOctaUp(bool sampleAllFlag)
 			if (noteSrc->period)
 			{
 				// period -> note
+				int32_t k;
 				for (k = 0; k < 36; k++)
 				{
 					if (noteSrc->period >= periodTable[k])
 						break;
 				}
 
-				noteDeleted = false;
+				bool noteDeleted = false;
 				if (k+12 > 35 && config.transDel)
 				{
 					noteSrc->period = 0;
@@ -1692,16 +1633,12 @@ void pattOctaUp(bool sampleAllFlag)
 
 void pattOctaDown(bool sampleAllFlag)
 {
-	bool noteDeleted;
-	int8_t k;
-	note_t *noteSrc;
-
 	saveUndo();
-	for (uint8_t i = 0; i < AMIGA_VOICES; i++)
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
-		for (uint8_t j = 0; j < MOD_ROWS; j++)
+		for (int32_t j = 0; j < MOD_ROWS; j++)
 		{
-			noteSrc = &song->patterns[song->currPattern][(j * AMIGA_VOICES) + i];
+			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
 			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
 				continue;
@@ -1709,13 +1646,14 @@ void pattOctaDown(bool sampleAllFlag)
 			if (noteSrc->period)
 			{
 				// period -> note
+				int32_t k;
 				for (k = 0; k < 36; k++)
 				{
 					if (noteSrc->period >= periodTable[k])
 						break;
 				}
 
-				noteDeleted = false;
+				bool noteDeleted = false;
 				if (k-12 < 0 && config.transDel)
 				{
 					noteSrc->period = 0;
@@ -1740,12 +1678,11 @@ void pattOctaDown(bool sampleAllFlag)
 int8_t keyToNote(SDL_Scancode scancode)
 {
 	int8_t note;
-	int32_t lookUpKey;
 
 	if (scancode < SDL_SCANCODE_B || scancode > SDL_SCANCODE_SLASH)
 		return -1; // not a note key
 
-	lookUpKey = (int32_t)scancode - SDL_SCANCODE_B;
+	int32_t lookUpKey = (int32_t)scancode - SDL_SCANCODE_B;
 	if (lookUpKey < 0 || lookUpKey >= 52)
 		return -1; // just in case
 

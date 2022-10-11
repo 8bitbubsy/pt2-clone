@@ -1,6 +1,4 @@
 #include <stdint.h>
-#include <stdbool.h>
-#include "pt2_header.h"
 #include "pt2_tables.h"
 #include "pt2_textout.h"
 #include "pt2_structs.h"
@@ -15,20 +13,18 @@ static const char emptyDottedSample[3] = { 0x02, 0x02, 0x00 };
 
 static int32_t periodToNote(int32_t period) // 0 = no note, 1 = illegal note, 2..37 = note
 {
-	int32_t beg, end, tableVal;
-
 	if (period == 0)
 		return 0;
 
-	beg = 0;
-	end = 36 - 1;
+	int32_t beg = 0;
+	int32_t end = 36 - 1;
 
 	// do binary search
 	while (beg <= end)
 	{
 		const int32_t mid = (beg + end) >> 1;
 
-		tableVal = periodTable[mid];
+		int32_t tableVal = periodTable[mid];
 		if (period == tableVal)
 			return 2+mid;
 
@@ -44,18 +40,14 @@ static int32_t periodToNote(int32_t period) // 0 = no note, 1 = illegal note, 2.
 static void drawPatternNormal(void)
 {
 	const char **noteNames;
-	char smpChar;
-	int32_t row, j, x, y;
-	note_t *patt, *note;
-
 	if (config.accidental)
 		noteNames = (const char **)noteNames2;
 	else
 		noteNames = (const char **)noteNames1;
 
-	patt = song->patterns[song->currPattern];
-	row = song->currRow - MIDDLE_ROW;
-	y = 140;
+	note_t *patt = song->patterns[song->currPattern];
+	int32_t row = song->currRow - MIDDLE_ROW;
+	int32_t y = 140;
 
 	for (int32_t i = 0; i < VISIBLE_ROWS; i++, y += 7, row++)
 	{
@@ -75,14 +67,14 @@ static void drawPatternNormal(void)
 				y++;
 				printTwoDecimalsBigBg(8, y, row, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
-				note = patt + (row << 2);
-				x = 32;
-				for (j = 0; j < AMIGA_VOICES; j++, note++)
+				note_t *note = patt + (row << 2);
+				int32_t x = 32;
+				for (int32_t j = 0; j < PAULA_VOICES; j++, note++)
 				{
 					textOutBigBg(x, y, noteNames[periodToNote(note->period)], video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 					x += 8*3;
 
-					smpChar = (config.blankZeroFlag && !(note->sample & 0xF0)) ? ' ' : hexTable[note->sample >> 4];
+					char smpChar = (config.blankZeroFlag && !(note->sample & 0xF0)) ? ' ' : hexTable[note->sample >> 4];
 					charOutBigBg(x, y, smpChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 					x += 8;
 
@@ -101,14 +93,14 @@ static void drawPatternNormal(void)
 			{
 				printTwoDecimalsBg(8, y, row, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
 
-				note = patt + (row << 2);
-				x = 32;
-				for (j = 0; j < AMIGA_VOICES; j++, note++)
+				note_t *note = patt + (row << 2);
+				int32_t x = 32;
+				for (int32_t j = 0; j < PAULA_VOICES; j++, note++)
 				{
 					textOutBg(x, y, noteNames[periodToNote(note->period)], video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
 					x += 8*3;
 
-					smpChar = (config.blankZeroFlag && !(note->sample & 0xF0)) ? ' ' : hexTable[note->sample >> 4];
+					char smpChar = (config.blankZeroFlag && !(note->sample & 0xF0)) ? ' ' : hexTable[note->sample >> 4];
 					charOutBg(x, y, smpChar, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
 					x += 8;
 
@@ -128,19 +120,15 @@ static void drawPatternNormal(void)
 
 static void drawPatternDotted(void)
 {
-	char smpChar;
 	const char **noteNames;
-	int32_t row, j, x, y;
-	note_t *patt, *note;
-
 	if (config.accidental)
 		noteNames = (const char **)noteNames4;
 	else
 		noteNames = (const char **)noteNames3;
 
-	patt = song->patterns[song->currPattern];
-	row = song->currRow - MIDDLE_ROW;
-	y = 140; 
+	note_t *patt = song->patterns[song->currPattern];
+	int32_t row = song->currRow - MIDDLE_ROW;
+	int32_t y = 140;
 
 	for (int32_t i = 0; i < VISIBLE_ROWS; i++, y += 7, row++)
 	{
@@ -160,9 +148,9 @@ static void drawPatternDotted(void)
 				y++;
 				printTwoDecimalsBigBg(8, y, row, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
-				note = patt + (row << 2);
-				x = 32;
-				for (j = 0; j < AMIGA_VOICES; j++, note++)
+				note_t *note = patt + (row << 2);
+				int32_t x = 32;
+				for (int32_t j = 0; j < PAULA_VOICES; j++, note++)
 				{
 					textOutBigBg(x, y, noteNames[periodToNote(note->period)], video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 					x += 8*3;
@@ -174,7 +162,7 @@ static void drawPatternDotted(void)
 					}
 					else
 					{
-						smpChar = (note->sample & 0xF0) ? hexTable[note->sample >> 4] : 0x02;
+						char smpChar = (note->sample & 0xF0) ? hexTable[note->sample >> 4] : 0x02;
 						charOutBigBg(x, y, smpChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 						x += 8;
 						printOneHexBigBg(x, y, note->sample & 0x0F, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -201,9 +189,9 @@ static void drawPatternDotted(void)
 				printTwoDecimalsBg(8, y, row, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
 
 				// pattern data
-				note = patt + (row << 2);
-				x = 32;
-				for (j = 0; j < AMIGA_VOICES; j++, note++)
+				note_t *note = patt + (row << 2);
+				int32_t x = 32;
+				for (int32_t j = 0; j < PAULA_VOICES; j++, note++)
 				{
 					textOutBg(x, y, noteNames[periodToNote(note->period)], video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
 					x += 8*3;
@@ -215,7 +203,7 @@ static void drawPatternDotted(void)
 					}
 					else
 					{
-						smpChar = (note->sample & 0xF0) ? hexTable[note->sample >> 4] : 0x02;
+						char smpChar = (note->sample & 0xF0) ? hexTable[note->sample >> 4] : 0x02;
 						charOutBg(x, y, smpChar, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);
 						x += 8;
 						printOneHexBg(x, y, note->sample & 0x0F, video.palette[PAL_PATTXT], video.palette[PAL_BACKGRD]);

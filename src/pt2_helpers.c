@@ -9,15 +9,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <ctype.h> // toupper()
-#ifndef _WIN32
-#include <unistd.h>
-#else
-#define WIN32_MEAN_AND_LEAN
-#include <windows.h>
-#endif
-#include "pt2_helpers.h"
-#include "pt2_header.h"
-#include "pt2_tables.h"
 #include "pt2_structs.h"
 #include "pt2_config.h"
 
@@ -54,7 +45,7 @@ bool sampleNameIsEmpty(char *name)
 	if (name == NULL)
 		return true;
 
-	for (uint8_t i = 0; i < 22; i++)
+	for (int32_t i = 0; i < 22; i++)
 	{
 		if (name[i] != '\0')
 			return false;
@@ -68,7 +59,7 @@ bool moduleNameIsEmpty(char *name)
 	if (name == NULL)
 		return true;
 
-	for (uint8_t i = 0; i < 20; i++)
+	for (int32_t i = 0; i < 20; i++)
 	{
 		if (name[i] != '\0')
 			return false;
@@ -79,7 +70,11 @@ bool moduleNameIsEmpty(char *name)
 
 void updateWindowTitle(bool modified)
 {
-	char titleTemp[128];
+	char editStr[32], titleTemp[256];
+
+	editStr[0] = '\0';
+	if (editor.currMode == MODE_EDIT)
+		strcpy(editStr, "[EDITING] ");
 
 	if (modified)
 		song->modified = true;
@@ -91,16 +86,20 @@ void updateWindowTitle(bool modified)
 		if (modified)
 		{
 			if (config.modDot)
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\" (unsaved)", PROG_VER_STR, song->header.name);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"mod.%s\" (unsaved)",
+					PROG_VER_STR, editStr, song->header.name);
 			else
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\" (unsaved)", PROG_VER_STR, song->header.name);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"%s.mod\" (unsaved)",
+					PROG_VER_STR, editStr, song->header.name);
 		}
 		else
 		{
 			if (config.modDot)
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.%s\"", PROG_VER_STR, song->header.name);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"mod.%s\"",
+					PROG_VER_STR, editStr, song->header.name);
 			else
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"%s.mod\"", PROG_VER_STR, song->header.name);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"%s.mod\"",
+					PROG_VER_STR, editStr, song->header.name);
 		}
 	}
 	else
@@ -108,16 +107,20 @@ void updateWindowTitle(bool modified)
 		if (modified)
 		{
 			if (config.modDot)
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.untitled\" (unsaved)", PROG_VER_STR);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"mod.untitled\" (unsaved)",
+					PROG_VER_STR, editStr);
 			else
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"untitled.mod\" (unsaved)", PROG_VER_STR);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"untitled.mod\" (unsaved)",
+					PROG_VER_STR, editStr);
 		}
 		else
 		{
 			if (config.modDot)
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"mod.untitled\"", PROG_VER_STR);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"mod.untitled\"",
+					PROG_VER_STR, editStr);
 			else
-				sprintf(titleTemp, "ProTracker 2 clone v%s - \"untitled.mod\"", PROG_VER_STR);
+				sprintf(titleTemp, "ProTracker 2 clone v%s %s- \"untitled.mod\"",
+					PROG_VER_STR, editStr);
 		}
 	}
 

@@ -20,7 +20,7 @@ typedef struct config_t
 	uint8_t pixelFilter, filterModel;
 	uint16_t quantizeValue;
 	int32_t maxSampleLength;
-	uint32_t soundFrequency, soundBufferSize, audioInputFrequency, reservedSampleOffset;
+	uint32_t soundFrequency, soundBufferSize, audioInputFrequency, mod2WavOutputFreq, reservedSampleOffset;
 } config_t;
 
 extern config_t config; // pt2_config.c

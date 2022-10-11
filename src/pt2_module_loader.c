@@ -16,19 +16,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "pt2_mouse.h"
-#include "pt2_header.h"
-#include "pt2_config.h"
 #include "pt2_sampler.h"
+#include "pt2_replayer.h"
 #include "pt2_textout.h"
 #include "pt2_audio.h"
+#include "pt2_amigafilters.h"
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
-#include "pt2_unicode.h"
-#include "pt2_module_loader.h"
 #include "pt2_sample_loader.h"
 #include "pt2_config.h"
-#include "pt2_sampling.h"
 #include "pt2_xpk.h"
+#include "pt2_askbox.h"
 
 typedef struct mem_t
 {
@@ -37,10 +35,7 @@ typedef struct mem_t
 	uint32_t _cnt, _bufsiz;
 } MEMFILE;
 
-static bool oldAutoPlay;
-static char oldFullPath[(PATH_MAX * 2) + 2];
 static int32_t realSampleLengths[MOD_SAMPLES];
-static uint32_t oldFullPathLen;
 
 static MEMFILE *mopen(const uint8_t *src, uint32_t length);
 static void mclose(MEMFILE **buf);
@@ -49,16 +44,6 @@ static size_t mread(void *buffer, size_t size, size_t count, MEMFILE *buf);
 static void mseek(MEMFILE *buf, int32_t offset, int32_t whence);
 static void mrewind(MEMFILE *buf);
 static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint32_t srcLen, uint32_t dstLen, uint8_t skipBits);
-
-void showSongUnsavedAskBox(int8_t askScreenType)
-{
-	ui.askScreenShown = true;
-	ui.askScreenType = askScreenType;
-
-	pointerSetMode(POINTER_MODE_MSG1, NO_CARRY);
-	setStatusMessage("SONG IS UNSAVED !", NO_CARRY);
-	renderAskDialog();
-}
 
 #define IS_ID(s, b) !strncmp(s, b, 4)
 
@@ -167,28 +152,19 @@ static uint8_t *unpackPPModule(FILE *f, uint32_t *filesize)
 
 module_t *modLoad(UNICHAR *fileName)
 {
-	bool mightBeSTK, lateSTKVerFlag, veryLateSTKVerFlag;
-	char modID[4], tmpChar;
-	int8_t numSamples;
-	uint8_t bytes[4], restartPos, modFormat;
-	uint8_t *modBuffer, numChannels;
-	int32_t i, j, k, loopStart, loopLength, loopOverflowVal, numPatterns;
-	uint32_t powerPackerID, filesize;
-	FILE *f;
-	MEMFILE *m;
-	module_t *newMod;
-	moduleSample_t *s;
-	note_t *note;
+	char modID[4];
+	uint8_t numChannels;
+	uint32_t powerPackerID;
 
-	veryLateSTKVerFlag = false; // "DFJ SoundTracker III" and later
-	lateSTKVerFlag = false; // "TJC SoundTracker II" and later
-	mightBeSTK = false;
+	bool veryLateSTKVerFlag = false; // "DFJ SoundTracker III" and later
+	bool lateSTKVerFlag = false; // "TJC SoundTracker II" and later
+	bool mightBeSTK = false;
 
-	m = NULL;
-	f = NULL;
-	modBuffer = NULL;
+	MEMFILE *m = NULL;
+	FILE *f = NULL;
+	uint8_t *modBuffer = NULL;
 
-	newMod = (module_t *)calloc(1, sizeof (module_t));
+	module_t *newMod = (module_t *)calloc(1, sizeof (module_t));
 	if (newMod == NULL)
 	{
 		statusOutOfMemory();
@@ -203,7 +179,7 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 
 	fseek(f, 0, SEEK_END);
-	filesize = ftell(f);
+	uint32_t filesize = ftell(f);
 	rewind(f);
 
 	// check if mod is a powerpacker mod
@@ -240,7 +216,6 @@ module_t *modLoad(UNICHAR *fileName)
 		else
 		{
 			modBuffer = (uint8_t *)malloc(filesize);
-
 			if (modBuffer == NULL)
 			{
 				statusOutOfMemory();
@@ -274,8 +249,8 @@ module_t *modLoad(UNICHAR *fileName)
 	mseek(m, 1080, SEEK_SET);
 	mread(modID, 1, 4, m);
 
-	modFormat = getModType(&numChannels, modID);
-	if (numChannels == 0 || numChannels > AMIGA_VOICES)
+	uint8_t modFormat = getModType(&numChannels, modID);
+	if (numChannels == 0 || numChannels > PAULA_VOICES)
 	{
 		displayErrorMsg("UNSUPPORTED MOD !");
 		goto modLoadError;
@@ -289,9 +264,9 @@ module_t *modLoad(UNICHAR *fileName)
 	newMod->header.name[20] = '\0';
 
 	// convert illegal song name characters to space
-	for (i = 0; i < 20; i++)
+	for (int32_t i = 0; i < 20; i++)
 	{
-		tmpChar = newMod->header.name[i];
+		char tmpChar = newMod->header.name[i];
 		if ((tmpChar < ' ' || tmpChar > '~') && tmpChar != '\0')
 			tmpChar = ' ';
 
@@ -301,8 +276,8 @@ module_t *modLoad(UNICHAR *fileName)
 	fixZeroesInString(newMod->header.name, 20);
 
 	// read sample headers
-	s = newMod->samples;
-	for (i = 0; i < MOD_SAMPLES; i++, s++)
+	moduleSample_t *s = newMod->samples;
+	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)
 	{
 		if (mightBeSTK && i >= 15) // skip reading sample headers past sample slot 15 in STK/UST modules
 		{
@@ -321,9 +296,9 @@ module_t *modLoad(UNICHAR *fileName)
 		else
 		{
 			// convert illegal sample name characters to space
-			for (j = 0; j < 22; j++)
+			for (int32_t j = 0; j < 22; j++)
 			{
-				tmpChar = s->text[j];
+				char tmpChar = s->text[j];
 				if ((tmpChar < ' ' || tmpChar > '~') && tmpChar != '\0')
 					tmpChar = ' ';
 
@@ -354,8 +329,8 @@ module_t *modLoad(UNICHAR *fileName)
 		if ((uint8_t)s->volume > 64)
 			s->volume = 64;
 
-		loopStart = ((mgetc(m) << 8) | mgetc(m)) * 2;
-		loopLength = ((mgetc(m) << 8) | mgetc(m)) * 2;
+		int32_t loopStart = ((mgetc(m) << 8) | mgetc(m)) * 2;
+		int32_t loopLength = ((mgetc(m) << 8) | mgetc(m)) * 2;
 
 		if (loopLength < 2)
 			loopLength = 2; // fixes empty samples in .MODs saved from FT2
@@ -401,7 +376,7 @@ module_t *modLoad(UNICHAR *fileName)
 		goto modLoadError;
 	}
 
-	restartPos = (uint8_t)mgetc(m);
+	uint8_t restartPos = (uint8_t)mgetc(m);
 	if (mightBeSTK && restartPos > 220)
 	{
 		displayErrorMsg("NOT A MOD FILE !");
@@ -439,8 +414,8 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 
 	// read orders and count number of patterns
-	numPatterns = 0;
-	for (i = 0; i < MOD_ORDERS; i++)
+	int32_t numPatterns = 0;
+	for (int32_t i = 0; i < MOD_ORDERS; i++)
 	{
 		newMod->header.order[i] = (int16_t)mgetc(m);
 		if (newMod->header.order[i] > numPatterns)
@@ -459,9 +434,9 @@ module_t *modLoad(UNICHAR *fileName)
 		mseek(m, 4, SEEK_CUR);
 
 	// allocate 100 patterns
-	for (i = 0; i < MAX_PATTERNS; i++)
+	for (int32_t i = 0; i < MAX_PATTERNS; i++)
 	{
-		newMod->patterns[i] = (note_t *)calloc(MOD_ROWS * AMIGA_VOICES, sizeof (note_t));
+		newMod->patterns[i] = (note_t *)calloc(MOD_ROWS * PAULA_VOICES, sizeof (note_t));
 		if (newMod->patterns[i] == NULL)
 		{
 			statusOutOfMemory();
@@ -470,13 +445,14 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 
 	// load pattern data
-	for (i = 0; i < numPatterns; i++)
+	for (int32_t i = 0; i < numPatterns; i++)
 	{
-		note = newMod->patterns[i];
-		for (j = 0; j < MOD_ROWS; j++)
+		note_t *note = newMod->patterns[i];
+		for (int32_t j = 0; j < MOD_ROWS; j++)
 		{
-			for (k = 0; k < numChannels; k++, note++)
+			for (int32_t k = 0; k < numChannels; k++, note++)
 			{
+				uint8_t bytes[4];
 				mread(bytes, 1, 4, m);
 
 				note->period = ((bytes[0] & 0x0F) << 8) | bytes[1];
@@ -501,18 +477,18 @@ module_t *modLoad(UNICHAR *fileName)
 				}
 			}
 
-			if (numChannels < AMIGA_VOICES)
-				note += AMIGA_VOICES-numChannels;
+			if (numChannels < PAULA_VOICES)
+				note += PAULA_VOICES-numChannels;
 		}
 	}
 
 	// pattern command conversion for non-PT formats
 	if (modFormat == FORMAT_STK || modFormat == FORMAT_FT2 || modFormat == FORMAT_NT || modFormat == FORMAT_HMNT || modFormat == FORMAT_FLT)
 	{
-		for (i = 0; i < numPatterns; i++)
+		for (int32_t i = 0; i < numPatterns; i++)
 		{
-			note = newMod->patterns[i];
-			for (j = 0; j < MOD_ROWS*4; j++, note++)
+			note_t *note = newMod->patterns[i];
+			for (int32_t j = 0; j < MOD_ROWS*4; j++, note++)
 			{
 				if (modFormat == FORMAT_NT || modFormat == FORMAT_HMNT)
 				{
@@ -617,13 +593,13 @@ module_t *modLoad(UNICHAR *fileName)
 	}
 
 	// set sample data offsets (sample data = one huge buffer to rule them all)
-	for (i = 0; i < MOD_SAMPLES; i++)
+	for (int32_t i = 0; i < MOD_SAMPLES; i++)
 		newMod->samples[i].offset = config.maxSampleLength * i;
 
 	// load sample data
-	numSamples = (modFormat == FORMAT_STK) ? 15 : 31;
+	int32_t numSamples = (modFormat == FORMAT_STK) ? 15 : 31;
 	s = newMod->samples;
-	for (i = 0; i < numSamples; i++, s++)
+	for (int32_t i = 0; i < numSamples; i++, s++)
 	{
 		/* For Ultimate SoundTracker modules, only the loop area of a looped sample is played.
 		** Skip loading of eventual data present before loop start.
@@ -664,7 +640,7 @@ module_t *modLoad(UNICHAR *fileName)
 		// some modules are broken like this, adjust sample length if possible (this is ok if we have room)
 		if (s->length > 0 && s->loopLength > 2 && s->loopStart+s->loopLength > s->length)
 		{
-			loopOverflowVal = (s->loopStart + s->loopLength) - s->length;
+			int32_t loopOverflowVal = (s->loopStart + s->loopLength) - s->length;
 			if (s->length+loopOverflowVal <= config.maxSampleLength)
 			{
 				s->length += loopOverflowVal; // this is safe, we're allocating 65534 bytes per sample slot
@@ -680,8 +656,7 @@ module_t *modLoad(UNICHAR *fileName)
 	mclose(&m);
 	free(modBuffer);
 
-	for (i = 0; i < AMIGA_VOICES; i++)
-		newMod->channels[i].n_chanindex = (int8_t)i;
+	initializeModuleChannels(newMod);
 
 	return newMod;
 
@@ -694,7 +669,7 @@ modLoadError:
 
 	if (newMod != NULL)
 	{
-		for (i = 0; i < MAX_PATTERNS; i++)
+		for (int32_t i = 0; i < MAX_PATTERNS; i++)
 		{
 			if (newMod->patterns[i] != NULL)
 				free(newMod->patterns[i]);
@@ -708,12 +683,10 @@ modLoadError:
 
 static MEMFILE *mopen(const uint8_t *src, uint32_t length)
 {
-	MEMFILE *b;
-
 	if (src == NULL || length == 0)
 		return NULL;
 
-	b = (MEMFILE *)malloc(sizeof (MEMFILE));
+	MEMFILE *b = (MEMFILE *)malloc(sizeof (MEMFILE));
 	if (b == NULL)
 		return NULL;
 
@@ -737,12 +710,10 @@ static void mclose(MEMFILE **buf)
 
 static int32_t mgetc(MEMFILE *buf)
 {
-	int32_t b;
-
 	if (buf == NULL || buf->_ptr == NULL || buf->_cnt <= 0)
 		return 0;
 
-	b = *buf->_ptr;
+	int32_t b = *buf->_ptr;
 
 	buf->_cnt--;
 	buf->_ptr++;
@@ -759,17 +730,14 @@ static int32_t mgetc(MEMFILE *buf)
 
 static size_t mread(void *buffer, size_t size, size_t count, MEMFILE *buf)
 {
-	int32_t pcnt;
-	size_t wrcnt;
-
 	if (buf == NULL || buf->_ptr == NULL)
 		return 0;
 
-	wrcnt = size * count;
+	size_t wrcnt = size * count;
 	if (size == 0 || buf->_eof)
 		return 0;
 
-	pcnt = (buf->_cnt > (uint32_t)wrcnt) ? (uint32_t)wrcnt : buf->_cnt;
+	int32_t pcnt = (buf->_cnt > (uint32_t)wrcnt) ? (uint32_t)wrcnt : buf->_cnt;
 	memcpy(buffer, buf->_ptr, pcnt);
 
 	buf->_cnt -= pcnt;
@@ -842,18 +810,18 @@ static void mrewind(MEMFILE *buf)
 
 static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint32_t srcLen, uint32_t dstLen, uint8_t skipBits)
 {
-	uint8_t *bufSrc, *dstEnd, *out, bitsLeft, bitCnt;
-	uint32_t x, todo, offBits, offset, written, bitBuffer;
+	uint8_t bitCnt;
+	uint32_t x, todo, offset;
 
 	if (src == NULL || dst == NULL || offsetLens == NULL)
 		return false;
 
-	bitsLeft = 0;
-	bitBuffer = 0;
-	written = 0;
-	bufSrc = src + srcLen;
-	out = dst + dstLen;
-	dstEnd = out;
+	uint8_t bitsLeft = 0;
+	uint32_t bitBuffer = 0;
+	uint32_t written = 0;
+	uint8_t *bufSrc = src + srcLen;
+	uint8_t *out = dst + dstLen;
+	uint8_t *dstEnd = out;
 
 	PP_READ_BITS(skipBits, x);
 	while (written < dstLen)
@@ -885,7 +853,7 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 		}
 
 		PP_READ_BITS(2, x);
-		offBits = offsetLens[x];
+		uint32_t offBits = offsetLens[x];
 		todo = x + 2;
 
 		if (x == 3)
@@ -925,17 +893,15 @@ static uint8_t ppdecrunch(uint8_t *src, uint8_t *dst, uint8_t *offsetLens, uint3
 
 void setupLoadedMod(void)
 {
-	int8_t i;
-
 	// setup GUI text pointers
-	for (i = 0; i < MOD_SAMPLES; i++)
+	for (int32_t i = 0; i < MOD_SAMPLES; i++)
 	{
 		song->samples[i].volumeDisp = &song->samples[i].volume;
 		song->samples[i].lengthDisp = &song->samples[i].length;
 		song->samples[i].loopStartDisp = &song->samples[i].loopStart;
 		song->samples[i].loopLengthDisp = &song->samples[i].loopLength;
 
-		fillSampleRedoBuffer(i);
+		fillSampleRedoBuffer((uint8_t)i);
 	}
 
 	modSetPos(0, 0);
@@ -963,7 +929,9 @@ void setupLoadedMod(void)
 	editor.sampleZero = false;
 	editor.hiLowInstr = 0;
 
-	setLEDFilter(false, false); // real PT doesn't do this, but that's insane
+	// disable LED filter after module load (real PT doesn't do this)
+	editor.useLEDFilter = false;
+	setLEDFilter(false);
 
 	updateWindowTitle(MOD_NOT_MODIFIED);
 
@@ -980,15 +948,12 @@ void setupLoadedMod(void)
 
 void loadModFromArg(char *arg)
 {
-	uint32_t filenameLen;
-	UNICHAR *filenameU;
-
-	ui.introScreenShown = false;
+	ui.introTextShown = false;
 	statusAllRight();
 
-	filenameLen = (uint32_t)strlen(arg);
+	uint32_t filenameLen = (uint32_t)strlen(arg);
 
-	filenameU = (UNICHAR *)calloc(filenameLen + 2, sizeof (UNICHAR));
+	UNICHAR *filenameU = (UNICHAR *)calloc(filenameLen + 2, sizeof (UNICHAR));
 	if (filenameU == NULL)
 	{
 		statusOutOfMemory();
@@ -1026,20 +991,20 @@ void loadModFromArg(char *arg)
 static bool testExtension(char *ext, uint8_t extLen, char *fullPath)
 {
 	// checks for EXT.filename and filename.EXT
-	char *fileName, begStr[8], endStr[8];
-	uint32_t fileNameLen;
 
 	extLen++; // add one to length (dot)
 
-	fileName = strrchr(fullPath, DIR_DELIMITER);
+	char *fileName = strrchr(fullPath, DIR_DELIMITER);
 	if (fileName != NULL)
 		fileName++;
 	else
 		fileName = fullPath;
 
-	fileNameLen = (uint32_t)strlen(fileName);
+	uint32_t fileNameLen = (uint32_t)strlen(fileName);
 	if (fileNameLen >= extLen)
 	{
+		char begStr[8], endStr[8];
+
 		sprintf(begStr, "%s.", ext);
 		if (!_strnicmp(begStr, fileName, extLen))
 			return true;
@@ -1054,27 +1019,22 @@ static bool testExtension(char *ext, uint8_t extLen, char *fullPath)
 
 void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool songModifiedCheck)
 {
-	bool isMod;
-	char *fileName, *ansiName;
-	uint8_t oldMode, oldPlayMode;
-	UNICHAR *fullPathU;
-
 	// don't allow drag n' drop if the tracker is busy
 	if (ui.pointerMode == POINTER_MODE_MSG1 || diskop.isFilling ||
-		editor.isWAVRendering || editor.isSMPRendering ||
+		editor.mod2WavOngoing || editor.pat2SmpOngoing ||
 		ui.samplerFiltersBoxShown || ui.samplerVolBoxShown || ui.samplingBoxShown)
 	{
 		return;
 	}
 
-	ansiName = (char *)calloc(fullPathLen + 10, sizeof (char));
+	char *ansiName = (char *)calloc(fullPathLen + 10, sizeof (char));
 	if (ansiName == NULL)
 	{
 		statusOutOfMemory();
 		return;
 	}
 
-	fullPathU = (UNICHAR *)calloc(fullPathLen + 2, sizeof (UNICHAR));
+	UNICHAR *fullPathU = (UNICHAR *)calloc(fullPathLen + 2, sizeof (UNICHAR));
 	if (fullPathU == NULL)
 	{
 		free(ansiName);
@@ -1091,14 +1051,14 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 	unicharToAnsi(ansiName, fullPathU, fullPathLen);
 
 	// make a new pointer point to filename (strip path)
-	fileName = strrchr(ansiName, DIR_DELIMITER);
+	char *fileName = strrchr(ansiName, DIR_DELIMITER);
 	if (fileName != NULL)
 		fileName++;
 	else
 		fileName = ansiName;
 
 	// check if the file extension is a module (FIXME: check module by content instead..?)
-	isMod = false;
+	bool isMod = false;
 	     if (testExtension("MOD", 3, fileName)) isMod = true;
 	else if (testExtension("M15", 3, fileName)) isMod = true;
 	else if (testExtension("STK", 3, fileName)) isMod = true;
@@ -1111,29 +1071,19 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 	{
 		if (songModifiedCheck && song->modified)
 		{
-			free(ansiName);
-			free(fullPathU);
-
-			memcpy(oldFullPath, fullPath, fullPathLen);
-			oldFullPath[fullPathLen+0] = 0;
-			oldFullPath[fullPathLen+1] = 0;
-
-			oldFullPathLen = fullPathLen;
-			oldAutoPlay = autoPlay;
-
 			// de-minimize window and set focus so that the user sees the message box
 			SDL_RestoreWindow(video.window);
 			SDL_RaiseWindow(video.window);
 
-			showSongUnsavedAskBox(ASK_DISCARD_SONG_DRAGNDROP);
-			return;
+			if (!askBox(ASKBOX_YES_NO, "SONG IS UNSAVED !"))
+				goto DropExit;
 		}
 
 		module_t *newSong = modLoad(fullPathU);
 		if (newSong != NULL)
 		{
-			oldMode = editor.currMode;
-			oldPlayMode = editor.playMode;
+			uint8_t oldMode = editor.currMode;
+			uint8_t oldPlayMode = editor.playMode;
 
 			modStop();
 			modFree();
@@ -1193,27 +1143,20 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 		loadSample(fullPathU, fileName);
 	}
 
+DropExit:
 	free(ansiName);
 	free(fullPathU);
 }
 
-void loadDroppedFile2(void)
-{
-	loadDroppedFile(oldFullPath, oldFullPathLen, oldAutoPlay, false);
-}
-
 module_t *createEmptyMod(void)
 {
-	uint8_t i;
-	module_t *newMod;
-
-	newMod = (module_t *)calloc(1, sizeof (module_t));
+	module_t *newMod = (module_t *)calloc(1, sizeof (module_t));
 	if (newMod == NULL)
 		goto oom;
 
-	for (i = 0; i < MAX_PATTERNS; i++)
+	for (int32_t i = 0; i < MAX_PATTERNS; i++)
 	{
-		newMod->patterns[i] = (note_t *)calloc(1, MOD_ROWS * sizeof (note_t) * AMIGA_VOICES);
+		newMod->patterns[i] = (note_t *)calloc(1, MOD_ROWS * sizeof (note_t) * PAULA_VOICES);
 		if (newMod->patterns[i] == NULL)
 			goto oom;
 	}
@@ -1225,7 +1168,7 @@ module_t *createEmptyMod(void)
 	newMod->header.numOrders = 1;
 
 	moduleSample_t *s = newMod->samples;
-	for (i = 0; i < MOD_SAMPLES; i++, s++)
+	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)
 	{
 		s->offset = config.maxSampleLength * i;
 		s->loopLength = 2;
@@ -1237,8 +1180,7 @@ module_t *createEmptyMod(void)
 		s->loopLengthDisp = &s->loopLength;
 	}
 
-	for (i = 0; i < AMIGA_VOICES; i++)
-		newMod->channels[i].n_chanindex = i;
+	initializeModuleChannels(newMod);
 
 	// setup GUI text pointers
 	editor.currEditPatternDisp = &newMod->currPattern;

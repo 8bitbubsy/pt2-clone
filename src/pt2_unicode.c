@@ -4,16 +4,13 @@
 // this is probably broken, but it "works" for now
 uint32_t unicharToAnsi(char *dstBuffer, const UNICHAR *inputString, uint32_t maxDstLen)
 {
-	uint32_t i;
-	UNICHAR ch;
-
 	if (inputString == NULL || dstBuffer == NULL)
 		return 0;
 
-	i = 0;
+	uint32_t i = 0;
 	while (i < maxDstLen && inputString[i] != '\0')
 	{
-		ch = inputString[i];
+		UNICHAR ch = inputString[i];
 #ifdef _WIN32
 		if (ch >= 256)
 #else

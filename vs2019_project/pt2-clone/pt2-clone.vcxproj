@@ -237,6 +237,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\pt2_amigafilters.h" />
+    <ClInclude Include="..\..\src\pt2_askbox.h" />
     <ClInclude Include="..\..\src\pt2_audio.h" />
     <ClInclude Include="..\..\src\pt2_blep.h" />
     <ClInclude Include="..\..\src\pt2_bmp.h" />
@@ -248,7 +250,6 @@
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_hpc.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
-    <ClInclude Include="..\..\src\pt2_ledfilter.h" />
     <ClInclude Include="..\..\src\pt2_math.h" />
     <ClInclude Include="..\..\src\pt2_mod2wav.h" />
     <ClInclude Include="..\..\src\pt2_module_loader.h" />
@@ -257,8 +258,10 @@
     <ClInclude Include="..\..\src\pt2_palette.h" />
     <ClInclude Include="..\..\src\pt2_pat2smp.h" />
     <ClInclude Include="..\..\src\pt2_pattern_viewer.h" />
+    <ClInclude Include="..\..\src\pt2_paula.h" />
     <ClInclude Include="..\..\src\pt2_rcfilter.h" />
     <ClInclude Include="..\..\src\pt2_downsample2x.h" />
+    <ClInclude Include="..\..\src\pt2_replayer.h" />
     <ClInclude Include="..\..\src\pt2_sample_loader.h" />
     <ClInclude Include="..\..\src\pt2_sampler.h" />
     <ClInclude Include="..\..\src\pt2_sample_saver.h" />
@@ -274,15 +277,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c" />
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_clear.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_diskop.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_editop.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_font.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_icon.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_loop_pins.c" />
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_mod2wav.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_mute_buttons.c" />
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_pat2smp_dialog.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_patcursor.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_pointer.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_posed.c" />
@@ -290,7 +290,8 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_spectrum.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_tracker.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c" />
-    <ClCompile Include="..\..\src\gfx\pt2_gfx_yes_no_dialog.c" />
+    <ClCompile Include="..\..\src\pt2_amigafilters.c" />
+    <ClCompile Include="..\..\src\pt2_askbox.c" />
     <ClCompile Include="..\..\src\pt2_audio.c" />
     <ClCompile Include="..\..\src\pt2_blep.c" />
     <ClCompile Include="..\..\src\pt2_bmp.c" />
@@ -301,11 +302,11 @@
     <ClCompile Include="..\..\src\pt2_helpers.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
-    <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_module_loader.c" />
+    <ClCompile Include="..\..\src\pt2_paula.c" />
     <ClCompile Include="..\..\src\pt2_rcfilter.c" />
     <ClCompile Include="..\..\src\pt2_replayer.c" />
     <ClCompile Include="..\..\src\pt2_module_saver.c" />
