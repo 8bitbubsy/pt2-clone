@@ -25,12 +25,12 @@ static bool ledFilterEnabled, useA1200LowPassFilter;
 static rcFilter_t filterLoA500, filterHiA500, filterLoA1200, filterHiA1200;
 static ledFilter_t filterLED;
 
+void (*processAmigaFilters)(double *, double *, int32_t); // globalized
+
 static void processFiltersA1200_NoLED(double *dBufferL, double *dBufferR, int32_t numSamples);
 static void processFiltersA1200_LED(double *dBufferL, double *dBufferR, int32_t numSamples);
 static void processFiltersA500_NoLED(double *dBufferL, double *dBufferR, int32_t numSamples);
 static void processFiltersA500_LED(double *dBufferL, double *dBufferR, int32_t numSamples);
-
-void (*processAmigaFilters)(double *, double *, int32_t);
 
 // --------------------------------------------------------
 // Crude LED filter implementation

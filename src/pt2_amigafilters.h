@@ -9,4 +9,4 @@ void setAmigaFilterModel(uint8_t amigaModel);
 void setLEDFilter(bool state);
 void toggleAmigaFilterModel(void);
 
-void (*processAmigaFilters)(double *, double *, int32_t);
+extern void (*processAmigaFilters)(double *, double *, int32_t);
