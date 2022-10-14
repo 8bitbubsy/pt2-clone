@@ -157,13 +157,9 @@ void updateChannelSyncBuffer(void)
 			if (flags & SET_SCOPE_PERIOD)
 				scopeSetPeriod(ch, c->period);
 
-			if (flags & SET_SCOPE_DATA)
-				scope[ch].newData = c->newData;
+			// the following handling order is important, don't change it!
 
-			if (flags & SET_SCOPE_LENGTH)
-				scope[ch].newLength = c->newLength;
-
-			if (flags & STOP_SCOPE) // this must be handled *before* TRIGGER_SCOPE
+			if (flags & STOP_SCOPE)
 				scope[ch].active = false;
 
 			if (flags & TRIGGER_SCOPE)
@@ -172,6 +168,14 @@ void updateChannelSyncBuffer(void)
 				s->newLength = c->triggerLength;
 				scopeTrigger(ch);
 			}
+
+			if (flags & SET_SCOPE_DATA)
+				scope[ch].newData = c->newData;
+
+			if (flags & SET_SCOPE_LENGTH)
+				scope[ch].newLength = c->newLength;
+
+			// ---------------------------------------------------------------
 
 			if (flags & UPDATE_ANALYZER)
 				updateSpectrumAnalyzer(c->analyzerVolume, c ->analyzerPeriod);
