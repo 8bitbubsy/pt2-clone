@@ -75,15 +75,9 @@ static void pointerSetColor(uint8_t cursorColorIndex)
 		setSystemCursor(cursors[cursorColorIndex]);
 }
 
-void pointerSetMode(uint8_t pointerMode, bool carry)
+void updatePointerColor(void)
 {
-	assert(pointerMode <= 5);
-
-	ui.pointerMode = pointerMode;
-	if (carry)
-		ui.previousPointerMode = ui.pointerMode;
-
-	switch (pointerMode)
+	switch (ui.pointerMode)
 	{
 		case POINTER_MODE_IDLE:   pointerSetColor(POINTER_GRAY);   break;
 		case POINTER_MODE_PLAY:   pointerSetColor(POINTER_YELLOW); break;
@@ -95,12 +89,30 @@ void pointerSetMode(uint8_t pointerMode, bool carry)
 	}
 }
 
-void pointerResetThreadSafe(void) // used for effect F00 in replayer (stop song)
+void pointerSetMode(uint8_t pointerMode, bool carry)
 {
-	ui.previousPointerMode = ui.pointerMode = POINTER_MODE_IDLE;
+	assert(pointerMode <= 5);
 
+	ui.pointerMode = pointerMode;
+	if (carry)
+		ui.previousPointerMode = ui.pointerMode;
+
+	updatePointerColor();
+}
+
+void pointerSetModeThreadSafe(uint8_t pointerMode, bool carry)
+{
+	assert(pointerMode <= 5);
+
+	ui.pointerMode = pointerMode;
+	if (carry)
+		ui.previousPointerMode = ui.pointerMode;
+
+	// in hardware mouse mode, the pointer color can only be changed from the main thread
 	if (config.hwMouse)
-		mouse.resetCursorColorFlag = true;
+		mouse.updatePointerColorFlag = true;
+	else
+		updatePointerColor();
 }
 
 void pointerSetPreviousMode(void)
@@ -237,10 +249,10 @@ void readMouseXY(void)
 {
 	int32_t mx, my, windowX, windowY;
 
-	if (mouse.resetCursorColorFlag) // used for effect F00 in replayer (stop song)
+	if (mouse.updatePointerColorFlag) // used when changing pointer color from other threads
 	{
-		mouse.resetCursorColorFlag = false;
-		pointerSetColor(POINTER_GRAY);
+		mouse.updatePointerColorFlag = false;
+		updatePointerColor();
 	}
 
 	if (mouse.setPosFlag)

@@ -130,8 +130,7 @@ void doStopIt(bool resetPlayMode)
 	{
 		editor.playMode = PLAY_MODE_NORMAL;
 		editor.currMode = MODE_IDLE;
-
-		pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
+		pointerSetModeThreadSafe(POINTER_MODE_IDLE, true);
 	}
 
 	if (song != NULL)
@@ -1014,9 +1013,9 @@ static void nextPosition(void)
 			{
 				doStopIt(false);
 
-				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
 				editor.playMode = PLAY_MODE_NORMAL;
 				editor.currMode = MODE_EDIT;
+				pointerSetModeThreadSafe(POINTER_MODE_EDIT, true);
 			}
 			else
 			{
@@ -1260,9 +1259,9 @@ bool intMusic(void) // replayer ticker
 			{
 				doStopIt(false);
 
-				pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
 				editor.playMode = PLAY_MODE_NORMAL;
 				editor.currMode = MODE_EDIT;
+				pointerSetModeThreadSafe(POINTER_MODE_EDIT, true);
 			}
 			else
 			{
@@ -1311,10 +1310,10 @@ bool intMusic(void) // replayer ticker
 		doStopSong = false;
 
 		editor.songPlaying = false;
+
 		editor.playMode = PLAY_MODE_NORMAL;
 		editor.currMode = MODE_IDLE;
-
-		pointerResetThreadSafe(); // set normal gray mouse pointer
+		pointerSetModeThreadSafe(POINTER_MODE_IDLE, true);
 	}
 
 	return renderEndCheck(); // MOD2WAV/PAT2SMP listens to the return value (true = not done yet)

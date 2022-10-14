@@ -118,7 +118,7 @@ typedef struct keyb_t
 
 typedef struct mouse_t
 {
-	volatile bool setPosFlag, resetCursorColorFlag;
+	volatile bool setPosFlag, updatePointerColorFlag;
 	bool buttonWaiting, leftButtonPressed, rightButtonPressed;
 	uint8_t repeatCounter, buttonWaitCounter;
 	int32_t rawX, rawY, x, y, lastMouseX, setPosX, setPosY, lastGUIButton, prevX, prevY;
