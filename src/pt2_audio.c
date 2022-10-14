@@ -320,28 +320,31 @@ static void fillVisualsSyncBuffer(void)
 		tickTime64Frac = audLatencyPerfValFrac;
 	}
 
-	moduleChannel_t *ch = song->channels;
-	paulaVoice_t *v = paula;
-	syncedChannel_t *sc = chSyncData.channels;
-
-	for (int32_t i = 0; i < PAULA_VOICES; i++, ch++, sc++, v++)
+	if (song != NULL)
 	{
-		sc->flags = v->syncFlags | ch->syncFlags;
-		ch->syncFlags = v->syncFlags = 0; // clear sync flags
+		moduleChannel_t *ch = song->channels;
+		paulaVoice_t *v = paula;
+		syncedChannel_t *sc = chSyncData.channels;
 
-		sc->volume = v->syncVolume;
-		sc->period = v->syncPeriod;
-		sc->triggerData = v->syncTriggerData;
-		sc->triggerLength = v->syncTriggerLength;
-		sc->newData = v->AUD_LC;
-		sc->newLength = v->AUD_LEN * 2;
-		sc->vuVolume = ch->syncVuVolume;
-		sc->analyzerVolume = ch->syncAnalyzerVolume;
-		sc->analyzerPeriod = ch->syncAnalyzerPeriod;
+		for (int32_t i = 0; i < PAULA_VOICES; i++, ch++, sc++, v++)
+		{
+			sc->flags = v->syncFlags | ch->syncFlags;
+			ch->syncFlags = v->syncFlags = 0; // clear sync flags
+
+			sc->volume = v->syncVolume;
+			sc->period = v->syncPeriod;
+			sc->triggerData = v->syncTriggerData;
+			sc->triggerLength = v->syncTriggerLength;
+			sc->newData = v->AUD_LC;
+			sc->newLength = v->AUD_LEN * 2;
+			sc->vuVolume = ch->syncVuVolume;
+			sc->analyzerVolume = ch->syncAnalyzerVolume;
+			sc->analyzerPeriod = ch->syncAnalyzerPeriod;
+		}
+
+		chSyncData.timestamp = tickTime64;
+		chQueuePush(chSyncData);
 	}
-
-	chSyncData.timestamp = tickTime64;
-	chQueuePush(chSyncData);
 
 	tickTime64 += tickTimeLen;
 	tickTime64Frac += tickTimeLenFrac;
