@@ -31,7 +31,7 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 
 	int32_t realPeriod = period;
 	if (realPeriod == 0)
-		realPeriod = 1+65535; // confirmed behavior on real Amiga
+		realPeriod = 65535; // On Amiga: period 0 = one full cycle with period 65536, then period 65535 for the rest
 	else if (realPeriod < 113)
 		realPeriod = 113; // close to what happens on real Amiga (and needed for BLEP synthesis)
 
