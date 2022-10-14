@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h> // modf()
@@ -83,6 +84,7 @@ int32_t getSampleReadPos(int32_t ch) // used for the sampler screen
 
 void scopeSetPeriod(int32_t ch, int32_t period)
 {
+	assert(period >= 113 && period <= 65535);
 	scope[ch].dDelta = (PAULA_PAL_CLK / (double)SCOPE_HZ) / period;
 }
 
