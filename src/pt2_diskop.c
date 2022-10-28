@@ -393,6 +393,17 @@ bool changePathToDesktop(void)
 #endif
 }
 
+#ifndef _WIN32
+bool changePathToHome(void)
+{
+	char *homePath = getenv("HOME");
+	if (homePath != NULL && chdir(homePath) == 0)
+		return true;
+
+	return false;
+}
+#endif
+
 void setPathFromDiskOpMode(void)
 {
 	UNICHAR_CHDIR((diskop.mode == DISKOP_MODE_MOD) ? editor.modulesPathU : editor.samplesPathU);

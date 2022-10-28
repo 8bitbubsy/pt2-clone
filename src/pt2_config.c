@@ -17,7 +17,7 @@
 #include "pt2_config.h"
 #include "pt2_tables.h"
 #include "pt2_sampler.h"
-#include "pt2_diskop.h" // changePathToDesktop()
+#include "pt2_diskop.h" // changePathToDesktop(), changePathToHome()
 
 #ifndef _WIN32
 static char oldCwd[PATH_MAX];
@@ -87,7 +87,7 @@ void loadConfig(void)
 		proTrackerDotIniFound = true;
 
 	// check in ~/.protracker/
-	if (!proTrackerDotIniFound && changePathToDesktop() && chdir(".protracker") == 0)
+	if (!proTrackerDotIniFound && changePathToHome() && chdir(".protracker") == 0)
 	{
 		f = fopen("protracker.ini", "r");
 		if (f != NULL)
@@ -116,7 +116,7 @@ void loadConfig(void)
 		ptDotConfigFound = true;
 
 	// check in ~/.protracker/
-	if (!ptDotConfigFound && changePathToDesktop() && chdir(".protracker") == 0)
+	if (!ptDotConfigFound && changePathToHome() && chdir(".protracker") == 0)
 	{
 		f = openPTDotConfig();
 		if (f != NULL)
@@ -140,7 +140,7 @@ void loadConfig(void)
 	colorsDotIniFound = loadColorsDotIni();
 
 	// check in ~/.protracker/
-	if (!colorsDotIniFound && changePathToDesktop() && chdir(".protracker") == 0)
+	if (!colorsDotIniFound && changePathToHome() && chdir(".protracker") == 0)
 		loadColorsDotIni();
 #endif
 

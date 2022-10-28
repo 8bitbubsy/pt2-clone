@@ -28,5 +28,8 @@ void freeDiskOpMem(void);
 void freeDiskOpEntryMem(void);
 void setPathFromDiskOpMode(void);
 bool changePathToDesktop(void);
+#ifndef _WIN32
+bool changePathToHome(void);
+#endif
 void renderDiskOpScreen(void);
 void updateDiskOp(void);
