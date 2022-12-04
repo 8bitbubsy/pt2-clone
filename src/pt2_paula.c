@@ -1,39 +1,176 @@
 /* Simple Paula emulator by 8bitbubsy (with BLEP synthesis by aciddose).
-** The Amiga filters are handled in pt2_amigafilters.c
-**
 ** Limitation: The audio output frequency can't be below 31389Hz ( ceil(PAULA_PAL_CLK / 113.0) )
+**
+** WARNING: These functions must not be called while paulaGenerateSamples() is running!
+**          If so, lock the audio first so that you're sure it's not running.
 */
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "pt2_audio.h"
 #include "pt2_paula.h"
 #include "pt2_blep.h"
-#include "pt2_sync.h"
-#include "pt2_scopes.h" 
-#include "pt2_config.h"
+#include "pt2_rcfilter.h"
+#include "pt2_ledfilter.h"
+#include "pt2_math.h"
 
-paulaVoice_t paula[PAULA_VOICES]; // globalized
-
-static blep_t blep[PAULA_VOICES];
-static double dPeriodToDeltaDiv;
-
-void paulaSetOutputFrequency(double dAudioFreq, bool oversampling2x)
+typedef struct voice_t
 {
-	dPeriodToDeltaDiv = PAULA_PAL_CLK / dAudioFreq;
-	if (oversampling2x)
-		dPeriodToDeltaDiv /= 2.0;
+	volatile bool DMA_active;
+
+	// internal registers
+	bool DMATriggerFlag, nextSampleStage;
+	int8_t AUD_DAT[2]; // DMA data buffer
+	const int8_t *location; // current location
+	uint16_t lengthCounter; // current length
+	int32_t sampleCounter; // how many bytes left in AUD_DAT
+	double dSample; // currently held sample point (multiplied by volume)
+	double dDelta, dPhase;
+
+	// for BLEP synthesis
+	double dLastDelta, dLastPhase, dLastDeltaMul, dBlepOffset, dDeltaMul;
+
+	// registers modified by Paula functions
+	const int8_t *AUD_LC; // location (data pointer)
+	uint16_t AUD_LEN;
+	double AUD_PER_delta, AUD_PER_deltamul;
+	double AUD_VOL;
+} paulaVoice_t;
+
+static bool useLEDFilter, useLowpassFilter, useHighpassFilter;
+static int8_t nullSample[0xFFFF*2]; // buffer for NULL data pointer
+static double dPaulaOutputFreq, dPeriodToDeltaDiv;
+static blep_t blep[PAULA_VOICES];
+static rcFilter_t filterLo, filterHi;
+static ledFilter_t filterLED;
+static paulaVoice_t paula[PAULA_VOICES];
+
+void paulaSetup(double dOutputFreq, uint32_t amigaModel)
+{
+	if (dOutputFreq <= 0.0)
+		dOutputFreq = 44100.0;
+
+	dPaulaOutputFreq = dOutputFreq;
+	dPeriodToDeltaDiv = PAULA_PAL_CLK / dPaulaOutputFreq;
+
+	useLowpassFilter = useHighpassFilter = true;
+	clearRCFilterState(&filterLo);
+	clearRCFilterState(&filterHi);
+	clearLEDFilterState(&filterLED);
+
+	/* Amiga 500/1200 filter emulation
+	**
+	** aciddose:
+	** First comes a static low-pass 6dB formed by the supply current
+	** from the Paula's mixture of channels A+B / C+D into the opamp with
+	** 0.1uF capacitor and 360 ohm resistor feedback in inverting mode biased by
+	** dac vRef (used to center the output).
+	**
+	** R = 360 ohm
+	** C = 0.1uF
+	** Low Hz = 4420.97~ = 1 / (2pi * 360 * 0.0000001)
+	**
+	** Under spice simulation the circuit yields -3dB = 4400Hz.
+	** In the Amiga 1200, the low-pass cutoff is ~34kHz, so the
+	** static low-pass filter is disabled in the mixer in A1200 mode.
+	**
+	** Next comes a bog-standard Sallen-Key filter ("LED") with:
+	** R1 = 10K ohm
+	** R2 = 10K ohm
+	** C1 = 6800pF
+	** C2 = 3900pF
+	** Q ~= 1/sqrt(2)
+	**
+	** This filter is optionally bypassed by an MPF-102 JFET chip when
+	** the LED filter is turned off.
+	**
+	** Under spice simulation the circuit yields -3dB = 2800Hz.
+	** 90 degrees phase = 3000Hz (so, should oscillate at 3kHz!)
+	**
+	** The buffered output of the Sallen-Key passes into an RC high-pass with:
+	** R = 1.39K ohm (1K ohm + 390 ohm)
+	** C = 22uF (also C = 330nF, for improved high-frequency)
+	**
+	** High Hz = 5.2~ = 1 / (2pi * 1390 * 0.000022)
+	** Under spice simulation the circuit yields -3dB = 5.2Hz.
+	**
+	** 8bitbubsy:
+	** Keep in mind that many of the Amiga schematics that are floating around on
+	** the internet have wrong RC values! They were most likely very early schematics
+	** that didn't change before production (or changes that never reached production).
+	** This has been confirmed by measuring the components on several Amiga motherboards.
+	**
+	** Correct values for A500, >rev3 (?) (A500_R6.pdf):
+	** - 1-pole RC 6dB/oct low-pass: R=360 ohm, C=0.1uF
+	** - Sallen-key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF
+	** - 1-pole RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22.33uF (22+0.33)
+	**
+	** Correct values for A1200, all revs (A1200_R2.pdf):
+	** - 1-pole RC 6dB/oct low-pass: R=680 ohm, C=6800pF
+	** - Sallen-key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF (same as A500)
+	** - 1-pole RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22uF
+	*/
+	double R, C, R1, R2, C1, C2, cutoff, qfactor;
+
+	if (amigaModel == MODEL_A500)
+	{
+		// A500 1-pole (6db/oct) static RC low-pass filter:
+		R = 360.0; // R321 (360 ohm)
+		C = 1e-7;  // C321 (0.1uF)
+		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~4420.971Hz
+		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterLo);
+
+		// A500 1-pole (6dB/oct) static RC high-pass filter:
+		R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
+		C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
+		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.128Hz
+		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterHi);
+	}
+	else
+	{
+		/* Don't use the A1200 low-pass filter since its cutoff
+		** is well above human hearable range anyway (~34.4kHz).
+		** We don't do volume PWM, so we have nothing we need to
+		** filter away.
+		*/
+		useLowpassFilter = false;
+
+		// A1200 1-pole (6dB/oct) static RC high-pass filter:
+		R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
+		C = 2.2e-5; // C334 (22uF capacitor)
+		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.205Hz
+		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterHi);
+	}
+	
+	// Sallen-Key low-pass filter ("LED" filter, same values on A500/A1200):
+	R1 = 10000.0; // R322 (10K ohm)
+	R2 = 10000.0; // R323 (10K ohm)
+	C1 = 6.8e-9;  // C322 (6800pF)
+	C2 = 3.9e-9;  // C323 (3900pF)
+	cutoff = 1.0 / (PT2_TWO_PI * pt2_sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
+	qfactor = pt2_sqrt(R1 * R2 * C1 * C2) / (C2 * (R1 + R2)); // ~0.660225
+	calcLEDFilterCoeffs(dPaulaOutputFreq, cutoff, qfactor, &filterLED);
 }
 
-void paulaSetPeriod(int32_t ch, uint16_t period)
+void paulaDisableFilters(void) // disables low-pass/high-pass filter ("LED" filter is kept)
+{
+	useHighpassFilter = false;
+	useLowpassFilter = false;
+}
+
+int8_t *paulaGetNullSamplePtr(void)
+{
+	return nullSample;
+}
+
+static void audxper(int32_t ch, uint16_t period)
 {
 	paulaVoice_t *v = &paula[ch];
 
 	int32_t realPeriod = period;
 	if (realPeriod == 0)
-		realPeriod = 65535; // On Amiga: period 0 = one full cycle with period 65536, then period 65535 for the rest
+		realPeriod = 65536; // On Amiga: period 0 = period 65536 (1+65535)
 	else if (realPeriod < 113)
-		realPeriod = 113; // close to what happens on real Amiga (and needed for BLEP synthesis)
+		realPeriod = 113; // close to what happens on real Amiga (and low-limit needed for BLEP synthesis)
 
 	// to be read on next sampling step (or on DMA trigger)
 	v->AUD_PER_delta = dPeriodToDeltaDiv / realPeriod;
@@ -46,74 +183,29 @@ void paulaSetPeriod(int32_t ch, uint16_t period)
 
 	if (v->dLastDeltaMul == 0.0)
 		v->dLastDeltaMul = v->AUD_PER_deltamul;
-
-	// handle visualizers
-
-	if (editor.songPlaying)
-	{
-		v->syncPeriod = realPeriod;
-		v->syncFlags |= SET_SCOPE_PERIOD;
-	}
-	else
-	{
-		scopeSetPeriod(ch, realPeriod);
-	}
 }
 
-void paulaSetVolume(int32_t ch, uint16_t vol)
+static void audxvol(int32_t ch, uint16_t vol)
 {
-	paulaVoice_t *v = &paula[ch];
-
 	int32_t realVol = vol & 127;
 	if (realVol > 64)
 		realVol = 64;
 
-	// multiplying sample point by this also scales the sample from -128..127 -> -1.0 .. ~0.99
-	v->AUD_VOL = realVol * (1.0 / (128.0 * 64.0));
-
-	// handle visualizers
-
-	if (editor.songPlaying)
-	{
-		v->syncVolume = (uint8_t)realVol;
-		v->syncFlags |= SET_SCOPE_VOLUME;
-	}
-	else
-	{
-		scope[ch].volume = (uint8_t)realVol;
-	}
+	// multiplying sample point by this also scales the sample from -128..127 -> -1.000 .. ~0.992
+	paula[ch].AUD_VOL = realVol * (1.0 / (128.0 * 64.0));
 }
 
-void paulaSetLength(int32_t ch, uint16_t len)
+static void audxlen(int32_t ch, uint16_t len)
 {
-	paulaVoice_t *v = &paula[ch];
-
-	v->AUD_LEN = len;
-
-	// handle visualizers
-
-	if (editor.songPlaying)
-		v->syncFlags |= SET_SCOPE_LENGTH;
-	else
-		scope[ch].newLength = len * 2;
+	paula[ch].AUD_LEN = len;
 }
 
-void paulaSetData(int32_t ch, const int8_t *src)
+static void audxdat(int32_t ch, const int8_t *src)
 {
-	paulaVoice_t *v = &paula[ch];
-
-	// if pointer is NULL, use empty 128kB sample slot after sample 31 in the tracker
 	if (src == NULL)
-		src = &song->sampleData[config.reservedSampleOffset];
+		src = nullSample;
 
-	v->AUD_LC = src;
-
-	// handle visualizers
-
-	if (editor.songPlaying)
-		v->syncFlags |= SET_SCOPE_DATA;
-	else
-		scope[ch].newData = src;
+	paula[ch].AUD_LC = src;
 }
 
 static inline void refetchPeriod(paulaVoice_t *v) // Paula stage
@@ -131,13 +223,12 @@ static inline void refetchPeriod(paulaVoice_t *v) // Paula stage
 	v->nextSampleStage = true;
 }
 
-static void startPaulaDMA(int32_t ch)
+static void startDMA(int32_t ch)
 {
 	paulaVoice_t *v = &paula[ch];
 
-	// if pointer is NULL, use empty 128kB sample slot after sample 31 in the tracker
 	if (v->AUD_LC == NULL)
-		v->AUD_LC = &song->sampleData[config.reservedSampleOffset];
+		v->AUD_LC = nullSample;
 
 	// immediately update AUD_LC/AUD_LEN
 	v->location = v->AUD_LC;
@@ -151,55 +242,107 @@ static void startPaulaDMA(int32_t ch)
 	v->dPhase = 0.0; // kludge: must be cleared *after* refetchPeriod()
 
 	v->DMA_active = true;
+}
 
-	// handle visualizers
+static void stopDMA(int32_t ch)
+{
+	paula[ch].DMA_active = false;
+}
 
-	if (editor.songPlaying)
+void paulaWriteByte(uint32_t address, uint16_t data8)
+{
+	if (address == 0)
+		return;
+
+	switch (address)
 	{
-		v->syncTriggerData = v->AUD_LC;
-		v->syncTriggerLength = v->AUD_LEN * 2;
-		v->syncFlags |= TRIGGER_SCOPE;
-	}
-	else
-	{
-		scope_t *s = &scope[ch];
-		s->newData = v->AUD_LC;
-		s->newLength = v->AUD_LEN * 2;
-		scopeTrigger(ch);
+		// CIA-A ("LED" filter control only)
+		case 0xBFE001:
+		{
+			const bool oldLedFilterState = useLEDFilter;
+
+			useLEDFilter = !!(data8 & 2);
+
+			if (useLEDFilter != oldLedFilterState)
+				clearLEDFilterState(&filterLED);
+		}
+		break;
+	
+		// AUDxVOL ( byte-write to AUDxVOL works on most Amigas (not 68040/68060) )
+		case 0xDFF0A8: audxvol(0, data8); break;
+		case 0xDFF0B8: audxvol(1, data8); break;
+		case 0xDFF0C8: audxvol(2, data8); break;
+		case 0xDFF0D8: audxvol(3, data8); break;
+
+		default: return;
 	}
 }
 
-static void stopPaulaDMA(int32_t ch)
+void paulaWriteWord(uint32_t address, uint16_t data16)
 {
-	paulaVoice_t *v = &paula[ch];
+	if (address == 0)
+		return;
 
-	v->DMA_active = false;
+	switch (address)
+	{
+		// DMACON
+		case 0xDFF096:
+		{
+			if (data16 & 0x8000)
+			{
+				// set
+				if (data16 & 1) startDMA(0);
+				if (data16 & 2) startDMA(1);
+				if (data16 & 4) startDMA(2);
+				if (data16 & 8) startDMA(3);
+			}
+			else
+			{
+				// clear
+				if (data16 & 1) stopDMA(0);
+				if (data16 & 2) stopDMA(1);
+				if (data16 & 4) stopDMA(2);
+				if (data16 & 8) stopDMA(3);
+			}
+		}
+		break;
 
-	// handle visualizers
- 
-	if (editor.songPlaying)
-		v->syncFlags |= STOP_SCOPE;
-	else
-		scope[ch].active = false;
+		// AUDxLEN
+		case 0xDFF0A4: audxlen(0, data16); break;
+		case 0xDFF0B4: audxlen(1, data16); break;
+		case 0xDFF0C4: audxlen(2, data16); break;
+		case 0xDFF0D4: audxlen(3, data16); break;
+
+		// AUDxPER
+		case 0xDFF0A6: audxper(0, data16); break;
+		case 0xDFF0B6: audxper(1, data16); break;
+		case 0xDFF0C6: audxper(2, data16); break;
+		case 0xDFF0D6: audxper(3, data16); break;
+
+		// AUDxVOL
+		case 0xDFF0A8: audxvol(0, data16); break;
+		case 0xDFF0B8: audxvol(1, data16); break;
+		case 0xDFF0C8: audxvol(2, data16); break;
+		case 0xDFF0D8: audxvol(3, data16); break;
+
+		default: return;
+	}
 }
 
-void paulaSetDMACON(uint16_t bits) // $DFF096 register write (only controls paula DMAs)
+void paulaWritePtr(uint32_t address, const void *ptr)
 {
-	if (bits & 0x8000)
+	if (address == 0)
+		return;
+
+	switch (address)
 	{
-		// set
-		if (bits & 1) startPaulaDMA(0);
-		if (bits & 2) startPaulaDMA(1);
-		if (bits & 4) startPaulaDMA(2);
-		if (bits & 8) startPaulaDMA(3);
-	}
-	else
-	{
-		// clear
-		if (bits & 1) stopPaulaDMA(0);
-		if (bits & 2) stopPaulaDMA(1);
-		if (bits & 4) stopPaulaDMA(2);
-		if (bits & 8) stopPaulaDMA(3);
+		// AUDxDAT
+		case 0xDFF0A0: audxdat(0, ptr); break;
+		case 0xDFF0B0: audxdat(1, ptr); break;
+		case 0xDFF0C0: audxdat(2, ptr); break;
+		case 0xDFF0D0: audxdat(3, ptr); break;
+
+		default: return;
 	}
 }
 
@@ -248,12 +391,19 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b)
 	v->sampleCounter--;
 }
 
+// output is -4.00 .. 3.97 (can be louder because of high-pass filter)
 void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples)
 {
 	double *dMixBufSelect[PAULA_VOICES] = { dOutL, dOutR, dOutR, dOutL };
 
+	if (numSamples <= 0)
+		return;
+
+	// clear mix buffer block
 	memset(dOutL, 0, numSamples * sizeof (double));
 	memset(dOutR, 0, numSamples * sizeof (double));
+
+	// mix samples
 
 	paulaVoice_t *v = paula;
 	blep_t *b = blep;
@@ -269,10 +419,10 @@ void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples)
 			if (v->nextSampleStage)
 			{
 				v->nextSampleStage = false;
-				nextSample(v, b); // inlined
+				nextSample(v, b);
 			}
 
-			double dSample = v->dSample; // current Paula sample, pre-multiplied by volume, scaled to -1.0 .. 0.9921875
+			double dSample = v->dSample; // current sample, pre-multiplied by vol, scaled to -1.0 .. 0.992
 			if (b->samplesLeft > 0)
 				dSample = blepRun(b, dSample);
 
@@ -282,8 +432,26 @@ void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples)
 			if (v->dPhase >= 1.0)
 			{
 				v->dPhase -= 1.0;
-				refetchPeriod(v); // inlined
+				refetchPeriod(v);
 			}
 		}
+	}
+
+	// apply Amiga filters
+	for (int32_t i = 0; i < numSamples; i++)
+	{
+		double dOut[2] = { dOutL[i], dOutR[i] };
+
+		if (useLowpassFilter)
+			RCLowPassFilterStereo(&filterLo, dOut, dOut);
+
+		if (useLEDFilter)
+			LEDFilter(&filterLED, dOut, dOut);
+
+		if (useHighpassFilter)
+			RCHighPassFilterStereo(&filterHi, dOut, dOut);
+
+		dOutL[i] = dOut[0];
+		dOutR[i] = dOut[1];
 	}
 }

@@ -25,6 +25,7 @@
 #include "pt2_chordmaker.h"
 #include "pt2_edit.h"
 #include "pt2_replayer.h"
+#include "pt2_visuals_sync.h"
 
 static const int8_t scancode2NoteLo[52] = // "USB usage page standard" order
 {
@@ -731,19 +732,35 @@ static void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 			if (ch->n_length == 0)
 				ch->n_length = 1;
 
-			paulaSetVolume(chNum, ch->n_volume);
-			paulaSetPeriod(chNum, ch->n_period);
-			paulaSetData(chNum, ch->n_start);
-			paulaSetLength(chNum, ch->n_length);
+			const uint32_t voiceAddr = 0xDFF0A0 + (chNum * 16);
+			paulaWriteWord(voiceAddr + 8, ch->n_volume);
+			paulaWriteWord(voiceAddr + 6, ch->n_period);
+			paulaWritePtr(voiceAddr + 0, ch->n_start);
+			paulaWriteWord(voiceAddr + 4, ch->n_length);
 
 			if (!editor.muted[chNum])
-				paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
+				paulaWriteWord(0xDFF096, 0x8000 | ch->n_dmabit); // voice DMA on
 			else
-				paulaSetDMACON(ch->n_dmabit); // voice DMA off
+				paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off
 
 			// these take effect after the current DMA cycle is done
-			paulaSetData(chNum, ch->n_loopstart);
-			paulaSetLength(chNum, ch->n_replen);
+			paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
+			paulaWriteWord(voiceAddr + 4, ch->n_replen);
+
+			// update tracker visuals
+
+			setVisualsVolume(chNum, ch->n_volume);
+			setVisualsPeriod(chNum, ch->n_period);
+			setVisualsDataPtr(chNum, ch->n_start);
+			setVisualsLength(chNum, ch->n_length);
+
+			if (!editor.muted[chNum])
+				setVisualsDMACON(0x8000 | ch->n_dmabit);
+			else
+				setVisualsDMACON(ch->n_dmabit);
+
+			setVisualsDataPtr(chNum, ch->n_loopstart);
+			setVisualsLength(chNum, ch->n_replen);
 
 			unlockAudio();
 		}
@@ -1059,19 +1076,35 @@ void handleSampleJamming(SDL_Scancode scancode) // used for the sampling feature
 
 	ch->n_samplenum = editor.currSample; // needed for sample playback/sampling line
 
-	paulaSetVolume(chNum, vol);
-	paulaSetPeriod(chNum, period);
-	paulaSetData(chNum, n_start);
-	paulaSetLength(chNum, n_length);
+	const uint32_t voiceAddr = 0xDFF0A0 + (chNum * 16);
+	paulaWriteWord(voiceAddr +  8, vol);
+	paulaWriteWord(voiceAddr + 6, period);
+	paulaWritePtr(voiceAddr + 0, n_start);
+	paulaWriteWord(voiceAddr + 4, n_length);
 
 	if (!editor.muted[chNum])
-		paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
+		paulaWriteWord(0xDFF096, 0x8000 | ch->n_dmabit); // voice DMA on
 	else
-		paulaSetDMACON(ch->n_dmabit); // voice DMA off
+		paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off
 
 	// these take effect after the current DMA cycle is done
-	paulaSetData(chNum, NULL); // NULL = reserved buffer (empty)
-	paulaSetLength(chNum, 1);
+	paulaWritePtr(voiceAddr + 0, NULL); // data
+	paulaWriteWord(voiceAddr + 4, 1); // length
+
+	// update tracker visuals
+
+	setVisualsVolume(chNum, vol);
+	setVisualsPeriod(chNum, period);
+	setVisualsDataPtr(chNum, n_start);
+	setVisualsLength(chNum, n_length);
+
+	if (!editor.muted[chNum])
+		setVisualsDMACON(0x8000 | ch->n_dmabit);
+	else
+		setVisualsDMACON(ch->n_dmabit);
+
+	setVisualsDataPtr(chNum, NULL);
+	setVisualsLength(chNum, 1);
 
 	unlockAudio();
 }

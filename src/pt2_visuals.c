@@ -1073,9 +1073,6 @@ void renderQuadrascopeBg(void)
 		srcPtr += SCREEN_W;
 		dstPtr += SCREEN_W;
 	}
-
-	for (int32_t i = 0; i < PAULA_VOICES; i++)
-		scope[i].emptyScopeDrawn = false;
 }
 
 void renderSpectrumAnalyzerBg(void)

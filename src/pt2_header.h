@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.53"
+#define PROG_VER_STR "1.54"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -90,10 +90,6 @@ enum
 
 	TEMPFLAG_START = 1,
 	TEMPFLAG_DELAY = 2,
-
-	FILTERMODEL_A1200 = 0,
-	FILTERMODEL_A500 = 1,
-	FILTER_LED_ENABLED = 2,
 
 	NO_CARRY = 0,
 	DO_CARRY = 1,

@@ -246,7 +246,8 @@ void pat2SmpRender(void)
 
 	// do some prep work
 	generateBpmTable(dPat2SmpFreq, editor.timingMode == TEMPO_MODE_VBLANK);
-	paulaSetOutputFrequency(dPat2SmpFreq, AUDIO_2X_OVERSAMPLING);
+	paulaSetup(dPat2SmpFreq*2.0, MODEL_A1200);
+	paulaDisableFilters();
 	storeTempVariables();
 	restartSong(); // this also updates BPM (samples per tick) with the PAT2SMP audio output rate
 	clearMixerDownsamplerStates();
@@ -289,7 +290,8 @@ void pat2SmpRender(void)
 	song->currRow = song->row = oldRow; // set back old row
 
 	// set back audio configurations
-	paulaSetOutputFrequency(audio.outputRate, audio.oversamplingFlag);
+	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
+	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	generateBpmTable(audio.outputRate, editor.timingMode == TEMPO_MODE_VBLANK);
 	clearMixerDownsamplerStates();
 	resetSong(); // this also updates BPM (samples per tick) with the tracker's audio output rate

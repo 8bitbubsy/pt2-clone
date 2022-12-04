@@ -43,7 +43,7 @@ void loadConfig(void)
 	config.fullScreenStretch = false;
 	config.pattDots = false;
 	config.waveformCenterLine = true;
-	config.filterModel = FILTERMODEL_A1200;
+	config.amigaModel = MODEL_A1200;
 	config.soundFrequency = 48000;
 	config.rememberPlayMode = false;
 	config.stereoSeparation = 20;
@@ -65,9 +65,7 @@ void loadConfig(void)
 	config.audioInputFrequency = 44100;
 	config.mod2WavOutputFreq = 44100;
 	config.keepEditModeAfterStepPlay = false;
-
 	config.maxSampleLength = 65534;
-	config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -205,15 +203,9 @@ static bool loadProTrackerDotIni(FILE *f)
 		else if (!_strnicmp(configLine, "64K_LIMIT=", 10))
 		{
 			if (!_strnicmp(&configLine[10], "TRUE", 4))
-			{
 				config.maxSampleLength = 65534;
-				config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
-			}
 			else if (!_strnicmp(&configLine[10], "FALSE", 5))
-			{
 				config.maxSampleLength = 131070;
-				config.reservedSampleOffset = (MOD_SAMPLES+1) * config.maxSampleLength;
-			}
 		}
 
 		// NO_DWNSMP_ON_SMP_LOAD (no dialog for 2x downsample after >22kHz sample load)
@@ -407,22 +399,15 @@ static bool loadProTrackerDotIni(FILE *f)
 		// FILTERMODEL
 		else if (!_strnicmp(configLine, "FILTERMODEL=", 12))
 		{
-			     if (!_strnicmp(&configLine[12], "A500",  4)) config.filterModel = FILTERMODEL_A500;
-			else if (!_strnicmp(&configLine[12], "A1200", 5)) config.filterModel = FILTERMODEL_A1200;
+			     if (!_strnicmp(&configLine[12], "A500",  4)) config.amigaModel = MODEL_A500;
+			else if (!_strnicmp(&configLine[12], "A1200", 5)) config.amigaModel = MODEL_A1200;
 		}
 
 		// A500LOWPASSFILTER (deprecated, same as A4000LOWPASSFILTER)
 		else if (!_strnicmp(configLine, "A500LOWPASSFILTER=", 18))
 		{
-			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.filterModel = FILTERMODEL_A500;
-			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.filterModel = FILTERMODEL_A1200;
-		}
-
-		// A4000LOWPASSFILTER (deprecated)
-		else if (!_strnicmp(configLine, "A4000LOWPASSFILTER=", 19))
-		{
-			     if (!_strnicmp(&configLine[19], "TRUE",  4)) config.filterModel = FILTERMODEL_A500;
-			else if (!_strnicmp(&configLine[19], "FALSE", 5)) config.filterModel = FILTERMODEL_A1200;
+			     if (!_strnicmp(&configLine[18], "TRUE",  4)) config.amigaModel = MODEL_A500;
+			else if (!_strnicmp(&configLine[18], "FALSE", 5)) config.amigaModel = MODEL_A1200;
 		}
 
 		// SAMPLINGFREQ

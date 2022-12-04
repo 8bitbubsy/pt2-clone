@@ -13,8 +13,8 @@
 #include "pt2_config.h"
 #include "pt2_visuals.h"
 #include "pt2_scopes.h"
-#include "pt2_sync.h"
-#include "pt2_amigafilters.h"
+#include "pt2_paula.h"
+#include "pt2_visuals_sync.h"
 
 static bool posJumpAssert, pBreakFlag, modRenderDone;
 static bool doStopSong; // from F00 (Set Speed)
@@ -52,8 +52,12 @@ void updatePaulaLoops(void) // used after manipulating sample loop points while 
 		{
 			const moduleSample_t *s = &song->samples[editor.currSample];
 
-			paulaSetData(i, ch->n_start + s->loopStart);
-			paulaSetLength(i, (uint16_t)(s->loopLength >> 1));
+			const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
+			paulaWritePtr(voiceAddr + 0, ch->n_start + s->loopStart);
+			paulaWriteWord(voiceAddr + 4, (uint16_t)(s->loopLength >> 1));
+
+			setVisualsDataPtr(i, ch->n_start + s->loopStart);
+			setVisualsLength(i, (uint16_t)(s->loopLength >> 1));
 		}
 	}
 
@@ -67,13 +71,19 @@ void turnOffVoices(void)
 	if (audioWasntLocked)
 		lockAudio();
 
-	paulaSetDMACON(0x000F); // turn off all voice DMAs
+	paulaWriteWord(0xDFF096, 0x000F); // turn off all voice DMAs
+	setVisualsDMACON(0x000F);
 
+	// clear all volumes
 	for (int32_t i = 0; i < PAULA_VOICES; i++)
-		paulaSetVolume(i, 0);
+	{
+		const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
+		paulaWriteWord(voiceAddr + 8, 0);
+
+		setVisualsVolume(i, 0);
+	}
 
 	// reset dithering/filter states (so that every playback session is identical)
-	resetAmigaFilterStates();
 	resetAudioDithering();
 
 	if (audioWasntLocked)
@@ -289,19 +299,28 @@ static void karplusStrong(moduleChannel_t *ch)
 
 static void doRetrg(moduleChannel_t *ch)
 {
-	paulaSetDMACON(ch->n_dmabit); // voice DMA off
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 
-	paulaSetData(ch->n_chanindex, ch->n_start); // n_start is increased on 9xx
-	paulaSetLength(ch->n_chanindex, ch->n_length);
-	paulaSetPeriod(ch->n_chanindex, ch->n_period);
-
-	paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
-
+	paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off
+	paulaWritePtr(voiceAddr + 0, ch->n_start); // n_start is increased on 9xx
+	paulaWriteWord(voiceAddr + 4, ch->n_length);
+	paulaWriteWord(voiceAddr + 6, ch->n_period);
+	paulaWriteWord(0xDFF096, 0x8000 | ch->n_dmabit); // voice DMA on
+	
 	// these take effect after the current DMA cycle is done
-	paulaSetData(ch->n_chanindex, ch->n_loopstart);
-	paulaSetLength(ch->n_chanindex, ch->n_replen);
+	paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
+	paulaWriteWord(voiceAddr + 4, ch->n_replen);
 
-	// set visuals
+	// update tracker visuals
+
+	setVisualsDMACON(ch->n_dmabit);
+	setVisualsDataPtr(ch->n_chanindex, ch->n_start);
+	setVisualsLength(ch->n_chanindex, ch->n_length);
+	setVisualsPeriod(ch->n_chanindex, ch->n_period);
+	setVisualsDMACON(0x8000 | ch->n_dmabit);
+
+	setVisualsDataPtr(ch->n_chanindex, ch->n_loopstart);
+	setVisualsLength(ch->n_chanindex, ch->n_replen);
 
 	ch->syncAnalyzerVolume = ch->n_volume;
 	ch->syncAnalyzerPeriod = ch->n_period;
@@ -434,6 +453,8 @@ static void arpeggio(moduleChannel_t *ch)
 {
 	int32_t arpNote;
 
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+
 	int32_t arpTick = song->tick % 3; // 0, 1, 2
 	if (arpTick == 1)
 	{
@@ -445,7 +466,8 @@ static void arpeggio(moduleChannel_t *ch)
 	}
 	else // arpTick 0
 	{
-		paulaSetPeriod(ch->n_chanindex, ch->n_period);
+		paulaWriteWord(voiceAddr + 6, ch->n_period);
+		setVisualsPeriod(ch->n_chanindex, ch->n_period);
 		return;
 	}
 
@@ -459,7 +481,8 @@ static void arpeggio(moduleChannel_t *ch)
 	{
 		if (ch->n_period >= periods[baseNote])
 		{
-			paulaSetPeriod(ch->n_chanindex, periods[baseNote+arpNote]);
+			paulaWriteWord(voiceAddr + 6, periods[baseNote+arpNote]);
+			setVisualsPeriod(ch->n_chanindex, periods[baseNote+arpNote]);
 			break;
 		}
 	}
@@ -473,7 +496,10 @@ static void portaUp(moduleChannel_t *ch)
 	if ((ch->n_period & 0xFFF) < 113) // PT BUG: sign removed before comparison, underflow not clamped!
 		ch->n_period = (ch->n_period & 0xF000) | 113;
 
-	paulaSetPeriod(ch->n_chanindex, ch->n_period & 0xFFF);
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+	paulaWriteWord(voiceAddr + 6, ch->n_period & 0xFFF);
+
+	setVisualsPeriod(ch->n_chanindex, ch->n_period & 0xFFF);
 }
 
 static void portaDown(moduleChannel_t *ch)
@@ -484,7 +510,10 @@ static void portaDown(moduleChannel_t *ch)
 	if ((ch->n_period & 0xFFF) > 856)
 		ch->n_period = (ch->n_period & 0xF000) | 856;
 
-	paulaSetPeriod(ch->n_chanindex, ch->n_period & 0xFFF);
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+	paulaWriteWord(voiceAddr + 6, ch->n_period & 0xFFF);
+
+	setVisualsPeriod(ch->n_chanindex, ch->n_period & 0xFFF);
 }
 
 static void filterOnOff(moduleChannel_t *ch)
@@ -492,16 +521,8 @@ static void filterOnOff(moduleChannel_t *ch)
 	if (song->tick == 0) // added this (just pointless to call this during all ticks!)
 	{
 		const bool filterOn = (ch->n_cmd & 1) ^ 1;
-		if (filterOn)
-		{
-			editor.useLEDFilter = true;
-			setLEDFilter(true);
-		}
-		else
-		{
-			editor.useLEDFilter = false;
-			setLEDFilter(false);
-		}
+		paulaWriteByte(0xBFE001, filterOn << 1);
+		audio.ledFilterEnabled = filterOn;
 	}
 }
 
@@ -576,9 +597,12 @@ static void tonePortNoChange(moduleChannel_t *ch)
 		}
 	}
 
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+
 	if ((ch->n_glissfunk & 0xF) == 0)
 	{
-		paulaSetPeriod(ch->n_chanindex, ch->n_period);
+		paulaWriteWord(voiceAddr + 6, ch->n_period);
+		setVisualsPeriod(ch->n_chanindex, ch->n_period);
 	}
 	else
 	{
@@ -598,7 +622,8 @@ static void tonePortNoChange(moduleChannel_t *ch)
 			}
 		}
 
-		paulaSetPeriod(ch->n_chanindex, portaPointer[i]);
+		paulaWriteWord(voiceAddr + 6, portaPointer[i]);
+		setVisualsPeriod(ch->n_chanindex, portaPointer[i]);
 	}
 }
 
@@ -643,7 +668,10 @@ static void vibrato2(moduleChannel_t *ch)
 	else
 		vibratoData = ch->n_period - vibratoData;
 
-	paulaSetPeriod(ch->n_chanindex, vibratoData);
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+	paulaWriteWord(voiceAddr + 6, vibratoData); // period
+
+	setVisualsPeriod(ch->n_chanindex, vibratoData);
 
 	ch->n_vibratopos += (ch->n_vibratocmd >> 2) & 0x3C;
 }
@@ -715,7 +743,10 @@ static void tremolo(moduleChannel_t *ch)
 			tremoloData = 0;
 	}
 
-	paulaSetVolume(ch->n_chanindex, tremoloData);
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+	paulaWriteWord(voiceAddr + 8, tremoloData); // volume
+
+	setVisualsVolume(ch->n_chanindex, tremoloData);
 
 	ch->n_tremolopos += (ch->n_tremolocmd >> 2) & 0x3C;
 }
@@ -794,7 +825,10 @@ static void checkMoreEffects(moduleChannel_t *ch)
 		return;
 	}
 
-	paulaSetPeriod(ch->n_chanindex, ch->n_period);
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+	paulaWriteWord(voiceAddr + 6, ch->n_period);
+
+	setVisualsPeriod(ch->n_chanindex, ch->n_period);
 }
 
 static void chkefx2(moduleChannel_t *ch)
@@ -818,7 +852,10 @@ static void chkefx2(moduleChannel_t *ch)
 		default: break;
 	}
 
-	paulaSetPeriod(ch->n_chanindex, ch->n_period);
+	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+	paulaWriteWord(voiceAddr + 6, ch->n_period);
+
+	setVisualsPeriod(ch->n_chanindex, ch->n_period);
 
 	if (cmd == 0x7)
 		tremolo(ch);
@@ -842,7 +879,12 @@ static void checkEffects(moduleChannel_t *ch)
 	*/
 	const uint8_t cmd = (ch->n_cmd & 0x0F00) >> 8;
 	if (cmd != 0x7)
-		paulaSetVolume(ch->n_chanindex, ch->n_volume);
+	{
+		const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+		paulaWriteWord(voiceAddr + 8, ch->n_volume);
+
+		setVisualsVolume(ch->n_chanindex, ch->n_volume);
+	}
 }
 
 static void setPeriod(moduleChannel_t *ch)
@@ -862,24 +904,38 @@ static void setPeriod(moduleChannel_t *ch)
 
 	if ((ch->n_cmd & 0xFF0) != 0xED0) // no note delay
 	{
-		paulaSetDMACON(ch->n_dmabit); // voice DMA off (turned on in setDMA() later)
+		paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off (turned on in setDMA() later)
 
 		if ((ch->n_wavecontrol & 0x04) == 0) ch->n_vibratopos = 0;
 		if ((ch->n_wavecontrol & 0x40) == 0) ch->n_tremolopos = 0;
 
-		paulaSetLength(ch->n_chanindex, ch->n_length);
-		paulaSetData(ch->n_chanindex, ch->n_start);
+		const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+
+		paulaWriteWord(voiceAddr + 4, ch->n_length);
+		paulaWritePtr(voiceAddr + 0, ch->n_start);
 
 		if (ch->n_start == NULL)
 		{
 			ch->n_loopstart = NULL;
-			paulaSetLength(ch->n_chanindex, 1);
+			paulaWriteWord(voiceAddr + 4, 1); // length
 			ch->n_replen = 1;
 		}
 
-		paulaSetPeriod(ch->n_chanindex, ch->n_period);
+		paulaWriteWord(voiceAddr + 6, ch->n_period);
 
 		DMACONtemp |= ch->n_dmabit;
+
+		// update tracker visuals
+
+		setVisualsDMACON(ch->n_dmabit);
+
+		setVisualsLength(ch->n_chanindex, ch->n_length);
+		setVisualsDataPtr(ch->n_chanindex, ch->n_start);
+
+		if (ch->n_start == NULL)
+			setVisualsLength(ch->n_chanindex, 1);
+
+		setVisualsPeriod(ch->n_chanindex, ch->n_period);
 	}
 
 	checkMoreEffects(ch);
@@ -889,7 +945,7 @@ static void checkMetronome(moduleChannel_t *ch, note_t *note)
 {
 	if (editor.metroFlag && editor.metroChannel > 0)
 	{
-		if (ch->n_chanindex == editor.metroChannel-1 && (song->row % editor.metroSpeed) == 0)
+		if (ch->n_chanindex == (uint32_t)editor.metroChannel-1 && (song->row % editor.metroSpeed) == 0)
 		{
 			note->sample = 31;
 			note->period = (((song->row / editor.metroSpeed) % editor.metroSpeed) == 0) ? 160 : 214;
@@ -900,7 +956,12 @@ static void checkMetronome(moduleChannel_t *ch, note_t *note)
 static void playVoice(moduleChannel_t *ch)
 {
 	if (ch->n_note == 0 && ch->n_cmd == 0) // test period, command and command parameter
-		paulaSetPeriod(ch->n_chanindex, ch->n_period);
+	{
+		const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
+		paulaWriteWord(voiceAddr + 6, ch->n_period);
+
+		setVisualsPeriod(ch->n_chanindex, ch->n_period);
+	}
 
 	note_t note = song->patterns[modPattern][(song->row * PAULA_VOICES) + ch->n_chanindex];
 
@@ -935,7 +996,7 @@ static void playVoice(moduleChannel_t *ch)
 
 		// non-PT2 requirement (set safe sample space for uninitialized voices - f.ex. "the ultimate beeper.mod")
 		if (ch->n_length == 0)
-			ch->n_loopstart = ch->n_wavestart = &song->sampleData[config.reservedSampleOffset]; // 128K reserved sample
+			ch->n_loopstart = ch->n_wavestart = paulaGetNullSamplePtr();
 	}
 
 	if ((ch->n_note & 0xFFF) > 0)
@@ -1120,7 +1181,9 @@ static void setDMA(void)
 	if (editor.muted[2]) DMACONtemp &= ~4;
 	if (editor.muted[3]) DMACONtemp &= ~8;
 
-	paulaSetDMACON(0x8000 | DMACONtemp);
+	paulaWriteWord(0xDFF096, 0x8000 | DMACONtemp); // start DMAs for selected voices
+
+	setVisualsDMACON(0x8000 | DMACONtemp);
 
 	moduleChannel_t *ch = song->channels;
 	for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
@@ -1135,8 +1198,12 @@ static void setDMA(void)
 		}
 
 		// these take effect after the current DMA cycle is done
-		paulaSetData(i, ch->n_loopstart);
-		paulaSetLength(i, ch->n_replen);
+		const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
+		paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
+		paulaWriteWord(voiceAddr + 4, ch->n_replen);
+
+		setVisualsDataPtr(i, ch->n_loopstart);
+		setVisualsLength(i, ch->n_replen);
 	}
 }
 
@@ -1209,7 +1276,11 @@ bool intMusic(void) // replayer ticker
 			for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 			{
 				playVoice(ch);
-				paulaSetVolume(i, ch->n_volume);
+
+				const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
+				paulaWriteWord(voiceAddr + 8, ch->n_volume);
+
+				setVisualsVolume(i, ch->n_volume);
 			}
 
 			setDMA();
@@ -1583,7 +1654,6 @@ void clearSong(void)
 	modSetSpeed(editor.initialSpeed);
 
 	// disable the LED filter after clearing the song (real PT2 doesn't do this)
-	editor.useLEDFilter = false;
 	setLEDFilter(false);
 
 	updateCurrSample();

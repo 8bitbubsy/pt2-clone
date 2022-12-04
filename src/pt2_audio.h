@@ -6,19 +6,13 @@
 // for the low-pass/high-pass filters in the SAMPLER screen
 #define FILTERS_BASE_FREQ (PAULA_PAL_CLK / 214.0)
 
-enum
-{
-	AUDIO_NO_OVERSAMPLING = 0,
-	AUDIO_2X_OVERSAMPLING = 1
-};
-
 typedef struct audio_t
 {
 	volatile bool locked, isSampling;
 
 	bool ledFilterEnabled, oversamplingFlag;
 	
-	uint32_t outputRate, audioBufferSize;
+	uint32_t amigaModel, outputRate, audioBufferSize;
 	int64_t tickSampleCounter64, samplesPerTick64;
 	int64_t samplesPerTickTable[256-32]; // 32.32 fixed-point
 
@@ -29,6 +23,11 @@ typedef struct audio_t
 	bool resetSyncTickTimeFlag;
 	uint64_t tickLengthTable[224];
 } audio_t;
+
+void setAmigaFilterModel(uint8_t model);
+void toggleAmigaFilterModel(void);
+void setLEDFilter(bool state);
+void toggleLEDFilter(void);
 
 void updateReplayerTimingMode(void);
 void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac);

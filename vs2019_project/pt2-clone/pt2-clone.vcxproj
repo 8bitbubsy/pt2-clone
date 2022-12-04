@@ -237,7 +237,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\pt2_amigafilters.h" />
     <ClInclude Include="..\..\src\pt2_askbox.h" />
     <ClInclude Include="..\..\src\pt2_audio.h" />
     <ClInclude Include="..\..\src\pt2_blep.h" />
@@ -250,6 +249,7 @@
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_hpc.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
+    <ClInclude Include="..\..\src\pt2_ledfilter.h" />
     <ClInclude Include="..\..\src\pt2_math.h" />
     <ClInclude Include="..\..\src\pt2_mod2wav.h" />
     <ClInclude Include="..\..\src\pt2_module_loader.h" />
@@ -268,7 +268,7 @@
     <ClInclude Include="..\..\src\pt2_sampling.h" />
     <ClInclude Include="..\..\src\pt2_scopes.h" />
     <ClInclude Include="..\..\src\pt2_structs.h" />
-    <ClInclude Include="..\..\src\pt2_sync.h" />
+    <ClInclude Include="..\..\src\pt2_visuals_sync.h" />
     <ClInclude Include="..\..\src\pt2_tables.h" />
     <ClInclude Include="..\..\src\pt2_textout.h" />
     <ClInclude Include="..\..\src\pt2_unicode.h" />
@@ -290,7 +290,6 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_spectrum.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_tracker.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c" />
-    <ClCompile Include="..\..\src\pt2_amigafilters.c" />
     <ClCompile Include="..\..\src\pt2_askbox.c" />
     <ClCompile Include="..\..\src\pt2_audio.c" />
     <ClCompile Include="..\..\src\pt2_blep.c" />
@@ -302,6 +301,7 @@
     <ClCompile Include="..\..\src\pt2_helpers.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
+    <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
@@ -321,7 +321,7 @@
     <ClCompile Include="..\..\src\pt2_sampling.c" />
     <ClCompile Include="..\..\src\pt2_scopes.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
-    <ClCompile Include="..\..\src\pt2_sync.c" />
+    <ClCompile Include="..\..\src\pt2_visuals_sync.c" />
     <ClCompile Include="..\..\src\pt2_tables.c" />
     <ClCompile Include="..\..\src\pt2_textout.c" />
     <ClCompile Include="..\..\src\pt2_unicode.c" />

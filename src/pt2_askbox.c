@@ -4,7 +4,7 @@
 #include "pt2_visuals.h"
 #include "pt2_mouse.h"
 #include "pt2_structs.h"
-#include "pt2_sync.h"
+#include "pt2_visuals_sync.h"
 #include "pt2_keyboard.h"
 #include "pt2_diskop.h"
 #include "pt2_mod2wav.h"
@@ -96,7 +96,7 @@ void removeAskBox(void)
 
 	if (ui.diskOpScreenShown)
 	{
-		diskOpRenderFileList();
+		renderDiskOpScreen();
 	}
 	else if (ui.posEdScreenShown)
 	{

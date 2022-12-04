@@ -23,11 +23,10 @@
 #include "pt2_config.h"
 #include "pt2_textout.h"
 #include "pt2_scopes.h"
-#include "pt2_sync.h"
+#include "pt2_visuals_sync.h"
 #include "pt2_downsample2x.h"
 #include "pt2_replayer.h"
 #include "pt2_paula.h"
-#include "pt2_amigafilters.h"
 
 // cumulative mid/side normalization factor (1/sqrt(2))*(1/sqrt(2))
 #define STEREO_NORM_FACTOR 0.5
@@ -36,39 +35,77 @@
 
 static uint8_t panningMode;
 static int32_t randSeed = INITIAL_DITHER_SEED, stereoSeparation = 100;
-static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
-static uint64_t tickTime64, tickTime64Frac;
 static double *dMixBufferL, *dMixBufferR;
 static double dPrngStateL, dPrngStateR, dSideFactor;
 static SDL_AudioDeviceID dev;
 
-// for audio/video syncing
-static uint32_t tickTimeLen, tickTimeLenFrac;
-
 audio_t audio; // globalized
 
-static void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq)
+void setAmigaFilterModel(uint8_t model)
 {
-	double dInt, dFrac;
+	if (audio.amigaModel == model)
+		return; // same state as before!
 
-	if (audioFreq == 0)
-		return;
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
 
-	const double dAudioLatencySecs = audioBufferSize / (double)audioFreq;
+	audio.amigaModel = model;
 
-	dFrac = modf(dAudioLatencySecs * hpcFreq.dFreq, &dInt);
+	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
+	paulaSetup(paulaMixFrequency, audio.amigaModel);
 
-	// integer part
-	audLatencyPerfValInt = (uint32_t)dInt;
-
-	// fractional part (scaled to 0..2^32-1)
-	audLatencyPerfValFrac = (uint32_t)((dFrac * (UINT32_MAX+1.0)) + 0.5); // rounded
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
-void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac)
+void toggleAmigaFilterModel(void)
 {
-	tickTimeLen = timeLen;
-	tickTimeLenFrac = timeLenFrac;
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	audio.amigaModel ^= 1;
+
+	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
+	paulaSetup(paulaMixFrequency, audio.amigaModel);
+
+	if (audioWasntLocked)
+		unlockAudio();
+
+	if (audio.amigaModel == MODEL_A500)
+		displayMsg("AUDIO: AMIGA 500");
+	else
+		displayMsg("AUDIO: AMIGA 1200");
+}
+
+void setLEDFilter(bool state)
+{
+	if (audio.ledFilterEnabled == state)
+		return; // same state as before!
+
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	audio.ledFilterEnabled = state;
+	paulaWriteByte(0xBFE001, audio.ledFilterEnabled << 1);
+
+	if (audioWasntLocked)
+		unlockAudio();
+}
+
+void toggleLEDFilter(void)
+{
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
+	audio.ledFilterEnabled ^= 1;
+	paulaWriteByte(0xBFE001, audio.ledFilterEnabled << 1);
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void lockAudio(void)
@@ -252,9 +289,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 {
 	if (audio.oversamplingFlag) // 2x oversampling
 	{
-		// mix and filter channels (at 2x rate)
 		paulaGenerateSamples(dMixBufferL, dMixBufferR, numSamples*2);
-		processAmigaFilters(dMixBufferL, dMixBufferR, numSamples*2);
 
 		// downsample, normalize and dither
 		int16_t out[2];
@@ -280,9 +315,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	}
 	else
 	{
-		// mix and filter channels
 		paulaGenerateSamples(dMixBufferL, dMixBufferR, numSamples);
-		processAmigaFilters(dMixBufferL, dMixBufferR, numSamples);
 
 		// normalize and dither
 		int16_t out[2];
@@ -308,53 +341,6 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	}
 }
 
-static void fillVisualsSyncBuffer(void)
-{
-	chSyncData_t chSyncData;
-
-	if (audio.resetSyncTickTimeFlag)
-	{
-		audio.resetSyncTickTimeFlag = false;
-
-		tickTime64 = SDL_GetPerformanceCounter() + audLatencyPerfValInt;
-		tickTime64Frac = audLatencyPerfValFrac;
-	}
-
-	if (song != NULL)
-	{
-		moduleChannel_t *ch = song->channels;
-		paulaVoice_t *v = paula;
-		syncedChannel_t *sc = chSyncData.channels;
-
-		for (int32_t i = 0; i < PAULA_VOICES; i++, ch++, sc++, v++)
-		{
-			sc->flags = v->syncFlags | ch->syncFlags;
-			ch->syncFlags = v->syncFlags = 0; // clear sync flags
-
-			sc->volume = v->syncVolume;
-			sc->period = v->syncPeriod;
-			sc->triggerData = v->syncTriggerData;
-			sc->triggerLength = v->syncTriggerLength;
-			sc->newData = v->AUD_LC;
-			sc->newLength = v->AUD_LEN * 2;
-			sc->vuVolume = ch->syncVuVolume;
-			sc->analyzerVolume = ch->syncAnalyzerVolume;
-			sc->analyzerPeriod = ch->syncAnalyzerPeriod;
-		}
-
-		chSyncData.timestamp = tickTime64;
-		chQueuePush(chSyncData);
-	}
-
-	tickTime64 += tickTimeLen;
-	tickTime64Frac += tickTimeLenFrac;
-	if (tickTime64Frac > UINT32_MAX)
-	{
-		tickTime64Frac &= UINT32_MAX;
-		tickTime64++;
-	}
-}
-
 static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 {
 	if (editor.mod2WavOngoing || editor.pat2SmpOngoing) // send silence to sound output device
@@ -374,7 +360,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 
 			if (editor.songPlaying)
 			{
-				intMusic();
+				intMusic(); // PT replayer ticker
 				fillVisualsSyncBuffer();
 			}
 
@@ -504,9 +490,10 @@ bool setupAudio(void)
 	audio.outputRate = have.freq;
 	audio.audioBufferSize = have.samples;
 	audio.oversamplingFlag = (audio.outputRate < 96000); // we do 2x oversampling if the audio output rate is below 96kHz
+	audio.amigaModel = config.amigaModel;
 
-	const int32_t audioFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
-	const uint32_t maxSamplesToMix = (int32_t)ceil(audioFrequency / (REPLAYER_MIN_BPM / 2.5));
+	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
+	const uint32_t maxSamplesToMix = (int32_t)ceil(paulaMixFrequency / (REPLAYER_MIN_BPM / 2.5));
 
 	dMixBufferL = (double *)malloc((maxSamplesToMix + 1) * sizeof (double));
 	dMixBufferR = (double *)malloc((maxSamplesToMix + 1) * sizeof (double));
@@ -519,12 +506,10 @@ bool setupAudio(void)
 		return false;
 	}
 
-	paulaSetOutputFrequency(audio.outputRate, audio.oversamplingFlag);
+	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	audioSetStereoSeparation(config.stereoSeparation);
 	updateReplayerTimingMode(); // also generates the BPM table (audio.bpmTable)
-	setAmigaFilterModel(config.filterModel);
 	setLEDFilter(false);
-	setupAmigaFilters(audio.outputRate);
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
 	clearMixerDownsamplerStates();

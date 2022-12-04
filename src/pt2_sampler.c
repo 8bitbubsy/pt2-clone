@@ -19,6 +19,7 @@
 #include "pt2_rcfilter.h"
 #include "pt2_chordmaker.h"
 #include "pt2_replayer.h"
+#include "pt2_visuals_sync.h"
 
 #define CENTER_LINE_COLOR 0x303030
 #define MARK_COLOR_1 0x666666 /* inverted background */
@@ -1247,14 +1248,24 @@ void toggleTuningTone(void)
 
 		lockAudio();
 
-		paulaSetDMACON(TToneBit); // voice DMA off
+		const uint32_t voiceAddr = 0xDFF0A0 + (chNum * 16);
 
-		paulaSetPeriod(chNum, periodTable[editor.tuningNote]);
-		paulaSetVolume(chNum, 64);
-		paulaSetData(chNum, tuneToneData);
-		paulaSetLength(chNum, sizeof (tuneToneData) / 2);
+		paulaWriteWord(0xDFF096, TToneBit); // voice DMA off
 
-		paulaSetDMACON(0x8000 | TToneBit); // voice DMA on
+		paulaWriteWord(voiceAddr + 6, periodTable[editor.tuningNote]);
+		paulaWriteWord(voiceAddr + 8, 64); // volume
+		paulaWritePtr(voiceAddr + 0, tuneToneData);
+		paulaWriteWord(voiceAddr + 4, sizeof (tuneToneData) / 2); // length
+
+		paulaWriteWord(0xDFF096, 0x8000 | TToneBit); // voice DMA on
+
+		// update tracker visuals
+		setVisualsDMACON(TToneBit);
+		setVisualsPeriod(chNum, periodTable[editor.tuningNote]);
+		setVisualsVolume(chNum, 64);
+		setVisualsDataPtr(chNum, tuneToneData);
+		setVisualsLength(chNum, sizeof (tuneToneData) / 2);
+		setVisualsDMACON(0x8000 | TToneBit);
 
 		unlockAudio();
 	}
@@ -1263,7 +1274,8 @@ void toggleTuningTone(void)
 		// turn tuning tone off
 
 		lockAudio();
-		paulaSetDMACON(TToneBit); // voice DMA off
+		paulaWriteWord(0xDFF096, TToneBit); // voice DMA off
+		setVisualsDMACON(TToneBit);
 		unlockAudio();
 	}
 }
@@ -1772,26 +1784,51 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 	if (ch->n_length == 0)
 		ch->n_length = 1;
 
-	paulaSetVolume(chn, ch->n_volume);
-	paulaSetPeriod(chn, ch->n_period);
-	paulaSetData(chn, ch->n_start);
-	paulaSetLength(chn, ch->n_length);
+	const uint32_t voiceAddr = 0xDFF0A0 + (chn * 16);
+
+	paulaWriteWord(voiceAddr + 8, ch->n_volume);
+	paulaWriteWord(voiceAddr + 6, ch->n_period);
+	paulaWritePtr(voiceAddr + 0, ch->n_start);
+	paulaWriteWord(voiceAddr + 4, ch->n_length);
 
 	if (!editor.muted[chn])
-		paulaSetDMACON(0x8000 | ch->n_dmabit); // voice DMA on
+		paulaWriteWord(0xDFF096, 0x8000 | ch->n_dmabit); // voice DMA on
 	else
-		paulaSetDMACON(ch->n_dmabit); // voice DMA off
+		paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off
 
 	// these take effect after the current DMA cycle is done
 	if (playWaveformFlag)
 	{
-		paulaSetData(chn, ch->n_loopstart);
-		paulaSetLength(chn, ch->n_replen);
+		paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
+		paulaWriteWord(voiceAddr + 4, ch->n_replen);
 	}
 	else
 	{
-		paulaSetData(chn, NULL);
-		paulaSetLength(chn, 1);
+		paulaWritePtr(voiceAddr + 0, NULL); // data
+		paulaWriteWord(voiceAddr + 4, 1); // length
+	}
+
+	// update tracker visuals
+
+	setVisualsVolume(chn, ch->n_volume);
+	setVisualsPeriod(chn, ch->n_period);
+	setVisualsDataPtr(chn, ch->n_start);
+	setVisualsLength(chn, ch->n_length);
+
+	if (!editor.muted[chn])
+		setVisualsDMACON(0x8000 | ch->n_dmabit);
+	else
+		setVisualsDMACON(ch->n_dmabit);
+
+	if (playWaveformFlag)
+	{
+		setVisualsDataPtr(chn, ch->n_loopstart);
+		setVisualsLength(chn, ch->n_replen);
+	}
+	else
+	{
+		setVisualsDataPtr(chn, NULL);
+		setVisualsLength(chn, 1);
 	}
 
 	unlockAudio();

@@ -68,14 +68,14 @@ typedef struct moduleSample_t
 
 typedef struct moduleChannel_t
 {
-	int8_t *n_start, *n_wavestart, *n_loopstart, n_chanindex, n_volume, n_dmabit;
+	int8_t *n_start, *n_wavestart, *n_loopstart, n_volume, n_dmabit;
 	int8_t n_toneportdirec, n_pattpos, n_loopcount;
 	uint8_t n_wavecontrol, n_glissfunk, n_sampleoffset, n_toneportspeed;
 	uint8_t n_vibratocmd, n_tremolocmd, n_finetune, n_funkoffset, n_samplenum;
 	uint8_t n_vibratopos, n_tremolopos;
 	int16_t n_period, n_note, n_wantedperiod;
 	uint16_t n_cmd, n_length, n_replen;
-	uint32_t n_scopedelta;
+	uint32_t n_scopedelta, n_chanindex;
 
 	// for pt2_sync.c
 	uint8_t syncFlags;
@@ -162,7 +162,7 @@ typedef struct editor_t
 	UNICHAR *fileNameTmpU, *currPathU, *modulesPathU, *samplesPathU;
 
 	bool errorMsgActive, errorMsgBlock, multiFlag, metroFlag, keypadToggle8CFlag, normalizeFiltersFlag;
-	bool sampleAllFlag, halfClipFlag, newOldFlag, pat2SmpHQ, mixFlag, useLEDFilter;
+	bool sampleAllFlag, halfClipFlag, newOldFlag, pat2SmpHQ, mixFlag;
 	bool modLoaded, autoInsFlag, repeatKeyFlag, sampleZero, tuningToneFlag;
 	bool stepPlayEnabled, stepPlayBackwards, blockBufferFlag, blockMarkFlag, didQuantize;
 	bool swapChannelFlag, configFound, chordLengthMin, rowVisitTable[MOD_ORDERS * MOD_ROWS];

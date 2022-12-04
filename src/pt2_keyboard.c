@@ -19,7 +19,6 @@
 #include "pt2_edit.h"
 #include "pt2_sampler.h"
 #include "pt2_audio.h"
-#include "pt2_amigafilters.h"
 #include "pt2_tables.h"
 #include "pt2_module_saver.h"
 #include "pt2_sample_saver.h"
@@ -2264,17 +2263,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.leftCtrlPressed)
 			{
-				editor.useLEDFilter ^= 1;
-				if (editor.useLEDFilter)
-				{
-					setLEDFilter(true);
+				toggleLEDFilter();
+
+				if (audio.ledFilterEnabled)
 					displayMsg("LED FILTER ON");
-				}
 				else
-				{
-					setLEDFilter(false);
 					displayMsg("LED FILTER OFF");
-				}
 			}
 			else if (keyb.leftAltPressed)
 			{

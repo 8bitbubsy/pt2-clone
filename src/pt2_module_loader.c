@@ -20,7 +20,6 @@
 #include "pt2_replayer.h"
 #include "pt2_textout.h"
 #include "pt2_audio.h"
-#include "pt2_amigafilters.h"
 #include "pt2_helpers.h"
 #include "pt2_visuals.h"
 #include "pt2_sample_loader.h"
@@ -459,6 +458,10 @@ module_t *modLoad(UNICHAR *fileName)
 				note->sample = (bytes[0] & 0xF0) | (bytes[2] >> 4);
 				note->command = bytes[2] & 0x0F;
 				note->param = bytes[3];
+
+				// added sanitation not present in original PT
+				if (note->sample > 31)
+					note->sample = 0;
 
 				if (modFormat == FORMAT_STK)
 				{
@@ -930,7 +933,6 @@ void setupLoadedMod(void)
 	editor.hiLowInstr = 0;
 
 	// disable LED filter after module load (real PT doesn't do this)
-	editor.useLEDFilter = false;
 	setLEDFilter(false);
 
 	updateWindowTitle(MOD_NOT_MODIFIED);

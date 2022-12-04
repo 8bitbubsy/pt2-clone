@@ -8,7 +8,6 @@
 #include <stdbool.h>
 #include <sys/stat.h> // stat()
 #include "pt2_audio.h"
-#include "pt2_amigafilters.h"
 #include "pt2_mouse.h"
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
@@ -135,8 +134,8 @@ static void showMod2WavProgress(void)
 
 static void resetAudio(void)
 {
-	setupAmigaFilters(audio.outputRate);
-	paulaSetOutputFrequency(audio.outputRate, audio.oversamplingFlag);
+	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
+	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	generateBpmTable(audio.outputRate, editor.timingMode == TEMPO_MODE_VBLANK);
 	clearMixerDownsamplerStates();
 	modSetTempo(song->currBPM, true); // update BPM (samples per tick) with the tracker's audio frequency
@@ -352,8 +351,8 @@ bool mod2WavRender(char *filename)
 
 	strncpy(lastFilename, filename, PATH_MAX-1);
 
-	const int32_t audioFrequency = config.mod2WavOutputFreq * 2; // *2 for oversampling
-	const uint32_t maxSamplesToMix = (int32_t)ceil(audioFrequency / (REPLAYER_MIN_BPM / 2.5));
+	const int32_t paulaMixFrequency = config.mod2WavOutputFreq * 2; // *2 for oversampling
+	const uint32_t maxSamplesToMix = (int32_t)ceil(paulaMixFrequency / (REPLAYER_MIN_BPM / 2.5));
 
 	mod2WavBuffer = (int16_t *)malloc(((TICKS_PER_RENDER_CHUNK * maxSamplesToMix) + 1) * sizeof (int16_t) * 2);
 	if (mod2WavBuffer == NULL)
@@ -367,8 +366,7 @@ bool mod2WavRender(char *filename)
 
 	// do some prep work
 	generateBpmTable(config.mod2WavOutputFreq, editor.timingMode == TEMPO_MODE_VBLANK);
-	setupAmigaFilters(config.mod2WavOutputFreq);
-	paulaSetOutputFrequency(config.mod2WavOutputFreq, AUDIO_2X_OVERSAMPLING);
+	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	storeTempVariables();
 	calcMod2WavTotalRows();
 	restartSong(); // this also updates BPM (samples per tick) with the MOD2WAV audio output rate

@@ -31,7 +31,7 @@
 #include "pt2_scopes.h"
 #include "pt2_audio.h"
 #include "pt2_bmp.h"
-#include "pt2_sync.h"
+#include "pt2_visuals_sync.h"
 #include "pt2_sampling.h"
 #include "pt2_askbox.h"
 #include "pt2_replayer.h"

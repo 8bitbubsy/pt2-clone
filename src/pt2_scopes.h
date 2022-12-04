@@ -7,14 +7,12 @@
 
 typedef struct scope_t
 {
-	const int8_t *data;
-	bool active, emptyScopeDrawn;
+	volatile bool active;
+	const int8_t *data, *newData;
 	uint8_t volume;
-	int32_t length, pos;
-
+	int32_t length, newLength;
+	int32_t pos;
 	double dDelta, dPhase;
-	const int8_t *newData;
-	int32_t newLength;
 } scope_t;
 
 void scopeSetPeriod(int32_t ch, int32_t period);

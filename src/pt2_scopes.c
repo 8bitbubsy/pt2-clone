@@ -88,23 +88,19 @@ void scopeSetPeriod(int32_t ch, int32_t period)
 	scope[ch].dDelta = (PAULA_PAL_CLK / (double)SCOPE_HZ) / period;
 }
 
-void scopeTrigger(int32_t ch)
+void scopeTrigger(int32_t ch) // expects data & length variables to be set already
 {
 	volatile scope_t *sc = &scope[ch];
 	scope_t tempState = *sc; // cache it
 
-	const int8_t *newData = tempState.newData;
-	if (newData == NULL)
-		newData = &song->sampleData[config.reservedSampleOffset]; // 128K reserved sample
+	if (tempState.data == NULL)
+		tempState.data = paulaGetNullSamplePtr();
 
-	int32_t newLength = tempState.newLength; // in bytes, not words
-	if (newLength < 2)
-		newLength = 2; // for safety
+	if (tempState.length < 2)
+		tempState.length = 2; // for safety
 
 	tempState.dPhase = 0.0;
 	tempState.pos = 0;
-	tempState.data = newData;
-	tempState.length = newLength;
 	tempState.active = true;
 
 	/* Update live scope now.
@@ -240,14 +236,12 @@ void drawScopes(void)
 	{
 		scope_t tmpScope = *sc; // cache it
 
+		// clear scope background
+		fillRect(scopeX, 55, SCOPE_WIDTH, SCOPE_HEIGHT, bgColor);
+
 		// render scope
 		if (tmpScope.active && tmpScope.data != NULL && tmpScope.volume != 0 && tmpScope.length > 0)
 		{
-			sc->emptyScopeDrawn = false;
-
-			// fill scope background
-			fillRect(scopeX, 55, SCOPE_WIDTH, SCOPE_HEIGHT, bgColor);
-
 			// render scope data
 			int16_t scopeData;
 			int32_t pos = tmpScope.pos;
@@ -275,17 +269,10 @@ void drawScopes(void)
 				}
 			}
 		}
-		else if (!sc->emptyScopeDrawn)
+		else
 		{
-			// scope is inactive (or vol=0), draw empty scope once until it gets active again
-
-			// fill scope background
-			fillRect(scopeX, 55, SCOPE_WIDTH, SCOPE_HEIGHT, bgColor);
-
-			// draw scope line
+			// draw centered scope line
 			hLine(scopeX, 71, SCOPE_WIDTH, fgColor);
-
-			sc->emptyScopeDrawn = true;
 		}
 
 		scopeX += SCOPE_WIDTH+8;
