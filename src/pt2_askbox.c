@@ -96,16 +96,18 @@ void removeAskBox(void)
 
 	if (ui.diskOpScreenShown)
 	{
-		renderDiskOpScreen();
+		renderDiskOpScreen(); // also sets update flags
+		updateDiskOp(); // redraw requested updates
 	}
 	else if (ui.posEdScreenShown)
 	{
-		renderPosEdScreen();
-		ui.updatePosEd = true;
+		renderPosEdScreen(); // also sets update flags
+		updatePosEd(); // redraw requested updates
 	}
 	else if (ui.editOpScreenShown)
 	{
-		renderEditOpScreen();
+		renderEditOpScreen(); // also sets update flags
+		updateEditOp(); // redraw requested updates
 	}
 	else if (ui.aboutScreenShown)
 	{

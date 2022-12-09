@@ -860,6 +860,7 @@ void updatePosEd(void)
 void renderPosEdScreen(void)
 {
 	blit32(120, 0, 200, 99, posEdBMP);
+	ui.updatePosEd = true;
 }
 
 void renderMuteButtons(void)

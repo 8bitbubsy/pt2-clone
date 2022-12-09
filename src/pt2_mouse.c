@@ -3548,17 +3548,26 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_DO_SAVESAMPLE:
 		{
-			if (diskop.mode != DISKOP_MODE_SMP)
+			bool changeLoadMode = (diskop.mode != DISKOP_MODE_SMP);
+			if (changeLoadMode)
 			{
 				diskop.mode = DISKOP_MODE_SMP;
 				setPathFromDiskOpMode();
-				diskop.scrollOffset = 0;
-				diskop.cached = false;
-				ui.updateLoadMode = true;
+				ui.updateLoadMode = true; // redraw load mode cursor
+				updateDiskOp();
 			}
 
 			if (askBox(ASKBOX_YES_NO, "SAVE SAMPLE ?"))
-				saveSample(CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME);
+				saveSample(CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME); // also updates file list
+
+			// if we changed mode, re-read directory in Disk Op.
+			if (changeLoadMode)
+			{
+				diskop.scrollOffset = 0;
+				diskop.cached = false; // read new directory
+				ui.updateDiskOpFileList = true;
+				updateDiskOp();
+			}
 		}
 		break;
 
@@ -3758,17 +3767,26 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_DO_SAVEMODULE:
 		{
-			if (diskop.mode != DISKOP_MODE_MOD)
+			bool changeLoadMode = (diskop.mode != DISKOP_MODE_MOD);
+			if (changeLoadMode)
 			{
 				diskop.mode = DISKOP_MODE_MOD;
 				setPathFromDiskOpMode();
-				diskop.scrollOffset = 0;
-				diskop.cached = false;
-				ui.updateLoadMode = true;
+				ui.updateLoadMode = true; // redraw load mode cursor
+				updateDiskOp();
 			}
 
 			if (askBox(ASKBOX_YES_NO, "SAVE MODULE ?"))
-				saveModule(CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME);
+				saveModule(CHECK_IF_FILE_EXIST, DONT_GIVE_NEW_FILENAME); // also updates file list
+
+			// if we changed mode, re-read directory in Disk Op.
+			if (changeLoadMode)
+			{
+				diskop.scrollOffset = 0;
+				diskop.cached = false; // read new directory
+				ui.updateDiskOpFileList = true;
+				updateDiskOp();
+			}
 		}
 		break;
 
