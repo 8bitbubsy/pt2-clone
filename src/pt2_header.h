@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.55"
+#define PROG_VER_STR "1.56"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'

@@ -70,15 +70,13 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	** Low Hz = 4420.97~ = 1 / (2pi * 360 * 0.0000001)
 	**
 	** Under spice simulation the circuit yields -3dB = 4400Hz.
-	** In the Amiga 1200, the low-pass cutoff is ~34kHz, so the
-	** static low-pass filter is disabled in the mixer in A1200 mode.
 	**
 	** Next comes a bog-standard Sallen-Key filter ("LED") with:
 	** R1 = 10K ohm
 	** R2 = 10K ohm
 	** C1 = 6800pF
 	** C2 = 3900pF
-	** Q ~= 1/sqrt(2)
+	**  Q = 0.660 (8bitbubsy: edited with correct nominal)
 	**
 	** This filter is optionally bypassed by an MPF-102 JFET chip when
 	** the LED filter is turned off.
@@ -107,7 +105,7 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	** Correct values for A1200, all revs (A1200_R2.pdf):
 	** - 1-pole RC 6dB/oct low-pass: R=680 ohm, C=6800pF
 	** - Sallen-key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF (same as A500)
-	** - 1-pole RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22uF
+	** - 1-pole RC 6dB/oct high-pass: R=1360 ohm (1000+360), C=22uF
 	*/
 	double R, C, R1, R2, C1, C2, cutoff, qfactor;
 
@@ -135,9 +133,9 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 		useLowpassFilter = false;
 
 		// A1200 1-pole (6dB/oct) static RC high-pass filter:
-		R = 1390.0; // R324 (1K ohm resistor) + R325 (390 ohm resistor)
+		R = 1360.0; // R324 (1K ohm resistor) + R325 (360 ohm resistor)
 		C = 2.2e-5; // C334 (22uF capacitor)
-		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.205Hz
+		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.319Hz
 		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 	
