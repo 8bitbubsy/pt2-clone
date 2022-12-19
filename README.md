@@ -13,6 +13,8 @@ Windows/macOS binary releases can always be found at [16-bits.org/pt2.php](https
 - On some distros, a "pt2-clone" package may be available in the distribution's package repository
 - `protracker.ini` must be copied to `~/.protracker/`. You can find an up-to-date copy in the source code tree at `/release/other/` (or inside the Windows/macOS release zips at [16-bits.org/pt2.php](https://16-bits.org/pt2.php))
 
+# Note to macOS users
+- To get the config file to load, protracker.ini has to be in the same directory as the .app (program) itself
 
 # Handy keybindings
 1) Press F12 to toggle audio output between Amiga 500 and Amiga 1200. Amiga 500 mode uses a 4.42kHz 6dB/oct low-pass filter that matches that of a real A500.
