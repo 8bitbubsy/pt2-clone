@@ -327,7 +327,7 @@ void paulaWriteWord(uint32_t address, uint16_t data16)
 	}
 }
 
-void paulaWritePtr(uint32_t address, const void *ptr)
+void paulaWritePtr(uint32_t address, const int8_t *ptr)
 {
 	if (address == 0)
 		return;

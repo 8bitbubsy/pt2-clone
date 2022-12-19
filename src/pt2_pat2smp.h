@@ -5,7 +5,6 @@
 void pat2SmpDrawNote(void);
 void pat2SmpDrawFinetune(void);
 void pat2SmpDrawFrequency(void);
-void pat2SmpDrawFinetune(void);
 void pat2SmpDrawStartRow(void);
 void pat2SmpDrawRows(void);
 void pat2SmpCalculateFreq(void);

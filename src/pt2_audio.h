@@ -30,7 +30,6 @@ void setLEDFilter(bool state);
 void toggleLEDFilter(void);
 
 void updateReplayerTimingMode(void);
-void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac);
 void resetAudioDithering(void);
 void generateBpmTable(double dAudioFreq, bool vblankTimingFlag);
 uint16_t get16BitPeak(int16_t *sampleData, uint32_t sampleLength);

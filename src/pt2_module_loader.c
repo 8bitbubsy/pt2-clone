@@ -451,7 +451,7 @@ module_t *modLoad(UNICHAR *fileName)
 		{
 			for (int32_t k = 0; k < numChannels; k++, note++)
 			{
-				uint8_t bytes[4];
+				uint8_t bytes[4] = { 0 };
 				mread(bytes, 1, 4, m);
 
 				note->period = ((bytes[0] & 0x0F) << 8) | bytes[1];

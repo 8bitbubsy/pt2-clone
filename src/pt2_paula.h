@@ -24,7 +24,7 @@ int8_t *paulaGetNullSamplePtr(void);
 
 void paulaWriteByte(uint32_t address, uint16_t data8);
 void paulaWriteWord(uint32_t address, uint16_t data16);
-void paulaWritePtr(uint32_t address, const void *ptr);
+void paulaWritePtr(uint32_t address, const int8_t *ptr);
 
 // output is -4.00 .. 3.97 (can be louder because of high-pass filter)
 void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples);

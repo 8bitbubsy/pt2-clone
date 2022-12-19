@@ -100,7 +100,7 @@ void drawMod2WavProgressDialog(void)
 
 static void showMod2WavProgress(void)
 {
-	char percText[8];
+	char percText[16];
 
 	if (song->rowsInTotal == 0)
 		return;
