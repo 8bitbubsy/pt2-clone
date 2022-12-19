@@ -7,23 +7,23 @@ Has additional audio filters and audio mixer improvements to make it sound close
 
 
 # Releases
-Windows/macOS binary releases can always be found at [16-bits.org](https://16-bits.org/pt2.php).
+Windows/macOS binary releases can always be found at [16-bits.org/pt2.php](https://16-bits.org/pt2.php).
 
-Linux users can try to search for the "pt2-clone" package in the distribution's package repository, but it may not be present. \
-If it's not present, you will unfortunately have to compile the program manually, which may or may not be successful. Please don't contact me if it didn't go well, as I don't fully support Linux on my tracker clones.
+# Note to Linux users
+- On some distros, a "pt2-clone" package may be available in the distribution's package repository
+- `protracker.ini` must be copied to `~/.protracker/`. You can find an up-to-date copy in the source code tree at `/release/other/` (or inside the Windows/macOS release zips at [16-bits.org/pt2.php](https://16-bits.org/pt2.php))
 
 
-# Handy functions
-1) Press F12 to toggle "Amiga 500" audio mode. This will activate an RC low-pass filter that (closely) matches that of a real A500.
-If you want this to always be on, have a look at the config file (protracker.ini).
-Note: This must not be confused with the "LED" filter, which is something entirely different! (Yes, every Amiga has three filter stages)
-2) Press SHIFT+F12 to enable 100% stereo separation. This gives the same hard-panned audio that you get from an Amiga. This can also be permanently activated by changing the stereo separation to 100
-in protracker.ini. Setting it to 0 will result in mono.
+# Handy keybindings
+1) Press F12 to toggle audio output between Amiga 500 and Amiga 1200. Amiga 500 mode uses a 4.42kHz 6dB/oct low-pass filter that matches that of a real A500.
+If you want this to always be on, have a look at the config file. \
+__Note__: This must not be confused with the "LED" filter, which is a completely different filter.
+2) Press SHIFT+F12 to toggle stereo separation between centered (mono), custom (set in the config file) and Amiga (100%)
 3) Press CTRL+F12 to toggle BPM timing mode between CIA (most commonly used) and vblank. Only do this if you know what
 you are doing!
 4) Press ALT+F11 to toggle real VU-meters. This will change the fake VU-meters into real, averaged VU-meters.
-This can also be permanently activated by editing protracker.ini
-5) Press F11 to toggle fullscreen mode. Again, this can also be permanently activated in protracker.ini
+This can also be permanently activated by editing the config file
+5) Press F11 to toggle fullscreen mode. Again, this can also be permanently activated in the config file
 
 # Screenshots
 
