@@ -1,4 +1,6 @@
-// Crude Amiga "LED" filter implementation
+/* Biquad low-pass filter with resonance, from:
+** https://www.musicdsp.org/en/latest/Filters/38-lp-and-hp-filter.html
+*/
 
 #include "pt2_ledfilter.h"
 #include "pt2_math.h"
