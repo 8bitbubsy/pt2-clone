@@ -1,6 +1,13 @@
 
-*.exe
 pt_pal_editor/vs2019_project/.vs/pt_pal_editor/v16/.suo
+pt_pal_editor/vs2019_project/pt_pal_editor/Release/pt_pal_editor.vcxproj.FileListAbsolute.txt
+pt_pal_editor/vs2019_project/pt_pal_editor/Debug/pt_pal_editor.vcxproj.FileListAbsolute.txt
+vs2019_project/.vs/pt2-clone/v16/.suo
+vs2019_project/pt2-clone/Release/pt2-clone.vcxproj.FileListAbsolute.txt
+vs2019_project/pt2-clone/x64/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
+vs2019_project/pt2-clone/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
+.DS_Store
+*.exe
 *.db
 *.ilk
 *.pdb
@@ -9,21 +16,12 @@ pt_pal_editor/vs2019_project/.vs/pt_pal_editor/v16/.suo
 *.res
 *.tlog
 *.idb
-pt_pal_editor/vs2019_project/pt_pal_editor/Release/pt_pal_editor.vcxproj.FileListAbsolute.txt
-vs2019_project/.vs/pt2-clone/v16/.suo
 *.cache
 *.ipch
-.DS_Store
-vs2019_project/pt2-clone/Release/pt2-clone.vcxproj.FileListAbsolute.txt
-vs2019_project/pt2-clone/x64/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
 *.opendb
 *.cod
-vs2019_project/pt2-clone/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
 *.db-wal
 *.db-shm
-pt_pal_editor/vs2019_project/pt_pal_editor/Debug/pt_pal_editor.vcxproj.FileListAbsolute.txt
-vs2019_project/pt2-clone/Release/pt2-clone-win64.exe.recipe
 *.recipe
-vs2019_project/pt2-clone/Release/pt2-clone-win64.iobj
 *.iobj
-vs2019_project/pt2-clone/x64/Debug/pt2_audio.obj.enc
+*.enc
