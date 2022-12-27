@@ -90,7 +90,7 @@
     <ClInclude Include="..\..\src\pt2_visuals_sync.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\pt2_rcfilter.h">
+    <ClInclude Include="..\..\src\pt2_rcfilters.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_chordmaker.h">
@@ -115,9 +115,6 @@
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_paula.h">
-      <Filter>headers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\pt2_ledfilter.h">
       <Filter>headers</Filter>
     </ClInclude>
   </ItemGroup>
@@ -192,7 +189,7 @@
     <ClCompile Include="..\..\src\pt2_replayer.c" />
     <ClCompile Include="..\..\src\pt2_sampling.c" />
     <ClCompile Include="..\..\src\pt2_visuals_sync.c" />
-    <ClCompile Include="..\..\src\pt2_rcfilter.c" />
+    <ClCompile Include="..\..\src\pt2_rcfilters.c" />
     <ClCompile Include="..\..\src\pt2_chordmaker.c" />
     <ClCompile Include="..\..\src\pt2_downsample2x.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
@@ -200,7 +197,6 @@
     <ClCompile Include="..\..\src\pt2_xpk.c" />
     <ClCompile Include="..\..\src\pt2_askbox.c" />
     <ClCompile Include="..\..\src\pt2_paula.c" />
-    <ClCompile Include="..\..\src\pt2_ledfilter.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

@@ -249,7 +249,6 @@
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_hpc.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
-    <ClInclude Include="..\..\src\pt2_ledfilter.h" />
     <ClInclude Include="..\..\src\pt2_math.h" />
     <ClInclude Include="..\..\src\pt2_mod2wav.h" />
     <ClInclude Include="..\..\src\pt2_module_loader.h" />
@@ -259,7 +258,7 @@
     <ClInclude Include="..\..\src\pt2_pat2smp.h" />
     <ClInclude Include="..\..\src\pt2_pattern_viewer.h" />
     <ClInclude Include="..\..\src\pt2_paula.h" />
-    <ClInclude Include="..\..\src\pt2_rcfilter.h" />
+    <ClInclude Include="..\..\src\pt2_rcfilters.h" />
     <ClInclude Include="..\..\src\pt2_downsample2x.h" />
     <ClInclude Include="..\..\src\pt2_replayer.h" />
     <ClInclude Include="..\..\src\pt2_sample_loader.h" />
@@ -301,13 +300,12 @@
     <ClCompile Include="..\..\src\pt2_helpers.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
-    <ClCompile Include="..\..\src\pt2_ledfilter.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_module_loader.c" />
     <ClCompile Include="..\..\src\pt2_paula.c" />
-    <ClCompile Include="..\..\src\pt2_rcfilter.c" />
+    <ClCompile Include="..\..\src\pt2_rcfilters.c" />
     <ClCompile Include="..\..\src\pt2_replayer.c" />
     <ClCompile Include="..\..\src\pt2_module_saver.c" />
     <ClCompile Include="..\..\src\pt2_mouse.c" />

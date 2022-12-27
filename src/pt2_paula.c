@@ -9,8 +9,7 @@
 #include <stdbool.h>
 #include "pt2_paula.h"
 #include "pt2_blep.h"
-#include "pt2_rcfilter.h"
-#include "pt2_ledfilter.h"
+#include "pt2_rcfilters.h"
 #include "pt2_math.h"
 
 typedef struct voice_t
@@ -40,8 +39,8 @@ static bool useLEDFilter, useLowpassFilter, useHighpassFilter;
 static int8_t nullSample[0xFFFF*2]; // buffer for NULL data pointer
 static double dPaulaOutputFreq, dPeriodToDeltaDiv;
 static blep_t blep[PAULA_VOICES];
-static rcFilter_t filterLo, filterHi;
-static ledFilter_t filterLED;
+static onePoleFilter_t filterLo, filterHi;
+static twoPoleFilter_t filterLED;
 static paulaVoice_t paula[PAULA_VOICES];
 
 void paulaSetup(double dOutputFreq, uint32_t amigaModel)
@@ -53,9 +52,9 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	dPeriodToDeltaDiv = PAULA_PAL_CLK / dPaulaOutputFreq;
 
 	useLowpassFilter = useHighpassFilter = true;
-	clearRCFilterState(&filterLo);
-	clearRCFilterState(&filterHi);
-	clearLEDFilterState(&filterLED);
+	clearOnePoleFilterState(&filterLo);
+	clearOnePoleFilterState(&filterHi);
+	clearTwoPoleFilterState(&filterLED);
 
 	/* Amiga 500/1200 filter emulation
 	**
@@ -111,17 +110,17 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 
 	if (amigaModel == MODEL_A500)
 	{
-		// A500 1-pole (6db/oct) static RC low-pass filter:
+		// A500 1-pole (6db/oct) RC low-pass filter:
 		R = 360.0; // R321 (360 ohm)
 		C = 1e-7;  // C321 (0.1uF)
 		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~4420.971Hz
-		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterLo);
+		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterLo);
 
-		// A500 1-pole (6dB/oct) static RC high-pass filter:
+		// A500 1-pole (6dB/oct) RC high-pass filter:
 		R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
 		C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
 		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.128Hz
-		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterHi);
+		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 	else
 	{
@@ -132,21 +131,21 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 		*/
 		useLowpassFilter = false;
 
-		// A1200 1-pole (6dB/oct) static RC high-pass filter:
+		// A1200 1-pole (6dB/oct) RC high-pass filter:
 		R = 1360.0; // R324 (1K ohm resistor) + R325 (360 ohm resistor)
 		C = 2.2e-5; // C334 (22uF capacitor)
 		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.319Hz
-		calcRCFilterCoeffs(dPaulaOutputFreq, cutoff, &filterHi);
+		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 	
-	// Sallen-Key low-pass filter ("LED" filter, same values on A500/A1200):
+	// 2-pole (12dB/oct) RC low-pass filter ("LED" filter, same values on A500/A1200):
 	R1 = 10000.0; // R322 (10K ohm)
 	R2 = 10000.0; // R323 (10K ohm)
 	C1 = 6.8e-9;  // C322 (6800pF)
 	C2 = 3.9e-9;  // C323 (3900pF)
 	cutoff = 1.0 / (PT2_TWO_PI * pt2_sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
 	qfactor = pt2_sqrt(R1 * R2 * C1 * C2) / (C2 * (R1 + R2)); // ~0.660225
-	calcLEDFilterCoeffs(dPaulaOutputFreq, cutoff, qfactor, &filterLED);
+	setupTwoPoleFilter(dPaulaOutputFreq, cutoff, qfactor, &filterLED);
 }
 
 void paulaDisableFilters(void) // disables low-pass/high-pass filter ("LED" filter is kept)
@@ -262,7 +261,7 @@ void paulaWriteByte(uint32_t address, uint16_t data8)
 			useLEDFilter = !!(data8 & 2);
 
 			if (useLEDFilter != oldLedFilterState)
-				clearLEDFilterState(&filterLED);
+				clearTwoPoleFilterState(&filterLED);
 		}
 		break;
 	
@@ -441,13 +440,13 @@ void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples)
 		double dOut[2] = { dOutL[i], dOutR[i] };
 
 		if (useLowpassFilter)
-			RCLowPassFilterStereo(&filterLo, dOut, dOut);
+			onePoleLPFilterStereo(&filterLo, dOut, dOut);
 
 		if (useLEDFilter)
-			LEDFilter(&filterLED, dOut, dOut);
+			twoPoleLPFilterStereo(&filterLED, dOut, dOut);
 
 		if (useHighpassFilter)
-			RCHighPassFilterStereo(&filterHi, dOut, dOut);
+			onePoleHPFilterStereo(&filterHi, dOut, dOut);
 
 		dOutL[i] = dOut[0];
 		dOutR[i] = dOut[1];

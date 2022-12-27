@@ -16,7 +16,7 @@
 #include "pt2_sampler.h"
 #include "pt2_config.h"
 #include "pt2_bmp.h"
-#include "pt2_rcfilter.h"
+#include "pt2_rcfilters.h"
 #include "pt2_chordmaker.h"
 #include "pt2_replayer.h"
 #include "pt2_visuals_sync.h"
@@ -538,7 +538,7 @@ void redrawSample(void)
 
 void highPassSample(int32_t cutOff)
 {
-	rcFilter_t filterHi;
+	onePoleFilter_t filterHi;
 
 	assert(editor.currSample >= 0 && editor.currSample <= 30);
 
@@ -599,16 +599,16 @@ void highPassSample(int32_t cutOff)
 		editor.hpCutOff = (uint16_t)dCutOff;
 	}
 
-	calcRCFilterCoeffs(dBaseFreq, dCutOff, &filterHi);
+	setupOnePoleFilter(dBaseFreq, dCutOff, &filterHi);
 
-	clearRCFilterState(&filterHi);
+	clearOnePoleFilterState(&filterHi);
 	if (to <= s->length)
 	{
 		const int8_t *smpPtr = &song->sampleData[s->offset];
 		for (int32_t i = from; i < to; i++)
 		{
 			double dSmp = smpPtr[i];
-			RCHighPassFilter(&filterHi, dSmp, &dSampleData[i]);
+			onePoleHPFilter(&filterHi, dSmp, &dSampleData[i]);
 		}
 	}
 
@@ -637,7 +637,7 @@ void highPassSample(int32_t cutOff)
 
 void lowPassSample(int32_t cutOff)
 {
-	rcFilter_t filterLo;
+	onePoleFilter_t filterLo;
 
 	if (editor.sampleZero)
 	{
@@ -698,20 +698,20 @@ void lowPassSample(int32_t cutOff)
 		editor.lpCutOff = (uint16_t)dCutOff;
 	}
 
-	calcRCFilterCoeffs(dBaseFreq, dCutOff, &filterLo);
+	setupOnePoleFilter(dBaseFreq, dCutOff, &filterLo);
 
 	// copy over sample data to double buffer
 	for (int32_t i = 0; i < s->length; i++)
 		dSampleData[i] = song->sampleData[s->offset+i];
 
-	clearRCFilterState(&filterLo);
+	clearOnePoleFilterState(&filterLo);
 	if (to <= s->length)
 	{
 		const int8_t *smpPtr = &song->sampleData[s->offset];
 		for (int32_t i = from; i < to; i++)
 		{ 
 			double dSmp = smpPtr[i];
-			RCLowPassFilter(&filterLo, dSmp, &dSampleData[i]);
+			onePoleLPFilter(&filterLo, dSmp, &dSampleData[i]);
 		}
 	}
 
