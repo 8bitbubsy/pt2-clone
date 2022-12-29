@@ -62,12 +62,6 @@ void onePoleHPFilterStereo(onePoleFilter_t *f, const double *in, double *out)
 ** https://www.musicdsp.org/en/latest/Filters/38-lp-and-hp-filter.html
 */
 
-void clearTwoPoleFilterState(twoPoleFilter_t *f)
-{
-	f->tmpL[0] = f->tmpL[1] = f->tmpL[2] = f->tmpL[3] = 0.0;
-	f->tmpR[0] = f->tmpR[1] = f->tmpR[2] = f->tmpR[3] = 0.0;
-}
-
 void setupTwoPoleFilter(double audioRate, double cutOff, double qFactor, twoPoleFilter_t *f)
 {
 	if (cutOff >= audioRate/2.0)
@@ -80,6 +74,12 @@ void setupTwoPoleFilter(double audioRate, double cutOff, double qFactor, twoPole
 	f->a2 = 2.0 * f->a1;
 	f->b1 = 2.0 * (1.0 - a*a) * f->a1;
 	f->b2 = (1.0 - b * a + a * a) * f->a1;
+}
+
+void clearTwoPoleFilterState(twoPoleFilter_t *f)
+{
+	f->tmpL[0] = f->tmpL[1] = f->tmpL[2] = f->tmpL[3] = 0.0;
+	f->tmpR[0] = f->tmpR[1] = f->tmpR[2] = f->tmpR[3] = 0.0;
 }
 
 void twoPoleLPFilter(twoPoleFilter_t *f, const double in, double *out)
