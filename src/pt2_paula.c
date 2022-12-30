@@ -266,10 +266,10 @@ void paulaWriteByte(uint32_t address, uint16_t data8)
 		break;
 	
 		// AUDxVOL ( byte-write to AUDxVOL works on most Amigas (not 68040/68060) )
-		case 0xDFF0A8: audxvol(0, data8); break;
-		case 0xDFF0B8: audxvol(1, data8); break;
-		case 0xDFF0C8: audxvol(2, data8); break;
-		case 0xDFF0D8: audxvol(3, data8); break;
+		case 0xDFF0A9: audxvol(0, data8); break;
+		case 0xDFF0B9: audxvol(1, data8); break;
+		case 0xDFF0C9: audxvol(2, data8); break;
+		case 0xDFF0D9: audxvol(3, data8); break;
 
 		default: return;
 	}
