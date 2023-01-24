@@ -475,7 +475,7 @@ void renderSamplingBox(void)
 {
 	changeStatusText("PLEASE WAIT ...");
 	flipFrame();
-	hpc_ResetEndTime(&video.vblankHpc);
+	hpc_ResetCounters(&video.vblankHpc);
 
 	editor.sampleZero = false;
 	editor.blockMarkFlag = false;

@@ -146,7 +146,7 @@ void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq)
 
 	const double dAudioLatencySecs = audioBufferSize / (double)audioFreq;
 
-	dFrac = modf(dAudioLatencySecs * hpcFreq.dFreq, &dInt);
+	dFrac = modf(dAudioLatencySecs * (double)hpcFreq.freq64, &dInt);
 
 	// integer part
 	audLatencyPerfValInt = (uint32_t)dInt;

@@ -336,7 +336,7 @@ int main(int argc, char *argv[])
 	SDL_EventState(SDL_DROPFILE, SDL_ENABLE);
 
 	editor.mainLoopOngoing = true;
-	hpc_ResetEndTime(&video.vblankHpc); // this must be the very last thing done before entering the main loop
+	hpc_ResetCounters(&video.vblankHpc); // this must be the last thing we do before entering the main loop
 
 	// XXX: if you change anything in the main loop, make sure it goes in the askBox()(pt2_askbox.c) loop too, if needed
 	while (editor.programRunning)
@@ -377,7 +377,7 @@ static void handleInput(void)
 
 			// reset vblank end time if we minimize window
 			if (event.window.event == SDL_WINDOWEVENT_MINIMIZED || event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
-				hpc_ResetEndTime(&video.vblankHpc);
+				hpc_ResetCounters(&video.vblankHpc);
 		}
 
 #ifdef _WIN32

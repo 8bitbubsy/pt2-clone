@@ -321,7 +321,7 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 
 				// reset vblank end time if we minimize window
 				if (event.window.event == SDL_WINDOWEVENT_MINIMIZED || event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
-					hpc_ResetEndTime(&video.vblankHpc);
+					hpc_ResetCounters(&video.vblankHpc);
 			}
 			else if (event.type == SDL_KEYDOWN)
 			{

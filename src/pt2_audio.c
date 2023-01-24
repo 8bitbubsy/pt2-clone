@@ -432,7 +432,7 @@ static void generateTickLengthTable(bool vblankTimingFlag)
 
 		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
 		double dTimeInt;
-		double dTimeFrac = modf(hpcFreq.dFreq / dHz, &dTimeInt);
+		double dTimeFrac = modf((double)hpcFreq.freq64 / dHz, &dTimeInt);
 		const int32_t timeInt = (int32_t)dTimeInt;
 	
 		dTimeFrac = floor((dTimeFrac * (UINT32_MAX+1.0)) + 0.5); // fractional part (scaled to 0..2^32-1)

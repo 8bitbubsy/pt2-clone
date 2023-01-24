@@ -286,7 +286,7 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 
 	hpc_SetDurationInHz(&scopeHpc, SCOPE_HZ);
-	hpc_ResetEndTime(&scopeHpc);
+	hpc_ResetCounters(&scopeHpc);
 
 	while (editor.programRunning)
 	{
