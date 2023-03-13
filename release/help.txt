@@ -1,9 +1,4 @@
-Windows: If the program can't start at all, you might need to install
-"Microsoft Visual C++ Redistributable for Visual Studio 2015, 2017 and 2019"
-which can be found here:
-https://support.microsoft.com/en-us/help/2977003/the-latest-supported-visual-c-downloads
-
- == Frequently Asked Questions (FAQ) ==
+== Frequently Asked Questions (FAQ) ==
  
   * Is there a way to make the window bigger?
  - Set VIDEOSCALE to 2X, 3x or 4X in protracker.ini.
