@@ -2953,7 +2953,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			if (askBox(ASKBOX_YES_NO, "DOWNSAMPLE ?"))
+			if (askBox(ASKBOX_YES_NO, "UPSAMPLE ?"))
 				upSample();
 		}
 		break;
