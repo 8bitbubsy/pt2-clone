@@ -10,7 +10,7 @@
  == Where's the Amiga key? ==
    PC keyboard:
       Left Amiga key = left Windows key
-     Right Amiga key = right Alt Gr key
+     Right Amiga key = right alt key
  
    Mac keyboard:
       Left Amiga key = left Command key
@@ -93,7 +93,7 @@
 
  space - Toggle between Stop/Edit-mode
 
-      alt gr (right alt) - Play Song
+              right alt  - Play Song
  right ctrl (cmd on Mac) - Play Pattern
              right shift - Record
         
