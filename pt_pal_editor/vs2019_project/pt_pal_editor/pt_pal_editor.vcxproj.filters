@@ -41,6 +41,7 @@
     <ClCompile Include="..\..\src\gfx\gfx_misc.c">
       <Filter>gfx</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\hpc.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\tinyfiledialogs\tinyfiledialogs.h">
@@ -50,6 +51,7 @@
     <ClInclude Include="..\..\src\palette.h" />
     <ClInclude Include="..\..\src\unicode.h" />
     <ClInclude Include="..\..\src\gui.h" />
+    <ClInclude Include="..\..\src\hpc.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt_pal_editor.rc" />

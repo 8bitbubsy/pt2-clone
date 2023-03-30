@@ -311,7 +311,7 @@ bool savePalette(bool showNotes)
 	if (loadedFile[0] == '\0' && loadedFile[1] == '\0')
 	{
 #ifdef _WIN32
-		folder = (UNICHAR *)tinyfd_selectFolderDialogW(L"Please select ProTracker clone folder...", NULL);
+		folder = (UNICHAR *)tinyfd_selectFolderDialogW(L"Please select ProTracker 2 clone folder...", NULL);
 		if (folder == NULL || UNICHAR_STRLEN(folder) < 1)
 			return false;
 
@@ -319,7 +319,7 @@ bool savePalette(bool showNotes)
 		UNICHAR_STRCAT(loadedFile, L"\\");
 		UNICHAR_STRCAT(loadedFile, L"colors.ini");
 #else
-		folder = (UNICHAR *)tinyfd_selectFolderDialog("Please select ProTracker clone folder...", NULL);
+		folder = (UNICHAR *)tinyfd_selectFolderDialog("Please select ProTracker 2 clone folder...", NULL);
 		if (folder == NULL || UNICHAR_STRLEN(folder) < 1)
 			return false;
 

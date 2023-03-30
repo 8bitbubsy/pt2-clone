@@ -16,18 +16,21 @@
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>pt_pal_editor-macos</string>
+    <key>CFBundleDisplayName</key>
+    <string>Palette editor for ProTracker 2 clone</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>CFBundleShortVersionString</key>
-    <string>v0.1</string>
-    <key>CFBundleSignature</key>
-    <string>Ptrk</string>
     <key>CFBundleVersion</key>
-    <string>Beta</string>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleSignature</key>
+    <string>Ptpe</string>
     <key>NSHumanReadableCopyright</key>
-    <string></string>
+    <string>Copyright © Olav "8bitbubsy" Sørensen
+https://16-bits.org</string>
     <key>LSMinimumSystemVersion</key>
-    <string>10.6</string>
+    <string>10.9</string>
     <key>CGDisableCoalescedUpdates</key>
     <true/>
     <key>NSHighResolutionCapable</key>

@@ -39,7 +39,7 @@ function compile() {
 }
 
 echo Compiling x86_64 binary...
-CFLAGS="-target x86_64-apple-macos10.7 -mmacosx-version-min=10.7 -arch x86_64 -mmmx -mfpmath=sse -msse2 -O3"
+CFLAGS="-target x86_64-apple-macos10.9 -mmacosx-version-min=10.9 -arch x86_64 -mmmx -mfpmath=sse -msse2 -O3"
 LDFLAGS=
 export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 compile $TARGET_X86_64

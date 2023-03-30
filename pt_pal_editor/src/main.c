@@ -19,6 +19,7 @@
 #include "config.h"
 #include "palette.h"
 #include "gui.h"
+#include "hpc.h"
 
 #define CLAMP(x, low, high) (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
 
@@ -27,6 +28,7 @@
 #pragma warning(disable: 4221)
 #endif
 
+static hpc_t vblankHpc;
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
@@ -47,6 +49,10 @@ static void osxSetDirToProgramDirFromArgs(char **argv);
 
 int main(int argc, char *argv[])
 {
+#if defined _WIN32 || defined __APPLE__
+	SDL_version sdlVer;
+#endif
+
 	// for finding memory leaks in debug mode with Visual Studio
 #if defined _DEBUG && defined _MSC_VER
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -54,6 +60,37 @@ int main(int argc, char *argv[])
 
 	(void)argc;
 	(void)argv;
+	
+	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+	SDL_EnableScreenSaver(); // allow screensaver to activate
+	
+	// on Windows and macOS, test what version SDL2.DLL is (against library version used in compilation)
+#if defined _WIN32 || defined __APPLE__
+	SDL_GetVersion(&sdlVer);
+	if (sdlVer.major != SDL_MAJOR_VERSION || sdlVer.minor != SDL_MINOR_VERSION || sdlVer.patch != SDL_PATCHLEVEL)
+	{
+#ifdef _WIN32
+		showErrorMsgBox("SDL2.dll is not the expected version, the program will terminate.\n\n" \
+		                "Loaded dll version: %d.%d.%d\n" \
+		                "Required (compiled with) version: %d.%d.%d",
+		                sdlVer.major, sdlVer.minor, sdlVer.patch,
+		                SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
+#else
+		showErrorMsgBox("The loaded SDL2 library is not the expected version, the program will terminate.\n\n" \
+		                "Loaded library version: %d.%d.%d\n" \
+		                "Required (compiled with) version: %d.%d.%d",
+		                sdlVer.major, sdlVer.minor, sdlVer.patch,
+		                SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_PATCHLEVEL);
+#endif
+		return 0;
+	}
+#endif
+
+#ifdef _WIN32
+#ifndef _MSC_VER
+	SetProcessDPIAware();
+#endif
+#endif
 
 #ifdef __APPLE__
 	osxSetDirToProgramDirFromArgs(argv);
@@ -64,11 +101,18 @@ int main(int argc, char *argv[])
 		SDL_Quit();
 		return 0;
 	}
+	
+	SDL_StopTextInput();
+	
+	hpc_Init();
+	hpc_SetDurationInHz(&vblankHpc, 60);
 
 	setupGUI();
 	redrawScreen = true;
 
 	programRunning = true;
+	
+	hpc_ResetCounters(&vblankHpc); // this must be the last thing we do before entering the main loop
 	while (programRunning)
 	{
 		readMouseXY();
@@ -85,7 +129,7 @@ int main(int argc, char *argv[])
 			SDL_RenderPresent(renderer);
 		}
 
-		SDL_Delay((1000 / 60) + 1); // ~60Hz
+		hpc_Wait(&vblankHpc);
 	}
 
 	if (loadedFile != NULL) free(loadedFile);
@@ -241,10 +285,10 @@ static bool setupVideo(void)
 	** reinitialized in Windows and what not.
 	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4391
 	*/
-#if defined _WIN32 && SDL_PATCHLEVEL == 9
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0)
+#if defined _WIN32 && SDL_MAJOR_VERSION == 2 && SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL == 9
+	if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0)
 #else
-	if (SDL_Init(SDL_INIT_VIDEO) != 0)
+	if (SDL_Init(SDL_INIT_AUDIO | SDL_INIT_VIDEO) != 0)
 #endif
 	{
 		showErrorMsgBox("Couldn't initialize SDL: %s", SDL_GetError());
@@ -256,21 +300,23 @@ static bool setupVideo(void)
 
 	if (window == NULL)
 	{
-		showErrorMsgBox("Couldn't create an SDL2 window: %s", SDL_GetError());
+		showErrorMsgBox("Couldn't create SDL window:\n%s", SDL_GetError());
 		return false;
 	}
 
 	renderer = SDL_CreateRenderer(window, -1, 0);
 	if (renderer == NULL)
 	{
-		showErrorMsgBox("Couldn't create an SDL2 renderer: %s", SDL_GetError());
+		showErrorMsgBox("Couldn't create SDL renderer:\n%s\n\n" \
+				"Is your GPU (+ driver) too old?", SDL_GetError());
 		return false;
 	}
 
 	SDL_RenderSetLogicalSize(renderer, SCREEN_W, SCREEN_H);
 
-#if SDL_PATCHLEVEL >= 5
+#if SDL_MINOR_VERSION >= 24 || (SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL >= 5)
 	SDL_RenderSetIntegerScale(renderer, SDL_TRUE);
+	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 #endif
 
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
