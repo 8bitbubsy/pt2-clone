@@ -214,12 +214,12 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 
 			if (loopStart+loopLength > 2) // loop enabled?
 			{
-				iffWriteUint32(f, loopStart); // oneShotHiSamples
+				iffWriteUint32(f, loopStart); // oneShotHiSamples (loop start when loop is enabled)
 				iffWriteUint32(f, loopLength); // repeatHiSamples
 			}
 			else
 			{
-				iffWriteUint32(f, 0); // oneShotHiSamples
+				iffWriteUint32(f, sampleLength); // oneShotHiSamples (length of sample when no loop)
 				iffWriteUint32(f, 0); // repeatHiSamples
 			}
 
