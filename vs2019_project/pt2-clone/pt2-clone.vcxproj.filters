@@ -7,6 +7,15 @@
     <Filter Include="headers">
       <UniqueIdentifier>{d92546b9-e457-49e3-83c0-5826b29679ee}</UniqueIdentifier>
     </Filter>
+    <Filter Include="modloaders">
+      <UniqueIdentifier>{4edd2c33-3edd-4892-ad94-f40d3fadc82a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="smploaders">
+      <UniqueIdentifier>{962f7c81-1341-453b-a297-c8364806f7f6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libflac">
+      <UniqueIdentifier>{5d2aea95-3dd5-40ab-8051-220433bcd953}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\pt2_audio.h">
@@ -105,9 +114,6 @@
     <ClInclude Include="..\..\src\pt2_hpc.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\pt2_xpk.h">
-      <Filter>headers</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\pt2_askbox.h">
       <Filter>headers</Filter>
     </ClInclude>
@@ -116,6 +122,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\pt2_paula.h">
       <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_pp_unpack.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_xpk_unpack.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_load_mod31.h">
+      <Filter>modloaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\modloaders\pt2_load_mod15.h">
+      <Filter>modloaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -194,9 +212,74 @@
     <ClCompile Include="..\..\src\pt2_downsample2x.c" />
     <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
-    <ClCompile Include="..\..\src\pt2_xpk.c" />
     <ClCompile Include="..\..\src\pt2_askbox.c" />
     <ClCompile Include="..\..\src\pt2_paula.c" />
+    <ClCompile Include="..\..\src\modloaders\pt2_pp_unpack.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\modloaders\pt2_xpk_unpack.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\modloaders\pt2_load_mod15.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\modloaders\pt2_load_mod31.c">
+      <Filter>modloaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_iff.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_raw.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_aiff.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_wav.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\smploaders\pt2_load_flac.c">
+      <Filter>smploaders</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\bitmath.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\bitreader.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\crc.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\fixed.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\format.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\lpc.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\md5.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\memory.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\metadata_iterators.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\metadata_object.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\stream_decoder.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\window.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\libflac\windows_unicode_filenames.c">
+      <Filter>libflac</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

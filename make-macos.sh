@@ -36,12 +36,12 @@ fi
 #
 function compile() {
     rm $1 &> /dev/null
-    clang $VERBOSE $CFLAGS -F /Library/Frameworks -g0 -DNDEBUG src/gfx/*.c src/*.c -Wall -Winit-self -Wextra -Wunused -Wredundant-decls -Wswitch-default  $LDFLAGS -L /Library/Frameworks -framework SDL2 -framework Cocoa -lm -o $1
+    clang $VERBOSE $CFLAGS -F /Library/Frameworks -g0 -DNDEBUG -DHAS_LIBFLAC src/gfx/*.c src/modloaders/*.c src/libflac/*.c src/smploaders/*.c src/*.c -Wall -Winit-self -Wextra -Wunused -Wredundant-decls -Wswitch-default  $LDFLAGS -L /Library/Frameworks -framework SDL2 -framework Cocoa -lm -o $1
     return $?
 }
 
 echo Compiling x86_64 binary, please wait patiently...
-CFLAGS="-target x86_64-apple-macos10.9 -mmacosx-version-min=10.9 -arch x86_64 -mmmx -mfpmath=sse -msse2 -O3"
+CFLAGS="-target x86_64-apple-macos10.11 -mmacosx-version-min=10.11 -arch x86_64 -mmmx -mfpmath=sse -msse2 -O3"
 LDFLAGS=
 export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 compile $TARGET_X86_64

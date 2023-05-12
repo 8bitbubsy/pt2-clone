@@ -8,6 +8,5 @@
 
 void loadModFromArg(char *arg);
 void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool songModifiedCheck);
-module_t *createEmptyMod(void);
 module_t *modLoad(UNICHAR *fileName);
 void setupLoadedMod(void);

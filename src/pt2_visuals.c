@@ -33,6 +33,7 @@
 #include "pt2_sampling.h"
 #include "pt2_chordmaker.h"
 #include "pt2_mod2wav.h"
+#include "pt2_audio.h"
 
 typedef struct sprite_t
 {
@@ -543,9 +544,7 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 
 	// playback timer
 
-	const uint32_t ms1024 = editor.musicTime64 >> 32; // milliseconds (scaled from 1000 to 1024)
-
-	uint32_t seconds = ms1024 >> 10;
+	uint32_t seconds = editor.playbackSeconds;
 	if (seconds <= 5999) // below 100 minutes (99:59 is max for the UI)
 	{
 		const uint32_t MI_TimeM = seconds / 60;
@@ -1721,6 +1720,15 @@ void flipFrame(void)
 			hpc_Wait(&video.vblankHpc);
 #endif
 	}
+
+	editor.framesPassed++;
+
+	/* Reset audio/video sync timestamp every half an hour to prevent
+	** possible sync drifting after hours of playing a song without
+	** a single song stop (resets timestamp) in-between.
+	*/
+	if (editor.framesPassed >= VBLANK_HZ*60*30)
+		audio.resetSyncTickTimeFlag = true;
 }
 
 void updateSpectrumAnalyzer(int8_t vol, int16_t period)

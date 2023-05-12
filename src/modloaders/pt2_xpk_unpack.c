@@ -6,12 +6,12 @@
 */
 
 #include <assert.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "pt2_helpers.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include "../pt2_helpers.h"
 
 typedef struct XPKFILEHEADER
 {
@@ -91,8 +91,6 @@ static bool XPK_DoUnpack(const uint8_t *src_, uint32_t srcLen, int32_t len, uint
 		return false;
 
 	int32_t d0, d1, d2, d3, d4, d5, d6, a2, a5, cup1;
-	size_t phist = 0;
-
 	const uint32_t unpackedLen = MIN((uint32_t)len, MIN(srcLen, UINT32_MAX / 20) * 20);
 
 	uint8_t *unpackedData = (uint8_t *)malloc(unpackedLen);
@@ -115,10 +113,10 @@ static bool XPK_DoUnpack(const uint8_t *src_, uint32_t srcLen, int32_t len, uint
 		cup1 = (SrcRead(c+6, &bufs)<<8) | (SrcRead(c+7, &bufs)); // unpacked
 
 		c += 8;
-		src = c+2;
-		if (type == 0)
+		src = c + 2;
+
+		if (type == 0) // RAW chunk
 		{
-			// RAW chunk
 			if (cp < 0 || cp > len)
 			{
 				free(unpackedData);
@@ -151,32 +149,32 @@ static bool XPK_DoUnpack(const uint8_t *src_, uint32_t srcLen, int32_t len, uint
 		while (cup1 > 0)
 		{
 			if (d1 >= 8) goto l6dc;
-			if (bfextu(src,d0,1,&bufs)) goto l75a;
-			d0 += 1;
+			if (bfextu(src, d0, 1, &bufs)) goto l75a;
+			d0++;
 			d5 = 0;
 			d6 = 8;
 			goto l734;
 
 l6dc:
-			if (bfextu(src,d0,1,&bufs)) goto l726;
-			d0 += 1;
-			if (!bfextu(src,d0,1,&bufs)) goto l75a;
-			d0 += 1;
-			if (bfextu(src,d0,1,&bufs)) goto l6f6;
+			if (bfextu(src, d0, 1, &bufs)) goto l726;
+			d0++;
+			if (!bfextu(src, d0, 1, &bufs)) goto l75a;
+			d0++;
+			if (bfextu(src, d0, 1, &bufs)) goto l6f6;
 			d6 = 2;
 			goto l708;
 
 l6f6:
-			d0 += 1;
-			if (!bfextu(src,d0,1,&bufs)) goto l706;
-			d6 = bfextu(src,d0,3,&bufs);
+			d0++;
+			if (!bfextu(src, d0, 1, &bufs)) goto l706;
+			d6 = bfextu(src, d0, 3, &bufs);
 			d0 += 3;
 			goto l70a;
 
 l706:
 			d6 = 3;
 l708:
-			d0 += 1;
+			d0++;
 l70a:
 			d6 = XPK_ReadTable((a2*8) + d6 - 17);
 			if (d6 != 8) goto l730;
@@ -190,7 +188,7 @@ l718:
 			goto l734;
 
 l726:
-			d0 += 1;
+			d0++;
 			d6 = 8;
 			if (d6 == a2) goto l718;
 			d6 = a2;
@@ -201,7 +199,7 @@ l732:
 l734:
 			while (d5 >= 0 && cup1 > 0)
 			{
-				d4 = bfexts(src,d0,d6,&bufs);
+				d4 = bfexts(src, d0, d6, &bufs);
 				d0 += d6;
 				d3 -= d4;
 				*PtrOut++ = (uint8_t)d3;
@@ -230,43 +228,43 @@ l74c:
 	return true;
 
 l75a:
-	d0 += 1;
-	if (bfextu(src,d0,1,&bufs)) goto l766;
+	d0++;
+	if (bfextu(src, d0, 1, &bufs)) goto l766;
 	d4 = 2;
 	goto l79e;
 
 l766:
-	d0 += 1;
-	if (bfextu(src,d0,1,&bufs)) goto l772;
+	d0++;
+	if (bfextu(src, d0, 1, &bufs)) goto l772;
 	d4 = 4;
 	goto l79e;
 
 l772:
-	d0 += 1;
-	if (bfextu(src,d0,1,&bufs)) goto l77e;
+	d0++;
+	if (bfextu(src, d0, 1, &bufs)) goto l77e;
 	d4 = 6;
 	goto l79e;
 
 l77e:
-	d0 += 1;
-	if (bfextu(src,d0,1,&bufs)) goto l792;
-	d0 += 1;
-	d6 = bfextu(src,d0,3,&bufs);
+	d0++;
+	if (bfextu(src, d0, 1, &bufs)) goto l792;
+	d0++;
+	d6 = bfextu(src, d0, 3, &bufs);
 	d0 += 3;
 	d6 += 8;
 	goto l7a8;
 
 l792:
-	d0 += 1;
-	d6 = bfextu(src,d0,5,&bufs);
+	d0++;
+	d6 = bfextu(src, d0, 5, &bufs);
 	d0 += 5;
 	d4 = 16;
 	goto l7a6;
 
 l79e:
-	d0 += 1;
-	d6 = bfextu(src,d0,1,&bufs);
-	d0 += 1;
+	d0++;
+	d6 = bfextu(src, d0, 1, &bufs);
+	d0++;
 l7a6:
 	d6 += d4;
 l7a8:
@@ -277,7 +275,7 @@ l7a8:
 	}
 	else
 	{
-		d0 += 1;
+		d0++;
 		if (bfextu(src, d0, 1, &bufs))
 		{
 			d5 = 14;
@@ -290,22 +288,22 @@ l7a8:
 		}
 	}
 
-	d0 += 1;
-	d4 = bfextu(src,d0,d5,&bufs);
+	d0++;
+	d4 = bfextu(src, d0, d5, &bufs);
 	d0 += d5;
 	d6 -= 3;
 	if (d6 >= 0)
 	{
 		if (d6 > 0)
-			d1 -= 1;
+			d1--;
 
-		d1 -= 1;
+		d1--;
 		if (d1 < 0)
 			d1 = 0;
 	}
 	d6 += 2;
 
-	phist = (size_t)(PtrOut-unpackedData) + a5 - d4 - 1;
+	size_t phist = (size_t)(PtrOut-unpackedData) + a5 - d4 - 1;
 	if (phist >= (size_t)(PtrOut-unpackedData))
 	{
 		free(unpackedData);
@@ -352,7 +350,7 @@ bool ReadHeader(FILE *f, XPKFILEHEADER *header)
 	return true;
 }
 
-bool DetectXPK(FILE *f)
+bool detectXPK(FILE *f)
 {
 	XPKFILEHEADER header;
 
@@ -367,7 +365,7 @@ bool DetectXPK(FILE *f)
 	return ValidateHeader(&header);
 }
 
-bool UnpackXPK(FILE *f, uint32_t *filesize, uint8_t **out)
+bool unpackXPK(FILE *f, uint32_t *filesize, uint8_t **out)
 {
 	XPKFILEHEADER header;
 

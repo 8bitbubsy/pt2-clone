@@ -224,10 +224,10 @@ void pat2SmpRender(void)
 	}
 
 	const double dAudioFrequency = dPat2SmpFreq * 2.0; // *2 for oversampling
-	const uint32_t maxSamplesToMix = (int32_t)ceil(dAudioFrequency / (REPLAYER_MIN_BPM / 2.5)); // *2 for oversampling
+	int32_t maxSamplesPerTick = (int32_t)ceil(dAudioFrequency / (MIN_BPM / 2.5)) + 1;
 
-	dMixBufferL = (double *)malloc((maxSamplesToMix + 1) * sizeof (double));
-	dMixBufferR = (double *)malloc((maxSamplesToMix + 1) * sizeof (double));
+	dMixBufferL = (double *)malloc(maxSamplesPerTick * sizeof (double));
+	dMixBufferR = (double *)malloc(maxSamplesPerTick * sizeof (double));
 
 	if (dMixBufferL == NULL || dMixBufferR == NULL)
 	{
@@ -254,33 +254,37 @@ void pat2SmpRender(void)
 
 	song->currRow = song->row = 0;
 	pat2SmpPos = 0;
-	int64_t tickSampleCounter64 = 0;
+
+	uint64_t samplesToMixFrac = 0;
 
 	bool lastRow = false;
 
 	pat2SmpEndReached = false;
 	while (!pat2SmpEndReached && editor.songPlaying)
 	{
-		//int8_t prevRow = song->row;
-		if (tickSampleCounter64 <= 0) // new replayer tick
+		/* PT replayer ticker (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac).
+		** Returns false on end of song.
+		*/
+		if (!intMusic())
+			lastRow = true;
+
+		if (song->row > pat2SmpStartRow+pat2SmpRows)
+			break; // we rendered as many rows as requested (don't write this tick to output)
+
+		uint32_t samplesToMix = audio.samplesPerTickInt;
+
+		samplesToMixFrac += audio.samplesPerTickFrac;
+		if (samplesToMixFrac >= BPM_FRAC_SCALE)
 		{
-			if (!intMusic())
-				lastRow = true;
-
-			if (song->row > pat2SmpStartRow+pat2SmpRows)
-				break; // we rendered as many rows as requested (don't write this tick to output)
-
-			tickSampleCounter64 += audio.samplesPerTick64;
+			samplesToMixFrac &= BPM_FRAC_MASK;
+			samplesToMix++;
 		}
 
 		if (lastRow && song->tick == song->speed-1)
 			pat2SmpEndReached = true;
 
-		const uint32_t samplesTodo = ((uint64_t)tickSampleCounter64 + UINT32_MAX) >> 32; // ceil (rounded upwards)
 		if (lastRow || song->row > pat2SmpStartRow)
-			pat2SmpOutputAudio(samplesTodo);
-
-		tickSampleCounter64 -= (uint64_t)samplesTodo << 32;
+			pat2SmpOutputAudio(samplesToMix);
 	}
 	editor.pat2SmpOngoing = false;
 

@@ -2,9 +2,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "pt2_replayer.h"
 
 // for the low-pass/high-pass filters in the SAMPLER screen
 #define FILTERS_BASE_FREQ (PAULA_PAL_CLK / 214.0)
+
+// too many bits makes little sense here
+
+#define BPM_FRAC_BITS 52
+#define BPM_FRAC_SCALE (1ULL << BPM_FRAC_BITS)
+#define BPM_FRAC_MASK (BPM_FRAC_SCALE-1)
+
+#define TICK_TIME_FRAC_BITS 52
+#define TICK_TIME_FRAC_SCALE (1ULL << TICK_TIME_FRAC_BITS)
+#define TICK_TIME_FRAC_MASK (TICK_TIME_FRAC_SCALE-1)
 
 typedef struct audio_t
 {
@@ -13,15 +24,17 @@ typedef struct audio_t
 	bool ledFilterEnabled, oversamplingFlag;
 	
 	uint32_t amigaModel, outputRate, audioBufferSize;
-	int64_t tickSampleCounter64, samplesPerTick64;
-	int64_t samplesPerTickTable[256-32]; // 32.32 fixed-point
+
+	uint32_t tickSampleCounter, samplesPerTickInt, samplesPerTickIntTab[(MAX_BPM-MIN_BPM)+1];
+	uint64_t tickSampleCounterFrac, samplesPerTickFrac, samplesPerTickFracTab[(MAX_BPM-MIN_BPM)+1];
 
 	// for audio sampling
 	bool rescanAudioDevicesSupported;
 
 	// for audio/video syncing
 	bool resetSyncTickTimeFlag;
-	uint64_t tickLengthTable[224];
+	uint32_t tickTimeIntTab[(MAX_BPM-MIN_BPM)+1];
+	uint64_t tickTimeFracTab[(MAX_BPM-MIN_BPM)+1];
 } audio_t;
 
 void setAmigaFilterModel(uint8_t model);

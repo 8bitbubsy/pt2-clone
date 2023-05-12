@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.57"
+#define PROG_VER_STR "1.58"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -68,19 +68,6 @@
 
 // Amount of video frames. 14 (PT on Amiga) -> 17 (converted from 49.92Hz to 60Hz)
 #define KEYB_REPEAT_DELAY 17
-
-// .MOD types
-enum
-{
-	FORMAT_MK, // ProTracker or compatible
-	FORMAT_FLT, // Startrekker (4 channels)
-	FORMAT_FT2, // FT2 (or other trackers, multichannel)
-	FORMAT_STK, // The Ultimate SoundTracker (15 samples)
-	FORMAT_NT, // NoiseTracker
-	FORMAT_HMNT, // His Master's NoiseTracker (special one)
-
-	FORMAT_UNKNOWN // may be The Ultimate Soundtracker (set to FORMAT_STK later)
-};
 
 enum
 {

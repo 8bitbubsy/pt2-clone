@@ -31,9 +31,9 @@
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <PlatformToolset>v140</PlatformToolset>
@@ -88,7 +88,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;HAS_LIBFLAC</PreprocessorDefinitions>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -135,7 +135,7 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;HAS_LIBFLAC</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <StringPooling>true</StringPooling>
@@ -178,7 +178,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;HAS_LIBFLAC</PreprocessorDefinitions>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -207,7 +207,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
-      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRTDBG_MAP_ALLOC;DEBUG;_DEBUG;WIN32;_CRT_SECURE_NO_WARNINGS;HAS_LIBFLAC</PreprocessorDefinitions>
       <OmitFramePointers>false</OmitFramePointers>
       <TreatWChar_tAsBuiltInType>false</TreatWChar_tAsBuiltInType>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -242,6 +242,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\modloaders\pt2_load_mod15.h" />
+    <ClInclude Include="..\..\src\modloaders\pt2_load_mod31.h" />
+    <ClInclude Include="..\..\src\modloaders\pt2_pp_unpack.h" />
+    <ClInclude Include="..\..\src\modloaders\pt2_xpk_unpack.h" />
     <ClInclude Include="..\..\src\pt2_askbox.h" />
     <ClInclude Include="..\..\src\pt2_audio.h" />
     <ClInclude Include="..\..\src\pt2_blep.h" />
@@ -277,7 +281,6 @@
     <ClInclude Include="..\..\src\pt2_textout.h" />
     <ClInclude Include="..\..\src\pt2_unicode.h" />
     <ClInclude Include="..\..\src\pt2_visuals.h" />
-    <ClInclude Include="..\..\src\pt2_xpk.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\gfx\pt2_gfx_aboutscreen.c" />
@@ -294,6 +297,23 @@
     <ClCompile Include="..\..\src\gfx\pt2_gfx_spectrum.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_tracker.c" />
     <ClCompile Include="..\..\src\gfx\pt2_gfx_vumeter.c" />
+    <ClCompile Include="..\..\src\libflac\bitmath.c" />
+    <ClCompile Include="..\..\src\libflac\bitreader.c" />
+    <ClCompile Include="..\..\src\libflac\crc.c" />
+    <ClCompile Include="..\..\src\libflac\fixed.c" />
+    <ClCompile Include="..\..\src\libflac\format.c" />
+    <ClCompile Include="..\..\src\libflac\lpc.c" />
+    <ClCompile Include="..\..\src\libflac\md5.c" />
+    <ClCompile Include="..\..\src\libflac\memory.c" />
+    <ClCompile Include="..\..\src\libflac\metadata_iterators.c" />
+    <ClCompile Include="..\..\src\libflac\metadata_object.c" />
+    <ClCompile Include="..\..\src\libflac\stream_decoder.c" />
+    <ClCompile Include="..\..\src\libflac\window.c" />
+    <ClCompile Include="..\..\src\libflac\windows_unicode_filenames.c" />
+    <ClCompile Include="..\..\src\modloaders\pt2_load_mod15.c" />
+    <ClCompile Include="..\..\src\modloaders\pt2_load_mod31.c" />
+    <ClCompile Include="..\..\src\modloaders\pt2_pp_unpack.c" />
+    <ClCompile Include="..\..\src\modloaders\pt2_xpk_unpack.c" />
     <ClCompile Include="..\..\src\pt2_askbox.c" />
     <ClCompile Include="..\..\src\pt2_audio.c" />
     <ClCompile Include="..\..\src\pt2_blep.c" />
@@ -329,7 +349,11 @@
     <ClCompile Include="..\..\src\pt2_textout.c" />
     <ClCompile Include="..\..\src\pt2_unicode.c" />
     <ClCompile Include="..\..\src\pt2_visuals.c" />
-    <ClCompile Include="..\..\src\pt2_xpk.c" />
+    <ClCompile Include="..\..\src\smploaders\pt2_load_aiff.c" />
+    <ClCompile Include="..\..\src\smploaders\pt2_load_flac.c" />
+    <ClCompile Include="..\..\src\smploaders\pt2_load_iff.c" />
+    <ClCompile Include="..\..\src\smploaders\pt2_load_raw.c" />
+    <ClCompile Include="..\..\src\smploaders\pt2_load_wav.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc">

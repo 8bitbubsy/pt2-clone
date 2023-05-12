@@ -89,7 +89,7 @@ void setLEDFilter(bool state)
 		lockAudio();
 
 	audio.ledFilterEnabled = state;
-	paulaWriteByte(0xBFE001, audio.ledFilterEnabled << 1);
+	paulaWriteByte(0xBFE001, (uint8_t)audio.ledFilterEnabled << 1);
 
 	if (audioWasntLocked)
 		unlockAudio();
@@ -102,7 +102,7 @@ void toggleLEDFilter(void)
 		lockAudio();
 
 	audio.ledFilterEnabled ^= 1;
-	paulaWriteByte(0xBFE001, audio.ledFilterEnabled << 1);
+	paulaWriteByte(0xBFE001, (uint8_t)audio.ledFilterEnabled << 1);
 
 	if (audioWasntLocked)
 		unlockAudio();
@@ -351,33 +351,36 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 
 	int16_t *streamOut = (int16_t *)stream;
 
-	uint32_t samplesLeft = (uint32_t)len >> 2;
+	uint32_t samplesLeft = (uint32_t)len / 4;
 	while (samplesLeft > 0)
 	{
-		if (audio.tickSampleCounter64 <= 0)
+		if (audio.tickSampleCounter == 0) // new replayer tick
 		{
-			// new replayer tick
-
 			if (editor.songPlaying)
 			{
-				intMusic(); // PT replayer ticker
+				intMusic(); // PT replayer ticker (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac)
 				fillVisualsSyncBuffer();
 			}
 
-			audio.tickSampleCounter64 += audio.samplesPerTick64;
+			audio.tickSampleCounter = audio.samplesPerTickInt;
+
+			audio.tickSampleCounterFrac += audio.samplesPerTickFrac;
+			if (audio.tickSampleCounterFrac >= BPM_FRAC_SCALE)
+			{
+				audio.tickSampleCounterFrac &= BPM_FRAC_MASK;
+				audio.tickSampleCounter++;
+			}
 		}
 
-		const uint32_t remainingTickSamples = ((uint64_t)audio.tickSampleCounter64 + UINT32_MAX) >> 32; // ceil rounding (upwards)
+		uint32_t samplesToMix = samplesLeft;
+		if (samplesToMix > audio.tickSampleCounter)
+			samplesToMix = audio.tickSampleCounter;
 
-		uint32_t samplesTodo = samplesLeft;
-		if (samplesTodo > remainingTickSamples)
-			samplesTodo = remainingTickSamples;
+		outputAudio(streamOut, samplesToMix);
+		streamOut += samplesToMix * 2; // *2 for stereo
 
-		outputAudio(streamOut, samplesTodo);
-		streamOut += samplesTodo << 1;
-
-		samplesLeft -= samplesTodo;
-		audio.tickSampleCounter64 -= (int64_t)samplesTodo << 32;
+		audio.tickSampleCounter -= samplesToMix;
+		samplesLeft -= samplesToMix;
 	}
 
 	(void)userdata;
@@ -397,10 +400,11 @@ void generateBpmTable(double dAudioFreq, bool vblankTimingFlag)
 	if (audioWasntLocked)
 		lockAudio();
 
-	for (int32_t bpm = 32; bpm <= 255; bpm++)
+	for (int32_t bpm = MIN_BPM; bpm <= MAX_BPM; bpm++)
 	{
+		const int32_t i = bpm - MIN_BPM; // index for tables
+
 		double dBpmHz;
-		
 		if (vblankTimingFlag)
 			dBpmHz = AMIGA_PAL_VBLANK_HZ;
 		else
@@ -408,12 +412,15 @@ void generateBpmTable(double dAudioFreq, bool vblankTimingFlag)
 
 		const double dSamplesPerTick = dAudioFreq / dBpmHz;
 
-		// convert to rounded 32.32 fixed-point
-		const int32_t i = bpm - 32;
-		audio.samplesPerTickTable[i] = (int64_t)((dSamplesPerTick * (UINT32_MAX+1.0)) + 0.5);
+		double dSamplesPerTickInt;
+		double dSamplesPerTickFrac = modf(dSamplesPerTick, &dSamplesPerTickInt);
+
+		audio.samplesPerTickIntTab[i] = (uint32_t)dSamplesPerTickInt;
+		audio.samplesPerTickFracTab[i] = (uint64_t)((dSamplesPerTickFrac * BPM_FRAC_SCALE) + 0.5); // rounded
 	}
 
-	audio.tickSampleCounter64 = 0;
+	audio.tickSampleCounter = 0;
+	audio.tickSampleCounterFrac = 0;
 
 	if (audioWasntLocked)
 		unlockAudio();
@@ -421,23 +428,24 @@ void generateBpmTable(double dAudioFreq, bool vblankTimingFlag)
 
 static void generateTickLengthTable(bool vblankTimingFlag)
 {
-	for (int32_t bpm = 32; bpm <= 255; bpm++)
+	for (int32_t bpm = MIN_BPM; bpm <= MAX_BPM; bpm++)
 	{
-		double dHz;
+		const int32_t i = bpm - MIN_BPM; // index for tables
 
+		double dHz;
 		if (vblankTimingFlag)
 			dHz = AMIGA_PAL_VBLANK_HZ;
 		else
 			dHz = ciaBpm2Hz(bpm);
 
 		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
-		double dTimeInt;
-		double dTimeFrac = modf((double)hpcFreq.freq64 / dHz, &dTimeInt);
-		const int32_t timeInt = (int32_t)dTimeInt;
-	
-		dTimeFrac = floor((dTimeFrac * (UINT32_MAX+1.0)) + 0.5); // fractional part (scaled to 0..2^32-1)
+		const double dTickTime = (double)hpcFreq.freq64 / dHz;
 
-		audio.tickLengthTable[bpm-32] = ((uint64_t)timeInt << 32) | (uint32_t)dTimeFrac;
+		double dTimeInt;
+		double dTimeFrac = modf(dTickTime, &dTimeInt);
+
+		audio.tickTimeIntTab[i] = (uint32_t)dTimeInt;
+		audio.tickTimeFracTab[i] = (uint64_t)((dTimeFrac * TICK_TIME_FRAC_SCALE) + 0.5); // rounded
 	}
 }
 
@@ -493,30 +501,32 @@ bool setupAudio(void)
 	audio.amigaModel = config.amigaModel;
 
 	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
-	const uint32_t maxSamplesToMix = (int32_t)ceil(paulaMixFrequency / (REPLAYER_MIN_BPM / 2.5));
+	int32_t maxSamplesPerTick = (int32_t)ceil(paulaMixFrequency / (MIN_BPM / 2.5)) + 1;
 
-	dMixBufferL = (double *)malloc((maxSamplesToMix + 1) * sizeof (double));
-	dMixBufferR = (double *)malloc((maxSamplesToMix + 1) * sizeof (double));
+	dMixBufferL = (double *)malloc(maxSamplesPerTick * sizeof (double));
+	dMixBufferR = (double *)malloc(maxSamplesPerTick * sizeof (double));
 
 	if (dMixBufferL == NULL || dMixBufferR == NULL)
 	{
 		// these two are free'd later
-
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
 
 	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	audioSetStereoSeparation(config.stereoSeparation);
-	updateReplayerTimingMode(); // also generates the BPM table (audio.bpmTable)
+	updateReplayerTimingMode(); // also generates the BPM table (audio.samplesPerTickIntTab & audio.samplesPerTickFracTab)
 	setLEDFilter(false);
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
 	clearMixerDownsamplerStates();
 	audio.resetSyncTickTimeFlag = true;
 
-	audio.samplesPerTick64 = audio.samplesPerTickTable[125-32]; // BPM 125
-	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.samplesPerTickInt = audio.samplesPerTickIntTab[125-MIN_BPM]; // BPM 125
+	audio.samplesPerTickFrac = audio.samplesPerTickFracTab[125-MIN_BPM]; // BPM 125
+
+	audio.tickSampleCounter = 0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.tickSampleCounterFrac = 0;
 
 	SDL_PauseAudioDevice(dev, false);
 	return true;

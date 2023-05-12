@@ -53,7 +53,7 @@ typedef struct chSync_t
 } chSync_t;
 
 void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq);
-void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac);
+void setSyncTickTimeLen(uint32_t timeLenInt, uint64_t timeLenFrac);
 void fillVisualsSyncBuffer(void);
 void resetChSyncQueue(void);
 void updateChannelSyncBuffer(void);

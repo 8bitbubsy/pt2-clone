@@ -3,8 +3,10 @@
 #include <stdint.h>
 #include "pt2_palette.h"
 #include "pt2_mouse.h"
+#include "pt2_replayer.h"
 
 // TABLES
+
 extern const char *ftuneStrTab[16];
 extern const int8_t vuMeterHeights[65];
 extern const char hexTable[16];
@@ -16,7 +18,7 @@ extern const char *noteNames4[2+36];
 extern const uint8_t vibratoTable[32];
 extern const int16_t periodTable[(37*16)+15];
 extern int8_t pNoteTable[32];
-extern const uint64_t musicTimeTab64[(256-32)+1];
+extern const uint64_t musicTimeTab52[(MAX_BPM-MIN_BPM)+1+1];
 
 // changable by config file
 extern uint16_t analyzerColors[36];

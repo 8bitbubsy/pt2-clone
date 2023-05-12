@@ -17,9 +17,11 @@ typedef struct syncVoice_t
 } syncVoice_t;
 
 static volatile bool chQueueClearing;
-static uint32_t audLatencyPerfValInt, audLatencyPerfValFrac;
+static uint32_t audLatencyPerfValInt;
+static uint64_t audLatencyPerfValFrac;
 static uint64_t tickTime64, tickTime64Frac;
-static uint32_t tickTimeLen, tickTimeLenFrac;
+static uint32_t tickTimeLenInt;
+static uint64_t tickTimeLenFrac;
 static syncVoice_t syncVoice[PAULA_VOICES];
 static chSyncData_t *chSyncEntry;
 static chSync_t chSync;
@@ -139,25 +141,22 @@ void setVisualsDataPtr(int32_t ch, const int8_t *src)
 
 void calcAudioLatencyVars(int32_t audioBufferSize, int32_t audioFreq)
 {
-	double dInt, dFrac;
+	double dInt;
 
 	if (audioFreq == 0)
 		return;
 
 	const double dAudioLatencySecs = audioBufferSize / (double)audioFreq;
 
-	dFrac = modf(dAudioLatencySecs * (double)hpcFreq.freq64, &dInt);
+	double dFrac = modf(dAudioLatencySecs * (double)hpcFreq.freq64, &dInt);
 
-	// integer part
 	audLatencyPerfValInt = (uint32_t)dInt;
-
-	// fractional part (scaled to 0..2^32-1)
-	audLatencyPerfValFrac = (uint32_t)((dFrac * (UINT32_MAX+1.0)) + 0.5); // rounded
+	audLatencyPerfValFrac = (uint64_t)((dFrac * TICK_TIME_FRAC_SCALE) + 0.5); // rounded
 }
 
-void setSyncTickTimeLen(uint32_t timeLen, uint32_t timeLenFrac)
+void setSyncTickTimeLen(uint32_t timeLenInt, uint64_t timeLenFrac)
 {
-	tickTimeLen = timeLen;
+	tickTimeLenInt = timeLenInt;
 	tickTimeLenFrac = timeLenFrac;
 }
 
@@ -294,11 +293,12 @@ void fillVisualsSyncBuffer(void)
 		chQueuePush(chSyncData);
 	}
 
-	tickTime64 += tickTimeLen;
+	tickTime64 += tickTimeLenInt;
+
 	tickTime64Frac += tickTimeLenFrac;
-	if (tickTime64Frac > UINT32_MAX)
+	if (tickTime64Frac >= TICK_TIME_FRAC_SCALE)
 	{
-		tickTime64Frac &= UINT32_MAX;
+		tickTime64Frac &= TICK_TIME_FRAC_MASK;
 		tickTime64++;
 	}
 }

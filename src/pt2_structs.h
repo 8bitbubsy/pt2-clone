@@ -180,7 +180,11 @@ typedef struct editor_t
 	uint16_t effectMacros[10], currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	int32_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
 	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, samplePos, chordLength;
-	uint64_t musicTime64;
+	uint32_t playbackSeconds;
+	uint64_t playbackSecondsFrac;
+
+	uint32_t framesPassed;
+
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
 	note_t patternBuffer[MOD_ROWS * PAULA_VOICES], undoBuffer[MOD_ROWS * PAULA_VOICES];
 	SDL_Thread *mod2WavThread, *pat2SmpThread;

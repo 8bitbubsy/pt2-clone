@@ -4,13 +4,14 @@
 #include <stdbool.h>
 #include "pt2_structs.h"
 
-#define REPLAYER_MIN_BPM 32
+#define MIN_BPM 32
+#define MAX_BPM 255
 
 double ciaBpm2Hz(int32_t bpm);
-void updatePaulaLoops(void); // used after manipulating sample loop points while Paula is live
+void updatePaulaLoops(void); // used after manipulating Paula sample loop points while playing
 void turnOffVoices(void);
 void initializeModuleChannels(module_t *s);
-int8_t *allocMemForAllSamples(void);
+module_t *createEmptyMod(void);
 void setReplayerPosToTrackerPos(void);
 void setPattern(int16_t pattern);
 bool intMusic(void);

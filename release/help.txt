@@ -89,15 +89,17 @@
    If you press ctrl+z, the current sample's data+attributes will be restored.
    Now you don't need to reload a sample when you make a change you regret!
    
- * WAV sample loader.
+ * WAV sample loader
    Supports: 8-bit, 16-bit, 24-bit, 32-bit and 32-bit/64-bit floating point
-   The WAV samples are mixed to mono and quantized to 8-bit.
-   It also attempts to load the "SMPL" chunk to get loop points and
-   volume from sampler WAVs and Open ModPlug Tracker and the like.
+   Stereo WAV samples are mixed to mono.
    
- * AIFF sample loader.
+ * AIFF sample loader
    Supports: 8-bit, 16-bit, 24-bit and 32-bit
-   The AIFF samples are mixed to mono and quantized to 8-bit.
+   Stereo AIFF samples are mixed to mono.
+   
+ * FLAC sample loader
+   Supports: 8-bit, 16-bit and 24-bit
+   Stereo FLAC samples are mixed to mono.
    
  * PAGE UP/DOWN and HOME/END works in POS-ED, DISK OP. and the pattern editor
    (and HOME/END works while editing strings)

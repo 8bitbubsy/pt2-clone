@@ -286,6 +286,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	// setup GUI text pointers (for recently allocated song structure)
+	editor.currEditPatternDisp = &song->currPattern;
+	editor.currPosDisp = &song->currOrder;
+	editor.currPatternDisp = &song->header.order[0];
+	editor.currPosEdPattDisp = &song->header.order[0];
+	editor.currLengthDisp = &song->header.numOrders;
+
 	if (!initScopes())
 	{
 		cleanUp();

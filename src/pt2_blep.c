@@ -4,12 +4,7 @@
 #include <assert.h>
 #include "pt2_blep.h"
 
-/* 18th of April 2022, 8bitbubsy:
-** Table entries were changed to readable numbers instead of "IEEE 754" 64-bit hex data, for better cross-platform support.
-** These numbers have enough digits to keep the same accuracy as the old table (verified).
-** If some compilers were to make a small rounding error here, it wouldn't matter. We have good enough accuracy anyway.
-*/
-static const double dMinblepData[256 + 1] =
+static const double dMinblepData[256+1] =
 {
 	 1.000047730261351741631870027, 1.000070326525919428561905988, 1.000026295486963423542192686, 0.999910424773336803383472216,
 	 0.999715744379055859525351480, 0.999433014919733908598686867, 0.999050085771328588712947294, 0.998551121919525108694415394,

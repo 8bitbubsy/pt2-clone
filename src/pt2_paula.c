@@ -246,7 +246,7 @@ static void stopDMA(int32_t ch)
 	paula[ch].DMA_active = false;
 }
 
-void paulaWriteByte(uint32_t address, uint16_t data8)
+void paulaWriteByte(uint32_t address, uint8_t data8)
 {
 	if (address == 0)
 		return;
@@ -264,12 +264,6 @@ void paulaWriteByte(uint32_t address, uint16_t data8)
 				clearTwoPoleFilterState(&filterLED);
 		}
 		break;
-	
-		// AUDxVOL ( byte-write to AUDxVOL works on most Amigas (not 68040/68060) )
-		case 0xDFF0A9: audxvol(0, data8); break;
-		case 0xDFF0B9: audxvol(1, data8); break;
-		case 0xDFF0C9: audxvol(2, data8); break;
-		case 0xDFF0D9: audxvol(3, data8); break;
 
 		default: return;
 	}
@@ -391,7 +385,12 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b)
 // output is -4.00 .. 3.97 (can be louder because of high-pass filter)
 void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples)
 {
-	double *dMixBufSelect[PAULA_VOICES] = { dOutL, dOutR, dOutR, dOutL };
+	double *dMixBufSelect[PAULA_VOICES];
+
+	dMixBufSelect[0] = dOutL;
+	dMixBufSelect[1] = dOutR;
+	dMixBufSelect[2] = dOutR;
+	dMixBufSelect[3] = dOutL;
 
 	if (numSamples <= 0)
 		return;
@@ -437,7 +436,10 @@ void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples)
 	// apply Amiga filters
 	for (int32_t i = 0; i < numSamples; i++)
 	{
-		double dOut[2] = { dOutL[i], dOutR[i] };
+		double dOut[2];
+
+		dOut[0] = dOutL[i];
+		dOut[1] = dOutR[i];
 
 		if (useLowpassFilter)
 			onePoleLPFilterStereo(&filterLo, dOut, dOut);

@@ -195,9 +195,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	fseek(f, sizeof (wavHeader_t), SEEK_SET);
 
 	uint32_t sampleCounter = 0;
-	uint8_t tickCounter = 8;
-	int64_t tickSampleCounter64 = 0;
-
+	uint64_t samplesToMixFrac = 0;
 	int8_t numLoops = editor.mod2WavNumLoops;
 
 	bool renderDone = false;
@@ -205,7 +203,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	{
 		uint32_t samplesInChunk = 0;
 
-		// render several ticks at once to prevent frequent disk I/O (can speed up the process)
+		// render several ticks at once to prevent frequent disk I/O (speeds up the process)
 		int16_t *ptr16 = mod2WavBuffer;
 		for (uint32_t i = 0; i < TICKS_PER_RENDER_CHUNK; i++)
 		{
@@ -215,45 +213,46 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 				break;
 			}
 
-			if (tickSampleCounter64 <= 0) // new replayer tick
+			/* PT replayer ticker (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac).
+			** Returns false on end of song.
+			*/
+			if (!intMusic())
 			{
-				if (!intMusic())
+				if (--numLoops < 0)
 				{
-					if (--numLoops < 0)
-					{
-						renderDone = true; // this tick is the last tick
-					}
-					else
-					{
-						// clear the "last visisted rows" table and let the song continue playing (loop)
-						memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS);
-					}
+					renderDone = true; // this tick is the last tick
 				}
-
-				tickSampleCounter64 += audio.samplesPerTick64;
+				else
+				{
+					// clear the "last visisted rows" table and let the song continue playing (loop)
+					memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS);
+				}
 			}
 
-			int32_t remainingTick = (tickSampleCounter64 + UINT32_MAX) >> 32; // ceil (rounded upwards)
+			uint32_t samplesToMix = audio.samplesPerTickInt;
 
-			outputAudio(ptr16, remainingTick);
-			tickSampleCounter64 -= (int64_t)remainingTick << 32;
-
-			samplesInChunk += remainingTick;
-			sampleCounter += remainingTick;
-
-			ptr16 += remainingTick * 2;
-
-			if (++tickCounter >= 4)
+			samplesToMixFrac += audio.samplesPerTickFrac;
+			if (samplesToMixFrac >= BPM_FRAC_SCALE)
 			{
-				tickCounter = 0;
-				ui.updateMod2WavDialog = true;
+				samplesToMixFrac &= BPM_FRAC_MASK;
+				samplesToMix++;
 			}
+
+			outputAudio(ptr16, samplesToMix);
+			ptr16 += samplesToMix * 2; // *2 for stereo
+
+			samplesInChunk += samplesToMix;
+			sampleCounter += samplesToMix;
+
+			ui.updateMod2WavDialog = true;
 		}
 
 		// write buffer to disk
 		if (samplesInChunk > 0)
 			fwrite(mod2WavBuffer, sizeof (int16_t), samplesInChunk * 2, f);
 	}
+
+	ui.updateMod2WavDialog = true;
 
 	uint32_t endOfDataOffset = ftell(f);
 
@@ -353,9 +352,9 @@ bool mod2WavRender(char *filename)
 	strncpy(lastFilename, filename, PATH_MAX-1);
 
 	const int32_t paulaMixFrequency = config.mod2WavOutputFreq * 2; // *2 for oversampling (we always do oversampling in MOD2WAV)
-	const uint32_t maxSamplesToMix = (int32_t)ceil(paulaMixFrequency / (REPLAYER_MIN_BPM / 2.5));
+	int32_t maxSamplesPerTick = (int32_t)ceil(paulaMixFrequency / (MIN_BPM / 2.5)) + 1;
 
-	mod2WavBuffer = (int16_t *)malloc(((TICKS_PER_RENDER_CHUNK * maxSamplesToMix) + 1) * sizeof (int16_t) * 2);
+	mod2WavBuffer = (int16_t *)malloc((TICKS_PER_RENDER_CHUNK * maxSamplesPerTick) * sizeof (int16_t) * 2);
 	if (mod2WavBuffer == NULL)
 	{
 		fclose(fOut);

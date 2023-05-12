@@ -679,7 +679,7 @@ static uint8_t quantizeCheck(uint8_t row)
 		{
 			if (song->tick > song->speed>>1)
 			{
-				row = (row + 1) & 0x3F;
+				row = (row + 1) & 63;
 				editor.didQuantize = true;
 			}
 		}

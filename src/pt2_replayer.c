@@ -92,13 +92,13 @@ void turnOffVoices(void)
 	editor.tuningToneFlag = false;
 }
 
-void initializeModuleChannels(module_t *s)
+void initializeModuleChannels(module_t *m)
 {
-	assert(s != NULL);
+	assert(m != NULL);
 
-	memset(s->channels, 0, sizeof (s->channels));
+	memset(m->channels, 0, sizeof (m->channels));
 
-	moduleChannel_t *ch = s->channels;
+	moduleChannel_t *ch = m->channels;
 	for (uint8_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
 		ch->n_chanindex = i;
@@ -117,11 +117,63 @@ void setReplayerPosToTrackerPos(void)
 	song->tick = 0;
 }
 
-int8_t *allocMemForAllSamples(void)
+module_t *createEmptyMod(void)
 {
+	module_t *m = (module_t *)calloc(1, sizeof (module_t));
+	if (m == NULL)
+		goto error;
+
 	// allocate memory for all sample data blocks (+ 2 extra, for quirk + safety)
 	const size_t allocLen = (MOD_SAMPLES + 2) * config.maxSampleLength;
-	return (int8_t *)calloc(allocLen, 1);
+
+	m->sampleData = (int8_t *)calloc(allocLen, 1);
+	if (m->sampleData == NULL)
+		goto error;
+
+	for (int32_t i = 0; i < MAX_PATTERNS; i++)
+	{
+		m->patterns[i] = (note_t *)calloc(1, MOD_ROWS * sizeof (note_t) * PAULA_VOICES);
+		if (m->patterns[i] == NULL)
+			goto error;
+	}
+
+	m->header.numOrders = 1;
+
+	moduleSample_t *s = m->samples;
+	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)
+	{
+		// setup GUI text pointers
+		s->volumeDisp = &s->volume;
+		s->lengthDisp = &s->length;
+		s->loopStartDisp = &s->loopStart;
+		s->loopLengthDisp = &s->loopLength;
+
+		s->loopLength = 2;
+
+		// sample data offsets (sample data = one huge buffer to rule them all)
+		s->offset = config.maxSampleLength * i;
+	}
+
+	initializeModuleChannels(m);
+
+	return m;
+
+error:
+	if (m != NULL)
+	{
+		for (int32_t i = 0; i < MAX_PATTERNS; i++)
+		{
+			if (m->patterns[i] != NULL)
+				free(m->patterns[i]);
+		}
+
+		if (m->sampleData != NULL)
+			free(m->sampleData);
+
+		free(m);
+	}
+
+	return NULL;
 }
 
 void modSetSpeed(int32_t speed)
@@ -1130,13 +1182,19 @@ static void nextPosition(void)
 
 static void increasePlaybackTimer(void)
 {
-	// the timer is not counting in "play pattern" mode
-	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= 32 && modBPM <= 255)
+	// (the timer is not counting in "play pattern" mode)
+	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= MIN_BPM && modBPM <= MAX_BPM)
 	{
 		if (editor.timingMode == TEMPO_MODE_CIA)
-			editor.musicTime64 += musicTimeTab64[modBPM-32];
+			editor.playbackSecondsFrac += musicTimeTab52[modBPM-MIN_BPM];
 		else
-			editor.musicTime64 += musicTimeTab64[(255-32)+1]; // vblank tempo mode
+			editor.playbackSecondsFrac += musicTimeTab52[(MAX_BPM-MIN_BPM)+1]; // vblank tempo mode
+
+		if (editor.playbackSecondsFrac >= 1ULL << 52)
+		{
+			editor.playbackSecondsFrac &= (1ULL << 52)-1;
+			editor.playbackSeconds++;
+		}
 	}
 }
 
@@ -1188,7 +1246,7 @@ static void setDMA(void)
 	moduleChannel_t *ch = song->channels;
 	for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
-		if (DMACONtemp & ch->n_dmabit) // sample trigger
+		if (DMACONtemp & ch->n_dmabit) // handle visuals on sample trigger
 		{
 			ch->syncAnalyzerVolume = ch->n_volume;
 			ch->syncAnalyzerPeriod = ch->n_period;
@@ -1209,7 +1267,7 @@ static void setDMA(void)
 
 void modSetTempo(int32_t bpm, bool doLockAudio)
 {
-	if (bpm < 32 || bpm > 255)
+	if (bpm < MIN_BPM || bpm > MAX_BPM)
 		return;
 
 	const bool audioWasntLocked = !audio.locked;
@@ -1223,18 +1281,14 @@ void modSetTempo(int32_t bpm, bool doLockAudio)
 		ui.updateSongBPM = true;
 	}
 
-	bpm -= 32; // 32..255 -> 0..223
-	audio.samplesPerTick64 = audio.samplesPerTickTable[bpm];
+	const int32_t i = bpm - MIN_BPM; // 32..255 -> 0..223
+
+	audio.samplesPerTickInt = audio.samplesPerTickIntTab[i];
+	audio.samplesPerTickFrac = audio.samplesPerTickFracTab[i];
 
 	// calculate tick time length for audio/video sync timestamp (visualizers)
 	if (!editor.pat2SmpOngoing && !editor.mod2WavOngoing)
-	{
-		const uint64_t tickTimeLen64 = audio.tickLengthTable[bpm];
-		const uint32_t tickTimeLen = tickTimeLen64 >> 32;
-		const uint32_t tickTimeLenFrac = (uint32_t)tickTimeLen64;
-
-		setSyncTickTimeLen(tickTimeLen, tickTimeLenFrac);
-	}
+		setSyncTickTimeLen(audio.tickTimeIntTab[i], audio.tickTimeFracTab[i]);
 
 	if (doLockAudio && audioWasntLocked)
 		unlockAudio();
@@ -1341,13 +1395,13 @@ bool intMusic(void) // replayer ticker
 
 			if (editor.stepPlayLastMode == MODE_EDIT || editor.stepPlayLastMode == MODE_IDLE)
 			{
-				song->row &= 0x3F;
+				song->row &= 63;
 				song->currRow = song->row;
 			}
 			else
 			{
 				// if we were playing, set replayer row to tracker row (stay in sync)
-				song->currRow &= 0x3F;
+				song->currRow &= 63;
 				song->row = song->currRow;
 			}
 
@@ -1485,8 +1539,10 @@ void playPattern(int8_t startRow)
 	if (!editor.stepPlayEnabled)
 		pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 
-	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
-	song->currRow = song->row = startRow & 0x3F;
+	audio.tickSampleCounter = 0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.tickSampleCounterFrac = 0;
+
+	song->currRow = song->row = startRow & 63;
 
 	if (!editor.stepPlayEnabled)
 		song->tick = song->speed-1;
@@ -1584,10 +1640,15 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 	editor.songPlaying = true;
 	editor.didQuantize = false;
 
+	// don't reset playback counter in "play/rec pattern" mode
 	if (editor.playMode != PLAY_MODE_PATTERN)
-		editor.musicTime64 = 0; // don't reset playback counter in "play/rec pattern" mode
+	{
+		editor.playbackSeconds = 0;
+		editor.playbackSecondsFrac = 0;
+	}
 
-	audio.tickSampleCounter64 = 0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.tickSampleCounter = 0; // zero tick sample counter so that it will instantly initiate a tick
+	audio.tickSampleCounterFrac = 0;
 
 	if (audioWasntLocked)
 		unlockAudio();
@@ -1621,7 +1682,8 @@ void clearSong(void)
 	editor.f9Pos = 48;
 	editor.f10Pos = 63;
 
-	editor.musicTime64 = 0;
+	editor.playbackSeconds = 0;
+	editor.playbackSecondsFrac = 0;
 
 	editor.metroFlag = false;
 	editor.currSample = 0;

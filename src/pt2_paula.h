@@ -22,7 +22,7 @@ void paulaDisableFilters(void); // disables low-pass & high-pass filters ("LED" 
 
 int8_t *paulaGetNullSamplePtr(void);
 
-void paulaWriteByte(uint32_t address, uint16_t data8);
+void paulaWriteByte(uint32_t address, uint8_t data8);
 void paulaWriteWord(uint32_t address, uint16_t data16);
 void paulaWritePtr(uint32_t address, const int8_t *ptr);
 
