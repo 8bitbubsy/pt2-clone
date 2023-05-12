@@ -14,7 +14,7 @@
 #include "../pt2_downsample2x.h"
 #include "../pt2_audio.h"
 
-bool loadIFFSample(FILE *f, int32_t filesize, moduleSample_t *s)
+bool loadIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 {
 	char tmpCharBuf[23];
 	uint16_t sampleRate;
@@ -33,7 +33,7 @@ bool loadIFFSample(FILE *f, int32_t filesize, moduleSample_t *s)
 	uint32_t sampleVolume = 65536; // max volume
 
 	fseek(f, 12, SEEK_SET);
-	while (!feof(f) && ftell(f) < filesize-12)
+	while (!feof(f) && (uint32_t)ftell(f) < filesize-12)
 	{
 		uint32_t blockName, blockSize;
 

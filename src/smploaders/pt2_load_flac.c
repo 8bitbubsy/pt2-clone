@@ -48,7 +48,7 @@ static void metadata_callback(const FLAC__StreamDecoder *decoder, const FLAC__St
 static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 *const buffer[], void *client_data);
 static void error_callback(const FLAC__StreamDecoder *decoder, FLAC__StreamDecoderErrorStatus status, void *client_data);
 
-bool loadFLACSample(FILE *f, int32_t filesize, moduleSample_t *s)
+bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 {
 	FLAC__StreamDecoder *decoder = FLAC__stream_decoder_new();
 	if (decoder == NULL)

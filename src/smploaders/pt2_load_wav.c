@@ -20,7 +20,7 @@ enum
 	WAV_FORMAT_IEEE_FLOAT = 0x0003
 };
 
-bool loadWAVSample(FILE *f, int32_t filesize, moduleSample_t *s)
+bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 {
 	uint16_t audioFormat, numChannels, bitsPerSample;
 	uint32_t sampleRate;

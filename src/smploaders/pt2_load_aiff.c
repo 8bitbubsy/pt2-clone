@@ -33,7 +33,7 @@ static uint32_t getAIFFSampleRate(uint8_t *in)
 	return (uint32_t)round(dResult);
 }
 
-bool loadAIFFSample(FILE *f, int32_t filesize, moduleSample_t *s)
+bool loadAIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 {
 	uint8_t sampleRateBytes[10];
 	uint16_t bitDepth, numChannels;
@@ -46,7 +46,7 @@ bool loadAIFFSample(FILE *f, int32_t filesize, moduleSample_t *s)
 	bool unsigned8bit = false;
 
 	fseek(f, 12, SEEK_SET);
-	while (!feof(f) && ftell(f) < filesize-12)
+	while (!feof(f) && (uint32_t)ftell(f) < filesize-12)
 	{
 		uint32_t blockName, blockSize;
 

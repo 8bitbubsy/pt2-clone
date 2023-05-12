@@ -7,10 +7,10 @@
 #include "../pt2_structs.h"
 #include "../pt2_replayer.h"
 
-bool loadRAWSample(FILE *f, int32_t filesize, moduleSample_t *s)
+bool loadRAWSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 {
-	int32_t sampleLength = filesize;
-	if (sampleLength > config.maxSampleLength)
+	uint32_t sampleLength = filesize;
+	if (sampleLength > (uint32_t)config.maxSampleLength)
 		sampleLength = config.maxSampleLength;
 
 	int8_t *smpDataPtr = &song->sampleData[s->offset];
@@ -20,7 +20,7 @@ bool loadRAWSample(FILE *f, int32_t filesize, moduleSample_t *s)
 
 	if (sampleLength & 1)
 	{
-		if (++sampleLength > config.maxSampleLength)
+		if (++sampleLength > (uint32_t)config.maxSampleLength)
 			sampleLength = config.maxSampleLength;
 	}
 

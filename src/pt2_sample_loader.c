@@ -27,11 +27,11 @@ enum
 	SAMPLETYPE_FLAC
 };
 
-bool loadRAWSample(FILE *f, int32_t filesize, moduleSample_t *s);
-bool loadIFFSample(FILE *f, int32_t filesize, moduleSample_t *s);
-bool loadAIFFSample(FILE *f, int32_t filesize, moduleSample_t *s);
-bool loadWAVSample(FILE *f, int32_t filesize, moduleSample_t *s);
-bool loadFLACSample(FILE *f, int32_t filesize, moduleSample_t *s);
+bool loadRAWSample(FILE *f, uint32_t filesize, moduleSample_t *s);
+bool loadIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s);
+bool loadAIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s);
+bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s);
+bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s);
 
 static void setSampleTextFromFilename(moduleSample_t *s, char *entryName, const char *ext)
 {
