@@ -84,12 +84,7 @@ bool loadFLACSample(FILE *f, int32_t filesize, moduleSample_t *s)
 	smpBuf16 = NULL;
 	smpBuf24 = NULL;
 
-	if (!FLAC__stream_decoder_process_until_end_of_stream(decoder))
-	{
-		displayErrorMsg("FLAC LOAD ERROR !");
-		goto error;
-	}
-
+	FLAC__stream_decoder_process_until_end_of_stream(decoder);
 	FLAC__stream_decoder_finish(decoder);
 	FLAC__stream_decoder_delete(decoder);
 
@@ -447,9 +442,14 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
 
 	uint32_t blockSize = frame->header.blocksize;
 
+	bool doAbort = false;
+
 	const uint32_t samplesAllocated = config.maxSampleLength * 2;
-	if (samplesRead+blockSize > samplesAllocated)
+	if (samplesRead+blockSize >= samplesAllocated)
+	{
 		blockSize = samplesAllocated-samplesRead;
+		doAbort = true;
+	}
 	
 	if (blockSize > 0)
 	{
@@ -503,6 +503,9 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
 
 		samplesRead += blockSize;
 	}
+
+	if (doAbort)
+		return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
 
 	return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
 
