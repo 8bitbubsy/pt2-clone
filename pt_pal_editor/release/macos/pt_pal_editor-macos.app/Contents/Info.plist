@@ -1,39 +1,1 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>English</string>
-    <key>CFBundleExecutable</key>
-    <string>pt_pal_editor-macos</string>
-    <key>CFBundleGetInfoString</key>
-    <string>Palette editor for ProTracker 2 clone</string>
-    <key>CFBundleIconFile</key>
-    <string>pt_pal_editor-macos.icns</string>
-    <key>CFBundleIdentifier</key>
-    <string>org.16-bits.pt_pal_editor-macos</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    <key>CFBundleName</key>
-    <string>pt_pal_editor-macos</string>
-    <key>CFBundleDisplayName</key>
-    <string>Palette editor for ProTracker 2 clone</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleVersion</key>
-    <string>1.0.0</string>
-    <key>CFBundleShortVersion</key>
-    <string>1.0.0</string>
-    <key>CFBundleSignature</key>
-    <string>Ptpe</string>
-    <key>NSHumanReadableCopyright</key>
-    <string>Copyright © Olav "8bitbubsy" Sørensen
-https://16-bits.org</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>10.9</string>
-    <key>CGDisableCoalescedUpdates</key>
-    <true/>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>    <key>CFBundleDevelopmentRegion</key>    <string>English</string>    <key>CFBundleExecutable</key>    <string>pt_pal_editor-macos</string>    <key>CFBundleGetInfoString</key>    <string>Palette editor for ProTracker 2 clone</string>    <key>CFBundleIconFile</key>    <string>pt_pal_editor-macos.icns</string>    <key>CFBundleIdentifier</key>    <string>org.16-bits.pt_pal_editor-macos</string>    <key>CFBundleInfoDictionaryVersion</key>    <string>6.0</string>    <key>CFBundleName</key>    <string>pt_pal_editor-macos</string>    <key>CFBundleDisplayName</key>    <string>Palette editor for ProTracker 2 clone</string>    <key>CFBundlePackageType</key>    <string>APPL</string>    <key>CFBundleVersion</key>    <string>1.0.0</string>    <key>CFBundleShortVersion</key>    <string>1.0.0</string>    <key>CFBundleSignature</key>    <string>Ptpe</string>    <key>NSHumanReadableCopyright</key>    <string>Copyright © Olav "8bitbubsy" Sørensenhttps://16-bits.org</string>    <key>LSMinimumSystemVersion</key>    <string>10.11</string>    <key>CGDisableCoalescedUpdates</key>    <true/>    <key>NSHighResolutionCapable</key>    <true/></dict></plist>
