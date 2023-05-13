@@ -474,10 +474,10 @@ bool setupAudio(void)
 	want.callback = audioCallback;
 	want.userdata = NULL;
 
-	dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+	dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
 	if (dev == 0)
 	{
-		showErrorMsgBox("Unable to open audio device: %s", SDL_GetError());
+		showErrorMsgBox("Couldn't open audio device:\n\"%s\"\n\nDo you have an audio device enabled and plugged in?", SDL_GetError());
 		return false;
 	}
 
@@ -489,9 +489,9 @@ bool setupAudio(void)
 		return false;
 	}
 
-	if (have.format != want.format)
+	if (have.format != AUDIO_S16)
 	{
-		showErrorMsgBox("Unable to open audio: The sample format (signed 16-bit) couldn't be used!");
+		showErrorMsgBox("Couldn't open audio device:\nThis program only supports 16-bit audio streams. Sorry!");
 		return false;
 	}
 
