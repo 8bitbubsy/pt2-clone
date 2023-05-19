@@ -2675,6 +2675,13 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (keyb.leftAmigaPressed)
 			{
 				trackNoteDown(TRANSPOSE_ALL, 0, MOD_ROWS - 1);
+#ifdef __APPLE__
+				/* On Mac, command+Q sends a quit signal to the program.
+				** However, command+Q is also one of the transpose keys in this ProTracker port.
+				** Ignore the signal if command+Q was pressed.
+				*/
+				editor.macCmdQIssued = true;
+#endif
 			}
 			else if (keyb.leftCtrlPressed)
 			{

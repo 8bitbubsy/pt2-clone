@@ -415,9 +415,20 @@ static void handleInput(void)
 			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
 			SDL_free(event.drop.file);
 		}
-		if (event.type == SDL_QUIT)
+		else if (event.type == SDL_QUIT)
 		{
-			handleSigTerm();
+#ifdef __APPLE__
+			/* On Mac, command+Q sends a quit signal to the program.
+			** However, command+Q is also one of the transpose keys in this ProTracker port.
+			** Ignore the signal if command+Q was pressed.
+			*/
+			if (!editor.macCmdQIssued)
+#endif
+				handleSigTerm();
+
+#ifdef __APPLE__
+			editor.macCmdQIssued = false; // read note above
+#endif
 		}
 		else if (event.type == SDL_KEYUP)
 		{

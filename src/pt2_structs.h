@@ -188,6 +188,10 @@ typedef struct editor_t
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
 	note_t patternBuffer[MOD_ROWS * PAULA_VOICES], undoBuffer[MOD_ROWS * PAULA_VOICES];
 	SDL_Thread *mod2WavThread, *pat2SmpThread;
+
+#ifdef __APPLE__
+	bool macCmdQIssued;
+#endif
 } editor_t;
 
 typedef struct diskop_t
