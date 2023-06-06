@@ -3,7 +3,7 @@
 */
 
 #include <stdint.h>
-#include <math.h>
+#include <math.h> // fmod()
 #include "pt2_math.h"
 
 static const double pi = PT2_PI;
