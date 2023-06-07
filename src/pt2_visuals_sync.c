@@ -375,7 +375,7 @@ void updateChannelSyncBuffer(void)
 
 			// ---------------------------------------------------------------
 
-			if (flags & UPDATE_ANALYZER)
+			if (flags & UPDATE_SPECTRUM_ANALYZER)
 				updateSpectrumAnalyzer(c->analyzerVolume, c ->analyzerPeriod);
 
 			if (flags & UPDATE_VUMETER) // for fake VU-meters only

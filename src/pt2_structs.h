@@ -112,7 +112,7 @@ typedef struct keyb_t
 	bool shiftPressed, leftCtrlPressed, leftAltPressed;
 	bool leftCommandPressed, leftAmigaPressed, keypadEnterPressed;
 	uint8_t repeatCounter, delayCounter;
-	uint64_t repeatDelta, repeatFrac;
+	uint64_t repeatFrac;
 	SDL_Scancode lastRepKey, lastKey;
 } keyb_t;
 
@@ -135,6 +135,7 @@ typedef struct video_t
 	hpc_t vblankHpc;
 	SDL_PixelFormat *pixelFormat;
 	uint32_t *frameBuffer;
+	uint64_t amigaVblankDelta; // 0.52 fixed-point
 
 	SDL_Window *window;
 	SDL_Renderer *renderer;
@@ -149,7 +150,7 @@ typedef struct video_t
 
 typedef struct editor_t
 {
-	volatile int8_t vuMeterVolumes[PAULA_VOICES], spectrumVolumes[SPECTRUM_BAR_NUM];
+	volatile uint8_t vuMeterVolumes[PAULA_VOICES], spectrumVolumes[SPECTRUM_BAR_NUM];
 	volatile int8_t *sampleFromDisp, *sampleToDisp, *currSampleDisp, realVuMeterVolumes[PAULA_VOICES], mod2WavNumLoops, mod2WavFadeOutSeconds;
 	volatile bool songPlaying, programRunning, mod2WavOngoing, pat2SmpOngoing, mainLoopOngoing, abortMod2Wav, mod2WavFadeOut;
 	volatile uint16_t *quantizeValueDisp, *metroSpeedDisp, *metroChannelDisp, *sampleVolDisp;

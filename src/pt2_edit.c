@@ -793,6 +793,7 @@ static void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 				gotoNextMulti();
 		}
 
+		// PT quirk: spectrum analyzer is still handled here even if channel is muted
 		updateSpectrumAnalyzer(s->volume, tempPeriod);
 	}
 	else if (noteVal == -2)

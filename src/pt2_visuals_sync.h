@@ -14,7 +14,7 @@ enum // flags
 	STOP_SCOPE = 32,
 
 	UPDATE_VUMETER = 64,
-	UPDATE_ANALYZER = 128
+	UPDATE_SPECTRUM_ANALYZER = 128
 };
 
 // 2^n-1 - don't change this! Total queue buffer length is already big.

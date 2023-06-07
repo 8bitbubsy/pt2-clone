@@ -1731,55 +1731,66 @@ void flipFrame(void)
 		audio.resetSyncTickTimeFlag = true;
 }
 
-void updateSpectrumAnalyzer(int8_t vol, int16_t period)
+void updateSpectrumAnalyzer(uint8_t vol, uint16_t period)
 {
-	const uint8_t maxHeight = SPECTRUM_BAR_HEIGHT + 1; // +1 because of audio latency - allows full height to be seen
-
-	if (ui.visualizerMode != VISUAL_SPECTRUM || vol <= 0)
+	if (ui.visualizerMode != VISUAL_SPECTRUM || vol == 0)
 		return;
 
-	uint16_t scaledVol = ((uint16_t)vol * 24576) >> 16; // scaledVol = vol / 2.66667 (0..64 -> 0..24)
+	/* This routine is buggy in real PT. Behavior for periods outside of 108..907 is undefined.
+	** Behavior for sane input outside of 113..856 (B-3 finetune > 0 and C-1 finetune < 0)
+	** seems to be defined, and we simulate this.
+	*/
+	if (period < 108 || period > 907)
+		return; // we don't really know what to do here
 
-	period = CLAMP(period, 113, 856);
-	period -= 113;
+	// C-1 with finetune < 0 is ignored (confirmed behavior)
+	if (period > 856)
+		return;
 
-	uint32_t scaledNote = 743 - period;
-	scaledNote *= scaledNote;
-	scaledNote /= 25093; // scaledNote now ranges 0..22, no need to clamp
+	// B-3 with finetune > 0 behaves like finetune 0 (confirmed behavior)
+	if (period < 113)
+		period = 113;
 
-	// increment main spectrum bar
-	editor.spectrumVolumes[scaledNote] += (uint8_t)scaledVol;
-	if (editor.spectrumVolumes[scaledNote] > maxHeight)
-		editor.spectrumVolumes[scaledNote] = maxHeight;
+	// just in case
+	if (vol > 64)
+		vol = 64;
 
-	// increment left side of spectrum bar with half volume
-	if (scaledNote > 0)
+	const uint8_t vol24 = (vol * 24) >> 6; // 0..64 -> 0..24
+
+	// convert period from log (113..856) to linear (0..22)
+	period = (856 - 113) - (period - 113); // 0..743 (inverted)
+	const uint32_t index = (period * period) / 25093; // 0..22 (25093 = round[743^2 / 22])
+
+	// increment bar
+	editor.spectrumVolumes[index] += vol24;
+	if (editor.spectrumVolumes[index] > SPECTRUM_BAR_HEIGHT)
+		editor.spectrumVolumes[index] = SPECTRUM_BAR_HEIGHT;
+
+	// increment left and right neighbor bars with half the volume
+
+	if (index > 0)
 	{
-		editor.spectrumVolumes[scaledNote-1] += (uint8_t)(scaledVol >> 1);
-		if (editor.spectrumVolumes[scaledNote-1] > maxHeight)
-			editor.spectrumVolumes[scaledNote-1] = maxHeight;
+		editor.spectrumVolumes[index-1] += vol24 / 2;
+		if (editor.spectrumVolumes[index-1] > SPECTRUM_BAR_HEIGHT)
+			editor.spectrumVolumes[index-1] = SPECTRUM_BAR_HEIGHT;
 	}
 
-	// increment right side of spectrum bar with half volume
-	if (scaledNote < SPECTRUM_BAR_NUM-1)
+	if (index < SPECTRUM_BAR_NUM-1)
 	{
-		editor.spectrumVolumes[scaledNote+1] += (uint8_t)(scaledVol >> 1);
-		if (editor.spectrumVolumes[scaledNote+1] > maxHeight)
-			editor.spectrumVolumes[scaledNote+1] = maxHeight;
+		editor.spectrumVolumes[index+1] += vol24 / 2;
+		if (editor.spectrumVolumes[index+1] > SPECTRUM_BAR_HEIGHT)
+			editor.spectrumVolumes[index+1] = SPECTRUM_BAR_HEIGHT;
 	}
 }
 
-void sinkVisualizerBars(void)
+void sinkVisualizerBars(void) // sinks visualizer bars @ 49.92Hz (Amiga PAL) rate
 {
-	// sink visualizer bars @ 49.92Hz (Amiga PAL) rate
+	static uint64_t counter50Hz; // pre-initialized to zero because of static
 
-	static uint64_t counter50Hz;
-	const uint64_t counter50HzDelta = (uint64_t)(((UINT32_MAX+1.0) * (AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ)) + 0.5);
-
-	counter50Hz += counter50HzDelta; // 32.32 fixed-point counter
-	if (counter50Hz > UINT32_MAX)
+	counter50Hz += video.amigaVblankDelta; // 0.52 fixed-point
+	if (counter50Hz > 1ULL<<52)
 	{
-		counter50Hz &= UINT32_MAX;
+		counter50Hz &= (1ULL<<52)-1;
 
 		// sink VU-meters
 		for (int32_t i = 0; i < PAULA_VOICES; i++)

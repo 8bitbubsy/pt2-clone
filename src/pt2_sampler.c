@@ -1833,6 +1833,7 @@ static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, 
 
 	unlockAudio();
 
+	// PT quirk: spectrum analyzer is still handled here even if channel is muted
 	updateSpectrumAnalyzer(ch->n_volume, ch->n_period);
 }
 

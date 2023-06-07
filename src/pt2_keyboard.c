@@ -3467,10 +3467,10 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		break;
 	}
 
-	keyb.repeatFrac += keyb.repeatDelta; // 32.32 fixed-point counter
-	if (keyb.repeatFrac > UINT32_MAX)
+	keyb.repeatFrac += video.amigaVblankDelta;  // 0.52 fixed-point
+	if (keyb.repeatFrac > 1ULL<<52)
 	{
-		keyb.repeatFrac &= UINT32_MAX;
+		keyb.repeatFrac &= (1ULL<<52)-1;
 		keyb.repeatCounter++;
 	}
 }

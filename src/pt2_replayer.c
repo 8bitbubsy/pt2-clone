@@ -374,9 +374,10 @@ static void doRetrg(moduleChannel_t *ch)
 	setVisualsDataPtr(ch->n_chanindex, ch->n_loopstart);
 	setVisualsLength(ch->n_chanindex, ch->n_replen);
 
+	// set spectrum analyzer state for this channel
 	ch->syncAnalyzerVolume = ch->n_volume;
 	ch->syncAnalyzerPeriod = ch->n_period;
-	ch->syncFlags |= UPDATE_ANALYZER;
+	ch->syncFlags |= UPDATE_SPECTRUM_ANALYZER;
 
 	setVUMeterHeight(ch);
 }
@@ -988,6 +989,14 @@ static void setPeriod(moduleChannel_t *ch)
 			setVisualsLength(ch->n_chanindex, 1);
 
 		setVisualsPeriod(ch->n_chanindex, ch->n_period);
+
+		// set spectrum analyzer state for this channel
+		if (!editor.muted[ch->n_chanindex])
+		{
+			ch->syncAnalyzerVolume = ch->n_volume;
+			ch->syncAnalyzerPeriod = ch->n_period;
+			ch->syncFlags |= UPDATE_SPECTRUM_ANALYZER;
+		}
 	}
 
 	checkMoreEffects(ch);
@@ -1247,13 +1256,7 @@ static void setDMA(void)
 	for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
 		if (DMACONtemp & ch->n_dmabit) // handle visuals on sample trigger
-		{
-			ch->syncAnalyzerVolume = ch->n_volume;
-			ch->syncAnalyzerPeriod = ch->n_period;
-			ch->syncFlags |= UPDATE_ANALYZER;
-
 			setVUMeterHeight(ch);
-		}
 
 		// these take effect after the current DMA cycle is done
 		const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);

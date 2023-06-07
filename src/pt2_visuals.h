@@ -43,7 +43,7 @@ bool setupVideo(void);
 void renderFrame2(void);
 void renderFrame(void);
 void flipFrame(void);
-void updateSpectrumAnalyzer(int8_t vol, int16_t period);
+void updateSpectrumAnalyzer(uint8_t vol, uint16_t period);
 void sinkVisualizerBars(void);
 void updatePosEd(void);
 void updateVisualizer(void);

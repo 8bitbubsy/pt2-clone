@@ -84,7 +84,11 @@ int32_t getSampleReadPos(int32_t ch) // used for the sampler screen
 
 void scopeSetPeriod(int32_t ch, int32_t period)
 {
-	assert(period >= 113 && period <= 65535);
+	period &= 0xFFFF;
+
+	if (period < 113) // just in case, should already be clamped
+		period = 113;
+
 	scope[ch].dDelta = (PAULA_PAL_CLK / (double)SCOPE_HZ) / period;
 }
 
@@ -180,7 +184,7 @@ static void updateRealVuMeters(void)
 		if (!tmpScope.active || tmpScope.data == NULL || tmpScope.volume == 0 || tmpScope.length == 0)
 			continue;
 
-		// amount of integer samples getting skipped every frame
+		// amount of integer samples getting skipped every frame (periods < 113 are clamped, this number can't get big)
 		const int32_t samplesToScan = (const int32_t)tmpScope.dDelta;
 		if (samplesToScan <= 0)
 			continue;
@@ -246,7 +250,7 @@ void drawScopes(void)
 			int16_t scopeData;
 			int32_t pos = tmpScope.pos;
 			int32_t length = tmpScope.length;
-			const int16_t volume = -(tmpScope.volume << 7);
+			const int8_t volume = -(tmpScope.volume >> 1);
 			const int8_t *data = tmpScope.data;
 			uint32_t *scopeDrawPtr = &video.frameBuffer[(71 * SCREEN_W) + scopeX];
 
@@ -254,7 +258,7 @@ void drawScopes(void)
 			{
 				scopeData = 0;
 				if (data != NULL)
-					scopeData = (data[pos] * volume) >> 16;
+					scopeData = (data[pos] * volume) >> 8;
 
 				scopeDrawPtr[(scopeData * SCREEN_W) + x] = fgColor;
 
