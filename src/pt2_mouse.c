@@ -1286,7 +1286,8 @@ static void handleSamplerVolumeBox(void)
 				}
 
 				int8_t *sampleData = &song->sampleData[s->offset];
-				if (editor.markStartOfs != -1)
+
+				if (editor.markStartOfs != -1 && editor.markEndOfs != editor.markStartOfs)
 				{
 					sampleData += editor.markStartOfs;
 					sampleLength = editor.markEndOfs - editor.markStartOfs;
