@@ -572,7 +572,7 @@ void highPassSample(int32_t cutOff)
 		if (to > s->length)
 			to = s->length;
 
-		if (from == to)
+		if (from == to || from >= s->length || to < from)
 		{
 			from = 0;
 			to = s->length;
@@ -671,7 +671,7 @@ void lowPassSample(int32_t cutOff)
 		if (to > s->length)
 			to = s->length;
 
-		if (from == to)
+		if (from == to || from >= s->length || to < from)
 		{
 			from = 0;
 			to = s->length;
@@ -875,7 +875,7 @@ void samplerRemoveDcOffset(void)
 		if (to > s->length)
 			to = s->length;
 
-		if (from == to)
+		if (from == to || from >= s->length || to < from)
 		{
 			from = 0;
 			to = s->length;
@@ -1158,7 +1158,7 @@ void boostSample(int32_t sample, bool ignoreMark)
 			if (to > s->length)
 				to = s->length;
 
-			if (from == to)
+			if (from == to || from >= s->length || to < from)
 			{
 				from = 0;
 				to = s->length;
@@ -1209,7 +1209,7 @@ void filterSample(int32_t sample, bool ignoreMark)
 			if (to > s->length)
 				to = s->length;
 
-			if (from == to)
+			if (from == to || from >= s->length || to < from)
 			{
 				from = 0;
 				to = s->length;

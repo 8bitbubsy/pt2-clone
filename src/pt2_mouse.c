@@ -1270,8 +1270,6 @@ static void handleSamplerVolumeBox(void)
 			// NORMALIZE
 			if (mouse.x >= 101 && mouse.x <= 143)
 			{
-				int32_t sampleLength;
-
 				if (editor.sampleZero)
 				{
 					statusNotSampleZero();
@@ -1287,44 +1285,46 @@ static void handleSamplerVolumeBox(void)
 
 				int8_t *sampleData = &song->sampleData[s->offset];
 
-				if (editor.markStartOfs != -1 && editor.markEndOfs != editor.markStartOfs)
+				int32_t from = 0;
+				int32_t to = s->length;
+
+				if (editor.markStartOfs != -1)
 				{
-					sampleData += editor.markStartOfs;
-					sampleLength = editor.markEndOfs - editor.markStartOfs;
-				}
-				else
-				{
-					sampleLength = s->length;
-				}
+					from = editor.markStartOfs;
+					to = editor.markEndOfs;
 
-				int16_t sampleVol = 0;
-				int32_t sampleIndex = 0;
+					if (to > s->length)
+						to = s->length;
 
-				while (sampleIndex < sampleLength)
-				{
-					int16_t sample = *sampleData++;
-					sample = ABS(sample);
-
-					if (sampleVol < sample)
-						sampleVol = sample;
-
-					sampleIndex++;
+					if (from == to || from >= s->length || to < from)
+					{
+						from = 0;
+						to = s->length;
+					}
 				}
 
-				if (sampleVol <= 0 || sampleVol > 127)
+				int32_t hi = 0;
+				for (int32_t i = from; i < to; i++)
+				{
+					const int32_t sample = ABS(sampleData[i]);
+					if (sample > hi)
+						hi = sample;
+				}
+
+				if (hi <= 0 || hi > 127)
 				{
 					editor.vol1 = 100;
 					editor.vol2 = 100;
 				}
-				else if (sampleVol < 64)
+				else if (hi < 64)
 				{
 					editor.vol1 = 200;
 					editor.vol2 = 200;
 				}
 				else
 				{
-					editor.vol1 = (uint16_t)((100 * 127) / sampleVol);
-					editor.vol2 = (uint16_t)((100 * 127) / sampleVol);
+					editor.vol1 = (uint16_t)((100 * 127) / hi);
+					editor.vol2 = (uint16_t)((100 * 127) / hi);
 				}
 
 				ui.updateVolFromText = true;
@@ -1382,8 +1382,6 @@ static void handleSamplerVolumeBox(void)
 			// RAMP
 			else if (mouse.x >= 72 && mouse.x <= 100)
 			{
-				int32_t sampleLength;
-
 				if (editor.sampleZero)
 				{
 					statusNotSampleZero();
@@ -1405,34 +1403,42 @@ static void handleSamplerVolumeBox(void)
 				}
 
 				int8_t *sampleData = &song->sampleData[s->offset];
-				if (editor.markStartOfs != -1 && editor.markEndOfs-editor.markStartOfs >= 1)
-				{
-					sampleData += editor.markStartOfs;
-					sampleLength = editor.markEndOfs - editor.markStartOfs;
-				}
-				else
-				{
-					sampleLength = s->length;
-				}
 
-				if (sampleLength > 0)
-				{
-					double dSampleLengthMul = 1.0 / sampleLength;
+				int32_t from = 0;
+				int32_t to = s->length;
 
-					int32_t sampleIndex = 0;
-					while (sampleIndex < sampleLength)
+				if (editor.markStartOfs != -1)
+				{
+					from = editor.markStartOfs;
+					to = editor.markEndOfs;
+
+					if (to > s->length)
+						to = s->length;
+
+					if (from == to || from >= s->length || to < from)
 					{
-						double dSmp = (sampleIndex * editor.vol2) * dSampleLengthMul;
-						dSmp += ((sampleLength - sampleIndex) * editor.vol1) * dSampleLengthMul;
-						dSmp *= *sampleData;
-						dSmp *= (1.0 / 100.0);
-
-						int32_t smp32 = (int32_t)dSmp;
-						CLAMP8(smp32);
-
-						*sampleData++ = (int8_t)smp32;
-						sampleIndex++;
+						from = 0;
+						to = s->length;
 					}
+				}
+
+				const int32_t markLength = to - from;
+
+				const double dSampleLengthMul = 1.0 / markLength;
+
+				int32_t sampleIndex = 0;
+				for (int32_t i = from; i < to; i++)
+				{
+					double dSmp = (sampleIndex * editor.vol2) * dSampleLengthMul;
+					dSmp += ((markLength - sampleIndex) * editor.vol1) * dSampleLengthMul;
+					dSmp *= sampleData[i];
+					dSmp *= 1.0 / 100.0;
+
+					int32_t smp32 = (int32_t)dSmp;
+					CLAMP8(smp32);
+
+					sampleData[i] = (int8_t)smp32;
+					sampleIndex++;
 				}
 
 				fixSampleBeep(s);
