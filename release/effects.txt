@@ -18,7 +18,7 @@
 
  The E command has been altered to contain more commands than one.
 
- E0- LED Filter On/Off      E8- * NOT USED *
+ E0- LED Filter On/Off      E8- Karplus-Strong
  E1- Fine Pitch Slide Up    E9- Note Retrig
  E2- Fine Pitch Slide Down  EA- Fine Volume Slide Up
  E3- Glissando Control      EB- Fine Volume Slide Down
@@ -306,6 +306,20 @@
                E75  Don't retrig WF
           C-300E72  Set Squarewave
                E76  Don't retrig WF
+
+
+
+ Cmd E8. Karplus-Strong [No range] (documented by 8bitbubsy)
+ -----------------------------------------------------------
+ Usage: $E80 (all values behave the same)
+
+ $E8x is a little-known effect, present in ProTracker 1.x, 2.x and 3.x.
+ This command only works on looped samples. It will low-pass filter the
+ sample's loop section. The longer you run the command, the more filtered it
+ gets. This is a sample-trashing effect, just like $EFx.
+ 
+ Note: This command is only implemented in the ProTracker trackers, and not
+ in the standalone replayer source codes shipped with the trackers.
 
 
 
