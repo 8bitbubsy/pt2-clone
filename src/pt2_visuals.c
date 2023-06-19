@@ -1944,6 +1944,38 @@ void toggleFullscreen(void)
 
 bool setupVideo(void)
 {
+	if (config.autoFitVideoScale)
+	{
+		int8_t i;
+		SDL_DisplayMode dm;
+
+		int32_t di = SDL_GetWindowDisplayIndex(video.window);
+		if (di < 0)
+			di = 0; // return display index 0 (default) on error
+
+		// find out which upscaling factor is the biggest to fit on screen
+		if (SDL_GetDesktopDisplayMode(di, &dm) == 0)
+		{
+			for (i = MAX_UPSCALE_FACTOR; i >= 1; i--)
+			{
+				// height test is slightly taller because of window title, window borders and taskbar/menu/dock
+				if (dm.w >= SCREEN_W*i && dm.h >= (SCREEN_H+64)*i)
+				{
+					config.videoScaleFactor = i;
+					break;
+				}
+			}
+
+			if (i == 0)
+				config.videoScaleFactor = 1; // 1x is not going to fit, but use 1x anyways...
+		}
+		else
+		{
+			// couldn't get screen resolution, set to 1x
+			config.videoScaleFactor = 1;
+		}
+	}
+
 	int32_t screenW = SCREEN_W * config.videoScaleFactor;
 	int32_t screenH = SCREEN_H * config.videoScaleFactor;
 

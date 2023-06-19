@@ -18,6 +18,7 @@
 #include "pt2_tables.h"
 #include "pt2_sampler.h"
 #include "pt2_diskop.h" // changePathToDesktop(), changePathToHome()
+#include "pt2_visuals.h" // MAX_UPSCALE_FACTOR
 
 #ifndef _WIN32
 static char oldCwd[PATH_MAX];
@@ -47,7 +48,8 @@ void loadConfig(void)
 	config.soundFrequency = 48000;
 	config.rememberPlayMode = false;
 	config.stereoSeparation = 20;
-	config.videoScaleFactor = 2;
+	config.autoFitVideoScale = true;
+	config.videoScaleFactor = 0; // will be set later if autoFitVideoScale is set
 	config.realVuMeters = false;
 	config.modDot = false;
 	config.accidental = 0; // sharp
@@ -345,18 +347,20 @@ static bool loadProTrackerDotIni(FILE *f)
 			else if (!_strnicmp(&configLine[7], "FALSE", 5)) config.modDot = false;
 		}
 
-		// SCALE3X (deprecated)
-		else if (!_strnicmp(configLine, "SCALE3X=", 8))
-		{
-			     if (!_strnicmp(&configLine[8], "TRUE",  4)) config.videoScaleFactor = 3;
-			else if (!_strnicmp(&configLine[8], "FALSE", 5)) config.videoScaleFactor = 2;
-		}
-
 		// VIDEOSCALE
 		else if (!_strnicmp(configLine, "VIDEOSCALE=", 11))
 		{
-			if (lineLen >= 13 && configLine[12] == 'X' && isdigit(configLine[11]))
-				config.videoScaleFactor = configLine[11] - '0';
+			if (!_strnicmp(&configLine[11], "AUTO", 4))
+			{
+				config.autoFitVideoScale = true;
+				config.videoScaleFactor = 0; // will be set later
+			}
+			else if (lineLen >= 13 && configLine[12] == 'X' && isdigit(configLine[11]))
+			{
+				config.autoFitVideoScale = false;
+				config.videoScaleFactor = (int8_t)(configLine[11] - '0');
+				config.videoScaleFactor = CLAMP(config.videoScaleFactor, 1, MAX_UPSCALE_FACTOR);
+			}
 		}
 
 		// REMEMBERPLAYMODE

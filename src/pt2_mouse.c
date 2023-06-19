@@ -162,7 +162,9 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 {
 	freeMouseCursors();
 
-	const uint32_t scaleFactor = video.yScale;
+	uint32_t scaleFactor = video.yScale;
+	if (scaleFactor > 6) // just in case
+		scaleFactor = 6;
 
 	for (uint32_t i = 0; i < NUM_CURSORS; i++)
 	{

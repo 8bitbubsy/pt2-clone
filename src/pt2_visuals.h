@@ -5,6 +5,8 @@
 #include "pt2_header.h"
 #include "pt2_hpc.h"
 
+#define MAX_UPSCALE_FACTOR 16 // 5120x4080 - ought to be good enough for many years to come
+
 enum
 {
 	SPRITE_PATTERN_CURSOR = 0,
