@@ -42,7 +42,7 @@
 
 module_t *song = NULL; // globalized
 
-static bool backupMadeAfterCrash, didDropFile;
+static bool backupMadeAfterCrash;
 
 #ifdef _WIN32
 #define SYSMSG_FILE_ARG (WM_USER + 1)
@@ -372,6 +372,7 @@ int main(int argc, char *argv[])
 
 static void handleInput(void)
 {
+	
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
@@ -408,12 +409,11 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_DROPFILE)
 		{
-			// kludge: allow focus-clickthrough after drag-n-drop
-			SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
-			didDropFile = true;
-
 			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
 			SDL_free(event.drop.file);
+
+			SDL_RestoreWindow(video.window);
+			SDL_RaiseWindow(video.window);
 		}
 		else if (event.type == SDL_QUIT)
 		{
@@ -449,13 +449,6 @@ static void handleInput(void)
 					statusAllRight();
 
 				ui.introTextShown = false;
-			}
-
-			// kludge: we drag-n-dropped a file before this mouse click release, restore focus-clickthrough mode
-			if (didDropFile)
-			{
-				didDropFile = false;
-				SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "0");
 			}
 		}
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
@@ -861,6 +854,12 @@ static void handleSysMsg(SDL_Event inputEvent)
 
 				UnmapViewOfFile(sharedMemBuf);
 				sharedMemBuf = NULL;
+
+				if (video.window != NULL)
+				{
+					SDL_RestoreWindow(video.window);
+					SDL_RaiseWindow(video.window);
+				}
 			}
 
 			CloseHandle(hMapFile);
