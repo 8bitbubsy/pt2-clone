@@ -355,7 +355,7 @@ static bool loadProTrackerDotIni(FILE *f)
 				config.autoFitVideoScale = true;
 				config.videoScaleFactor = 0; // will be set later
 			}
-			else if (lineLen >= 13 && configLine[12] == 'X' && isdigit(configLine[11]))
+			else if (lineLen >= 13 && toupper(configLine[12]) == 'X' && isdigit(configLine[11]))
 			{
 				config.autoFitVideoScale = false;
 				config.videoScaleFactor = (int8_t)(configLine[11] - '0');
