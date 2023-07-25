@@ -1,10 +1,6 @@
 ---- Guide on how to compile the PT2 clone for Windows/macOS/Linux ---
 
-LINUX NOTE: This code is NOT big-endian compatible! The clone might also
-            behave slightly wrong if bitshift-right on signed numbers is
-            compiled into using logical shift (LSR/SHR) instead of arithmetic
-            shift (ASR/SAR). Most CPUs have ASR/SAR instructions.
-
+LINUX NOTE: This code is NOT big-endian compatible!
 
 Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
 
