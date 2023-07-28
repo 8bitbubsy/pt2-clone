@@ -49,7 +49,7 @@ module_t *loadMod15(uint8_t *buffer, uint32_t filesize)
 		if (s->length > 9999)
 			lateSTKVerFlag = true;
 
-		p++; // Hi-byte of volume, no finetune in STK/UST modules. Skip it.
+		p++; // hi-byte of volume, no finetune in STK/UST modules. Skip it.
 		s->volume = *p++;
 
 		// in The Ultimate SoundTracker, sample loop start is in bytes, not words
@@ -89,10 +89,9 @@ module_t *loadMod15(uint8_t *buffer, uint32_t filesize)
 		// convert UST tempo to BPM
 		uint16_t ciaPeriod = (240 - initTempo) * 122;
 
-		double dHz = (double)CIA_PAL_CLK / (ciaPeriod+1); // +1, CIA triggers on underflow
-		int32_t BPM = (int32_t)((dHz * (125.0 / 50.0)) + 0.5);
+		const double dHz = (double)CIA_PAL_CLK / (ciaPeriod+1); // +1, CIA triggers on underflow
 
-		m->header.initialTempo = (uint16_t)BPM;
+		m->header.initialTempo = (uint16_t)((dHz * (125.0 / 50.0)) + 0.5);
 	}
 
 	// read orders and count number of patterns
@@ -221,7 +220,7 @@ module_t *loadMod15(uint8_t *buffer, uint32_t filesize)
 	s = m->samples;
 	for (int32_t i = 0; i < 15; i++, s++)
 	{
-		// For Ultimate SoundTracker modules, only the loop area of a looped sample is played.
+		// for Ultimate SoundTracker modules, only the loop area of a looped sample is played.
 		if (s->loopStart > 0 && s->loopLength < s->length)
 		{
 			s->length -= s->loopStart;
@@ -229,14 +228,11 @@ module_t *loadMod15(uint8_t *buffer, uint32_t filesize)
 			s->loopStart = 0;
 		}
 
-		/* We don't support loading samples bigger than 65534 bytes in our PT2 clone,
-		** so skip overflown data in .MOD file if present.
-		*/
 		int32_t bytesToSkip = 0;
 		if (realSampleLengths[i] > config.maxSampleLength)
 			bytesToSkip = realSampleLengths[i] - config.maxSampleLength;
 
-		// For Ultimate SoundTracker modules, don't load sample data after loop end
+		// for Ultimate SoundTracker modules, don't load sample data after loop end
 		int32_t loopEnd = s->loopStart + s->loopLength;
 		if (loopEnd > 2 && s->length > loopEnd)
 		{

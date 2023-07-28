@@ -178,9 +178,6 @@ module_t *loadMod31(uint8_t *buffer, uint32_t filesize)
 	s = m->samples;
 	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)
 	{
-		/* We don't support loading samples bigger than 65534 bytes in our PT2 clone,
-		** so skip overflown data in .MOD file if present.
-		*/
 		int32_t bytesToSkip = 0;
 		if (realSampleLengths[i] > config.maxSampleLength)
 			bytesToSkip = realSampleLengths[i] - config.maxSampleLength;
