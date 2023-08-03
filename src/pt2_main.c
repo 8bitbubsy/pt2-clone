@@ -36,9 +36,10 @@
 #include "pt2_askbox.h"
 #include "pt2_replayer.h"
 
-#define CRASH_TEXT "Oh no!\nThe ProTracker 2 clone has crashed...\n\nA backup .mod was hopefully " \
+#define CRASH_TEXT "Oh no! The ProTracker 2 clone has crashed...\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
-                   "Try to mention what you did before the crash happened."
+                   "Try to mention what you did before the crash happened.\n" \
+                   "My email is on the bottom of https://16-bits.org"
 
 module_t *song = NULL; // globalized
 
