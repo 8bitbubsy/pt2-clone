@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
+#include <ctype.h>
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
