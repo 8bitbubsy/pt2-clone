@@ -135,6 +135,12 @@
     <ClInclude Include="..\..\src\modloaders\pt2_load_mod15.h">
       <Filter>modloaders</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\pt2_posed.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\pt2_textedit.h">
+      <Filter>headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\pt2_audio.c" />
@@ -280,6 +286,8 @@
     <ClCompile Include="..\..\src\libflac\windows_unicode_filenames.c">
       <Filter>libflac</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\pt2_posed.c" />
+    <ClCompile Include="..\..\src\pt2_textedit.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\pt2-clone.rc" />

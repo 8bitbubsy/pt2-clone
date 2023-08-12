@@ -52,17 +52,17 @@ bool modSave(char *fileName)
 		fwrite(&loopLength16, sizeof (int16_t), 1, f);
 	}
 
-	fputc((uint8_t)song->header.numOrders, f);
+	fputc((uint8_t)song->header.songLength, f);
 	fputc(0x7F, f); // ProTracker puts 0x7F at this place (restartPos/tempo in other trackers)
 
-	for (int32_t i = 0; i < MOD_ORDERS; i++)
-		fputc((uint8_t)song->header.order[i], f);
+	for (int32_t i = 0; i < 128; i++)
+		fputc((uint8_t)song->header.patternTable[i], f);
 
 	int32_t numPatterns = 0;
-	for (int32_t i = 0; i < MOD_ORDERS; i++)
+	for (int32_t i = 0; i < 128; i++)
 	{
-		if (song->header.order[i] > numPatterns)
-			numPatterns = song->header.order[i];
+		if (song->header.patternTable[i] > numPatterns)
+			numPatterns = song->header.patternTable[i];
 	}
 
 	numPatterns++;

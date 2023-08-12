@@ -360,7 +360,7 @@ const guiButton_t bPosEd[] =
 	{268,  0,319, 10, PTB_PLAY},
 
 	{120, 11,171, 21, PTB_POSDEL},
-	{178, 22,307, 98, PTB_DUMMY},
+	{178, 22,307, 98, PTB_PE_PATTNAME},
 	{268, 11,319, 21, PTB_PATTERN},
 
 	{120, 22,177, 98, PTB_PE_PATT},

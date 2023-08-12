@@ -52,7 +52,7 @@ typedef struct note_t
 typedef struct moduleHeader_t
 {
 	char name[20 + 1];
-	uint16_t order[MOD_ORDERS], numOrders;
+	uint16_t patternTable[128], songLength;
 	uint16_t initialTempo; // used for STK/UST modules after module is loaded
 } moduleHeader_t;
 
@@ -100,7 +100,7 @@ typedef struct module_t
 	// for pattern viewer
 	int8_t currRow;
 	int32_t currSpeed, currBPM;
-	uint16_t currOrder, currPattern;
+	uint16_t currPos, currPattern;
 
 	// for MOD2WAV progress bar
 	uint32_t rowsCounter, rowsInTotal;
@@ -158,7 +158,7 @@ typedef struct editor_t
 	volatile uint16_t *currPosEdPattDisp, *currLengthDisp, *lpCutOffDisp, *hpCutOffDisp;
 	volatile int32_t *samplePosDisp, *chordLengthDisp;
 
-	char mixText[16];
+	char mixText[16+1];
 	char *entryNameTmp, *currPath, *dropTempFileName;
 	UNICHAR *fileNameTmpU, *currPathU, *modulesPathU, *samplesPathU;
 
@@ -166,7 +166,7 @@ typedef struct editor_t
 	bool sampleAllFlag, halfClipFlag, newOldFlag, pat2SmpHQ, mixFlag;
 	bool modLoaded, autoInsFlag, repeatKeyFlag, sampleZero, tuningToneFlag;
 	bool stepPlayEnabled, stepPlayBackwards, blockBufferFlag, blockMarkFlag, didQuantize;
-	bool swapChannelFlag, configFound, chordLengthMin, rowVisitTable[MOD_ORDERS * MOD_ROWS];
+	bool swapChannelFlag, configFound, chordLengthMin, rowVisitTable[128 * MOD_ROWS];
 	bool muted[PAULA_VOICES];
 
 	int8_t smpRedoFinetunes[MOD_SAMPLES], smpRedoVolumes[MOD_SAMPLES], multiModeNext[4], trackPattFlag;
@@ -201,6 +201,7 @@ typedef struct diskop_t
 	bool modPackFlg;
 	int8_t mode, smpSaveType;
 	int32_t numEntries, scrollOffset;
+	SDL_Keycode lastEntryJumpKey;
 	SDL_Thread *fillThread;
 } diskop_t;
 
@@ -213,20 +214,18 @@ typedef struct cursor_t
 typedef struct ui_t
 {
 	char statusMessage[18], prevStatusMessage[18];
-	char *dstPtr, *editPos, *textEndPtr, *showTextPtr;
-
 	volatile bool askBoxShown, throwExit;
-
 	bool editTextFlag, samplerScreenShown;
 	bool leftLoopPinMoving, rightLoopPinMoving, changingSmpResample, changingDrumPadNote;
 	bool forceSampleDrag, forceSampleEdit, introTextShown;
 	bool aboutScreenShown, posEdScreenShown, diskOpScreenShown;
 	bool samplerVolBoxShown, samplerFiltersBoxShown, samplingBoxShown, editOpScreenShown;
-	bool changingSamplingNote, force32BitNumPtr;
-
-	int8_t *numPtr8, tmpDisp8, pointerMode, editOpScreen, editTextType;
+	bool changingSamplingNote;
+	bool disableVisualizer; // ask boxes (f.ex. MOD2WAV)
+	int8_t pointerMode, editOpScreen;
 	int8_t visualizerMode, previousPointerMode, forceVolDrag, changingChordNote;
-	uint8_t numLen, numBits;
+	int16_t sampleMarkingPos;
+	uint16_t lastSampleOffset;
 
 	// render/update flags
 	bool updateStatusText, updatePatternData;
@@ -259,14 +258,18 @@ typedef struct ui_t
 
 	// pos ed.
 	bool updatePosEd, updateDiskOpFileList;
-
-	bool disableVisualizer; // ask boxes (f.ex. MOD2WAV)
-
-	int16_t lineCurX, lineCurY, editObject, sampleMarkingPos;
-	uint16_t *numPtr16, tmpDisp16, *dstOffset, dstPos, textLength, editTextPos;
-	uint16_t dstOffsetEnd, lastSampleOffset, diskOpPathTextOffset;
-	int32_t *numPtr32, tmpDisp32;
 } ui_t;
+
+typedef struct textEdit_t
+{
+	bool endReached, scrollable, force32BitNumPtr;
+	char *textPtr, *textEndPtr, *textStartPtr;
+	int8_t *numPtr8, tmpDisp8, type;
+	uint8_t numDigits, numBits;
+	int16_t cursorStartX, cursorStartY, object;
+	uint16_t *numPtr16, tmpDisp16, cursorBlock, numBlocks;
+	int32_t scrollOffset, *numPtr32, tmpDisp32;
+} textEdit_t;
 
 extern keyb_t keyb;
 extern mouse_t mouse;
@@ -275,5 +278,5 @@ extern editor_t editor;
 extern diskop_t diskop;
 extern cursor_t cursor;
 extern ui_t ui;
-
+extern textEdit_t textEdit;
 extern module_t *song; // pt2_main.c

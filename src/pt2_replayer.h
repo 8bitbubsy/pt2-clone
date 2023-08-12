@@ -7,6 +7,7 @@
 #define MIN_BPM 32
 #define MAX_BPM 255
 
+void gotoNextMulti(void);
 double ciaBpm2Hz(int32_t bpm);
 void updatePaulaLoops(void); // used after manipulating Paula sample loop points while playing
 void turnOffVoices(void);
@@ -20,11 +21,11 @@ void restartSong(void);
 void resetSong(void);
 void incPatt(void);
 void decPatt(void);
-void modSetPos(int16_t order, int16_t row);
+void modSetPos(int16_t pos, int16_t row);
 void modStop(void);
 void doStopIt(bool resetPlayMode);
 void playPattern(int8_t startRow);
-void modPlay(int16_t patt, int16_t order, int8_t row);
+void modPlay(int16_t patt, int16_t pos, int8_t row);
 void modSetSpeed(int32_t speed);
 void modSetTempo(int32_t bpm, bool doLockAudio);
 void modFree(void);

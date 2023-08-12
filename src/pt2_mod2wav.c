@@ -225,7 +225,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 				else
 				{
 					// clear the "last visisted rows" table and let the song continue playing (loop)
-					memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS);
+					memset(editor.rowVisitTable, 0, 128 * MOD_ROWS);
 				}
 			}
 
@@ -408,7 +408,7 @@ if (--numLoops < 0) \
 } \
 else \
 { \
-	memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS); \
+	memset(editor.rowVisitTable, 0, 128 * MOD_ROWS); \
 }
 
 // ONLY used for a visual percentage counter, so accuracy is not very important
@@ -423,27 +423,27 @@ static void calcMod2WavTotalRows(void)
 	song->rowsCounter = song->rowsInTotal  = 0;
 
 	uint8_t modRow = 0;
-	int16_t modOrder = 0;
-	uint16_t modPattern = song->header.order[0];
+	int16_t modPos = 0;
+	uint16_t modPattern = song->header.patternTable[0];
 	uint8_t pBreakPosition = 0;
 	bool posJumpAssert = false;
 	bool pBreakFlag = false;
 
-	memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS);
+	memset(editor.rowVisitTable, 0, 128 * MOD_ROWS);
 
 	int8_t numLoops = editor.mod2WavNumLoops; // make a copy
 
 	bool calcingRows = true;
 	while (calcingRows)
 	{
-		editor.rowVisitTable[(modOrder * MOD_ROWS) + modRow] = true;
+		editor.rowVisitTable[(modPos * MOD_ROWS) + modRow] = true;
 
 		for (int32_t ch = 0; ch < PAULA_VOICES; ch++)
 		{
 			note_t *note = &song->patterns[modPattern][(modRow * PAULA_VOICES) + ch];
 			if (note->command == 0x0B) // Bxx - Position Jump
 			{
-				modOrder = note->param - 1;
+				modPos = note->param - 1;
 				pBreakPosition = 0;
 				posJumpAssert = true;
 			}
@@ -474,7 +474,7 @@ static void calcMod2WavTotalRows(void)
 					pBreakFlag = true;
 
 					for (pos = pBreakPosition; pos <= modRow; pos++)
-						editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
+						editor.rowVisitTable[(modPos * MOD_ROWS) + pos] = false;
 				}
 				else if (--n_loopcount[ch])
 				{
@@ -482,7 +482,7 @@ static void calcMod2WavTotalRows(void)
 					pBreakFlag = true;
 
 					for (pos = pBreakPosition; pos <= modRow; pos++)
-						editor.rowVisitTable[(modOrder * MOD_ROWS) + pos] = false;
+						editor.rowVisitTable[(modPos * MOD_ROWS) + pos] = false;
 				}
 			}
 		}
@@ -503,19 +503,19 @@ static void calcMod2WavTotalRows(void)
 			pBreakPosition = 0;
 			posJumpAssert = false;
 
-			modOrder = (modOrder + 1) & 127;
-			if (modOrder >= song->header.numOrders)
+			modPos = (modPos + 1) & 127;
+			if (modPos >= song->header.songLength)
 			{
-				modOrder = 0;
+				modPos = 0;
 				CALC__END_OF_SONG
 			}
 
-			modPattern = song->header.order[modOrder];
+			modPattern = song->header.patternTable[modPos];
 			if (modPattern > MAX_PATTERNS-1)
 				modPattern = MAX_PATTERNS-1;
 		}
 
-		if (calcingRows && editor.rowVisitTable[(modOrder * MOD_ROWS) + modRow])
+		if (calcingRows && editor.rowVisitTable[(modPos * MOD_ROWS) + modRow])
 		{
 			// row has been visited before, we're now done!
 			CALC__END_OF_SONG

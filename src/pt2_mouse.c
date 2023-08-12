@@ -28,11 +28,12 @@
 #include "pt2_mod2wav.h"
 #include "pt2_askbox.h"
 #include "pt2_replayer.h"
+#include "pt2_posed.h"
+#include "pt2_textedit.h"
 
 SDL_Cursor *cursors[NUM_CURSORS]; // globalized
 
 static int32_t checkGUIButtons(void);
-static void handleTextEditing(uint8_t mouseButton);
 static bool handleRightMouseButton(void);
 static bool handleLeftMouseButton(void);
 static bool handleGUIButtons(int32_t button);
@@ -1050,7 +1051,7 @@ static void tempoDownButton(void)
 
 static void songLengthUpButton(void)
 {
-	int16_t val = song->header.numOrders;
+	int16_t val = song->header.songLength;
 	if (mouse.rightButtonPressed)
 		val += 10;
 	else
@@ -1059,19 +1060,19 @@ static void songLengthUpButton(void)
 	if (val > 128)
 		val = 128;
 
-	song->header.numOrders = (uint8_t)val;
+	song->header.songLength = (uint8_t)val;
 
-	val = song->currOrder;
-	if (val > song->header.numOrders-1)
-		val = song->header.numOrders-1;
+	val = song->currPos;
+	if (val > song->header.songLength-1)
+		val = song->header.songLength-1;
 
-	editor.currPosEdPattDisp = &song->header.order[val];
+	editor.currPosEdPattDisp = &song->header.patternTable[val];
 	ui.updateSongLength = true;
 }
 
 static void songLengthDownButton(void)
 {
-	int16_t val = song->header.numOrders;
+	int16_t val = song->header.songLength;
 
 	if (mouse.rightButtonPressed)
 		val -= 10;
@@ -1081,19 +1082,19 @@ static void songLengthDownButton(void)
 	if (val < 1)
 		val = 1;
 
-	song->header.numOrders = (uint8_t)val;
+	song->header.songLength = (uint8_t)val;
 
-	val = song->currOrder;
-	if (val > song->header.numOrders-1)
-		val = song->header.numOrders-1;
+	val = song->currPos;
+	if (val > song->header.songLength-1)
+		val = song->header.songLength-1;
 
-	editor.currPosEdPattDisp = &song->header.order[val];
+	editor.currPosEdPattDisp = &song->header.patternTable[val];
 	ui.updateSongLength = true;
 }
 
 static void patternUpButton(void)
 {
-	int16_t val = song->header.order[song->currOrder];
+	int16_t val = song->header.patternTable[song->currPos];
 
 	if (mouse.rightButtonPressed)
 		val += 10;
@@ -1103,7 +1104,7 @@ static void patternUpButton(void)
 	if (val > MAX_PATTERNS-1)
 		val = MAX_PATTERNS-1;
 
-	song->header.order[song->currOrder] = (uint8_t)val;
+	song->header.patternTable[song->currPos] = (uint8_t)val;
 
 	if (ui.posEdScreenShown)
 		ui.updatePosEd = true;
@@ -1113,7 +1114,7 @@ static void patternUpButton(void)
 
 static void patternDownButton(void)
 {
-	int16_t val = song->header.order[song->currOrder];
+	int16_t val = song->header.patternTable[song->currPos];
 
 	if (mouse.rightButtonPressed)
 		val -= 10;
@@ -1123,7 +1124,7 @@ static void patternDownButton(void)
 	if (val < 0)
 		val = 0;
 
-	song->header.order[song->currOrder] = (uint8_t)val;
+	song->header.patternTable[song->currPos] = (uint8_t)val;
 
 	if (ui.posEdScreenShown)
 		ui.updatePosEd = true;
@@ -1133,7 +1134,7 @@ static void patternDownButton(void)
 
 static void positionUpButton(void)
 {
-	int16_t val = song->currOrder;
+	int16_t val = song->currPos;
 
 	if (mouse.rightButtonPressed)
 		val += 10;
@@ -1148,7 +1149,7 @@ static void positionUpButton(void)
 
 static void positionDownButton(void)
 {
-	int16_t val = song->currOrder;
+	int16_t val = song->currPos;
 
 	if (mouse.rightButtonPressed)
 		val -= 10;
@@ -1167,7 +1168,7 @@ static void handleSamplerVolumeBox(void)
 	{
 		if (ui.editTextFlag)
 		{
-			exitGetTextLine(EDIT_TEXT_NO_UPDATE);
+			leaveTextEditMode(EDIT_TEXT_NO_UPDATE);
 		}
 		else
 		{
@@ -1245,24 +1246,26 @@ static void handleSamplerVolumeBox(void)
 			// FROM NUM
 			if (mouse.y >= 154 && mouse.y <= 164)
 			{
-				ui.tmpDisp16 = editor.vol1;
-				editor.vol1Disp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 3;
-				ui.editTextPos = 6342; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_VOL_FROM_NUM);
+				textEdit.tmpDisp16 = editor.vol1;
+				editor.vol1Disp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 3;
+				textEdit.cursorStartX = 176;
+				textEdit.cursorStartY = 162;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_SA_VOL_FROM_NUM);
 				return;
 			}
 
 			// TO NUM
 			else if (mouse.y >= 165 && mouse.y <= 175)
 			{
-				ui.tmpDisp16 = editor.vol2;
-				editor.vol2Disp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 3;
-				ui.editTextPos = 6782; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_VOL_TO_NUM);
+				textEdit.tmpDisp16 = editor.vol2;
+				editor.vol2Disp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 3;
+				textEdit.cursorStartX = 176;
+				textEdit.cursorStartY = 173;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_SA_VOL_TO_NUM);
 				return;
 			}
 		}
@@ -1559,7 +1562,7 @@ static void handleSamplerFiltersBox(void)
 {
 	if (mouse.rightButtonPressed && ui.editTextFlag)
 	{
-		exitGetTextLine(EDIT_TEXT_NO_UPDATE);
+		leaveTextEditMode(EDIT_TEXT_NO_UPDATE);
 		return;
 	}
 
@@ -1660,12 +1663,13 @@ static void handleSamplerFiltersBox(void)
 			}
 			else
 			{
-				ui.tmpDisp16 = editor.lpCutOff;
-				editor.lpCutOffDisp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 4;
-				ui.editTextPos = 6341; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_FIL_LP_CUTOFF);
+				textEdit.tmpDisp16 = editor.lpCutOff;
+				editor.lpCutOffDisp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 4;
+				textEdit.cursorStartX = 168;
+				textEdit.cursorStartY = 162;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_SA_FIL_LP_CUTOFF);
 			}
 
 			return;
@@ -1741,12 +1745,13 @@ static void handleSamplerFiltersBox(void)
 			}
 			else
 			{
-				ui.tmpDisp16 = editor.hpCutOff;
-				editor.hpCutOffDisp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 4;
-				ui.editTextPos = 6781; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_SA_FIL_HP_CUTOFF);
+				textEdit.tmpDisp16 = editor.hpCutOff;
+				editor.hpCutOffDisp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 4;
+				textEdit.cursorStartX = 168;
+				textEdit.cursorStartY = 173;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_SA_FIL_HP_CUTOFF);
 			}
 
 			return;
@@ -1879,92 +1884,6 @@ static int32_t checkGUIButtons(void)
 	return -1;
 }
 
-static void handleTextEditing(uint8_t mouseButton)
-{
-	// handle mouse while editing text/numbers
-
-	if (!ui.editTextFlag)
-		return;
-
-	if (ui.editTextType != TEXT_EDIT_STRING)
-	{
-		if (mouseButton == SDL_BUTTON_RIGHT)
-			exitGetTextLine(EDIT_TEXT_NO_UPDATE);
-	}
-	else if (mouseButton == SDL_BUTTON_LEFT && !editor.mixFlag)
-	{
-		int32_t tmp32 = mouse.y - ui.lineCurY;
-		if (tmp32 <= 2 && tmp32 >= -9)
-		{
-			tmp32 = (int32_t)((mouse.x - ui.lineCurX) + 4) >> 3;
-			while (tmp32 != 0) // 0 = pos we want
-			{
-				if (tmp32 > 0)
-				{
-					if (ui.editPos < ui.textEndPtr && *ui.editPos != '\0')
-					{
-						ui.editPos++;
-						textMarkerMoveRight();
-					}
-					tmp32--;
-				}
-				else if (tmp32 < 0)
-				{
-					if (ui.editPos > ui.dstPtr)
-					{
-						ui.editPos--;
-						textMarkerMoveLeft();
-					}
-					tmp32++;
-				}
-			}
-		}
-		else
-		{
-			exitGetTextLine(EDIT_TEXT_UPDATE);
-		}
-	}
-	else if (mouseButton == SDL_BUTTON_RIGHT)
-	{
-		if (editor.mixFlag)
-		{
-			exitGetTextLine(EDIT_TEXT_UPDATE);
-			editor.mixFlag = false;
-			ui.updateMixText = true;
-		}
-		else
-		{
-			char *tmpRead = ui.dstPtr;
-			while (tmpRead < ui.textEndPtr)
-				*tmpRead++ = '\0';
-
-			*ui.textEndPtr = '\0';
-
-			// don't exit text edit mode if the disk op. path was about to be deleted
-			if (ui.editObject == PTB_DO_DATAPATH)
-			{
-				// move text cursor to pos 0
-				while (ui.editPos > ui.dstPtr)
-				{
-					ui.editPos--;
-					textMarkerMoveLeft();
-				}
-
-				ui.updateDiskOpPathText = true;
-			}
-			else
-			{
-				if (ui.editObject == PTB_SONGNAME)
-					ui.updateSongName = true;
-				else if (ui.editObject == PTB_SAMPLENAME)
-					ui.updateCurrSampleName = true;
-
-				exitGetTextLine(EDIT_TEXT_UPDATE);
-			}
-		}
-	}
-}
-
 void mouseWheelUpHandler(void)
 {
 	if (ui.editTextFlag || ui.askBoxShown || editor.swapChannelFlag ||
@@ -1982,9 +1901,9 @@ void mouseWheelUpHandler(void)
 				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (ui.posEdScreenShown && song->currOrder > 0)
+		else if (ui.posEdScreenShown && song->currPos > 0)
 		{
-			modSetPos(song->currOrder - 1, DONT_SET_ROW);
+			modSetPos(song->currPos - 1, DONT_SET_ROW);
 		}
 	}
 	else if (ui.samplerScreenShown) // lower part of screen
@@ -2014,9 +1933,9 @@ void mouseWheelDownHandler(void)
 				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (ui.posEdScreenShown && song->currOrder < song->header.numOrders-1)
+		else if (ui.posEdScreenShown && song->currPos < song->header.songLength-1)
 		{
-			modSetPos(song->currOrder + 1, DONT_SET_ROW);
+			modSetPos(song->currPos + 1, DONT_SET_ROW);
 		}
 	}
 	else if (ui.samplerScreenShown) // lower part of screen
@@ -2182,7 +2101,7 @@ void updateMouseCounters(void)
 
 static bool handleGUIButtons(int32_t button) // are you prepared to enter the jungle?
 {
-	ui.force32BitNumPtr = false;
+	textEdit.force32BitNumPtr = false;
 
 	switch (button)
 	{
@@ -2283,58 +2202,63 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_EO_QUANTIZE:
 		{
-			ui.tmpDisp16 = config.quantizeValue;
-			editor.quantizeValueDisp = &ui.tmpDisp16;
-			ui.numPtr16 = &ui.tmpDisp16;
-			ui.numLen = 2;
-			ui.editTextPos = 2824; // (y * 40) + x
-			getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_QUANTIZE);
+			textEdit.tmpDisp16 = config.quantizeValue;
+			editor.quantizeValueDisp = &textEdit.tmpDisp16;
+			textEdit.numPtr16 = &textEdit.tmpDisp16;
+			textEdit.numDigits = 2;
+			textEdit.cursorStartX = 192;
+			textEdit.cursorStartY = 74;
+			enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_EO_QUANTIZE);
 		}
 		break;
 
 		case PTB_EO_METRO_1: // metronome speed
 		{
-			ui.tmpDisp16 = editor.metroSpeed;
-			editor.metroSpeedDisp = &ui.tmpDisp16;
-			ui.numPtr16 = &ui.tmpDisp16;
-			ui.numLen = 2;
-			ui.editTextPos = 3261; // (y * 40) + x
-			getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_METRO_1);
+			textEdit.tmpDisp16 = editor.metroSpeed;
+			editor.metroSpeedDisp = &textEdit.tmpDisp16;
+			textEdit.numPtr16 = &textEdit.tmpDisp16;
+			textEdit.numDigits = 2;
+			textEdit.cursorStartX = 168;
+			textEdit.cursorStartY = 85;
+			enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_EO_METRO_1);
 		}
 		break;
 
 		case PTB_EO_METRO_2: // metronome channel
 		{
-			ui.tmpDisp16 = editor.metroChannel;
-			editor.metroChannelDisp = &ui.tmpDisp16;
-			ui.numPtr16 = &ui.tmpDisp16;
-			ui.numLen = 2;
-			ui.editTextPos = 3264; // (y * 40) + x
-			getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_METRO_2);
+			textEdit.tmpDisp16 = editor.metroChannel;
+			editor.metroChannelDisp = &textEdit.tmpDisp16;
+			textEdit.numPtr16 = &textEdit.tmpDisp16;
+			textEdit.numDigits = 2;
+			textEdit.cursorStartX = 192;
+			textEdit.cursorStartY = 85;
+			enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_EO_METRO_2);
 		}
 		break;
 
 		case PTB_EO_FROM_NUM:
 		{
-			ui.tmpDisp8 = editor.sampleFrom;
-			editor.sampleFromDisp = &ui.tmpDisp8;
-			ui.numPtr8 = &ui.tmpDisp8;
-			ui.numLen = 2;
-			ui.numBits = 8;
-			ui.editTextPos = 3273; // (y * 40) + x
-			getNumLine(TEXT_EDIT_HEX, PTB_EO_FROM_NUM);
+			textEdit.tmpDisp8 = editor.sampleFrom;
+			editor.sampleFromDisp = &textEdit.tmpDisp8;
+			textEdit.numPtr8 = &textEdit.tmpDisp8;
+			textEdit.numDigits = 2;
+			textEdit.numBits = 8;
+			textEdit.cursorStartX = 264;
+			textEdit.cursorStartY = 85;
+			enterNumberEditMode(TEXT_EDIT_HEX, PTB_EO_FROM_NUM);
 		}
 		break;
 
 		case PTB_EO_TO_NUM:
 		{
-			ui.tmpDisp8 = editor.sampleTo;
-			editor.sampleToDisp = &ui.tmpDisp8;
-			ui.numPtr8 = &ui.tmpDisp8;
-			ui.numLen = 2;
-			ui.numBits = 8;
-			ui.editTextPos = 3713; // (y * 40) + x
-			getNumLine(TEXT_EDIT_HEX, PTB_EO_TO_NUM);
+			textEdit.tmpDisp8 = editor.sampleTo;
+			editor.sampleToDisp = &textEdit.tmpDisp8;
+			textEdit.numPtr8 = &textEdit.tmpDisp8;
+			textEdit.numDigits = 2;
+			textEdit.numBits = 8;
+			textEdit.cursorStartX = 264;
+			textEdit.cursorStartY = 96;
+			enterNumberEditMode(TEXT_EDIT_HEX, PTB_EO_TO_NUM);
 		}
 		break;
 
@@ -2394,14 +2318,15 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (!mouse.rightButtonPressed)
 			{
 				editor.mixFlag = true;
-				ui.showTextPtr = editor.mixText;
-				ui.textEndPtr = editor.mixText + 15;
-				ui.textLength = 16;
-				ui.editTextPos = 1936; // (y * 40) + x
-				ui.dstOffset = NULL;
-				ui.dstOffsetEnd = false;
 				ui.updateMixText = true;
-				getTextLine(PTB_EO_MIX);
+
+				textEdit.textStartPtr = editor.mixText;
+				textEdit.textEndPtr = editor.mixText + 15;
+				textEdit.numBlocks = 16;
+				textEdit.cursorStartX = 128;
+				textEdit.cursorStartY = 52;
+				textEdit.scrollable = false;
+				enterTextEditMode(PTB_EO_MIX);
 			}
 			else
 			{
@@ -2569,26 +2494,28 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.force32BitNumPtr = true;
+				textEdit.force32BitNumPtr = true;
 
-				ui.tmpDisp32 = editor.samplePos;
-				editor.samplePosDisp = &ui.tmpDisp32;
-				ui.numPtr32 = &ui.tmpDisp32;
+				textEdit.tmpDisp32 = editor.samplePos;
+				editor.samplePosDisp = &textEdit.tmpDisp32;
+				textEdit.numPtr32 = &textEdit.tmpDisp32;
 
 				if (config.maxSampleLength == 65534)
 				{
-					ui.numLen = 4;
-					ui.numBits = 16;
-					ui.editTextPos = 2391; // (y * 40) + x
+					textEdit.numDigits = 4;
+					textEdit.numBits = 16;
+					textEdit.cursorStartX = 248;
+					textEdit.cursorStartY = 63;
 				}
 				else
 				{
-					ui.numLen = 5;
-					ui.numBits = 17;
-					ui.editTextPos = 2390; // (y * 40) + x
+					textEdit.numDigits = 5;
+					textEdit.numBits = 17;
+					textEdit.cursorStartX = 240;
+					textEdit.cursorStartY = 63;
 				}
 
-				getNumLine(TEXT_EDIT_HEX, PTB_EO_POS_NUM);
+				enterNumberEditMode(TEXT_EDIT_HEX, PTB_EO_POS_NUM);
 			}
 		}
 		break;
@@ -2990,12 +2917,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.tmpDisp16 = editor.sampleVol;
-				editor.sampleVolDisp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 3;
-				ui.editTextPos = 3711; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_EO_VOL_NUM);
+				textEdit.tmpDisp16 = editor.sampleVol;
+				editor.sampleVolDisp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 3;
+				textEdit.cursorStartX = 248;
+				textEdit.cursorStartY = 96;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_EO_VOL_NUM);
 			}
 		}
 		break;
@@ -3099,45 +3027,48 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT)
 			{
-				ui.tmpDisp16 = song->currOrder;
-				if (ui.tmpDisp16 > song->header.numOrders-1)
-					ui.tmpDisp16 = song->header.numOrders-1;
+				textEdit.tmpDisp16 = song->currPos;
+				if (textEdit.tmpDisp16 > song->header.songLength-1)
+					textEdit.tmpDisp16 = song->header.songLength-1;
 
-				ui.tmpDisp16 = song->header.order[ui.tmpDisp16];
-				editor.currPosEdPattDisp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 2;
-				ui.editTextPos = 2180; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_PE_PATT);
+				textEdit.tmpDisp16 = song->header.patternTable[textEdit.tmpDisp16];
+				editor.currPosEdPattDisp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 2;
+				textEdit.cursorStartX = 160;
+				textEdit.cursorStartY = 58;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_PE_PATT);
 			}
 		}
 		break;
 
+		case PTB_PE_PATTNAME: posEdEditName(); break;
+
 		case PTB_PE_SCROLLTOP:
 		{
-			if (song->currOrder != 0)
+			if (song->currPos != 0)
 				modSetPos(0, DONT_SET_ROW);
 		}
 		break;
 
 		case PTB_PE_SCROLLUP:
 		{
-			if (song->currOrder > 0)
-				modSetPos(song->currOrder - 1, DONT_SET_ROW);
+			if (song->currPos > 0)
+				modSetPos(song->currPos - 1, DONT_SET_ROW);
 		}
 		break;
 
 		case PTB_PE_SCROLLDOWN:
 		{
-			if (song->currOrder < song->header.numOrders-1)
-				modSetPos(song->currOrder + 1, DONT_SET_ROW);
+			if (song->currPos < song->header.songLength-1)
+				modSetPos(song->currPos + 1, DONT_SET_ROW);
 		}
 		break;
 
 		case PTB_PE_SCROLLBOT:
 		{
-			if (song->currOrder != song->header.numOrders-1)
-				modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
+			if (song->currPos != song->header.songLength-1)
+				modSetPos(song->header.songLength - 1, DONT_SET_ROW);
 		}
 		break;
 
@@ -3151,18 +3082,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_POS:
 		case PTB_POSED:
-		{
-			ui.posEdScreenShown ^= 1;
-			if (ui.posEdScreenShown)
-			{
-				renderPosEdScreen();
-				ui.updatePosEd = true;
-			}
-			else
-			{
-				displayMainScreen();
-			}
-		}
+			posEdToggle();
 		break;
 
 		case PTB_POSS:
@@ -3171,20 +3091,21 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				if (mouse.rightButtonPressed)
 				{
-					song->currOrder = 0;
-					editor.currPatternDisp = &song->header.order[song->currOrder];
+					song->currPos = 0;
+					editor.currPatternDisp = &song->header.patternTable[song->currPos];
 
 					if (ui.posEdScreenShown)
 						ui.updatePosEd = true;
 				}
 				else
 				{
-					ui.tmpDisp16 = song->currOrder;
-					editor.currPosDisp = &ui.tmpDisp16;
-					ui.numPtr16 = &ui.tmpDisp16;
-					ui.numLen = 3;
-					ui.editTextPos = 169; // (y * 40) + x
-					getNumLine(TEXT_EDIT_DECIMAL, PTB_POSS);
+					textEdit.tmpDisp16 = song->currPos;
+					editor.currPosDisp = &textEdit.tmpDisp16;
+					textEdit.numPtr16 = &textEdit.tmpDisp16;
+					textEdit.numDigits = 3;
+					textEdit.cursorStartX = 72;
+					textEdit.cursorStartY = 8;
+					enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_POSS);
 				}
 			}
 		}
@@ -3196,7 +3117,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				if (mouse.rightButtonPressed)
 				{
-					song->header.order[song->currOrder] = 0;
+					song->header.patternTable[song->currPos] = 0;
 
 					ui.updateSongSize = true;
 					updateWindowTitle(MOD_IS_MODIFIED);
@@ -3206,12 +3127,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				}
 				else
 				{
-					ui.tmpDisp16 = song->header.order[song->currOrder];
-					editor.currPatternDisp = &ui.tmpDisp16;
-					ui.numPtr16 = &ui.tmpDisp16;
-					ui.numLen = 2;
-					ui.editTextPos = 610; // (y * 40) + x
-					getNumLine(TEXT_EDIT_DECIMAL, PTB_PATTERNS);
+					textEdit.tmpDisp16 = song->header.patternTable[song->currPos];
+					editor.currPatternDisp = &textEdit.tmpDisp16;
+					textEdit.numPtr16 = &textEdit.tmpDisp16;
+					textEdit.numDigits = 2;
+					textEdit.cursorStartX = 80;
+					textEdit.cursorStartY = 19;
+					enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_PATTERNS);
 				}
 			}
 		}
@@ -3223,13 +3145,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			{
 				if (mouse.rightButtonPressed)
 				{
-					song->header.numOrders = 1;
+					song->header.songLength = 1;
 
-					int16_t tmp16 = song->currOrder;
-					if (tmp16 > song->header.numOrders-1)
-						tmp16 = song->header.numOrders-1;
+					int16_t tmp16 = song->currPos;
+					if (tmp16 > song->header.songLength-1)
+						tmp16 = song->header.songLength-1;
 
-					editor.currPosEdPattDisp = &song->header.order[tmp16];
+					editor.currPosEdPattDisp = &song->header.patternTable[tmp16];
 
 					ui.updateSongSize = true;
 					updateWindowTitle(MOD_IS_MODIFIED);
@@ -3239,12 +3161,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				}
 				else
 				{
-					ui.tmpDisp16 = song->header.numOrders;
-					editor.currLengthDisp = &ui.tmpDisp16;
-					ui.numPtr16 = &ui.tmpDisp16;
-					ui.numLen = 3;
-					ui.editTextPos = 1049; // (y * 40) + x
-					getNumLine(TEXT_EDIT_DECIMAL, PTB_LENGTHS);
+					textEdit.tmpDisp16 = song->header.songLength;
+					editor.currLengthDisp = &textEdit.tmpDisp16;
+					textEdit.numPtr16 = &textEdit.tmpDisp16;
+					textEdit.numDigits = 3;
+					textEdit.cursorStartX = 72;
+					textEdit.cursorStartY = 30;
+					enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_LENGTHS);
 				}
 			}
 		}
@@ -3255,12 +3178,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			if (!ui.introTextShown && (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT || editor.playMode != PLAY_MODE_NORMAL))
 			{
-				ui.tmpDisp16 = song->currPattern;
-				editor.currEditPatternDisp = &ui.tmpDisp16;
-				ui.numPtr16 = &ui.tmpDisp16;
-				ui.numLen = 2;
-				ui.editTextPos = 5121; // (y * 40) + x
-				getNumLine(TEXT_EDIT_DECIMAL, PTB_PATTDATA);
+				textEdit.tmpDisp16 = song->currPattern;
+				editor.currEditPatternDisp = &textEdit.tmpDisp16;
+				textEdit.numPtr16 = &textEdit.tmpDisp16;
+				textEdit.numDigits = 2;
+				textEdit.cursorStartX = 8;
+				textEdit.cursorStartY = 132;
+				enterNumberEditMode(TEXT_EDIT_DECIMAL, PTB_PATTDATA);
 			}
 		}
 		break;
@@ -3273,13 +3197,14 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				ui.updateCurrSampleNum = true;
 			}
 
-			ui.tmpDisp8 = editor.currSample;
-			editor.currSampleDisp = &ui.tmpDisp8;
-			ui.numPtr8 = &ui.tmpDisp8;
-			ui.numLen = 2;
-			ui.numBits = 8;
-			ui.editTextPos = 1930; // (y * 40) + x
-			getNumLine(TEXT_EDIT_HEX, PTB_SAMPLES);
+			textEdit.tmpDisp8 = editor.currSample;
+			editor.currSampleDisp = &textEdit.tmpDisp8;
+			textEdit.numPtr8 = &textEdit.tmpDisp8;
+			textEdit.numDigits = 2;
+			textEdit.numBits = 8;
+			textEdit.cursorStartX = 80;
+			textEdit.cursorStartY = 52;
+			enterNumberEditMode(TEXT_EDIT_HEX, PTB_SAMPLES);
 		}
 		break;
 
@@ -3297,13 +3222,14 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.tmpDisp8 = song->samples[editor.currSample].volume;
-				song->samples[editor.currSample].volumeDisp = &ui.tmpDisp8;
-				ui.numPtr8 = &ui.tmpDisp8;
-				ui.numLen = 2;
-				ui.numBits = 8;
-				ui.editTextPos = 2370; // (y * 40) + x
-				getNumLine(TEXT_EDIT_HEX, PTB_SVOLUMES);
+				textEdit.tmpDisp8 = song->samples[editor.currSample].volume;
+				song->samples[editor.currSample].volumeDisp = &textEdit.tmpDisp8;
+				textEdit.numPtr8 = &textEdit.tmpDisp8;
+				textEdit.numDigits = 2;
+				textEdit.numBits = 8;
+				textEdit.cursorStartX = 80;
+				textEdit.cursorStartY = 63;
+				enterNumberEditMode(TEXT_EDIT_HEX, PTB_SVOLUMES);
 			}
 		}
 		break;
@@ -3343,26 +3269,28 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.force32BitNumPtr = true;
+				textEdit.force32BitNumPtr = true;
 
-				ui.tmpDisp32 = song->samples[editor.currSample].length;
-				song->samples[editor.currSample].lengthDisp = &ui.tmpDisp32;
-				ui.numPtr32 = &ui.tmpDisp32;
+				textEdit.tmpDisp32 = song->samples[editor.currSample].length;
+				song->samples[editor.currSample].lengthDisp = &textEdit.tmpDisp32;
+				textEdit.numPtr32 = &textEdit.tmpDisp32;
 
 				if (config.maxSampleLength == 65534)
 				{
-					ui.numLen = 4;
-					ui.numBits = 16;
-					ui.editTextPos = 2808; // (y * 40) + x
+					textEdit.numDigits = 4;
+					textEdit.numBits = 16;
+					textEdit.cursorStartX = 64;
+					textEdit.cursorStartY = 74;
 				}
 				else
 				{
-					ui.numLen = 5;
-					ui.numBits = 17;
-					ui.editTextPos = 2807; // (y * 40) + x
+					textEdit.numDigits = 5;
+					textEdit.numBits = 17;
+					textEdit.cursorStartX = 56;
+					textEdit.cursorStartY = 74;
 				}
 
-				getNumLine(TEXT_EDIT_HEX, PTB_SLENGTHS);
+				enterNumberEditMode(TEXT_EDIT_HEX, PTB_SLENGTHS);
 			}
 		}
 		break;
@@ -3405,26 +3333,28 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.force32BitNumPtr = true;
+				textEdit.force32BitNumPtr = true;
 
-				ui.tmpDisp32 = song->samples[editor.currSample].loopStart;
-				song->samples[editor.currSample].loopStartDisp = &ui.tmpDisp32;
-				ui.numPtr32 = &ui.tmpDisp32;
+				textEdit.tmpDisp32 = song->samples[editor.currSample].loopStart;
+				song->samples[editor.currSample].loopStartDisp = &textEdit.tmpDisp32;
+				textEdit.numPtr32 = &textEdit.tmpDisp32;
 
 				if (config.maxSampleLength == 65534)
 				{
-					ui.numLen = 4;
-					ui.numBits = 16;
-					ui.editTextPos = 3248; // (y * 40) + x
+					textEdit.numDigits = 4;
+					textEdit.numBits = 16;
+					textEdit.cursorStartX = 64;
+					textEdit.cursorStartY = 85;
 				}
 				else
 				{
-					ui.numLen = 5;
-					ui.numBits = 17;
-					ui.editTextPos = 3247; // (y * 40) + x
+					textEdit.numDigits = 5;
+					textEdit.numBits = 17;
+					textEdit.cursorStartX = 56;
+					textEdit.cursorStartY = 85;
 				}
 
-				getNumLine(TEXT_EDIT_HEX, PTB_SREPEATS);
+				enterNumberEditMode(TEXT_EDIT_HEX, PTB_SREPEATS);
 			}
 		}
 		break;
@@ -3470,26 +3400,28 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.force32BitNumPtr = true;
+				textEdit.force32BitNumPtr = true;
 
-				ui.tmpDisp32 = song->samples[editor.currSample].loopLength;
-				song->samples[editor.currSample].loopLengthDisp = &ui.tmpDisp32;
-				ui.numPtr32 = &ui.tmpDisp32;
+				textEdit.tmpDisp32 = song->samples[editor.currSample].loopLength;
+				song->samples[editor.currSample].loopLengthDisp = &textEdit.tmpDisp32;
+				textEdit.numPtr32 = &textEdit.tmpDisp32;
 
 				if (config.maxSampleLength == 0xFFFE)
 				{
-					ui.numLen = 4;
-					ui.numBits = 16;
-					ui.editTextPos = 3688; // (y * 40) + x
+					textEdit.numDigits = 4;
+					textEdit.numBits = 16;
+					textEdit.cursorStartX = 64;
+					textEdit.cursorStartY = 96;
 				}
 				else
 				{
-					ui.numLen = 5;
-					ui.numBits = 17;
-					ui.editTextPos = 3687; // (y * 40) + x
+					textEdit.numDigits = 5;
+					textEdit.numBits = 17;
+					textEdit.cursorStartX = 56;
+					textEdit.cursorStartY = 96;
 				}
 
-				getNumLine(TEXT_EDIT_HEX, PTB_SREPLENS);
+				enterNumberEditMode(TEXT_EDIT_HEX, PTB_SREPLENS);
 			}
 		}
 		break;
@@ -3726,53 +3658,8 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_SA_TUNETONE: toggleTuningTone(); break;
 
-		case PTB_POSINS:
-		{
-			if ((editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT) && song->header.numOrders < 128)
-			{
-				for (int32_t i = 0; i < 127-song->currOrder; i++)
-					song->header.order[127-i] = song->header.order[(127-i)-1];
-				song->header.order[song->currOrder] = 0;
-
-				song->header.numOrders++;
-				if (song->currOrder > song->header.numOrders-1)
-					editor.currPosEdPattDisp = &song->header.order[song->header.numOrders-1];
-
-				updateWindowTitle(MOD_IS_MODIFIED);
-
-				ui.updateSongSize = true;
-				ui.updateSongLength = true;
-				ui.updateSongPattern = true;
-
-				if (ui.posEdScreenShown)
-					ui.updatePosEd = true;
-			}
-		}
-		break;
-
-		case PTB_POSDEL:
-		{
-			if ((editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT) && song->header.numOrders > 1)
-			{
-				for (int32_t i = 0; i < 128-song->currOrder; i++)
-					song->header.order[song->currOrder+i] = song->header.order[song->currOrder+i+1];
-				song->header.order[127] = 0;
-
-				song->header.numOrders--;
-				if (song->currOrder > song->header.numOrders-1)
-					editor.currPosEdPattDisp = &song->header.order[song->header.numOrders-1];
-
-				updateWindowTitle(MOD_IS_MODIFIED);
-
-				ui.updateSongSize = true;
-				ui.updateSongLength = true;
-				ui.updateSongPattern = true;
-
-				if (ui.posEdScreenShown)
-					ui.updatePosEd = true;
-			}
-		}
-		break;
+		case PTB_POSINS: posEdInsert(); break;
+		case PTB_POSDEL: posEdDelete(); break;
 
 		case PTB_DO_SAVEMODULE:
 		{
@@ -3807,13 +3694,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				ui.updateDiskOpPathText = true;
 			}
 
-			ui.showTextPtr = editor.currPath;
-			ui.textEndPtr = &editor.currPath[PATH_MAX - 1];
-			ui.textLength = 26;
-			ui.editTextPos = 1043; // (y * 40) + x
-			ui.dstOffset = &ui.diskOpPathTextOffset;
-			ui.dstOffsetEnd = false;
-			getTextLine(PTB_DO_DATAPATH);
+			textEdit.textStartPtr = editor.currPath;
+			textEdit.textEndPtr = &editor.currPath[PATH_MAX - 1];
+			textEdit.numBlocks = 26;
+			textEdit.cursorStartX = 24;
+			textEdit.cursorStartY = 30;
+			textEdit.scrollable = true;
+			enterTextEditMode(PTB_DO_DATAPATH);
 		}
 		break;
 
@@ -3827,13 +3714,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.showTextPtr = song->header.name;
-				ui.textEndPtr = song->header.name + 19;
-				ui.textLength = 20;
-				ui.editTextPos = 4133; // (y * 40) + x
-				ui.dstOffset = NULL;
-				ui.dstOffsetEnd = false;
-				getTextLine(PTB_SONGNAME);
+				textEdit.textStartPtr = song->header.name;
+				textEdit.textEndPtr = song->header.name + 19;
+				textEdit.numBlocks = 20;
+				textEdit.cursorStartX = 104;
+				textEdit.cursorStartY = 107;
+				textEdit.scrollable = false;
+				enterTextEditMode(PTB_SONGNAME);
 			}
 		}
 		break;
@@ -3848,13 +3735,13 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			}
 			else
 			{
-				ui.showTextPtr = song->samples[editor.currSample].text;
-				ui.textEndPtr = song->samples[editor.currSample].text + 21;
-				ui.textLength = 22;
-				ui.editTextPos = 4573; // (y * 40) + x
-				ui.dstOffset = NULL;
-				ui.dstOffsetEnd = false;
-				getTextLine(PTB_SAMPLENAME);
+				textEdit.textStartPtr = song->samples[editor.currSample].text;
+				textEdit.textEndPtr = song->samples[editor.currSample].text + 21;
+				textEdit.numBlocks = 22;
+				textEdit.cursorStartX = 104;
+				textEdit.cursorStartY = 118;
+				textEdit.scrollable = false;
+				enterTextEditMode(PTB_SAMPLENAME);
 			}
 		}
 		break;
@@ -4043,9 +3930,9 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			editor.playMode = PLAY_MODE_NORMAL;
 
 			if (mouse.rightButtonPressed)
-				modPlay(DONT_SET_PATTERN, song->currOrder, song->currRow);
+				modPlay(DONT_SET_PATTERN, song->currPos, song->currRow);
 			else
-				modPlay(DONT_SET_PATTERN, song->currOrder, DONT_SET_ROW);
+				modPlay(DONT_SET_PATTERN, song->currPos, DONT_SET_ROW);
 
 			editor.currMode = MODE_PLAY;
 			pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -4125,6 +4012,14 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			editor.currMode = MODE_IDLE;
 			pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
 			statusAllRight();
+
+			// hide edit op. and about screen, and redraw visualizer
+
+			ui.editOpScreenShown = false;
+			ui.aboutScreenShown = false;
+
+			     if (ui.visualizerMode == VISUAL_QUADRASCOPE) renderQuadrascopeBg();
+			else if (ui.visualizerMode == VISUAL_SPECTRUM) renderSpectrumAnalyzerBg();
 
 			updateWindowTitle(MOD_IS_MODIFIED);
 		}
@@ -4271,7 +4166,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_LENGTHU:
 		{
-			if (song->header.numOrders < 128)
+			if (song->header.songLength < 128)
 			{
 				songLengthUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4281,7 +4176,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_LENGTHD:
 		{
-			if (song->header.numOrders > 1)
+			if (song->header.songLength > 1)
 			{
 				songLengthDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4291,7 +4186,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PATTERNU:
 		{
-			if (song->header.order[song->currOrder] < 99)
+			if (song->header.patternTable[song->currPos] < 99)
 			{
 				patternUpButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4301,7 +4196,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 
 		case PTB_PATTERND:
 		{
-			if (song->header.order[song->currOrder] > 0)
+			if (song->header.patternTable[song->currPos] > 0)
 			{
 				patternDownButton();
 				updateWindowTitle(MOD_IS_MODIFIED);
@@ -4731,8 +4626,8 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 2)
 			{
 				mouse.repeatCounter = 0;
-				if (song->currOrder > 0)
-					modSetPos(song->currOrder - 1, DONT_SET_ROW);
+				if (song->currPos > 0)
+					modSetPos(song->currPos - 1, DONT_SET_ROW);
 			}
 		}
 		break;
@@ -4742,8 +4637,8 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 2)
 			{
 				mouse.repeatCounter = 0;
-				if (song->currOrder < song->header.numOrders-1)
-					modSetPos(song->currOrder + 1, DONT_SET_ROW);
+				if (song->currPos < song->header.songLength-1)
+					modSetPos(song->currPos + 1, DONT_SET_ROW);
 			}
 		}
 		break;

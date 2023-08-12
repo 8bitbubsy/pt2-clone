@@ -290,22 +290,55 @@ void handleEntryJumping(SDL_Keycode jumpToChar) // SHIFT+character
 {
 	if (diskOpEntry != NULL)
 	{
-		for (int32_t i = 0; i < diskop.numEntries; i++)
+		fileEntry_t *f;
+		
+		// if last jump key was the same, go to next page of matching character
+		if (diskop.numEntries > DISKOP_LINES && diskop.lastEntryJumpKey == jumpToChar)
 		{
-			if (jumpToChar == diskOpEntry[i].firstAnsiChar)
+			for (int32_t i = 0; i < DISKOP_LINES; i++)
 			{
-				// fix visual overrun
-				if (diskop.numEntries > DISKOP_LINES && i > diskop.numEntries-DISKOP_LINES)
-					i = diskop.numEntries - DISKOP_LINES;
+				int32_t offset = diskop.scrollOffset+DISKOP_LINES;
+				if (offset > diskop.numEntries-DISKOP_LINES)
+					offset = diskop.numEntries-DISKOP_LINES;
 
-				diskop.scrollOffset = i;
-				ui.updateDiskOpFileList = true;
+				f = &diskOpEntry[offset];
+
+				if (!f->isDir && f->firstAnsiChar == jumpToChar)
+				{
+					diskop.scrollOffset += DISKOP_LINES;
+					if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
+						diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
+
+					ui.updateDiskOpFileList = true;
+					return;
+				}
+			}
+		}
+
+		diskop.lastEntryJumpKey = jumpToChar;
+
+		// jump to first match from the beginning of file list
+
+		f = diskOpEntry;
+		for (int32_t i = 0; i < diskop.numEntries; i++, f++)
+		{
+			if (!f->isDir && f->firstAnsiChar == jumpToChar)
+			{
+				if (diskop.numEntries > DISKOP_LINES)
+				{
+					diskop.scrollOffset = i;
+					if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
+						diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
+
+					ui.updateDiskOpFileList = true;
+				}
+
 				return;
 			}
 		}
 	}
 
-	// character not found in file list, show red mouse pointer (error)!
+	// character not found in file list, show red mouse pointer (error)
 	editor.errorMsgActive = true;
 	editor.errorMsgBlock = true;
 	editor.errorMsgCounter = 0;
@@ -423,6 +456,8 @@ bool diskOpSetPath(UNICHAR *path, bool cache)
 			ui.updateDiskOpFileList = true;
 
 		diskop.scrollOffset = 0;
+		diskop.lastEntryJumpKey = SDLK_UNKNOWN;
+
 		return true;
 	}
 	else
@@ -562,6 +597,7 @@ static bool diskOpFillBuffer(void)
 	fileEntry_t tmpBuffer;
 
 	diskop.scrollOffset = 0;
+	diskop.lastEntryJumpKey = SDLK_UNKNOWN;
 
 	// do we have a path set?
 	if (editor.currPathU[0] == '\0')
@@ -917,11 +953,17 @@ void updateDiskOp(void)
 		// print disk op. path
 		for (int32_t i = 0; i < 26; i++)
 		{
-			char tmpChar = editor.currPath[ui.diskOpPathTextOffset+i];
-			if (tmpChar == '\0')
-				tmpChar = '_';
+			char ch;
+			
+			if (ui.editTextFlag)
+				ch = editor.currPath[textEdit.scrollOffset + i];
+			else
+				ch = editor.currPath[i];
 
-			charOutBg(24 + (i * FONT_CHAR_W), 25, tmpChar, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+			if (ch == '\0')
+				ch = '_';
+
+			charOutBg(24 + (i * FONT_CHAR_W), 25, ch, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
 	}
 }

@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.61"
+#define PROG_VER_STR "1.62"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -55,7 +55,6 @@
 
 #define MOD_ROWS 64
 #define MOD_SAMPLES 31
-#define MOD_ORDERS 128
 #define MAX_PATTERNS 100
 
 #define SCOPE_WIDTH 40
@@ -63,8 +62,6 @@
 #define SPECTRUM_BAR_NUM 23
 #define SPECTRUM_BAR_HEIGHT 36
 #define SPECTRUM_BAR_WIDTH 6
-
-#define POSED_LIST_SIZE 12
 
 // Amount of video frames. 14 (PT on Amiga) -> 17 (converted from 49.92Hz to 60Hz)
 #define KEYB_REPEAT_DELAY 17

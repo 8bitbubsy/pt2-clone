@@ -269,6 +269,7 @@
     <ClInclude Include="..\..\src\pt2_pat2smp.h" />
     <ClInclude Include="..\..\src\pt2_pattern_viewer.h" />
     <ClInclude Include="..\..\src\pt2_paula.h" />
+    <ClInclude Include="..\..\src\pt2_posed.h" />
     <ClInclude Include="..\..\src\pt2_rcfilters.h" />
     <ClInclude Include="..\..\src\pt2_downsample2x.h" />
     <ClInclude Include="..\..\src\pt2_replayer.h" />
@@ -278,6 +279,7 @@
     <ClInclude Include="..\..\src\pt2_sampling.h" />
     <ClInclude Include="..\..\src\pt2_scopes.h" />
     <ClInclude Include="..\..\src\pt2_structs.h" />
+    <ClInclude Include="..\..\src\pt2_textedit.h" />
     <ClInclude Include="..\..\src\pt2_visuals_sync.h" />
     <ClInclude Include="..\..\src\pt2_tables.h" />
     <ClInclude Include="..\..\src\pt2_textout.h" />
@@ -332,6 +334,7 @@
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_module_loader.c" />
     <ClCompile Include="..\..\src\pt2_paula.c" />
+    <ClCompile Include="..\..\src\pt2_posed.c" />
     <ClCompile Include="..\..\src\pt2_rcfilters.c" />
     <ClCompile Include="..\..\src\pt2_replayer.c" />
     <ClCompile Include="..\..\src\pt2_module_saver.c" />
@@ -346,6 +349,7 @@
     <ClCompile Include="..\..\src\pt2_sampling.c" />
     <ClCompile Include="..\..\src\pt2_scopes.c" />
     <ClCompile Include="..\..\src\pt2_structs.c" />
+    <ClCompile Include="..\..\src\pt2_textedit.c" />
     <ClCompile Include="..\..\src\pt2_visuals_sync.c" />
     <ClCompile Include="..\..\src\pt2_tables.c" />
     <ClCompile Include="..\..\src\pt2_textout.c" />

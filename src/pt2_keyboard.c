@@ -27,6 +27,8 @@
 #include "pt2_chordmaker.h"
 #include "pt2_askbox.h"
 #include "pt2_replayer.h"
+#include "pt2_posed.h"
+#include "pt2_textedit.h"
 
 #if defined _WIN32 && !defined _DEBUG
 extern bool windowsKeyIsDown;
@@ -40,13 +42,6 @@ static void movePatCurRight(void);
 static void movePatCurLeft(void);
 
 bool handleTextEditMode(SDL_Scancode scancode);
-
-void gotoNextMulti(void)
-{
-	cursor.channel = (editor.multiModeNext[cursor.channel] - 1) & 3;
-	cursor.pos = cursor.channel * 6;
-	updateCursorPos();
-}
 
 void readKeyModifiers(void)
 {
@@ -106,169 +101,6 @@ LRESULT CALLBACK lowLevelKeyboardProc(int32_t nCode, WPARAM wParam, LPARAM lPara
 	return CallNextHookEx(g_hKeyboardHook, nCode, wParam, lParam);
 }
 #endif
-
-// these four functions are for the text edit cursor
-void textMarkerMoveLeft(void)
-{
-	if (ui.dstPos > 0)
-	{
-		removeTextEditMarker();
-		ui.dstPos--;
-		ui.lineCurX -= FONT_CHAR_W;
-		renderTextEditMarker();
-	}
-	else
-	{
-		if (ui.dstOffset != NULL)
-		{
-			(*ui.dstOffset)--;
-			if (ui.editObject == PTB_DO_DATAPATH)
-				ui.updateDiskOpPathText = true;
-		}
-	}
-}
-
-void textMarkerMoveRight(void)
-{
-	if (ui.editTextType == TEXT_EDIT_STRING)
-	{
-		if (ui.dstPos < ui.textLength-1)
-		{
-			removeTextEditMarker();
-			ui.dstPos++;
-			ui.lineCurX += FONT_CHAR_W;
-			renderTextEditMarker();
-		}
-		else
-		{
-			if (ui.dstOffset != NULL)
-			{
-				(*ui.dstOffset)++;
-				if (ui.editObject == PTB_DO_DATAPATH)
-					ui.updateDiskOpPathText = true;
-			}
-		}
-	}
-	else
-	{
-		// we end up here when entering a number/hex digit
-
-		if (ui.dstPos < ui.numLen)
-			removeTextEditMarker();
-
-		ui.dstPos++;
-		ui.lineCurX += FONT_CHAR_W;
-
-		if (ui.dstPos < ui.numLen)
-			renderTextEditMarker();
-
-		// don't clamp, dstPos is tested elsewhere to check if done editing a number
-	}
-}
-
-void textCharPrevious(void)
-{
-	if (ui.editTextType != TEXT_EDIT_STRING)
-	{
-		if (ui.dstPos > 0)
-		{
-			removeTextEditMarker();
-			ui.dstPos--;
-			ui.lineCurX -= FONT_CHAR_W;
-			renderTextEditMarker();
-		}
-
-		return;
-	}
-
-	if (editor.mixFlag && ui.dstPos <= 4)
-		return;
-
-	if (ui.editPos > ui.showTextPtr)
-	{
-		removeTextEditMarker();
-
-		ui.editPos--;
-		textMarkerMoveLeft();
-
-		if (editor.mixFlag) // special case for "Mix" input field in Edit. Op.
-		{
-			if (ui.dstPos == 12)
-			{
-				ui.editPos--; textMarkerMoveLeft();
-				ui.editPos--; textMarkerMoveLeft();
-				ui.editPos--; textMarkerMoveLeft();
-				ui.editPos--; textMarkerMoveLeft();
-			}
-			else if (ui.dstPos == 6)
-			{
-				ui.editPos--;
-				textMarkerMoveLeft();
-			}
-		}
-
-		renderTextEditMarker();
-	}
-
-	ui.dstOffsetEnd = false;
-}
-
-void textCharNext(void)
-{
-	if (ui.editTextType != TEXT_EDIT_STRING)
-	{
-		if (ui.dstPos < ui.numLen-1)
-		{
-			removeTextEditMarker();
-			ui.dstPos++;
-			ui.lineCurX += FONT_CHAR_W;
-			renderTextEditMarker();
-		}
-
-		return;
-	}
-
-	if (editor.mixFlag && ui.dstPos >= 14)
-		return;
-
-	if (ui.editPos < ui.textEndPtr)
-	{
-		if (*ui.editPos != '\0')
-		{
-			removeTextEditMarker();
-
-			ui.editPos++;
-			textMarkerMoveRight();
-
-			if (editor.mixFlag) // special case for "Mix" input field in Edit. Op.
-			{
-				if (ui.dstPos == 9)
-				{
-					ui.editPos++; textMarkerMoveRight();
-					ui.editPos++; textMarkerMoveRight();
-					ui.editPos++; textMarkerMoveRight();
-					ui.editPos++; textMarkerMoveRight();
-				}
-				else if (ui.dstPos == 6)
-				{
-					ui.editPos++;
-					textMarkerMoveRight();
-				}
-			}
-
-			renderTextEditMarker();
-		}
-		else
-		{
-			ui.dstOffsetEnd = true;
-		}
-	}
-	else
-	{
-		ui.dstOffsetEnd = true;
-	}
-}
-// --------------------------------
 
 void keyUpHandler(SDL_Scancode scancode)
 {
@@ -473,7 +305,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			if (!ui.askBoxShown)
 			{
 				editor.playMode = PLAY_MODE_NORMAL;
-				modPlay(DONT_SET_PATTERN, song->currOrder, DONT_SET_ROW);
+				modPlay(DONT_SET_PATTERN, song->currPos, DONT_SET_ROW);
 				editor.currMode = MODE_PLAY;
 				pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 				statusAllRight();
@@ -562,10 +394,10 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (song->currOrder > 0)
+				if (song->currPos > 0)
 				{
-					if (song->currOrder-(POSED_LIST_SIZE-1) > 0)
-						modSetPos(song->currOrder-(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currPos-(POSED_LIST_SIZE-1) > 0)
+						modSetPos(song->currPos-(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
 						modSetPos(0, DONT_SET_ROW);
 				}
@@ -603,12 +435,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (song->currOrder != song->header.numOrders-1)
+				if (song->currPos != song->header.songLength-1)
 				{
-					if (song->currOrder+(POSED_LIST_SIZE-1) <= song->header.numOrders-1)
-						modSetPos(song->currOrder+(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currPos+(POSED_LIST_SIZE-1) <= song->header.songLength-1)
+						modSetPos(song->currPos+(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
-						modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
+						modSetPos(song->header.songLength - 1, DONT_SET_ROW);
 				}
 			}
 			else if (ui.diskOpScreenShown)
@@ -640,7 +472,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (song->currOrder > 0)
+				if (song->currPos > 0)
 					modSetPos(0, DONT_SET_ROW);
 			}
 			else if (ui.diskOpScreenShown)
@@ -663,7 +495,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
+				modSetPos(song->header.songLength - 1, DONT_SET_ROW);
 			}
 			else if (ui.diskOpScreenShown)
 			{
@@ -1049,7 +881,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f6Pos);
+					modPlay(DONT_SET_PATTERN, song->currPos, editor.f6Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1096,7 +928,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f7Pos);
+					modPlay(DONT_SET_PATTERN, song->currPos, editor.f7Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1143,7 +975,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f8Pos);
+					modPlay(DONT_SET_PATTERN, song->currPos, editor.f8Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1190,7 +1022,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f9Pos);
+					modPlay(DONT_SET_PATTERN, song->currPos, editor.f9Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1237,7 +1069,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				else if (keyb.leftAmigaPressed)
 				{
 					editor.playMode = PLAY_MODE_NORMAL;
-					modPlay(DONT_SET_PATTERN, song->currOrder, editor.f10Pos);
+					modPlay(DONT_SET_PATTERN, song->currPos, editor.f10Pos);
 
 					editor.currMode = MODE_PLAY;
 					pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
@@ -1864,12 +1696,12 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (ui.posEdScreenShown)
 			{
-				if (song->currOrder != song->header.numOrders-1)
+				if (song->currPos != song->header.songLength-1)
 				{
-					if (++song->currOrder > song->header.numOrders-1)
-						song->currOrder = song->header.numOrders-1;
+					if (++song->currPos > song->header.songLength-1)
+						song->currPos = song->header.songLength-1;
 
-					modSetPos(song->currOrder, DONT_SET_ROW);
+					modSetPos(song->currPos, DONT_SET_ROW);
 					ui.updatePosEd = true;
 				}
 
@@ -1913,9 +1745,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (ui.posEdScreenShown)
 			{
-				if (song->currOrder > 0)
+				if (song->currPos > 0)
 				{
-					modSetPos(song->currOrder - 1, DONT_SET_ROW);
+					modSetPos(song->currPos - 1, DONT_SET_ROW);
 					ui.updatePosEd = true;
 				}
 
@@ -1951,9 +1783,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				if (song->currOrder > 0)
+				if (song->currPos > 0)
 				{
-					modSetPos(song->currOrder - 1, DONT_SET_ROW);
+					modSetPos(song->currPos - 1, DONT_SET_ROW);
 					if (editor.repeatKeyFlag)
 					{
 						keyb.delayKey = true;
@@ -1994,9 +1826,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.shiftPressed)
 			{
-				if (song->currOrder < 126)
+				if (song->currPos < 126)
 				{
-					modSetPos(song->currOrder + 1, DONT_SET_ROW);
+					modSetPos(song->currPos + 1, DONT_SET_ROW);
 					if (editor.repeatKeyFlag)
 					{
 						keyb.delayKey = true;
@@ -2650,18 +2482,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else if (keyb.leftAltPressed)
 			{
 				if (!ui.diskOpScreenShown)
-				{
-					ui.posEdScreenShown ^= 1;
-					if (ui.posEdScreenShown)
-					{
-						renderPosEdScreen();
-						ui.updatePosEd = true;
-					}
-					else
-					{
-						displayMainScreen();
-					}
-				}
+					posEdToggle();
 			}
 			else
 			{
@@ -3148,8 +2969,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 				if (ui.posEdScreenShown)
 				{
-					if (song->currOrder-(POSED_LIST_SIZE-1) > 0)
-						modSetPos(song->currOrder-(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currPos-(POSED_LIST_SIZE-1) > 0)
+						modSetPos(song->currPos-(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
 						modSetPos(0, DONT_SET_ROW);
 				}
@@ -3185,10 +3006,10 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 				if (ui.posEdScreenShown)
 				{
-					if (song->currOrder+(POSED_LIST_SIZE-1) <= song->header.numOrders-1)
-						modSetPos(song->currOrder+(POSED_LIST_SIZE-1), DONT_SET_ROW);
+					if (song->currPos+(POSED_LIST_SIZE-1) <= song->header.songLength-1)
+						modSetPos(song->currPos+(POSED_LIST_SIZE-1), DONT_SET_ROW);
 					else
-						modSetPos(song->header.numOrders - 1, DONT_SET_ROW);
+						modSetPos(song->header.songLength - 1, DONT_SET_ROW);
 				}
 				else if (ui.diskOpScreenShown)
 				{
@@ -3218,7 +3039,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= 3)
 					{
 						keyb.repeatCounter = 0;
-						textCharPrevious();
+						editTextPrevChar();
 					}
 				}
 				else
@@ -3241,8 +3062,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= 6)
 					{
 						keyb.repeatCounter = 0;
-						if (song->currOrder > 0)
-							modSetPos(song->currOrder - 1, DONT_SET_ROW);
+						if (song->currPos > 0)
+							modSetPos(song->currPos - 1, DONT_SET_ROW);
 					}
 				}
 				else if (keyb.leftAltPressed)
@@ -3275,7 +3096,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= 3)
 					{
 						keyb.repeatCounter = 0;
-						textCharNext();
+						editTextNextChar();
 					}
 				}
 				else
@@ -3298,8 +3119,8 @@ void handleKeyRepeat(SDL_Scancode scancode)
 					if (keyb.repeatCounter >= 6)
 					{
 						keyb.repeatCounter = 0;
-						if (song->currOrder < 126)
-							modSetPos(song->currOrder + 1, DONT_SET_ROW);
+						if (song->currPos < 126)
+							modSetPos(song->currPos + 1, DONT_SET_ROW);
 					}
 				}
 				else if (keyb.leftAltPressed)
@@ -3346,9 +3167,9 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				if (keyb.repeatCounter >= 3)
 				{
 					keyb.repeatCounter = 0;
-					if (song->currOrder > 0)
+					if (song->currPos > 0)
 					{
-						modSetPos(song->currOrder - 1, DONT_SET_ROW);
+						modSetPos(song->currPos - 1, DONT_SET_ROW);
 						ui.updatePosEd = true;
 					}
 				}
@@ -3400,12 +3221,12 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				{
 					keyb.repeatCounter = 0;
 
-					if (song->currOrder != song->header.numOrders-1)
+					if (song->currPos != song->header.songLength-1)
 					{
-						if (++song->currOrder > song->header.numOrders-1)
-							song->currOrder = song->header.numOrders-1;
+						if (++song->currPos > song->header.songLength-1)
+							song->currPos = song->header.songLength-1;
 
-						modSetPos(song->currOrder, DONT_SET_ROW);
+						modSetPos(song->currPos, DONT_SET_ROW);
 						ui.updatePosEd = true;
 					}
 				}
@@ -3586,7 +3407,7 @@ static bool handleGeneralModes(SDL_Scancode scancode)
 	// EDIT OP. SCREEN #3
 	if (editor.mixFlag && scancode == SDL_SCANCODE_ESCAPE)
 	{
-		exitGetTextLine(EDIT_TEXT_UPDATE);
+		leaveTextEditMode(EDIT_TEXT_UPDATE);
 		editor.mixFlag = false;
 		ui.updateMixText = true;
 		return false;
@@ -3760,417 +3581,4 @@ static bool handleGeneralModes(SDL_Scancode scancode)
 	}
 
 	return true;
-}
-
-void handleTextEditInputChar(char textChar)
-{
-	// we only want certain keys
-	if (textChar < ' ' || textChar > '~')
-		return;
-
-	// A..Z -> a..z
-	if (textChar >= 'A' && textChar <= 'Z')
-		textChar = (char)tolower(textChar);
-
-	if (ui.editTextType == TEXT_EDIT_STRING)
-	{
-		if (ui.editPos < ui.textEndPtr)
-		{
-			if (!editor.mixFlag)
-			{
-				char *readTmp = ui.textEndPtr;
-				while (readTmp > ui.editPos)
-				{
-					int8_t readTmpPrev = *--readTmp;
-					*(readTmp + 1) = readTmpPrev;
-				}
-
-				*ui.textEndPtr = '\0';
-				*ui.editPos++ = textChar;
-
-				textMarkerMoveRight();
-			}
-			else if ((textChar >= '0' && textChar <= '9') || (textChar >= 'a' && textChar <= 'f'))
-			{
-				if (ui.dstPos == 14) // hack for sample mix text
-				{
-					*ui.editPos = textChar;
-				}
-				else
-				{
-					*ui.editPos++ = textChar;
-					textMarkerMoveRight();
-
-					if (ui.dstPos == 9) // hack for sample mix text
-					{
-						for (int32_t i = 0; i < 4; i++)
-						{
-							ui.editPos++;
-							textMarkerMoveRight();
-						}
-					}
-					else if (ui.dstPos == 6) // hack for sample mix text
-					{
-						ui.editPos++;
-						textMarkerMoveRight();
-					}
-				}
-			}
-		}
-	}
-	else
-	{
-		if (ui.editTextType == TEXT_EDIT_DECIMAL)
-		{
-			if (textChar >= '0' && textChar <= '9')
-			{
-				uint8_t digit1, digit2, digit3, digit4;
-				uint32_t number;
-
-				textChar -= '0';
-
-				if (ui.numLen == 4)
-				{
-					number = *ui.numPtr16;
-					digit4 = number % 10; number /= 10;
-					digit3 = number % 10; number /= 10;
-					digit2 = number % 10; number /= 10;
-					digit1 = (uint8_t)number;
-
-					     if (ui.dstPos == 0) *ui.numPtr16 = (textChar * 1000) + (digit2 * 100) + (digit3 * 10) + digit4;
-					else if (ui.dstPos == 1) *ui.numPtr16 = (digit1 * 1000) + (textChar * 100) + (digit3 * 10) + digit4;
-					else if (ui.dstPos == 2) *ui.numPtr16 = (digit1 * 1000) + (digit2 * 100) + (textChar * 10) + digit4;
-					else if (ui.dstPos == 3) *ui.numPtr16 = (digit1 * 1000) + (digit2 * 100) + (digit3 * 10) + textChar;
-				}
-				else if (ui.numLen == 3)
-				{
-					number = *ui.numPtr16;
-					digit3 = number % 10; number /= 10;
-					digit2 = number % 10; number /= 10;
-					digit1 = (uint8_t)number;
-
-					     if (ui.dstPos == 0) *ui.numPtr16 = (textChar * 100) + (digit2 * 10) + digit3;
-					else if (ui.dstPos == 1) *ui.numPtr16 = (digit1 * 100) + (textChar * 10) + digit3;
-					else if (ui.dstPos == 2) *ui.numPtr16 = (digit1 * 100) + (digit2 * 10) + textChar;
-				}
-				else if (ui.numLen == 2)
-				{
-					number = *ui.numPtr16;
-					digit2 = number % 10; number /= 10;
-					digit1 = (uint8_t)number;
-
-					     if (ui.dstPos == 0) *ui.numPtr16 = (textChar * 10) + digit2;
-					else if (ui.dstPos == 1) *ui.numPtr16 = (digit1 * 10) + textChar;
-				}
-
-				textMarkerMoveRight();
-				if (ui.dstPos >= ui.numLen)
-					exitGetTextLine(EDIT_TEXT_UPDATE);
-			}
-		}
-		else
-		{
-			if ((textChar >= '0' && textChar <= '9') || (textChar >= 'a' && textChar <= 'f'))
-			{
-				if (textChar <= '9')
-					textChar -= '0';
-				else if (textChar <= 'f')
-					textChar -= 'a'-10;
-
-				if (ui.numBits == 17)
-				{
-					*ui.numPtr32 &= ~(0xF0000 >> (ui.dstPos << 2));
-					*ui.numPtr32 |= textChar << (16 - (ui.dstPos << 2));
-				}
-				else if (ui.numBits == 16)
-				{
-					if (ui.force32BitNumPtr)
-					{
-						*ui.numPtr32 &= ~(0xF000 >> (ui.dstPos << 2));
-						*ui.numPtr32 |= textChar << (12 - (ui.dstPos << 2));
-					}
-					else
-					{
-						*ui.numPtr16 &= ~(0xF000 >> (ui.dstPos << 2));
-						*ui.numPtr16 |= textChar << (12 - (ui.dstPos << 2));
-					}
-				}
-				else if (ui.numBits == 8)
-				{
-					*ui.numPtr8 &= ~(0xF0 >> (ui.dstPos << 2));
-					*ui.numPtr8 |= textChar << (4 - (ui.dstPos << 2));
-				}
-
-				textMarkerMoveRight();
-				if (ui.dstPos >= ui.numLen)
-					exitGetTextLine(EDIT_TEXT_UPDATE);
-			}
-		}
-	}
-
-	updateTextObject(ui.editObject);
-
-	if (!keyb.repeatKey)
-		keyb.delayCounter = 0;
-
-	keyb.repeatKey = true;
-	keyb.delayKey = true;
-}
-
-bool handleTextEditMode(SDL_Scancode scancode)
-{
-	switch (scancode)
-	{
-		case SDL_SCANCODE_ESCAPE:
-		{
-			editor.blockMarkFlag = false;
-			if (ui.editTextFlag)
-			{
-				exitGetTextLine(EDIT_TEXT_NO_UPDATE);
-				return false;
-			}
-		}
-		break;
-
-		case SDL_SCANCODE_HOME:
-		{
-			if (ui.editTextFlag && !editor.mixFlag)
-			{
-				while (ui.editPos > ui.showTextPtr)
-					textCharPrevious();
-			}
-		}
-		break;
-
-		case SDL_SCANCODE_END:
-		{
-			if (ui.editTextFlag && !editor.mixFlag)
-			{
-				if (ui.editTextType != TEXT_EDIT_STRING)
-					break;
-
-				while (!ui.dstOffsetEnd)
-					textCharNext();
-			}
-		}
-		break;
-
-		case SDL_SCANCODE_LEFT:
-		{
-			if (ui.editTextFlag)
-			{
-				textCharPrevious();
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
-
-				keyb.repeatKey = true;
-				keyb.delayKey = false;
-			}
-			else
-			{
-				keyb.delayKey = false;
-				keyb.repeatKey = true;
-			}
-		}
-		break;
-
-		case SDL_SCANCODE_RIGHT:
-		{
-			if (ui.editTextFlag)
-			{
-				textCharNext();
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
-
-				keyb.repeatKey = true;
-				keyb.delayKey = false;
-			}
-			else
-			{
-				keyb.delayKey = false;
-				keyb.repeatKey = true;
-			}
-		}
-		break;
-
-		case SDL_SCANCODE_DELETE:
-		{
-			if (ui.editTextFlag)
-			{
-				if (editor.mixFlag || ui.editTextType != TEXT_EDIT_STRING)
-					break;
-
-				char *readTmp = ui.editPos;
-				while (readTmp < ui.textEndPtr)
-				{
-					int8_t readTmpNext = *(readTmp + 1);
-					*readTmp++ = readTmpNext;
-				}
-
-				// kludge to prevent cloning last character if the song/sample name has one character too much
-				if (ui.editObject == PTB_SONGNAME || ui.editObject == PTB_SAMPLENAME)
-					 *ui.textEndPtr = '\0';
-
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
-
-				keyb.repeatKey = true;
-				keyb.delayKey = true;
-
-				updateTextObject(ui.editObject);
-			}
-		}
-		break;
-
-		case SDL_SCANCODE_BACKSPACE:
-		{
-			if (ui.editTextFlag)
-			{
-				if (editor.mixFlag || ui.editTextType != TEXT_EDIT_STRING)
-					break;
-
-				if (ui.editPos > ui.dstPtr)
-				{
-					ui.editPos--;
-
-					char *readTmp = ui.editPos;
-					while (readTmp < ui.textEndPtr)
-					{
-						int8_t readTmpNext = *(readTmp + 1);
-						*readTmp++ = readTmpNext;
-					}
-
-					// kludge to prevent cloning last character if the song/sample name has one character too much
-					if (ui.editObject == PTB_SONGNAME || ui.editObject == PTB_SAMPLENAME)
-						*ui.textEndPtr = '\0';
-
-					textMarkerMoveLeft();
-					updateTextObject(ui.editObject);
-				}
-
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
-
-				keyb.repeatKey = true;
-				keyb.delayKey = false;
-			}
-			else
-			{
-				if (ui.diskOpScreenShown)
-				{
-#ifdef _WIN32
-					diskOpSetPath(L"..", DISKOP_CACHE);
-#else
-					diskOpSetPath("..", DISKOP_CACHE);
-#endif
-				}
-				else if (keyb.shiftPressed || keyb.leftAltPressed || keyb.leftCtrlPressed)
-				{
-					saveUndo();
-					if (keyb.leftAltPressed && !keyb.leftCtrlPressed)
-					{
-						if (song->currRow > 0)
-						{
-							for (int32_t i = 0; i < PAULA_VOICES; i++)
-							{
-								for (int32_t j = (song->currRow - 1); j < MOD_ROWS; j++)
-								{
-									note_t *noteSrc = &song->patterns[song->currPattern][((j + 1) * PAULA_VOICES) + i];
-									song->patterns[song->currPattern][(j * PAULA_VOICES) + i] = *noteSrc;
-								}
-
-								// clear newly made row on very bottom
-								note_t *noteDst = &song->patterns[song->currPattern][(63 * PAULA_VOICES) + i];
-								noteDst->period = 0;
-								noteDst->sample = 0;
-								noteDst->command = 0;
-								noteDst->param = 0;
-							}
-
-							song->currRow--;
-							ui.updatePatternData = true;
-						}
-					}
-					else
-					{
-						if (song->currRow > 0)
-						{
-							for (int32_t i = song->currRow-1; i < MOD_ROWS-1; i++)
-							{
-								note_t *noteSrc = &song->patterns[song->currPattern][((i + 1) * PAULA_VOICES) + cursor.channel];
-								note_t *noteDst = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
-
-								if (keyb.leftCtrlPressed)
-								{
-									noteDst->command = noteSrc->command;
-									noteDst->param = noteSrc->param;
-								}
-								else
-								{
-									*noteDst = *noteSrc;
-								}
-							}
-
-							// clear newly made row on very bottom
-							note_t *noteDst = &song->patterns[song->currPattern][(63 * PAULA_VOICES) + cursor.channel];
-							noteDst->period = 0;
-							noteDst->sample = 0;
-							noteDst->command = 0;
-							noteDst->param = 0;
-
-							song->currRow--;
-							ui.updatePatternData = true;
-						}
-					}
-				}
-				else
-				{
-					editor.stepPlayEnabled = true;
-					editor.stepPlayBackwards = true;
-
-					editor.stepPlayLastMode = editor.currMode;
-
-					if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
-						doStopIt(false);
-					else
-						doStopIt(true);
-
-					playPattern((song->currRow - 1) & 63);
-
-					if (config.keepEditModeAfterStepPlay && editor.stepPlayLastMode == MODE_EDIT)
-					{
-						pointerSetMode(POINTER_MODE_EDIT, DO_CARRY);
-						editor.playMode = PLAY_MODE_NORMAL;
-						editor.currMode = MODE_EDIT;
-					}
-				}
-			}
-		}
-		break;
-
-		default: break;
-	}
-
-	if (ui.editTextFlag)
-	{
-		if (scancode == SDL_SCANCODE_RETURN || scancode == SDL_SCANCODE_KP_ENTER)
-		{
-			// dirty hack
-			if (ui.editObject == PTB_SAMPLES)
-				ui.tmpDisp8++;
-
-			exitGetTextLine(EDIT_TEXT_UPDATE);
-
-			if (editor.mixFlag)
-			{
-				editor.mixFlag = false;
-				ui.updateMixText = true;
-				doMix();
-			}
-		}
-
-		return false; // don't continue further key handling
-	}
-
-	return true; // continue further key handling (we're not editing text)
 }

@@ -78,13 +78,13 @@ module_t *loadMod31(uint8_t *buffer, uint32_t filesize)
 		}
 	}
 
-	m->header.numOrders = *p++;
+	m->header.songLength = *p++;
 	p++; // skip uninteresting field (127 in PT MOds, "restart pos" in PC MODs)
 
-	if (modFormat == FORMAT_PT && m->header.numOrders == 129)
-		m->header.numOrders = 127; // fixes a specific copy of beatwave.mod (XXX: hackish...)
+	if (modFormat == FORMAT_PT && m->header.songLength == 129)
+		m->header.songLength = 127; // fixes a specific copy of beatwave.mod (XXX: hackish...)
 
-	if (m->header.numOrders == 0 || m->header.numOrders > 129)
+	if (m->header.songLength == 0 || m->header.songLength > 129)
 	{
 		displayErrorMsg("NOT A MOD FILE !");
 		goto loadError;
@@ -92,11 +92,11 @@ module_t *loadMod31(uint8_t *buffer, uint32_t filesize)
 
 	// read orders and count number of patterns
 	int32_t numPatterns = 0;
-	for (int32_t i = 0; i < MOD_ORDERS; i++)
+	for (int32_t i = 0; i < 128; i++)
 	{
-		m->header.order[i] = *p++;
-		if (m->header.order[i] > numPatterns)
-			numPatterns = m->header.order[i];
+		m->header.patternTable[i] = *p++;
+		if (m->header.patternTable[i] > numPatterns)
+			numPatterns = m->header.patternTable[i];
 	}
 	numPatterns++;
 

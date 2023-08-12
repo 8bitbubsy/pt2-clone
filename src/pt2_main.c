@@ -35,6 +35,7 @@
 #include "pt2_sampling.h"
 #include "pt2_askbox.h"
 #include "pt2_replayer.h"
+#include "pt2_textedit.h"
 
 #define CRASH_TEXT "Oh no! The ProTracker 2 clone has crashed...\nA backup .mod was hopefully " \
                    "saved to the current module directory.\n\nPlease report this bug if you can.\n" \
@@ -89,15 +90,16 @@ static void cleanUp(void);
 
 static void clearStructs(void)
 {
-	memset(&keyb,   0, sizeof (keyb));
-	memset(&mouse,  0, sizeof (mouse));
-	memset(&video,  0, sizeof (video));
+	memset(&keyb, 0, sizeof (keyb));
+	memset(&mouse, 0, sizeof (mouse));
+	memset(&video, 0, sizeof (video));
 	memset(&editor, 0, sizeof (editor));
 	memset(&diskop, 0, sizeof (diskop));
 	memset(&cursor, 0, sizeof (cursor));
-	memset(&ui,     0, sizeof (ui));
+	memset(&ui, 0, sizeof (ui));
 	memset(&config, 0, sizeof (config));
-	memset(&audio,  0, sizeof (audio));
+	memset(&audio, 0, sizeof (audio));
+	memset(&textEdit, 0, sizeof (textEdit));
 
 	audio.rescanAudioDevicesSupported = true;
 }
@@ -289,10 +291,10 @@ int main(int argc, char *argv[])
 
 	// setup GUI text pointers (for recently allocated song structure)
 	editor.currEditPatternDisp = &song->currPattern;
-	editor.currPosDisp = &song->currOrder;
-	editor.currPatternDisp = &song->header.order[0];
-	editor.currPosEdPattDisp = &song->header.order[0];
-	editor.currLengthDisp = &song->header.numOrders;
+	editor.currPosDisp = &song->currPos;
+	editor.currPatternDisp = &song->header.patternTable[0];
+	editor.currPosEdPattDisp = &song->header.patternTable[0];
+	editor.currLengthDisp = &song->header.songLength;
 
 	if (!initScopes())
 	{

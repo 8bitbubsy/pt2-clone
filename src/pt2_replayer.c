@@ -15,12 +15,13 @@
 #include "pt2_scopes.h"
 #include "pt2_paula.h"
 #include "pt2_visuals_sync.h"
+#include "pt2_posed.h"
 
 static bool posJumpAssert, pBreakFlag, modRenderDone;
 static bool doStopSong; // from F00 (Set Speed)
 static int8_t pBreakPosition, oldRow, modPattern;
 static uint8_t pattDelTime, lowMask = 0xFF, pattDelTime2;
-static int16_t modOrder, oldPattern, oldOrder;
+static int16_t modPos, oldPattern, oldPos;
 static uint16_t DMACONtemp;
 static int32_t modBPM, oldBPM, oldSpeed, ciaSetBPM;
 
@@ -29,6 +30,13 @@ static const uint8_t funkTable[16] = // EFx (FunkRepeat/InvertLoop)
 	0x00, 0x05, 0x06, 0x07, 0x08, 0x0A, 0x0B, 0x0D,
 	0x10, 0x13, 0x16, 0x1A, 0x20, 0x2B, 0x40, 0x80
 };
+
+void gotoNextMulti(void)
+{
+	cursor.channel = (editor.multiModeNext[cursor.channel] - 1) & 3;
+	cursor.pos = cursor.channel * 6;
+	updateCursorPos();
+}
 
 double ciaBpm2Hz(int32_t bpm)
 {
@@ -112,7 +120,7 @@ void setReplayerPosToTrackerPos(void)
 		return;
 
 	modPattern = (int8_t)song->currPattern;
-	modOrder = song->currOrder;
+	modPos = song->currPos;
 	song->row = song->currRow;
 	song->tick = 0;
 }
@@ -137,7 +145,7 @@ module_t *createEmptyMod(void)
 			goto error;
 	}
 
-	m->header.numOrders = 1;
+	m->header.songLength = 1;
 
 	moduleSample_t *s = m->samples;
 	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)
@@ -222,7 +230,7 @@ void storeTempVariables(void) // this one is accessed in other files, so non-sta
 {
 	oldBPM = song->currBPM;
 	oldRow = song->currRow;
-	oldOrder = song->currOrder;
+	oldPos = song->currPos;
 	oldSpeed = song->currSpeed;
 	oldPattern = song->currPattern;
 }
@@ -309,7 +317,7 @@ static void jumpLoop(moduleChannel_t *ch)
 		if (editor.mod2WavOngoing)
 		{
 			for (int32_t tempParam = pBreakPosition; tempParam <= song->row; tempParam++)
-				editor.rowVisitTable[(modOrder * MOD_ROWS) + tempParam] = false;
+				editor.rowVisitTable[(modPos * MOD_ROWS) + tempParam] = false;
 		}
 	}
 }
@@ -464,7 +472,7 @@ static void positionJump(moduleChannel_t *ch)
 {
 	// original PT doesn't do this check, but we have to
 	if (editor.playMode != PLAY_MODE_PATTERN || (editor.currMode == MODE_RECORD && editor.recordMode != RECORD_PATT))
-		modOrder = (ch->n_cmd & 0xFF) - 1; // B00 results in -1, but it safely jumps to order 0
+		modPos = (ch->n_cmd & 0xFF) - 1; // B00 results in -1, but it safely jumps to order 0
 
 	pBreakPosition = 0;
 	posJumpAssert = true;
@@ -1099,10 +1107,10 @@ static void updateUIPositions(void)
 		return; // don't update UI under MOD2WAV/PAT2SMP rendering
 
 	song->currRow = song->row;
-	song->currOrder = modOrder;
+	song->currPos = modPos;
 	song->currPattern = modPattern;
 
-	uint16_t *currPatPtr = &song->header.order[modOrder];
+	uint16_t *currPatPtr = &song->header.patternTable[modPos];
 	editor.currPatternDisp = currPatPtr;
 	editor.currPosEdPattDisp = currPatPtr;
 	editor.currPatternDisp = currPatPtr;
@@ -1162,18 +1170,18 @@ static void nextPosition(void)
 			return;
 		}
 
-		modOrder = (modOrder + 1) & 127;
-		if (modOrder >= song->header.numOrders)
+		modPos = (modPos + 1) & 127;
+		if (modPos >= song->header.songLength)
 		{
-			modOrder = 0;
+			modPos = 0;
 
 			if (config.compoMode) // stop song for music competitions playing
 			{
 				doStopIt(true);
 				turnOffVoices();
 
-				modOrder = 0;
-				modPattern = (int8_t)song->header.order[modOrder];
+				modPos = 0;
+				modPattern = (int8_t)song->header.patternTable[modPos];
 				song->row = 0;
 
 				updateUIPositions();
@@ -1183,7 +1191,7 @@ static void nextPosition(void)
 				modRenderDone = true;
 		}
 
-		modPattern = (int8_t)song->header.order[modOrder];
+		modPattern = (int8_t)song->header.patternTable[modPos];
 		if (modPattern > MAX_PATTERNS-1)
 			modPattern = MAX_PATTERNS-1;
 	}
@@ -1210,7 +1218,7 @@ static void increasePlaybackTimer(void)
 static void setCurrRowToVisited(void) // for MOD2WAV
 {
 	if (editor.mod2WavOngoing)
-		editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row] = true;
+		editor.rowVisitTable[(modPos * MOD_ROWS) + song->row] = true;
 }
 
 static bool renderEndCheck(void) // for MOD2WAV/PAT2SMP
@@ -1229,7 +1237,7 @@ static bool renderEndCheck(void) // for MOD2WAV/PAT2SMP
 
 		if (editor.mod2WavOngoing && song->tick == song->speed-1)
 		{
-			bool rowVisited = editor.rowVisitTable[(modOrder * MOD_ROWS) + song->row];
+			bool rowVisited = editor.rowVisitTable[(modPos * MOD_ROWS) + song->row];
 			if (rowVisited || modRenderDone)
 			{
 				modRenderDone = false;
@@ -1454,7 +1462,7 @@ void modSetPattern(uint8_t pattern)
 	ui.updateCurrPattText = true;
 }
 
-void modSetPos(int16_t order, int16_t row)
+void modSetPos(int16_t pos, int16_t row)
 {
 	if (row != -1)
 	{
@@ -1465,17 +1473,16 @@ void modSetPos(int16_t order, int16_t row)
 		song->currRow = (int8_t)row;
 	}
 
-	if (order != -1)
+	if (pos != -1)
 	{
-		if (order >= 0)
+		if (pos >= 0)
 		{
-			modOrder = order;
-			song->currOrder = order;
+			song->currPos = modPos = pos;
 			ui.updateSongPos = true;
 
 			if (editor.currMode == MODE_PLAY && editor.playMode == PLAY_MODE_NORMAL)
 			{
-				modPattern = (int8_t)song->header.order[order];
+				modPattern = (int8_t)song->header.patternTable[pos];
 				if (modPattern > MAX_PATTERNS-1)
 					modPattern = MAX_PATTERNS-1;
 
@@ -1484,13 +1491,13 @@ void modSetPos(int16_t order, int16_t row)
 			}
 
 			ui.updateSongPattern = true;
-			editor.currPatternDisp = &song->header.order[modOrder];
+			editor.currPatternDisp = &song->header.patternTable[modPos];
 
-			int16_t posEdPos = song->currOrder;
-			if (posEdPos > song->header.numOrders-1)
-				posEdPos = song->header.numOrders-1;
+			int16_t posEdPos = song->currPos;
+			if (posEdPos > song->header.songLength-1)
+				posEdPos = song->header.songLength-1;
 
-			editor.currPosEdPattDisp = &song->header.order[posEdPos];
+			editor.currPosEdPattDisp = &song->header.patternTable[posEdPos];
 
 			if (ui.posEdScreenShown)
 				ui.updatePosEd = true;
@@ -1584,7 +1591,7 @@ void decPatt(void)
 	ui.updateCurrPattText = true;
 }
 
-void modPlay(int16_t patt, int16_t order, int8_t row)
+void modPlay(int16_t patt, int16_t pos, int8_t row)
 {
 	const bool audioWasntLocked = !audio.locked;
 	if (audioWasntLocked)
@@ -1609,32 +1616,23 @@ void modPlay(int16_t patt, int16_t order, int8_t row)
 
 	if (editor.playMode != PLAY_MODE_PATTERN)
 	{
-		if (modOrder >= song->header.numOrders)
-		{
-			modOrder = 0;
-			song->currOrder = 0;
-		}
+		if (modPos >= song->header.songLength)
+			song->currPos = modPos = 0;
 
-		if (order >= 0 && order < song->header.numOrders)
-		{
-			modOrder = order;
-			song->currOrder = order;
-		}
+		if (pos >= 0 && pos < song->header.songLength)
+			song->currPos = modPos = pos;
 
-		if (order >= song->header.numOrders)
-		{
-			modOrder = 0;
-			song->currOrder = 0;
-		}
+		if (pos >= song->header.songLength)
+			song->currPos = modPos = 0;
 	}
 
 	if (patt >= 0 && patt <= MAX_PATTERNS-1)
 		song->currPattern = modPattern = (int8_t)patt;
 	else
-		song->currPattern = modPattern = (int8_t)song->header.order[modOrder];
+		song->currPattern = modPattern = (int8_t)song->header.patternTable[modPos];
 
-	editor.currPatternDisp = &song->header.order[modOrder];
-	editor.currPosEdPattDisp = &song->header.order[modOrder];
+	editor.currPatternDisp = &song->header.patternTable[modPos];
+	editor.currPosEdPattDisp = &song->header.patternTable[modPos];
 
 	song->tick = song->speed-1;
 	ciaSetBPM = -1; // fix possibly stuck "set BPM" flag
@@ -1671,8 +1669,10 @@ void clearSong(void)
 	if (song == NULL)
 		return;
 
-	memset(song->header.order, 0, sizeof (song->header.order));
+	memset(song->header.patternTable, 0, sizeof (song->header.patternTable));
 	memset(song->header.name, 0, sizeof (song->header.name));
+
+	posEdClearNames();
 
 	editor.muted[0] = false;
 	editor.muted[1] = false;
@@ -1694,7 +1694,7 @@ void clearSong(void)
 	editor.blockMarkFlag = false;
 	editor.swapChannelFlag = false;
 
-	song->header.numOrders = 1;
+	song->header.songLength = 1;
 
 	for (int32_t i = 0; i < MAX_PATTERNS; i++)
 		memset(song->patterns[i], 0, (MOD_ROWS * PAULA_VOICES) * sizeof (note_t));
@@ -1710,10 +1710,10 @@ void clearSong(void)
 
 	modSetPos(0, 0); // this also refreshes pattern data
 
-	song->currOrder = 0;
+	song->currPos = 0;
 	song->currPattern = 0;
-	editor.currPatternDisp = &song->header.order[0];
-	editor.currPosEdPattDisp = &song->header.order[0];
+	editor.currPatternDisp = &song->header.patternTable[0];
+	editor.currPosEdPattDisp = &song->header.patternTable[0];
 
 	modSetTempo(editor.initialTempo, true);
 	modSetSpeed(editor.initialSpeed);
@@ -1752,11 +1752,9 @@ void clearSamples(void)
 	editor.currSample = 0;
 	editor.hiLowInstr = 0;
 	editor.sampleZero = false;
-	ui.editOpScreenShown = false;
-	ui.aboutScreenShown = false;
 	editor.blockMarkFlag = false;
-
 	editor.samplePos = 0;
+
 	updateCurrSample();
 }
 
@@ -1799,7 +1797,7 @@ void restartSong(void) // for the beginning of MOD2WAV/PAT2SMP
 	song->currRow = 0;
 	song->rowsCounter = 0;
 
-	memset(editor.rowVisitTable, 0, MOD_ORDERS * MOD_ROWS); // for MOD2WAV
+	memset(editor.rowVisitTable, 0, 128 * MOD_ROWS); // for MOD2WAV
 
 	if (editor.pat2SmpOngoing)
 	{
@@ -1835,19 +1833,19 @@ void resetSong(void) // only call this after storeTempVariables() has been calle
 
 	initializeModuleChannels(song);
 
-	modOrder = oldOrder;
+	modPos = oldPos;
 	modPattern = (int8_t)oldPattern;
 
 	song->row = oldRow;
 	song->currRow = oldRow;
 	song->currBPM = oldBPM;
-	song->currOrder = oldOrder;
+	song->currPos = oldPos;
 	song->currPattern = oldPattern;
 
-	editor.currPosDisp = &song->currOrder;
+	editor.currPosDisp = &song->currPos;
 	editor.currEditPatternDisp = &song->currPattern;
-	editor.currPatternDisp = &song->header.order[song->currOrder];
-	editor.currPosEdPattDisp = &song->header.order[song->currOrder];
+	editor.currPatternDisp = &song->header.patternTable[song->currPos];
+	editor.currPosEdPattDisp = &song->header.patternTable[song->currPos];
 
 	modSetSpeed(oldSpeed);
 	modSetTempo(oldBPM, true);

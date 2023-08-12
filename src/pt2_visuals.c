@@ -34,6 +34,8 @@
 #include "pt2_chordmaker.h"
 #include "pt2_mod2wav.h"
 #include "pt2_audio.h"
+#include "pt2_posed.h"
+#include "pt2_textedit.h"
 
 typedef struct sprite_t
 {
@@ -288,7 +290,7 @@ void resetAllScreens(void) // prepare GUI for "really quit?" dialog
 	}
 
 	if (ui.editTextFlag)
-		exitGetTextLine(EDIT_TEXT_NO_UPDATE);
+		leaveTextEditMode(EDIT_TEXT_NO_UPDATE);
 }
 
 static void fillFromVuMetersBgBuffer(void)
@@ -603,10 +605,10 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 			totalSampleDataSize += song->samples[i].length;
 
 		uint32_t totalPatterns = 0;
-		for (int32_t i = 0; i < MOD_ORDERS; i++)
+		for (int32_t i = 0; i < 128; i++)
 		{
-			if (song->header.order[i] > totalPatterns)
-				totalPatterns = song->header.order[i];
+			if (song->header.patternTable[i] > totalPatterns)
+				totalPatterns = song->header.patternTable[i];
 		}
 
 		uint32_t moduleSize = 2108 + (totalPatterns * 1024) + totalSampleDataSize;
@@ -808,60 +810,6 @@ void removeSamplerFiltersBox(void)
 	displaySample();
 }
 
-void updatePosEd(void)
-{
-	if (!ui.posEdScreenShown || ui.askBoxShown || !ui.updatePosEd)
-		return;
-
-	ui.updatePosEd = false;
-
-	int32_t posEdPosition = song->currOrder;
-	if (posEdPosition > song->header.numOrders-1)
-		posEdPosition = song->header.numOrders-1;
-
-	// top five
-	for (int32_t y = 0; y < 5; y++)
-	{
-		if (posEdPosition-(5-y) >= 0)
-		{
-			printThreeDecimalsBg(128, 23+(y*6), posEdPosition-(5-y), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-			printTwoDecimalsBg(160, 23+(y*6), song->header.order[posEdPosition-(5-y)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-		}
-		else
-		{
-			fillRect(128, 23+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
-		}
-	}
-
-	// middle
-	printThreeDecimalsBg(128, 53, posEdPosition, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-	printTwoDecimalsBg(160, 53, *editor.currPosEdPattDisp, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-
-	// bottom six
-	for (int32_t y = 0; y < 6; y++)
-	{
-		if (posEdPosition+y < song->header.numOrders-1)
-		{
-			printThreeDecimalsBg(128, 59+(y*6), posEdPosition+(y+1), video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-			printTwoDecimalsBg(160, 59+(y*6), song->header.order[posEdPosition+(y+1)], video.palette[PAL_QADSCP], video.palette[PAL_BACKGRD]);
-		}
-		else
-		{
-			fillRect(128, 59+(y*6), 22*FONT_CHAR_W, FONT_CHAR_H, video.palette[PAL_BACKGRD]);
-		}
-	}
-
-	// kludge to fix bottom part of text edit marker in pos ed
-	if (ui.editTextFlag && ui.editObject == PTB_PE_PATT)
-		renderTextEditMarker();
-}
-
-void renderPosEdScreen(void)
-{
-	blit32(120, 0, 200, 99, posEdBMP);
-	ui.updatePosEd = true;
-}
-
 void renderMuteButtons(void)
 {
 	if (ui.diskOpScreenShown || ui.posEdScreenShown)
@@ -930,35 +878,6 @@ void updatePatternData(void)
 		if (!ui.samplerScreenShown)
 			redrawPattern();
 	}
-}
-
-void removeTextEditMarker(void)
-{
-	if (!ui.editTextFlag)
-		return;
-
-	if (ui.editObject == PTB_PE_PATT)
-	{
-		// position editor text editing
-		hLine(ui.lineCurX - 4, ui.lineCurY - 1, 7, video.palette[PAL_GENBKG2]);
-
-		// no need to clear the second row of pixels
-
-		ui.updatePosEd = true;
-	}
-	else
-	{
-		// all others
-		fillRect(ui.lineCurX - 4, ui.lineCurY - 1, 7, 2, video.palette[PAL_GENBKG]);
-	}
-}
-
-void renderTextEditMarker(void)
-{
-	if (!ui.editTextFlag)
-		return;
-
-	fillRect(ui.lineCurX - 4, ui.lineCurY - 1, 7, 2, video.palette[PAL_TEXTMARK]);
 }
 
 static void sendMouseButtonUpEvent(uint8_t button)

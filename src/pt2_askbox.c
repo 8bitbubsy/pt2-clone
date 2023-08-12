@@ -10,6 +10,7 @@
 #include "pt2_mod2wav.h"
 #include "pt2_pat2smp.h"
 #include "pt2_askbox.h"
+#include "pt2_posed.h"
 
 #define INIT_BUTTONS(num, abortRetVal, defRetVal) \
 d.numButtons = num; \

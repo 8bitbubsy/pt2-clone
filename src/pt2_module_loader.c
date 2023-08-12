@@ -29,6 +29,7 @@
 #include "modloaders/pt2_xpk_unpack.h"
 #include "modloaders/pt2_pp_unpack.h"
 #include "pt2_askbox.h"
+#include "pt2_posed.h"
 
 static void fixZeroesInString(char *str, uint32_t maxLength); // converts zeroes to spaces in a string, up until the last zero found
 
@@ -228,12 +229,14 @@ void setupLoadedMod(void)
 	modSetPos(0, 0);
 	modSetPattern(0); // set pattern to 00 instead of first order's pattern
 
+	posEdClearNames();
+
 	// setup GUI text pointers
 	editor.currEditPatternDisp = &song->currPattern;
-	editor.currPosDisp = &song->currOrder;
-	editor.currPatternDisp = &song->header.order[0];
-	editor.currPosEdPattDisp = &song->header.order[0];
-	editor.currLengthDisp = &song->header.numOrders;
+	editor.currPosDisp = &song->currPos;
+	editor.currPatternDisp = &song->header.patternTable[0];
+	editor.currPosEdPattDisp = &song->header.patternTable[0];
+	editor.currLengthDisp = &song->header.songLength;
 
 	// calculate MOD size
 	ui.updateSongSize = true;
