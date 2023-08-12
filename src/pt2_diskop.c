@@ -303,7 +303,7 @@ void handleEntryJumping(SDL_Keycode jumpToChar) // SHIFT+character
 
 				f = &diskOpEntry[offset];
 
-				if (!f->isDir && f->firstAnsiChar == jumpToChar)
+				if (!f->isDir && tolower(f->firstAnsiChar) == jumpToChar)
 				{
 					diskop.scrollOffset += DISKOP_LINES;
 					if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
@@ -322,7 +322,7 @@ void handleEntryJumping(SDL_Keycode jumpToChar) // SHIFT+character
 		f = diskOpEntry;
 		for (int32_t i = 0; i < diskop.numEntries; i++, f++)
 		{
-			if (!f->isDir && f->firstAnsiChar == jumpToChar)
+			if (!f->isDir && tolower(f->firstAnsiChar) == jumpToChar)
 			{
 				if (diskop.numEntries > DISKOP_LINES)
 				{
