@@ -127,6 +127,7 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 	switch (sampleType)
 	{
 		case SAMPLETYPE_RAW:
+			setSampleTextFromFilename(s, entryName, ".raw");
 			result = loadRAWSample(f, filesize, s);
 		break;
 
