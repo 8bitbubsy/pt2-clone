@@ -394,13 +394,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (song->currPos > 0)
-				{
-					if (song->currPos-(POSED_LIST_SIZE-1) > 0)
-						modSetPos(song->currPos-(POSED_LIST_SIZE-1), DONT_SET_ROW);
-					else
-						modSetPos(0, DONT_SET_ROW);
-				}
+				posEdPageUp();
 			}
 			else if (ui.diskOpScreenShown)
 			{
@@ -435,13 +429,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (song->currPos != song->header.songLength-1)
-				{
-					if (song->currPos+(POSED_LIST_SIZE-1) <= song->header.songLength-1)
-						modSetPos(song->currPos+(POSED_LIST_SIZE-1), DONT_SET_ROW);
-					else
-						modSetPos(song->header.songLength - 1, DONT_SET_ROW);
-				}
+				posEdPageDown();
 			}
 			else if (ui.diskOpScreenShown)
 			{
@@ -472,8 +460,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				if (song->currPos > 0)
-					modSetPos(0, DONT_SET_ROW);
+				posEdScrollToTop();
 			}
 			else if (ui.diskOpScreenShown)
 			{
@@ -495,7 +482,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (ui.posEdScreenShown)
 			{
-				modSetPos(song->header.songLength - 1, DONT_SET_ROW);
+				posEdScrollToBottom();
 			}
 			else if (ui.diskOpScreenShown)
 			{
@@ -1696,14 +1683,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (ui.posEdScreenShown)
 			{
-				if (song->currPos != song->header.songLength-1)
-				{
-					if (++song->currPos > song->header.songLength-1)
-						song->currPos = song->header.songLength-1;
-
-					modSetPos(song->currPos, DONT_SET_ROW);
-					ui.updatePosEd = true;
-				}
+				posEdScrollDown();
 
 				if (!keyb.repeatKey)
 					keyb.delayCounter = 0;
@@ -1745,11 +1725,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (ui.posEdScreenShown)
 			{
-				if (song->currPos > 0)
-				{
-					modSetPos(song->currPos - 1, DONT_SET_ROW);
-					ui.updatePosEd = true;
-				}
+				posEdScrollUp();
 
 				if (!keyb.repeatKey)
 					keyb.delayCounter = 0;
@@ -2969,10 +2945,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 				if (ui.posEdScreenShown)
 				{
-					if (song->currPos-(POSED_LIST_SIZE-1) > 0)
-						modSetPos(song->currPos-(POSED_LIST_SIZE-1), DONT_SET_ROW);
-					else
-						modSetPos(0, DONT_SET_ROW);
+					posEdPageUp();
 				}
 				else if (ui.diskOpScreenShown)
 				{
@@ -3006,10 +2979,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 				if (ui.posEdScreenShown)
 				{
-					if (song->currPos+(POSED_LIST_SIZE-1) <= song->header.songLength-1)
-						modSetPos(song->currPos+(POSED_LIST_SIZE-1), DONT_SET_ROW);
-					else
-						modSetPos(song->header.songLength - 1, DONT_SET_ROW);
+					posEdPageDown();
 				}
 				else if (ui.diskOpScreenShown)
 				{
@@ -3167,11 +3137,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				if (keyb.repeatCounter >= 3)
 				{
 					keyb.repeatCounter = 0;
-					if (song->currPos > 0)
-					{
-						modSetPos(song->currPos - 1, DONT_SET_ROW);
-						ui.updatePosEd = true;
-					}
+					posEdScrollUp();
 				}
 			}
 			else if (!ui.samplerScreenShown)
@@ -3220,15 +3186,7 @@ void handleKeyRepeat(SDL_Scancode scancode)
 				if (keyb.repeatCounter >= 3)
 				{
 					keyb.repeatCounter = 0;
-
-					if (song->currPos != song->header.songLength-1)
-					{
-						if (++song->currPos > song->header.songLength-1)
-							song->currPos = song->header.songLength-1;
-
-						modSetPos(song->currPos, DONT_SET_ROW);
-						ui.updatePosEd = true;
-					}
+					posEdScrollDown();
 				}
 			}
 			else if (!ui.samplerScreenShown)

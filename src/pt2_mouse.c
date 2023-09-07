@@ -1901,9 +1901,9 @@ void mouseWheelUpHandler(void)
 				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (ui.posEdScreenShown && song->currPos > 0)
+		else if (ui.posEdScreenShown)
 		{
-			modSetPos(song->currPos - 1, DONT_SET_ROW);
+			posEdScrollUp();
 		}
 	}
 	else if (ui.samplerScreenShown) // lower part of screen
@@ -1933,9 +1933,9 @@ void mouseWheelDownHandler(void)
 				ui.updateDiskOpFileList = true;
 			}
 		}
-		else if (ui.posEdScreenShown && song->currPos < song->header.songLength-1)
+		else if (ui.posEdScreenShown)
 		{
-			modSetPos(song->currPos + 1, DONT_SET_ROW);
+			posEdScrollDown();
 		}
 	}
 	else if (ui.samplerScreenShown) // lower part of screen
@@ -3043,34 +3043,10 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		break;
 
 		case PTB_PE_PATTNAME: posEdEditName(); break;
-
-		case PTB_PE_SCROLLTOP:
-		{
-			if (song->currPos != 0)
-				modSetPos(0, DONT_SET_ROW);
-		}
-		break;
-
-		case PTB_PE_SCROLLUP:
-		{
-			if (song->currPos > 0)
-				modSetPos(song->currPos - 1, DONT_SET_ROW);
-		}
-		break;
-
-		case PTB_PE_SCROLLDOWN:
-		{
-			if (song->currPos < song->header.songLength-1)
-				modSetPos(song->currPos + 1, DONT_SET_ROW);
-		}
-		break;
-
-		case PTB_PE_SCROLLBOT:
-		{
-			if (song->currPos != song->header.songLength-1)
-				modSetPos(song->header.songLength - 1, DONT_SET_ROW);
-		}
-		break;
+		case PTB_PE_SCROLLTOP: posEdScrollToTop(); break;
+		case PTB_PE_SCROLLUP: posEdScrollUp(); break;
+		case PTB_PE_SCROLLDOWN: posEdScrollDown(); break;
+		case PTB_PE_SCROLLBOT: posEdScrollToBottom(); break;
 
 		case PTB_PE_EXIT:
 		{
@@ -4626,8 +4602,7 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 2)
 			{
 				mouse.repeatCounter = 0;
-				if (song->currPos > 0)
-					modSetPos(song->currPos - 1, DONT_SET_ROW);
+				posEdScrollUp();
 			}
 		}
 		break;
@@ -4637,8 +4612,7 @@ static void handleRepeatedGUIButtons(void)
 			if (mouse.repeatCounter >= 2)
 			{
 				mouse.repeatCounter = 0;
-				if (song->currPos < song->header.songLength-1)
-					modSetPos(song->currPos + 1, DONT_SET_ROW);
+				posEdScrollDown();
 			}
 		}
 		break;

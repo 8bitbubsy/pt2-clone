@@ -12,6 +12,74 @@
 
 static char posEdNames[MAX_PATTERNS][16];
 
+void posEdScrollDown(void)
+{
+	const uint16_t scrollAmount = mouse.rightButtonPressed ? 10 : 1;
+
+	if (song->currPos < song->header.songLength-1)
+	{
+		int16_t pos = song->currPos + scrollAmount;
+		if (pos > song->header.songLength-1)
+			pos = song->header.songLength-1;
+
+		modSetPos(pos, DONT_SET_ROW);
+	}
+}
+
+void posEdScrollUp(void)
+{
+	const uint16_t scrollAmount = mouse.rightButtonPressed ? 10 : 1;
+
+	if (song->currPos > 0)
+	{
+		int16_t pos = song->currPos - scrollAmount;
+		if (pos < 0)
+			pos = 0;
+
+		modSetPos(pos, DONT_SET_ROW);
+	}
+}
+
+void posEdPageUp(void)
+{
+	const uint16_t scrollAmount = POSED_LIST_SIZE;
+
+	if (song->currPos > 0)
+	{
+		int16_t pos = song->currPos - scrollAmount;
+		if (pos < 0)
+			pos = 0;
+
+		modSetPos(pos, DONT_SET_ROW);
+	}
+}
+
+void posEdPageDown(void)
+{
+	const uint16_t scrollAmount = POSED_LIST_SIZE;
+
+	if (song->currPos < song->header.songLength-1)
+	{
+		int16_t pos = song->currPos + scrollAmount;
+		if (pos > song->header.songLength-1)
+			pos = song->header.songLength-1;
+
+		modSetPos(pos, DONT_SET_ROW);
+	}
+}
+
+void posEdScrollToTop(void)
+{
+	if (song->currPos > 0)
+		modSetPos(0, DONT_SET_ROW);
+}
+
+void posEdScrollToBottom(void)
+{
+	if (song->currPos < song->header.songLength-1)
+		modSetPos(song->header.songLength-1, DONT_SET_ROW);
+}
+
 void posEdClearNames(void)
 {
 	memset(posEdNames, 0, sizeof (posEdNames));
