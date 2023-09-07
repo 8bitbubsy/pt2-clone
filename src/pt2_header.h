@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.63"
+#define PROG_VER_STR "1.64"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -30,6 +30,9 @@
 
 #define SCREEN_W 320
 #define SCREEN_H 255
+
+#define MIN_AUDIO_FREQUENCY 44100
+#define MAX_AUDIO_FREQUENCY 192000
 
 // main crystal oscillator for PAL Amiga systems
 #define AMIGA_PAL_XTAL_HZ 28375160
