@@ -430,7 +430,7 @@ static bool loadProTrackerDotIni(FILE *f)
 			if (configLine[17] != '\0')
 			{
 				const int32_t num = atoi(&configLine[17]);
-				config.mod2WavOutputFreq = CLAMP(num, 44100, 192000);
+				config.mod2WavOutputFreq = CLAMP(num, MIN_AUDIO_FREQUENCY, MAX_AUDIO_FREQUENCY);
 			}
 		}
 
@@ -440,7 +440,7 @@ static bool loadProTrackerDotIni(FILE *f)
 			if (configLine[10] != '\0')
 			{
 				const int32_t num = atoi(&configLine[10]);
-				config.soundFrequency = CLAMP(num, 44100, 192000);
+				config.soundFrequency = CLAMP(num, MIN_AUDIO_FREQUENCY, MAX_AUDIO_FREQUENCY);
 			}
 		}
 

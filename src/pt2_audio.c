@@ -500,8 +500,14 @@ bool setupAudio(void)
 	audio.oversamplingFlag = (audio.outputRate < 96000); // we do 2x oversampling if the audio output rate is below 96kHz
 	audio.amigaModel = config.amigaModel;
 
+	uint32_t maxFrequency = audio.outputRate;
+	if (maxFrequency < config.mod2WavOutputFreq)
+		maxFrequency = config.mod2WavOutputFreq;
+
+	maxFrequency *= 2; // oversampling
+
 	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
-	int32_t maxSamplesPerTick = (int32_t)ceil(paulaMixFrequency / (MIN_BPM / 2.5)) + 1;
+	int32_t maxSamplesPerTick = (int32_t)ceil(maxFrequency / (MIN_BPM / 2.5)) + 1;
 
 	dMixBufferL = (double *)malloc(maxSamplesPerTick * sizeof (double));
 	dMixBufferR = (double *)malloc(maxSamplesPerTick * sizeof (double));
