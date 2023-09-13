@@ -1166,18 +1166,21 @@ void boostSample(int32_t sample, bool ignoreMark)
 		}
 	}
 
-	int16_t tmp16_0 = 0;
+	int8_t prevSmp = 0;
 	for (int32_t i = from; i < to; i++)
 	{
-		int16_t tmp16_1 = smpDat[i];
-		int16_t tmp16_2 = tmp16_1;
-		tmp16_1 -= tmp16_0;
-		tmp16_0 = tmp16_2;
-		tmp16_1 >>= 2;
-		tmp16_2 += tmp16_1;
+		int16_t tmp16 = smpDat[i] - prevSmp;
 
-		CLAMP8(tmp16_2);
-		smpDat[i] = (int8_t)tmp16_2;
+		int16_t smp16;
+		if (tmp16 < 0)
+			smp16 = smpDat[i] - (-tmp16 >> 2);
+		else
+			smp16 = smpDat[i] + ( tmp16 >> 2);
+
+		prevSmp = smpDat[i];
+
+		CLAMP8(smp16);
+		smpDat[i] = (int8_t)smp16;
 	}
 
 	fixSampleBeep(s);
@@ -1222,11 +1225,7 @@ void filterSample(int32_t sample, bool ignoreMark)
 	to--;
 
 	for (int32_t i = from; i < to; i++)
-	{
-		int16_t tmp16 = (smpDat[i+0] + smpDat[i+1]) >> 1;
-		CLAMP8(tmp16);
-		smpDat[i] = (int8_t)tmp16;
-	}
+		smpDat[i] = (smpDat[i+0] + smpDat[i+1]) >> 1;
 
 	fixSampleBeep(s);
 	// don't redraw sample here, it is done elsewhere
