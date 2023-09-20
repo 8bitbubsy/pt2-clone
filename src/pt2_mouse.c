@@ -1429,21 +1429,22 @@ static void handleSamplerVolumeBox(void)
 
 				const int32_t markLength = to - from;
 
-				const double dSampleLengthMul = 1.0 / markLength;
+				double dToFrac = 0.0;
+				double dFromFrac = editor.vol1;
 
-				int32_t sampleIndex = 0;
+				double dToDelta = (double)editor.vol2 / markLength;
+				double dFromDelta = (double)editor.vol1 / markLength;
+
 				for (int32_t i = from; i < to; i++)
 				{
-					double dSmp = (sampleIndex * editor.vol2) * dSampleLengthMul;
-					dSmp += ((markLength - sampleIndex) * editor.vol1) * dSampleLengthMul;
-					dSmp *= sampleData[i];
-					dSmp *= 1.0 / 100.0;
-
+					double dSmp = ((dToFrac + dFromFrac) * sampleData[i]) * (1.0 / 100.0);
 					int32_t smp32 = (int32_t)dSmp;
 					CLAMP8(smp32);
 
 					sampleData[i] = (int8_t)smp32;
-					sampleIndex++;
+
+					dToFrac += dToDelta;
+					dFromFrac -= dFromDelta;
 				}
 
 				fixSampleBeep(s);
@@ -2812,15 +2813,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			double dSamplePosMul = 1.0 / editor.samplePos;
+			double dDelta = 1.0 / editor.samplePos;
+			double dPos = 0.0;
 
 			int8_t *ptr8 = &song->sampleData[s->offset];
 			for (int32_t j = 0; j < editor.samplePos; j++)
 			{
-				double dSmp = ((*ptr8) * j) * dSamplePosMul;
-				int32_t smp32 = (int32_t)dSmp;
+				int32_t smp32 = (int32_t)((*ptr8) * dPos);
 				CLAMP8(smp32);
 				*ptr8++ = (int8_t)smp32;
+
+				dPos += dDelta;
 			}
 
 			fixSampleBeep(s);
@@ -2857,19 +2860,17 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			if (tmp32 == 0)
 				tmp32 = 1;
 
-			double dSampleMul = 1.0 / tmp32;
+			double dDelta = 1.0 / tmp32;
+			double dPos = 0.0;
 
 			int8_t *ptr8 = &song->sampleData[s->offset+s->length-1];
-
-			int32_t idx = 0;
 			for (int32_t j = editor.samplePos; j < s->length; j++)
 			{
-				double dSmp = ((*ptr8) * idx) * dSampleMul;
-				int32_t smp32 = (int32_t)dSmp;
+				int32_t smp32 = (int32_t)((*ptr8) * dPos);
 				CLAMP8(smp32);
 				*ptr8-- = (int8_t)smp32;
 
-				idx++;
+				dPos += dDelta;
 			}
 
 			fixSampleBeep(s);
