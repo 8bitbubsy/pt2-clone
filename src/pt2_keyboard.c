@@ -2100,20 +2100,7 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 		case SDL_SCANCODE_G:
 		{
-			if (keyb.leftCtrlPressed)
-			{
-				if (askBox(ASKBOX_YES_NO, "BOOST ALL SAMPLES"))
-				{
-					for (int32_t i = 0; i < MOD_SAMPLES; i++)
-						boostSample(i, true);
-
-					if (ui.samplerScreenShown)
-						redrawSample();
-
-					updateWindowTitle(MOD_IS_MODIFIED);
-				}
-			}
-			else if (keyb.leftAltPressed) // toggle record mode (PT clone and PT2.3E only)
+			if (keyb.leftAltPressed) // toggle record mode (PT clone and PT2.3E only)
 			{
 				editor.recordMode ^= 1;
 				if (editor.recordMode == 0)
@@ -2596,19 +2583,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 				if (ui.samplerScreenShown)
 				{
 					samplerSamPaste();
-				}
-				else
-				{
-					if (askBox(ASKBOX_YES_NO, "FILTER ALL SAMPLS"))
-					{
-						for (int32_t i = 0; i < MOD_SAMPLES; i++)
-							filterSample(i, true);
-
-						if (ui.samplerScreenShown)
-							redrawSample();
-
-						updateWindowTitle(MOD_IS_MODIFIED);
-					}
 				}
 			}
 			else if (keyb.leftAltPressed)

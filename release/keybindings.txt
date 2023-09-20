@@ -139,7 +139,6 @@
  ctrl+d - Delete block, drag notes up
  ctrl+e - Expand notes in channel
  ctrl+f - Toggle LED filter on/off
- ctrl+g - Boost treble on all samples
  ctrl+h - Transpose block up
  ctrl+i - Insert block, push notes down
  ctrl+j - Join-paste block
@@ -154,7 +153,7 @@
  ctrl+s - Save module (this is 'toggle split mode' in original PT)
  ctrl+t - Swap channels
  ctrl+u - Undo last pattern edit change
- ctrl+v - Decrease treble on all samples (if sampler is open; paste data)
+ ctrl+v - If sampler is open; paste data
  ctrl+w - Polyphonize block
  ctrl+x - Cut block to buffer (if sampler is open; cut data)
  ctrl+y - Backwards block
