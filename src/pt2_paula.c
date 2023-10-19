@@ -45,9 +45,7 @@ static paulaVoice_t paula[PAULA_VOICES];
 
 void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 {
-	if (dOutputFreq <= 0.0)
-		dOutputFreq = 44100.0;
-
+	assert(dOutputFreq != 0.0);
 	dPaulaOutputFreq = dOutputFreq;
 	dPeriodToDeltaDiv = PAULA_PAL_CLK / dPaulaOutputFreq;
 
@@ -110,7 +108,7 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 
 	if (amigaModel == MODEL_A500)
 	{
-		// A500 1-pole (6db/oct) RC low-pass filter:
+		// A500 1-pole (6dB/oct) RC low-pass filter:
 		R = 360.0; // R321 (360 ohm)
 		C = 1e-7;  // C321 (0.1uF)
 		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~4420.971Hz

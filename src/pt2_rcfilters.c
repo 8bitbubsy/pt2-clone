@@ -26,35 +26,35 @@ void clearOnePoleFilterState(onePoleFilter_t *f)
 
 void onePoleLPFilter(onePoleFilter_t *f, const double in, double *out)
 {
-	f->tmpL = (f->a1 * in) + (f->a2 * f->tmpL);
+	f->tmpL = (in * f->a1) + (f->tmpL * f->a2);
 	*out = f->tmpL;
 }
 
 void onePoleLPFilterStereo(onePoleFilter_t *f, const double *in, double *out)
 {
 	// left channel
-	f->tmpL = (f->a1 * in[0]) + (f->a2 * f->tmpL);
+	f->tmpL = (in[0] * f->a1) + (f->tmpL * f->a2);
 	out[0] = f->tmpL;
 
 	// right channel
-	f->tmpR = (f->a1 * in[1]) + (f->a2 * f->tmpR);
+	f->tmpR = (in[1] * f->a1) + (f->tmpR * f->a2);
 	out[1] = f->tmpR;
 }
 
 void onePoleHPFilter(onePoleFilter_t *f, const double in, double *out)
 {
-	f->tmpL = (f->a1 * in) + (f->a2 * f->tmpL);
+	f->tmpL = (in * f->a1) + (f->tmpL * f->a2);
 	*out = in - f->tmpL;
 }
 
 void onePoleHPFilterStereo(onePoleFilter_t *f, const double *in, double *out)
 {
 	// left channel
-	f->tmpL = (f->a1 * in[0]) + (f->a2 * f->tmpL);
+	f->tmpL = (in[0] * f->a1) + (f->tmpL * f->a2);
 	out[0] = in[0] - f->tmpL;
 
 	// right channel
-	f->tmpR = (f->a1 * in[1]) + (f->a2 * f->tmpR);
+	f->tmpR = (in[1] * f->a1) + (f->tmpR * f->a2);
 	out[1] = in[1] - f->tmpR;
 }
 
@@ -84,24 +84,22 @@ void clearTwoPoleFilterState(twoPoleFilter_t *f)
 
 void twoPoleLPFilter(twoPoleFilter_t *f, const double in, double *out)
 {
-	const double LOut = (f->a1 * in) + (f->a2 * f->tmpL[0]) + (f->a1 * f->tmpL[1]) - (f->b1 * f->tmpL[2]) - (f->b2 * f->tmpL[3]);
+	const double LOut = (in * f->a1) + (f->tmpL[0] * f->a2) + (f->tmpL[1] * f->a1) - (f->tmpL[2] * f->b1) - (f->tmpL[3] * f->b2);
 
 	// shift states
-
 	f->tmpL[1] = f->tmpL[0];
 	f->tmpL[0] = in;
 	f->tmpL[3] = f->tmpL[2];
 	f->tmpL[2] = LOut;
 
 	// set output
-
 	*out = LOut;
 }
 
 void twoPoleLPFilterStereo(twoPoleFilter_t *f, const double *in, double *out)
 {
-	const double LOut = (f->a1 * in[0]) + (f->a2 * f->tmpL[0]) + (f->a1 * f->tmpL[1]) - (f->b1 * f->tmpL[2]) - (f->b2 * f->tmpL[3]);
-	const double ROut = (f->a1 * in[1]) + (f->a2 * f->tmpR[0]) + (f->a1 * f->tmpR[1]) - (f->b1 * f->tmpR[2]) - (f->b2 * f->tmpR[3]);
+	const double LOut = (in[0] * f->a1) + (f->tmpL[0] * f->a2) + (f->tmpL[1] * f->a1) - (f->tmpL[2] * f->b1) - (f->tmpL[3] * f->b2);
+	const double ROut = (in[1] * f->a1) + (f->tmpR[0] * f->a2) + (f->tmpR[1] * f->a1) - (f->tmpR[2] * f->b1) - (f->tmpR[3] * f->b2);
 
 	// shift states
 
@@ -115,7 +113,7 @@ void twoPoleLPFilterStereo(twoPoleFilter_t *f, const double *in, double *out)
 	f->tmpR[3] = f->tmpR[2];
 	f->tmpR[2] = ROut;
 
-	// set output
+	// set outputs
 
 	out[0] = LOut;
 	out[1] = ROut;

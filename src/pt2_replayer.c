@@ -91,9 +91,6 @@ void turnOffVoices(void)
 		setVisualsVolume(i, 0);
 	}
 
-	// reset dithering/filter states (so that every playback session is identical)
-	resetAudioDithering();
-
 	if (audioWasntLocked)
 		unlockAudio();
 

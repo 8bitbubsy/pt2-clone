@@ -43,7 +43,6 @@ void setLEDFilter(bool state);
 void toggleLEDFilter(void);
 
 void updateReplayerTimingMode(void);
-void resetAudioDithering(void);
 void generateBpmTable(double dAudioFreq, bool vblankTimingFlag);
 uint16_t get16BitPeak(int16_t *sampleData, uint32_t sampleLength);
 uint32_t get32BitPeak(int32_t *sampleData, uint32_t sampleLength);
