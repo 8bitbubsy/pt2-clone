@@ -61,6 +61,8 @@ void updatePaulaLoops(void) // used after manipulating sample loop points while 
 			const moduleSample_t *s = &song->samples[editor.currSample];
 
 			const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
+
+			// set voice data ptr and data length
 			paulaWritePtr(voiceAddr + 0, ch->n_start + s->loopStart);
 			paulaWriteWord(voiceAddr + 4, (uint16_t)(s->loopLength >> 1));
 
@@ -358,24 +360,27 @@ static void doRetrg(moduleChannel_t *ch)
 {
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 
-	paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off
+	// voice DMA off
+	paulaWriteWord(0xDFF096, ch->n_dmabit); 
+
+	// set voice data ptr, data length and period
 	paulaWritePtr(voiceAddr + 0, ch->n_start); // n_start is increased on 9xx
 	paulaWriteWord(voiceAddr + 4, ch->n_length);
 	paulaWriteWord(voiceAddr + 6, ch->n_period);
-	paulaWriteWord(0xDFF096, 0x8000 | ch->n_dmabit); // voice DMA on
+
+	// voice DMA on
+	paulaWriteWord(0xDFF096, 0x8000 | ch->n_dmabit); 
 	
-	// these take effect after the current DMA cycle is done
+	// set new data ptr and data length (these take effect after the current DMA cycle is done)
 	paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
 	paulaWriteWord(voiceAddr + 4, ch->n_replen);
 
 	// update tracker visuals
-
 	setVisualsDMACON(ch->n_dmabit);
 	setVisualsDataPtr(ch->n_chanindex, ch->n_start);
 	setVisualsLength(ch->n_chanindex, ch->n_length);
 	setVisualsPeriod(ch->n_chanindex, ch->n_period);
 	setVisualsDMACON(0x8000 | ch->n_dmabit);
-
 	setVisualsDataPtr(ch->n_chanindex, ch->n_loopstart);
 	setVisualsLength(ch->n_chanindex, ch->n_replen);
 
@@ -524,8 +529,11 @@ static void arpeggio(moduleChannel_t *ch)
 	}
 	else // arpTick 0
 	{
+		// set voice period
 		paulaWriteWord(voiceAddr + 6, ch->n_period);
+
 		setVisualsPeriod(ch->n_chanindex, ch->n_period);
+
 		return;
 	}
 
@@ -539,8 +547,11 @@ static void arpeggio(moduleChannel_t *ch)
 	{
 		if (ch->n_period >= periods[baseNote])
 		{
+			// set voice period
 			paulaWriteWord(voiceAddr + 6, periods[baseNote+arpNote]);
+
 			setVisualsPeriod(ch->n_chanindex, periods[baseNote+arpNote]);
+
 			break;
 		}
 	}
@@ -554,6 +565,7 @@ static void portaUp(moduleChannel_t *ch)
 	if ((ch->n_period & 0xFFF) < 113) // PT BUG: sign removed before comparison, underflow not clamped!
 		ch->n_period = (ch->n_period & 0xF000) | 113;
 
+	// set voice period
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 	paulaWriteWord(voiceAddr + 6, ch->n_period & 0xFFF);
 
@@ -568,6 +580,7 @@ static void portaDown(moduleChannel_t *ch)
 	if ((ch->n_period & 0xFFF) > 856)
 		ch->n_period = (ch->n_period & 0xF000) | 856;
 
+	// set voice period
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 	paulaWriteWord(voiceAddr + 6, ch->n_period & 0xFFF);
 
@@ -579,6 +592,8 @@ static void filterOnOff(moduleChannel_t *ch)
 	if (song->tick == 0) // added this (just pointless to call this during all ticks!)
 	{
 		const bool filterOn = (ch->n_cmd & 1) ^ 1;
+
+		// set "LED" filter
 		paulaWriteByte(0xBFE001, filterOn << 1);
 		audio.ledFilterEnabled = filterOn;
 	}
@@ -659,7 +674,9 @@ static void tonePortNoChange(moduleChannel_t *ch)
 
 	if ((ch->n_glissfunk & 0xF) == 0)
 	{
+		// set voice period
 		paulaWriteWord(voiceAddr + 6, ch->n_period);
+
 		setVisualsPeriod(ch->n_chanindex, ch->n_period);
 	}
 	else
@@ -680,7 +697,9 @@ static void tonePortNoChange(moduleChannel_t *ch)
 			}
 		}
 
+		// set voice period
 		paulaWriteWord(voiceAddr + 6, portaPointer[i]);
+
 		setVisualsPeriod(ch->n_chanindex, portaPointer[i]);
 	}
 }
@@ -726,8 +745,9 @@ static void vibrato2(moduleChannel_t *ch)
 	else
 		vibratoData = ch->n_period - vibratoData;
 
+	// set voice period
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
-	paulaWriteWord(voiceAddr + 6, vibratoData); // period
+	paulaWriteWord(voiceAddr + 6, vibratoData);
 
 	setVisualsPeriod(ch->n_chanindex, vibratoData);
 
@@ -801,8 +821,9 @@ static void tremolo(moduleChannel_t *ch)
 			tremoloData = 0;
 	}
 
+	// set voice volume
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
-	paulaWriteWord(voiceAddr + 8, tremoloData); // volume
+	paulaWriteWord(voiceAddr + 8, tremoloData);
 
 	setVisualsVolume(ch->n_chanindex, tremoloData);
 
@@ -883,6 +904,7 @@ static void checkMoreEffects(moduleChannel_t *ch)
 		return;
 	}
 
+	// set voice period
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 	paulaWriteWord(voiceAddr + 6, ch->n_period);
 
@@ -910,6 +932,7 @@ static void chkefx2(moduleChannel_t *ch)
 		default: break;
 	}
 
+	// set voice period
 	const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 	paulaWriteWord(voiceAddr + 6, ch->n_period);
 
@@ -938,6 +961,7 @@ static void checkEffects(moduleChannel_t *ch)
 	const uint8_t cmd = (ch->n_cmd & 0x0F00) >> 8;
 	if (cmd != 0x7)
 	{
+		// set voice volume
 		const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 		paulaWriteWord(voiceAddr + 8, ch->n_volume);
 
@@ -962,13 +986,15 @@ static void setPeriod(moduleChannel_t *ch)
 
 	if ((ch->n_cmd & 0xFF0) != 0xED0) // no note delay
 	{
-		paulaWriteWord(0xDFF096, ch->n_dmabit); // voice DMA off (turned on in setDMA() later)
+		// voice DMA off (turned on in setDMA() later)
+		paulaWriteWord(0xDFF096, ch->n_dmabit);
 
 		if ((ch->n_wavecontrol & 0x04) == 0) ch->n_vibratopos = 0;
 		if ((ch->n_wavecontrol & 0x40) == 0) ch->n_tremolopos = 0;
 
 		const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 
+		// set voice data length and data ptr
 		paulaWriteWord(voiceAddr + 4, ch->n_length);
 		paulaWritePtr(voiceAddr + 0, ch->n_start);
 
@@ -979,6 +1005,7 @@ static void setPeriod(moduleChannel_t *ch)
 			ch->n_replen = 1;
 		}
 
+		// set voice period
 		paulaWriteWord(voiceAddr + 6, ch->n_period);
 
 		DMACONtemp |= ch->n_dmabit;
@@ -1023,6 +1050,7 @@ static void playVoice(moduleChannel_t *ch)
 {
 	if (ch->n_note == 0 && ch->n_cmd == 0) // test period, command and command parameter
 	{
+		// set voice period
 		const uint32_t voiceAddr = 0xDFF0A0 + (ch->n_chanindex * 16);
 		paulaWriteWord(voiceAddr + 6, ch->n_period);
 
@@ -1253,7 +1281,8 @@ static void setDMA(void)
 	if (editor.muted[2]) DMACONtemp &= ~4;
 	if (editor.muted[3]) DMACONtemp &= ~8;
 
-	paulaWriteWord(0xDFF096, 0x8000 | DMACONtemp); // start DMAs for selected voices
+	// start DMAs for selected voices
+	paulaWriteWord(0xDFF096, 0x8000 | DMACONtemp);
 
 	setVisualsDMACON(0x8000 | DMACONtemp);
 
@@ -1263,7 +1292,7 @@ static void setDMA(void)
 		if (DMACONtemp & ch->n_dmabit) // handle visuals on sample trigger
 			setVUMeterHeight(ch);
 
-		// these take effect after the current DMA cycle is done
+		// set new voice data ptr and length (these take effect after the current DMA cycle is done)
 		const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
 		paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
 		paulaWriteWord(voiceAddr + 4, ch->n_replen);
@@ -1339,6 +1368,7 @@ bool intMusic(void) // replayer ticker
 			{
 				playVoice(ch);
 
+				// set voice volume
 				const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
 				paulaWriteWord(voiceAddr + 8, ch->n_volume);
 
