@@ -14,7 +14,7 @@
 		</data>
 		<key>Resources/Info.plist</key>
 		<data>
-		W12gMTmaD7mAaqt5KDExNr0RKgM=
+		vK/siQQ1OKUypFFBghf4RQ9+BUo=
 		</data>
 		<key>Resources/License.txt</key>
 		<data>
@@ -46,11 +46,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			bOToHmbN+xx6t5JDrzQswLbnEZM=
+			S50t60okfb3/ykWKavFC3tnkGgE=
 			</data>
 			<key>hash2</key>
 			<data>
-			2yPzeIi/yrrj/kXEyXW4yRLtxPe1iXPO7joeTUBcZaM=
+			uPZQOi25pO/BZWjREOhxmXsoreSNJyZrNOnVJ/TyYzs=
 			</data>
 		</dict>
 		<key>Headers/SDL_atomic.h</key>
@@ -255,11 +255,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			ddWp0+3xCgtIDS6440MPWGe9/04=
+			SWTHcoPzInj/HwBHNEFfQGmL6Dw=
 			</data>
 			<key>hash2</key>
 			<data>
-			AhMB8T7Wo/c4Ix80R5g/zjWalP7OnCAvnIVEdw8SsLU=
+			BQwW6YWVYXbaOLc9Id+ZjuKHs2VIfcSjM/Oo9JBI6Yk=
 			</data>
 		</dict>
 		<key>Headers/SDL_joystick.h</key>
@@ -552,22 +552,22 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			sNcVNpmlpcvsqJmBOwyg6hjTWQ8=
+			5yyytzTD1eS/K13NSzW6faLAUlA=
 			</data>
 			<key>hash2</key>
 			<data>
-			1EY74HfczRb8zZ3CZfcoinmI8nVMwFaoIfcvG7kPBEE=
+			+ljWDPQHFdheD/Z6QxHzbpNQVg/XVlqx5+B3ovMbIF0=
 			</data>
 		</dict>
 		<key>Headers/SDL_revision.h</key>
 		<dict>
 			<key>hash</key>
 			<data>
-			2zFl2NItuevlztjQRT+teL9UtjY=
+			Pz7POdzqLvDgj19Vw7c1CqAv9/c=
 			</data>
 			<key>hash2</key>
 			<data>
-			1tOTMLCAdQRkl90qB0NtmJIvpr0E4EFoXWZ+4NhffJE=
+			lvSXs+TwAuhMpSDh1zgaCp/Es0DqcxGNgRcNk2F3KJE=
 			</data>
 		</dict>
 		<key>Headers/SDL_rwops.h</key>
@@ -706,11 +706,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			gBiHBn/GcLooPsMb3m+jTv+T1Is=
+			5kKiomtBdEvbeBiU7SpdMlmsVKw=
 			</data>
 			<key>hash2</key>
 			<data>
-			Mgpkfe47yvQhBrQOqP9Xij7/ILlB/q7anYqKeYoRMDw=
+			F+mPKEo8vd2ZM02TMH2M+WX6mEKvOnNaIK1xEIbPPh4=
 			</data>
 		</dict>
 		<key>Headers/SDL_video.h</key>
@@ -783,11 +783,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			W12gMTmaD7mAaqt5KDExNr0RKgM=
+			vK/siQQ1OKUypFFBghf4RQ9+BUo=
 			</data>
 			<key>hash2</key>
 			<data>
-			ct5khvInzhQJNnmPb2gTqlooYCRrHKg1NnWxtf/AwC8=
+			oKJvu1hlX1uYirJ61h7PLL6kUNbH/k0wvoSDwqXWwKg=
 			</data>
 		</dict>
 		<key>Resources/License.txt</key>
