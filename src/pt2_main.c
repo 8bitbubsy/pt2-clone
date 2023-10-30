@@ -374,7 +374,6 @@ int main(int argc, char *argv[])
 
 static void handleInput(void)
 {
-	
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
@@ -391,7 +390,8 @@ static void handleInput(void)
 		}
 
 #ifdef _WIN32
-		handleSysMsg(event);
+		if (event.type == SDL_SYSWMEVENT)
+			handleSysMsg(event);
 #endif
 		if (ui.editTextFlag && event.type == SDL_TEXTINPUT)
 		{
@@ -411,11 +411,16 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_DROPFILE)
 		{
+			if (!video.fullscreen)
+			{
+				if (SDL_GetWindowFlags(video.window) & SDL_WINDOW_MINIMIZED)
+					SDL_RestoreWindow(video.window);
+
+				SDL_RaiseWindow(video.window);
+			}
+
 			loadDroppedFile(event.drop.file, (uint32_t)strlen(event.drop.file), false, true);
 			SDL_free(event.drop.file);
-
-			SDL_RestoreWindow(video.window);
-			SDL_RaiseWindow(video.window);
 		}
 		else if (event.type == SDL_QUIT)
 		{
@@ -596,7 +601,9 @@ static void handleSigTerm(void)
 		if (!video.fullscreen)
 		{
 			// de-minimize window and set focus so that the user sees the message box
-			SDL_RestoreWindow(video.window);
+			if (SDL_GetWindowFlags(video.window) & SDL_WINDOW_MINIMIZED)
+				SDL_RestoreWindow(video.window);
+
 			SDL_RaiseWindow(video.window);
 		}
 
@@ -840,9 +847,6 @@ static bool handleSingleInstancing(int32_t argc, char **argv)
 
 static void handleSysMsg(SDL_Event inputEvent)
 {
-	if (inputEvent.type != SDL_SYSWMEVENT)
-		return;
-
 	SDL_SysWMmsg *wmMsg = inputEvent.syswm.msg;
 	if (wmMsg->subsystem == SDL_SYSWM_WINDOWS && wmMsg->msg.win.msg == SYSMSG_FILE_ARG)
 	{
@@ -852,16 +856,18 @@ static void handleSysMsg(SDL_Event inputEvent)
 			sharedMemBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_READ, 0, 0, ARGV_SHARED_MEM_MAX_LEN);
 			if (sharedMemBuf != NULL)
 			{
+				if (video.window != NULL && !video.fullscreen)
+				{
+					if (SDL_GetWindowFlags(video.window) & SDL_WINDOW_MINIMIZED)
+						SDL_RestoreWindow(video.window);
+
+					SDL_RaiseWindow(video.window);
+				}
+
 				loadDroppedFile((char *)sharedMemBuf, (uint32_t)strlen(sharedMemBuf), true, true);
 
 				UnmapViewOfFile(sharedMemBuf);
 				sharedMemBuf = NULL;
-
-				if (video.window != NULL)
-				{
-					SDL_RestoreWindow(video.window);
-					SDL_RaiseWindow(video.window);
-				}
 			}
 
 			CloseHandle(hMapFile);

@@ -398,10 +398,6 @@ void loadDroppedFile(char *fullPath, uint32_t fullPathLen, bool autoPlay, bool s
 	{
 		if (songModifiedCheck && song->modified)
 		{
-			// de-minimize window and set focus so that the user sees the message box
-			SDL_RestoreWindow(video.window);
-			SDL_RaiseWindow(video.window);
-
 			if (!askBox(ASKBOX_YES_NO, "SONG IS UNSAVED !"))
 				goto DropExit;
 		}
