@@ -4,4 +4,4 @@ Source code (BSD 3-clause):
 src\LICENSE.txt
 
 SDL2:
-vs2019_project\pt2-clone\sdl\COPYING.txt
+vs2019_project\pt2-clone\sdl\LICENSE.txt
