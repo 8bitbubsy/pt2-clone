@@ -247,7 +247,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	{
 		paulaGenerateSamples(dMixBufferL, dMixBufferR, numSamples*2);
 
-		// downsample, normalize and dither
+		// downsample and normalize
 		int16_t out[2];
 		int16_t *outStream = target;
 		if (stereoSeparation == 100)
@@ -273,7 +273,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	{
 		paulaGenerateSamples(dMixBufferL, dMixBufferR, numSamples);
 
-		// normalize and dither
+		// normalize
 		int16_t out[2];
 		int16_t *outStream = target;
 		if (stereoSeparation == 100)
