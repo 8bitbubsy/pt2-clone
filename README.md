@@ -1,7 +1,7 @@
 # pt2-clone
 ProTracker 2 clone for Windows/macOS/Linux
 
-Aims to be a **highly accurate** clone of the classic ProTracker 2.3D software for Amiga. \
+Aims to be a highly accurate clone of the classic ProTracker 2.3D software for Amiga. \
 Has additional audio filters and audio mixer improvements to make it sound close to a real Amiga computer. \
 *What is ProTracker? Read about it on [Wikipedia](https://en.wikipedia.org/wiki/ProTracker).*
 
@@ -37,4 +37,4 @@ This can also be permanently activated by editing the config file
 Please read HOW-TO-COMPILE.txt file in the repository.
 
 PS: The source code is quite hackish and hardcoded. \
-My first priority is to make an _accurate_ 1:1 clone, and not to make flexible and easily modifiable code.
+My first priority is to make an accurate clone, and not to make flexible and easily modifiable code.
