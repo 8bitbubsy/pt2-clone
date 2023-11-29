@@ -7,7 +7,7 @@
 typedef struct sampler_t
 {
 	const int8_t *samStart;
-	int8_t *blankSample, *copyBuf;
+	int8_t *blankSample, *copyBuf, *sampleUndoCopy;
 	int16_t loopStartPos, loopEndPos;
 	uint16_t dragStart, dragEnd;
 	int32_t samPointWidth, samOffset, samDisplay, samLength, saveMouseX, lastSamPos;

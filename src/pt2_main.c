@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 
 	loadConfig();
 
-	if (!setupVideo())
+	if (!allocSamplerVars() || !setupVideo())
 	{
 		cleanUp();
 		SDL_Quit();
@@ -501,14 +501,13 @@ static bool initializeVars(void)
 
 	// allocate some memory
 
-	if (!allocSamplerVars() || !allocDiskOpVars())
+	if (!allocDiskOpVars())
 		goto oom;
 
 	config.defModulesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
 	config.defSamplesDir = (char *)calloc(PATH_MAX + 1, sizeof (char));
-	editor.tempSample = (int8_t *)calloc(131070, 1);
 
-	if (config.defModulesDir == NULL || config.defSamplesDir == NULL || editor.tempSample == NULL)
+	if (config.defModulesDir == NULL || config.defSamplesDir == NULL)
 		goto oom;
 
 	turnOffVoices();
@@ -943,7 +942,6 @@ static void cleanUp(void) // never call this inside the main loop!
 
 	if (config.defModulesDir != NULL) free(config.defModulesDir);
 	if (config.defSamplesDir != NULL) free(config.defSamplesDir);
-	if (editor.tempSample != NULL) free(editor.tempSample);
 
 #ifdef _WIN32
 #ifndef _DEBUG

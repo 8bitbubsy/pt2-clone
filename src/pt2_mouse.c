@@ -1635,7 +1635,7 @@ static void handleSamplerFiltersBox(void)
 		}
 		else
 		{
-			memcpy(&song->sampleData[s->offset], editor.tempSample, config.maxSampleLength);
+			memcpy(&song->sampleData[s->offset], sampler.sampleUndoCopy, config.maxSampleLength);
 			redrawSample();
 			updateWindowTitle(MOD_IS_MODIFIED);
 			renderSamplerFiltersBox();

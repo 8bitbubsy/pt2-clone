@@ -217,7 +217,7 @@ void fillSampleFilterUndoBuffer(void)
 	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
 		s = &song->samples[editor.currSample];
-		memcpy(editor.tempSample, &song->sampleData[s->offset], s->length);
+		memcpy(sampler.sampleUndoCopy, &song->sampleData[s->offset], s->length);
 	}
 }
 
@@ -810,12 +810,13 @@ void fillSampleRedoBuffer(int8_t sample)
 	}
 }
 
-bool allocSamplerVars(void)
+bool allocSamplerVars(void) // must be called after config is loaded
 {
-	sampler.copyBuf = (int8_t *)malloc(131070);
-	sampler.blankSample = (int8_t *)calloc(131070, 1);
+	sampler.copyBuf = (int8_t *)malloc(config.maxSampleLength);
+	sampler.blankSample = (int8_t *)calloc(config.maxSampleLength, 1);
+	sampler.sampleUndoCopy = (int8_t *)calloc(config.maxSampleLength, 1);
 
-	if (sampler.copyBuf == NULL || sampler.blankSample == NULL)
+	if (sampler.copyBuf == NULL || sampler.blankSample == NULL || sampler.sampleUndoCopy == NULL)
 		return false;
 
 	return true;
@@ -833,6 +834,12 @@ void deAllocSamplerVars(void)
 	{
 		free(sampler.blankSample);
 		sampler.blankSample = NULL;
+	}
+	
+	if (sampler.sampleUndoCopy != NULL)
+	{
+		free(sampler.sampleUndoCopy);
+		sampler.sampleUndoCopy = NULL;
 	}
 
 	for (int32_t i = 0; i < MOD_SAMPLES; i++)
