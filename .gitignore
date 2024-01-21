@@ -25,3 +25,4 @@ vs2019_project/pt2-clone/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
 *.recipe
 *.iobj
 *.enc
+release/macos/pt2-clone-macos.app/Contents/MacOS/pt2-clone-macos
