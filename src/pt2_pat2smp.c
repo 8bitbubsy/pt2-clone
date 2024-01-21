@@ -28,26 +28,30 @@ static uint8_t pat2SmpStartRow = 0, pat2SmpRows = 32;
 static int32_t pat2SmpPos;
 static double *dMixBufferL, *dMixBufferR, *dPat2SmpBuf, dPat2SmpFreq, dSeconds;
 
-static void pat2SmpOutputAudio(int32_t numSamples)
+static void pat2SmpOutputAudio(int32_t numSamples, bool outputEnable)
 {
 	int32_t samplesTodo = numSamples;
-	if (pat2SmpPos+samplesTodo > config.maxSampleLength)
+
+	if (outputEnable && pat2SmpPos+samplesTodo > config.maxSampleLength)
 		samplesTodo = config.maxSampleLength - pat2SmpPos;
 
 	paulaGenerateSamples(dMixBufferL, dMixBufferR, samplesTodo*2); // 2x oversampling
 
-	for (int32_t i = 0; i < samplesTodo; i++)
+	if (outputEnable)
 	{
-		// 2x downsampling (decimation)
-		double dL = decimate2x_L(dMixBufferL[(i << 1) + 0], dMixBufferL[(i << 1) + 1]);
-		double dR = decimate2x_R(dMixBufferR[(i << 1) + 0], dMixBufferR[(i << 1) + 1]);
+		for (int32_t i = 0; i < samplesTodo; i++)
+		{
+			// 2x downsampling (decimation)
+			double dL = decimate2x_L(dMixBufferL[(i << 1) + 0], dMixBufferL[(i << 1) + 1]);
+			double dR = decimate2x_R(dMixBufferR[(i << 1) + 0], dMixBufferR[(i << 1) + 1]);
 
-		dPat2SmpBuf[pat2SmpPos+i] = (dL + dR) * 0.5; // stereo -> mono, normalized to -128..127 later
-	}
+			dPat2SmpBuf[pat2SmpPos+i] = (dL + dR) * 0.5; // stereo -> mono, normalized to -128..127 later
+		}
 
-	pat2SmpPos += samplesTodo;
-	if (pat2SmpPos >= config.maxSampleLength)
-		pat2SmpEndReached = true;
+		pat2SmpPos += samplesTodo;
+		if (pat2SmpPos >= config.maxSampleLength)
+			pat2SmpEndReached = true;
+	}	
 }
 
 void pat2SmpDrawNote(void)
@@ -283,8 +287,8 @@ void pat2SmpRender(void)
 		if (lastRow && song->tick == song->speed-1)
 			pat2SmpEndReached = true;
 
-		if (lastRow || song->row > pat2SmpStartRow)
-			pat2SmpOutputAudio(samplesToMix);
+		const bool outputEnableFlag = lastRow || song->row > pat2SmpStartRow;
+		pat2SmpOutputAudio(samplesToMix, outputEnableFlag);
 	}
 	editor.pat2SmpOngoing = false;
 
