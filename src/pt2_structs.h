@@ -121,31 +121,26 @@ typedef struct mouse_t
 	volatile bool setPosFlag, updatePointerColorFlag;
 	bool buttonWaiting, leftButtonPressed, rightButtonPressed;
 	uint8_t repeatCounter, buttonWaitCounter;
-	int32_t rawX, rawY, x, y, lastMouseX, setPosX, setPosY, lastGUIButton, prevX, prevY;
+	int32_t absX, absY, rawX, rawY, x, y, lastMouseX, setPosX, setPosY, lastGUIButton, prevX, prevY;
 	int32_t lastSmpFilterButton, lastSamplingButton;
 	uint32_t buttonState;
 } mouse_t;
 
 typedef struct video_t
 {
-	bool fullscreen, vsync60HzPresent, windowHidden, useDesktopMouseCoords;
-	int32_t renderX, renderY, renderW, renderH, displayW, displayH;
-	int32_t xScale, yScale;
-	float fMouseXMul, fMouseYMul;
-	hpc_t vblankHpc;
-	SDL_PixelFormat *pixelFormat;
-	uint32_t *frameBuffer;
+	bool fullscreen, vsync60HzPresent, windowHidden, useCustomRenderRect, debug;
+	int32_t renderX, renderY, renderW, renderH, displayW, displayH, windowW, windowH;
+	uint32_t mouseCursorUpscaleFactor, *frameBuffer, palette[PALETTE_NUM];
 	uint64_t amigaVblankDelta; // 0.52 fixed-point
-
-	SDL_Window *window;
-	SDL_Renderer *renderer;
-	SDL_Texture  *texture;
-
-	uint32_t palette[PALETTE_NUM];
-
+	double dMonitorRefreshRate, dMouseXMul, dMouseYMul;
 #ifdef _WIN32
 	HWND hWnd;
 #endif
+	hpc_t vblankHpc;
+	SDL_Window *window;
+	SDL_Rect renderRect;
+	SDL_Renderer *renderer;
+	SDL_Texture  *texture;
 } video_t;
 
 typedef struct editor_t

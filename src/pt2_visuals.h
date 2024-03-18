@@ -21,6 +21,10 @@ enum
 	SPRITE_TYPE_RGB = 1
 };
 
+void resetFPSCounter(void);
+void beginFPSCounter(void);
+void endFPSCounter(void);
+
 void blit32(int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *src);
 void putPixel(int32_t x, int32_t y, const uint32_t pixelColor);
 void hLine(int32_t x, int32_t y, int32_t w, const uint32_t pixelColor);

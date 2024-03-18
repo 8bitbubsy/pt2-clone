@@ -243,6 +243,10 @@ enum
 
 #define NUM_CURSORS 6
 
+#if defined __APPLE__ && defined __aarch64__
+void armMacGhostMouseCursorFix(void);
+#endif
+
 void sampleUpButton(void);
 void sampleDownButton(void);
 void setMsgPointer(void);

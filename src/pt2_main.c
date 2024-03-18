@@ -350,6 +350,7 @@ int main(int argc, char *argv[])
 	// XXX: if you change anything in the main loop, make sure it goes in the askBox()(pt2_askbox.c) loop too, if needed
 	while (editor.programRunning)
 	{
+		beginFPSCounter();
 		handleThreadedAskBox();
 		sinkVisualizerBars();
 		updateChannelSyncBuffer();
@@ -364,6 +365,7 @@ int main(int argc, char *argv[])
 
 		renderFrame();
 		flipFrame();
+		endFPSCounter();
 	}
 
 	cleanUp();
@@ -448,6 +450,9 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_MOUSEBUTTONUP)
 		{
+#if defined __APPLE__ && defined __aarch64__
+			armMacGhostMouseCursorFix();
+#endif
 			mouseButtonUpHandler(event.button.button);
 
 			if (ui.introTextShown)
@@ -463,6 +468,12 @@ static void handleInput(void)
 			if (ui.sampleMarkingPos == -1 && !ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
 				mouseButtonDownHandler(event.button.button);
 		}
+#if defined __APPLE__ && defined __aarch64__
+		else if (event.type == SDL_MOUSEMOTION)
+		{
+			armMacGhostMouseCursorFix();
+		}
+#endif
 
 		if (ui.throwExit)
 		{

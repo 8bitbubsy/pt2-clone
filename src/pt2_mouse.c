@@ -40,6 +40,21 @@ static bool handleGUIButtons(int32_t button);
 static void handleRepeatedGUIButtons(void);
 static void handleRepeatedSamplerFilterButtons(void);
 
+#if defined __APPLE__ && defined __aarch64__
+void armMacGhostMouseCursorFix(void)
+{
+	/* M E G A K L U D G E:
+	** The mouse cursor can sometimes change back to OS stock
+	** (or show both stock and custom mouse) on Macs with a notch
+	** (ARM based) in fullscreen mode. Weird, right?!
+	**
+	** XXX: Can this cause stuttering or performance issues?
+	*/
+	if (video.fullscreen)
+		SDL_SetCursor(NULL); // forces redraw
+}
+#endif
+
 void sampleUpButton(void)
 {
 	if (editor.sampleZero)
@@ -163,7 +178,7 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 {
 	freeMouseCursors();
 
-	uint32_t scaleFactor = video.yScale;
+	uint32_t scaleFactor = video.mouseCursorUpscaleFactor;
 	if (scaleFactor > 8) // just in case
 		scaleFactor = 8;
 
@@ -244,8 +259,8 @@ bool createMouseCursors(void) // creates scaled SDL surfaces for current mouse p
 
 void updateMouseScaling(void)
 {
-	if (video.renderW > 0) video.fMouseXMul = (float)SCREEN_W / video.renderW;
-	if (video.renderH > 0) video.fMouseYMul = (float)SCREEN_H / video.renderH;
+	if (video.renderW > 0) video.dMouseXMul = (double)SCREEN_W / video.renderW;
+	if (video.renderH > 0) video.dMouseYMul = (double)SCREEN_H / video.renderH;
 }
 
 void readMouseXY(void)
@@ -267,9 +282,19 @@ void readMouseXY(void)
 		return;
 	}
 
-	if (video.useDesktopMouseCoords)
+	if (video.fullscreen)
+	{
+		mouse.buttonState = SDL_GetMouseState(&mx, &my);
+
+		mouse.absX = mx;
+		mouse.absY = my;
+	}
+	else
 	{
 		mouse.buttonState = SDL_GetGlobalMouseState(&mx, &my);
+
+		mouse.absX = mx;
+		mouse.absY = my;
 
 		// convert desktop coords to window coords
 		SDL_GetWindowPosition(video.window, &windowX, &windowY);
@@ -277,60 +302,55 @@ void readMouseXY(void)
 		mx -= windowX;
 		my -= windowY;
 	}
-	else
-	{
-		// special mode for KMSDRM (XXX: Confirm that this still works...)
-		mouse.buttonState = SDL_GetMouseState(&mx, &my);
-	}
 
 	mouse.rawX = mx;
 	mouse.rawY = my;
 
 	if (video.fullscreen)
 	{
-		// centered fullscreen mode (not stretched) needs further coord translation
-		if (!config.fullScreenStretch)
+		// if software mouse is enabled, warp mouse inside render space
+		if (!config.hwMouse)
 		{
-			// if software mouse is enabled, warp mouse inside render space
-			if (!config.hwMouse)
+			bool warpMouse = false;
+
+			if (mx < video.renderX)
 			{
-				bool warpMouse = false;
-
-				if (mx < video.renderX)
-				{
-					mx = video.renderX;
-					warpMouse = true;
-				}
-				else if (mx >= video.renderX+video.renderW)
-				{
-					mx = (video.renderX + video.renderW) - 1;
-					warpMouse = true;
-				}
-
-				if (my < video.renderY)
-				{
-					my = video.renderY;
-					warpMouse = true;
-				}
-				else if (my >= video.renderY+video.renderH)
-				{
-					my = (video.renderY + video.renderH) - 1;
-					warpMouse = true;
-				}
-
-				if (warpMouse)
-					SDL_WarpMouseInWindow(video.window, mx, my);
+				mx = video.renderX;
+				warpMouse = true;
+			}
+			else if (mx >= video.renderX+video.renderW)
+			{
+				mx = (video.renderX + video.renderW) - 1;
+				warpMouse = true;
 			}
 
-			// convert fullscreen coords to window (centered image) coords
-			mx -= video.renderX;
-			my -= video.renderY;
+			if (my < video.renderY)
+			{
+				my = video.renderY;
+				warpMouse = true;
+			}
+			else if (my >= video.renderY+video.renderH)
+			{
+				my = (video.renderY + video.renderH) - 1;
+				warpMouse = true;
+			}
+
+			if (warpMouse)
+				SDL_WarpMouseInWindow(video.window, mx, my);
 		}
+
+		// convert fullscreen coords to window (centered image) coords
+		mx -= video.renderX;
+		my -= video.renderY;
 	}
 
-	// multiply coords by video upscaling factors (don't round)
-	mouse.x = (int32_t)(mx * video.fMouseXMul);
-	mouse.y = (int32_t)(my * video.fMouseYMul);
+	// kludge: this can happen and prevent buttons from pressing on the very first row of pixels
+	if (mx == -1) mx = 0;
+	if (my == -1) my = 0;
+
+	// multiply coords by video upscaling factors
+	mouse.x = (int32_t)floor(mx * video.dMouseXMul);
+	mouse.y = (int32_t)floor(my * video.dMouseYMul);
 
 	if (config.hwMouse)
 	{

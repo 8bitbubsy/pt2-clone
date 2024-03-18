@@ -46,6 +46,13 @@ typedef struct sprite_t
 	const void *data;
 } sprite_t;
 
+// for debug box
+#define FPS_SCAN_FRAMES 60
+static char fpsTextBuf[1024];
+static uint64_t frameStartTime;
+static double dRunningFrameDuration, dAvgFPS;
+// ------------------
+
 static int32_t oldCurrMode = -1;
 static uint32_t vuMetersBg[4 * (10 * 48)];
 
@@ -1600,20 +1607,140 @@ void renderSprites(void)
 	}
 }
 
+void resetFPSCounter(void)
+{
+	editor.framesPassed = 0;
+	fpsTextBuf[0] = '\0';
+	dRunningFrameDuration = 1000.0 / VBLANK_HZ;
+}
+
+void beginFPSCounter(void)
+{
+	if (video.debug)
+		frameStartTime = SDL_GetPerformanceCounter();
+}
+
+void endFPSCounter(void)
+{
+	if (video.debug && frameStartTime > 0)
+	{
+		uint64_t frameTimeDiff64 = SDL_GetPerformanceCounter() - frameStartTime;
+		if (frameTimeDiff64 > INT32_MAX)
+			frameTimeDiff64 = INT32_MAX;
+
+		dRunningFrameDuration += (int32_t)frameTimeDiff64 * hpcFreq.dFreqMulMs;
+	}
+}
+
+static void drawDebugBox(void)
+{
+	SDL_version SDLVer;
+
+	SDL_GetVersion(&SDLVer);
+
+	if (editor.framesPassed >= FPS_SCAN_FRAMES && (editor.framesPassed % FPS_SCAN_FRAMES) == 0)
+	{
+		dAvgFPS = 1000.0 / (dRunningFrameDuration / FPS_SCAN_FRAMES);
+		if (dAvgFPS < 0.0 || dAvgFPS > 99999999.9999)
+			dAvgFPS = 99999999.9999; // prevent number from overflowing text box
+
+		dRunningFrameDuration = 0.0;
+	}
+
+	drawFramework3(4, 4, SCREEN_W-8, 81);
+
+	// if enough frame data isn't collected yet, show a message
+	if (editor.framesPassed < FPS_SCAN_FRAMES)
+	{
+		const char text[] = "Gathering frame information...";
+		const uint16_t textW = (sizeof (text)-1) * (FONT_CHAR_W-1);
+		textOut2(4+(SCREEN_W-textW)/2, 4+(81/2) - (FONT_CHAR_H/2), text);
+		return;
+	}
+
+	double dRefreshRate = video.dMonitorRefreshRate;
+	if (dRefreshRate < 0.0 || dRefreshRate > 9999.9)
+		dRefreshRate = 9999.9; // prevent number from overflowing text box
+
+	sprintf(fpsTextBuf,
+	    "SDL version: %u.%u.%u\n" \
+	    "Frames per second: %.3f\n" \
+	    "Monitor refresh: %.1fHz (vsync: %s)\n" \
+	    "HPC frequency (timer): %.4fMHz\n" \
+	    "Render size: %dx%d (offset %d,%d)\n" \
+	    "Disp. size: %dx%d (window: %dx%d)\n" \
+	    "Render scaling: x=%.4f, y=%.4f\n" \
+	    "Mouse muls: x=%.4f, y=%.4f\n" \
+	    "Relative mouse coords: %d,%d\n" \
+	    "Absolute mouse coords: %d,%d\n" \
+	    "Press CTRL+SHIFT+F to close this box.\n",
+	    SDLVer.major, SDLVer.minor, SDLVer.patch,
+	    dAvgFPS,
+	    dRefreshRate,
+	    video.vsync60HzPresent ? "yes" : "no",
+	    hpcFreq.freq64 / (1000.0 * 1000.0),
+	    video.renderW, video.renderH, video.renderX, video.renderY,
+	    video.displayW, video.displayH, video.windowW, video.windowH,
+	    (double)video.renderW / SCREEN_W, (double)video.renderH / SCREEN_H,
+	    video.dMouseXMul, video.dMouseYMul,
+	    mouse.x, mouse.y,
+	    mouse.absX, mouse.absY);
+
+	// draw text
+
+	uint16_t xPos = 4+2;
+	uint16_t yPos = 4+3;
+
+	char *textPtr = fpsTextBuf;
+	while (*textPtr != '\0')
+	{
+		const char ch = *textPtr++;
+		if (ch == '\n')
+		{
+			yPos += FONT_CHAR_H+2;
+			xPos = 4+2;
+			continue;
+		}
+
+		charOut(xPos, yPos, ch, 0x00000000);
+		xPos += FONT_CHAR_W-1;
+	}
+
+	// draw framerate tester symbol
+
+	const uint16_t symbolEnd = 122;
+
+	// ping-pong movement
+	uint16_t x = editor.framesPassed % (symbolEnd * 2);
+	if (x >= symbolEnd)
+		x = (symbolEnd * 2) - x;
+
+	charOut(179+4+x, 4+10, '*', 0x00000000);
+}
+
 void flipFrame(void)
 {
 	const uint32_t windowFlags = SDL_GetWindowFlags(video.window);
 	bool minimized = (windowFlags & SDL_WINDOW_MINIMIZED) ? true : false;
 
 	renderSprites();
+
+	if (video.debug)
+		drawDebugBox();
+
 	SDL_UpdateTexture(video.texture, NULL, video.frameBuffer, SCREEN_W * sizeof (int32_t));
 
 	// SDL 2.0.14 bug on Windows (?): This function consumes ever-increasing memory if the program is minimized
 	if (!minimized)
 		SDL_RenderClear(video.renderer);
 
-	SDL_RenderCopy(video.renderer, video.texture, NULL, NULL);
+	if (video.useCustomRenderRect)
+		SDL_RenderCopy(video.renderer, video.texture, NULL, &video.renderRect);
+	else
+		SDL_RenderCopy(video.renderer, video.texture, NULL, NULL);
+
 	SDL_RenderPresent(video.renderer);
+
 	eraseSprites();
 
 	if (!video.vsync60HzPresent)
@@ -1729,73 +1856,63 @@ void sinkVisualizerBars(void) // sinks visualizer bars @ 49.92Hz (Amiga PAL) rat
 
 void updateRenderSizeVars(void)
 {
-	if (video.useDesktopMouseCoords)
-	{
-		SDL_DisplayMode dm;
+	SDL_DisplayMode dm;
 
-		int32_t di = SDL_GetWindowDisplayIndex(video.window);
-		if (di < 0)
-			di = 0; // return display index 0 (default) on error
+	int32_t di = SDL_GetWindowDisplayIndex(video.window);
+	if (di < 0)
+		di = 0; // return display index 0 (default) on error
 
-		SDL_GetDesktopDisplayMode(di, &dm);
-		video.displayW = dm.w;
-		video.displayH = dm.h;
-	}
-	else
-	{
-		SDL_GetWindowSize(video.window, &video.displayW, &video.displayH);
-	}
+	SDL_GetDesktopDisplayMode(di, &dm);
+	video.displayW = dm.w;
+	video.displayH = dm.h;
+
+	SDL_GetWindowSize(video.window, &video.windowW, &video.windowH);
+	video.renderX = 0;
+	video.renderY = 0;
+
+	video.useCustomRenderRect = false;
 
 	if (video.fullscreen)
 	{
 		if (config.fullScreenStretch)
 		{
-			video.renderW = video.displayW;
-			video.renderH = video.displayH;
-			video.renderX = 0;
-			video.renderY = 0;
+			// "streched out" windowed fullscreen
+
+			video.renderW = video.windowW;
+			video.renderH = video.windowH;
 		}
 		else
 		{
-			float fXScale, fYScale;
-			SDL_RenderGetScale(video.renderer, &fXScale, &fYScale);
+			// centered windowed fullscreen, with pixel-perfect integer upscaling
 
-			video.renderW = (int32_t)(SCREEN_W * fXScale);
-			video.renderH = (int32_t)(SCREEN_H * fYScale);
+			const int32_t maxUpscaleFactor = MIN(video.windowW / SCREEN_W, video.windowH / SCREEN_H);
+			video.renderW = SCREEN_W * maxUpscaleFactor;
+			video.renderH = SCREEN_H * maxUpscaleFactor;
+			video.renderX = (video.windowW - video.renderW) / 2;
+			video.renderY = (video.windowH - video.renderH) / 2;
 
-			// high-DPI hackery:
-			//  On high-DPI systems, the display w/h are given in logical pixels,
-			//  but the renderer size is given in physical pixels. Since our internal
-			//  render{X,Y,W,H} variables need to be in logical coordinates, as that's
-			//  what mouse input uses, scale them by the screen's DPI scale factor,
-			//  which is the physical (renderer) size / the logical (window) size.
-			//  On non high-DPI systems, this is effectively a no-op.
-			int32_t actualScreenW, actualScreenH;
-			SDL_GL_GetDrawableSize(video.window, &actualScreenW, &actualScreenH);
+			// get hi-DPI upscale factors (returns 1.0 if no hi-DPI upscaling)
+			int32_t widthInPixels, heightInPixels;
+			SDL_GL_GetDrawableSize(video.window, &widthInPixels, &heightInPixels);
+			double dHiDPIScaleX = (double)widthInPixels / video.windowW;
+			double dHiDPIScaleY = (double)heightInPixels / video.windowH;
 
-			const double dXUpscale = (const double)actualScreenW / video.displayW;
-			const double dYUpscale = (const double)actualScreenH / video.displayH;
-
-			// downscale back to correct sizes
-			if (dXUpscale != 0.0) video.renderW = (int32_t)(video.renderW / dXUpscale);
-			if (dYUpscale != 0.0) video.renderH = (int32_t)(video.renderH / dYUpscale);
-
-			video.renderX = (video.displayW - video.renderW) / 2;
-			video.renderY = (video.displayH - video.renderH) / 2;
+			video.renderRect.x = (int32_t)floor(video.renderX * dHiDPIScaleX);
+			video.renderRect.y = (int32_t)floor(video.renderY * dHiDPIScaleY);
+			video.renderRect.w = (int32_t)floor(video.renderW * dHiDPIScaleX);
+			video.renderRect.h = (int32_t)floor(video.renderH * dHiDPIScaleY);
+			video.useCustomRenderRect = true; // use the destination coordinates above in SDL_RenderCopy()
 		}
 	}
 	else
 	{
-		SDL_GetWindowSize(video.window, &video.renderW, &video.renderH);
+		// windowed mode
 
-		video.renderX = 0;
-		video.renderY = 0;
+		SDL_GetWindowSize(video.window, &video.renderW, &video.renderH);
 	}
 
-	// for mouse cursor creation
-	video.xScale = (int32_t)round(video.renderW / (double)SCREEN_W);
-	video.yScale = (int32_t)round(video.renderH / (double)SCREEN_H);
-
+	// "hardware mouse" calculations
+	video.mouseCursorUpscaleFactor = MIN(video.renderW / SCREEN_W, video.renderH / SCREEN_H);
 	createMouseCursors();
 }
 
@@ -1803,46 +1920,11 @@ void toggleFullscreen(void)
 {
 	video.fullscreen ^= 1;
 	if (video.fullscreen)
-	{
 		SDL_SetWindowFullscreen(video.window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-
-		if (config.fullScreenStretch)
-		{
-			SDL_DisplayMode dm;
-
-			int32_t di = SDL_GetWindowDisplayIndex(video.window);
-			if (di < 0)
-				di = 0; // return display index 0 (default) on error
-
-			SDL_GetDesktopDisplayMode(di, &dm);
-
-			SDL_RenderSetLogicalSize(video.renderer, dm.w, dm.h);
-		}
-		else
-		{
-			SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
-		}
-
-		SDL_SetWindowSize(video.window, SCREEN_W, SCREEN_H);
-
-#ifndef __unix__ // can be severely buggy on Linux... (at least when used like this)
-		SDL_SetWindowGrab(video.window, SDL_TRUE);
-#endif
-	}
 	else
-	{
 		SDL_SetWindowFullscreen(video.window, 0);
-		SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
-		SDL_SetWindowSize(video.window, SCREEN_W * config.videoScaleFactor, SCREEN_H * config.videoScaleFactor);
 
-#ifdef __unix__ // can be required on Linux... (or else the window keeps moving down every time you leave fullscreen)
-		SDL_SetWindowPosition(video.window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
-#endif
-
-#ifndef __unix__
-		SDL_SetWindowGrab(video.window, SDL_FALSE);
-#endif
-	}
+	SDL_Delay(15); // fixes possible issues
 
 	updateRenderSizeVars();
 	updateMouseScaling();
@@ -1900,16 +1982,19 @@ bool setupVideo(void)
 
 	uint32_t rendererFlags = 0;
 
+	SDL_DisplayMode dm;
+
+	int32_t di = SDL_GetWindowDisplayIndex(video.window);
+	if (di < 0)
+		di = 0; // return display index 0 (default) on error
+
+	SDL_GetDesktopDisplayMode(di, &dm);
+	video.dMonitorRefreshRate = (double)dm.refresh_rate;
+
 	video.vsync60HzPresent = false;
 	if (!config.vsyncOff)
 	{
-		SDL_DisplayMode dm;
 
-		int32_t di = SDL_GetWindowDisplayIndex(video.window);
-		if (di < 0)
-			di = 0; // return display index 0 (default) on error
-
-		SDL_GetDesktopDisplayMode(di, &dm);
 		if (dm.refresh_rate >= 59 && dm.refresh_rate <= 61)
 		{
 			video.vsync60HzPresent = true;
@@ -1946,12 +2031,6 @@ bool setupVideo(void)
 		}
 	}
 
-	SDL_RenderSetLogicalSize(video.renderer, SCREEN_W, SCREEN_H);
-
-#if SDL_MINOR_VERSION >= 24 || (SDL_MINOR_VERSION == 0 && SDL_PATCHLEVEL >= 5)
-	SDL_RenderSetIntegerScale(video.renderer, config.integerScaling ? SDL_TRUE : SDL_FALSE);
-#endif
-
 	SDL_SetRenderDrawBlendMode(video.renderer, SDL_BLENDMODE_NONE);
 
 	if (config.pixelFilter == PIXELFILTER_LINEAR)
@@ -1978,12 +2057,6 @@ bool setupVideo(void)
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
-
-	// Workaround: SDL_GetGlobalMouseState() doesn't work with KMSDRM/Wayland
-	video.useDesktopMouseCoords = true;
-	const char *videoDriver = SDL_GetCurrentVideoDriver();
-	if (videoDriver != NULL && (strcmp("KMSDRM", videoDriver) == 0 || strcmp("wayland", videoDriver) == 0))
-		video.useDesktopMouseCoords = false;
 
 	updateRenderSizeVars();
 	updateMouseScaling();

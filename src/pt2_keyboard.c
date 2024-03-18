@@ -184,11 +184,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 	if (scancode == SDL_SCANCODE_F11 && !keyb.leftAltPressed)
 	{
 		toggleFullscreen();
-
-		// prevent fullscreen toggle from firing twice on certain SDL2 Linux ports
-#ifdef __unix__
-		SDL_Delay(100);
-#endif
 		return;
 	}
 
@@ -2071,12 +2066,23 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else if (keyb.leftCtrlPressed)
 			{
-				toggleLEDFilter();
+				if (keyb.shiftPressed)
+				{
+					resetFPSCounter();
 
-				if (audio.ledFilterEnabled)
-					displayMsg("LED FILTER ON");
+					video.debug ^= 1;
+					if (!video.debug)
+						displayMainScreen();
+				}
 				else
-					displayMsg("LED FILTER OFF");
+				{
+					toggleLEDFilter();
+
+					if (audio.ledFilterEnabled)
+						displayMsg("LED FILTER ON");
+					else
+						displayMsg("LED FILTER OFF");
+				}
 			}
 			else if (keyb.leftAltPressed)
 			{

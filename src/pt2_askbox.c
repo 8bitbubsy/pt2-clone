@@ -307,6 +307,7 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 	{
 		SDL_Event event;
 
+		beginFPSCounter();
 		sinkVisualizerBars();
 		updateChannelSyncBuffer();
 		readMouseXY();
@@ -408,6 +409,9 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 			}
 			else if (event.type == SDL_MOUSEBUTTONUP)
 			{
+#if defined __APPLE__ && defined __aarch64__
+				armMacGhostMouseCursorFix();
+#endif
 				mouse.buttonWaitCounter = 0;
 				mouse.buttonWaiting = false;
 				buttonToRepeat = -1;
@@ -415,6 +419,12 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 				if (event.button.button == SDL_BUTTON_LEFT)
 					mouse.leftButtonPressed = false;
 			}
+#if defined __APPLE__ && defined __aarch64__
+			else if (event.type == SDL_MOUSEMOTION)
+			{
+				armMacGhostMouseCursorFix();
+			}
+#endif
 		}
 
 		if (!mouse.buttonWaiting && buttonToRepeat > -1)
@@ -437,6 +447,7 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 		updateMouseCounters();
 		renderFrame2();
 		flipFrame();
+		endFPSCounter();
 	}
 
 	mouse.leftButtonPressed = false;
