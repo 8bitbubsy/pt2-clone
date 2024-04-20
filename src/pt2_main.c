@@ -88,22 +88,6 @@ static bool initializeVars(void);
 static void handleSigTerm(void);
 static void cleanUp(void);
 
-static void clearStructs(void)
-{
-	memset(&keyb, 0, sizeof (keyb));
-	memset(&mouse, 0, sizeof (mouse));
-	memset(&video, 0, sizeof (video));
-	memset(&editor, 0, sizeof (editor));
-	memset(&diskop, 0, sizeof (diskop));
-	memset(&cursor, 0, sizeof (cursor));
-	memset(&ui, 0, sizeof (ui));
-	memset(&config, 0, sizeof (config));
-	memset(&audio, 0, sizeof (audio));
-	memset(&textEdit, 0, sizeof (textEdit));
-
-	audio.rescanAudioDevicesSupported = true;
-}
-
 int main(int argc, char *argv[])
 {
 #ifndef _WIN32
@@ -127,7 +111,7 @@ int main(int argc, char *argv[])
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
 	SDL_EnableScreenSaver(); // allow screensaver to activate
 
-	clearStructs();
+	audio.rescanAudioDevicesSupported = true;
 
 	// set up crash handler
 #ifndef _DEBUG
