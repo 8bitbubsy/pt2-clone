@@ -714,6 +714,8 @@ void delSampleTrack(void)
 
 void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	if (from > to)
 	{
 		uint8_t old = from;
@@ -726,7 +728,7 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 	{
 		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
-		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+		if (!sampleAllFlag && noteSrc->sample != transposeSample)
 			continue;
 
 		if (noteSrc->period)
@@ -764,6 +766,8 @@ void trackNoteUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	if (from > to)
 	{
 		uint8_t old = from;
@@ -776,7 +780,7 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 	{
 		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
-		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+		if (!sampleAllFlag && noteSrc->sample != transposeSample)
 			continue;
 
 		if (noteSrc->period)
@@ -814,6 +818,8 @@ void trackNoteDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	if (from > to)
 	{
 		uint8_t old = from;
@@ -828,7 +834,7 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 	{
 		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
-		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+		if (!sampleAllFlag && noteSrc->sample != transposeSample)
 			continue;
 
 		if (noteSrc->period)
@@ -872,6 +878,8 @@ void trackOctaUp(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	if (from > to)
 	{
 		uint8_t old = from;
@@ -884,7 +892,7 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 	{
 		note_t *noteSrc = &song->patterns[song->currPattern][(i * PAULA_VOICES) + cursor.channel];
 
-		if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+		if (!sampleAllFlag && noteSrc->sample != transposeSample)
 			continue;
 
 		if (noteSrc->period)
@@ -920,6 +928,8 @@ void trackOctaDown(bool sampleAllFlag, uint8_t from, uint8_t to)
 
 void pattNoteUp(bool sampleAllFlag)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	saveUndo();
 	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
@@ -927,7 +937,7 @@ void pattNoteUp(bool sampleAllFlag)
 		{
 			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
-			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+			if (!sampleAllFlag && noteSrc->sample != transposeSample)
 				continue;
 
 			if (noteSrc->period)
@@ -966,6 +976,8 @@ void pattNoteUp(bool sampleAllFlag)
 
 void pattNoteDown(bool sampleAllFlag)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	saveUndo();
 	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
@@ -973,7 +985,7 @@ void pattNoteDown(bool sampleAllFlag)
 		{
 			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
-			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+			if (!sampleAllFlag && noteSrc->sample != transposeSample)
 				continue;
 
 			if (noteSrc->period)
@@ -1012,6 +1024,8 @@ void pattNoteDown(bool sampleAllFlag)
 
 void pattOctaUp(bool sampleAllFlag)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	saveUndo();
 	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
@@ -1019,7 +1033,7 @@ void pattOctaUp(bool sampleAllFlag)
 		{
 			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
-			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+			if (!sampleAllFlag && noteSrc->sample != transposeSample)
 				continue;
 
 			if (noteSrc->period)
@@ -1056,6 +1070,8 @@ void pattOctaUp(bool sampleAllFlag)
 
 void pattOctaDown(bool sampleAllFlag)
 {
+	const uint8_t transposeSample = editor.sampleZero ? 0 : editor.currSample + 1;
+
 	saveUndo();
 	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
@@ -1063,7 +1079,7 @@ void pattOctaDown(bool sampleAllFlag)
 		{
 			note_t *noteSrc = &song->patterns[song->currPattern][(j * PAULA_VOICES) + i];
 
-			if (!sampleAllFlag && noteSrc->sample != editor.currSample+1)
+			if (!sampleAllFlag && noteSrc->sample != transposeSample)
 				continue;
 
 			if (noteSrc->period)
