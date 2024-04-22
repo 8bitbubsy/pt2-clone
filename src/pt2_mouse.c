@@ -737,6 +737,9 @@ static void edVolDownButton(void)
 
 static void sampleFineTuneUpButton(void)
 {
+	if (editor.sampleZero)
+		return;
+
 	int8_t finetune = song->samples[editor.currSample].fineTune & 0xF;
 	if (finetune != 7)
 		song->samples[editor.currSample].fineTune = (finetune + 1) & 0xF;
@@ -750,6 +753,9 @@ static void sampleFineTuneUpButton(void)
 
 static void sampleFineTuneDownButton(void)
 {
+	if (editor.sampleZero)
+		return;
+
 	int8_t finetune = song->samples[editor.currSample].fineTune & 0xF;
 	if (finetune != 8)
 		song->samples[editor.currSample].fineTune = (finetune - 1) & 0xF;
@@ -763,6 +769,9 @@ static void sampleFineTuneDownButton(void)
 
 static void sampleVolumeUpButton(void)
 {
+	if (editor.sampleZero)
+		return;
+
 	int8_t val = song->samples[editor.currSample].volume;
 
 	if (mouse.rightButtonPressed)
@@ -779,6 +788,9 @@ static void sampleVolumeUpButton(void)
 
 static void sampleVolumeDownButton(void)
 {
+	if (editor.sampleZero)
+		return;
+
 	int8_t val = song->samples[editor.currSample].volume;
 
 	if (mouse.rightButtonPressed)
@@ -795,7 +807,7 @@ static void sampleVolumeDownButton(void)
 
 static void sampleLengthUpButton(bool fast)
 {
-	if (song->samples[editor.currSample].length == config.maxSampleLength)
+	if (editor.sampleZero || song->samples[editor.currSample].length == config.maxSampleLength)
 		return;
 
 	int32_t val = song->samples[editor.currSample].length;
@@ -823,6 +835,9 @@ static void sampleLengthUpButton(bool fast)
 
 static void sampleLengthDownButton(bool fast)
 {
+	if (editor.sampleZero)
+		return;
+
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->loopStart+s->loopLength > 2)
 	{
@@ -867,6 +882,9 @@ static void sampleLengthDownButton(bool fast)
 
 static void sampleRepeatUpButton(bool fast)
 {
+	if (editor.sampleZero)
+		return;
+
 	int32_t val = song->samples[editor.currSample].loopStart;
 	int32_t loopLen = song->samples[editor.currSample].loopLength;
 	int32_t len = song->samples[editor.currSample].length;
@@ -909,6 +927,9 @@ static void sampleRepeatUpButton(bool fast)
 
 static void sampleRepeatDownButton(bool fast)
 {
+	if (editor.sampleZero)
+		return;
+
 	int32_t val = song->samples[editor.currSample].loopStart;
 	int32_t len = song->samples[editor.currSample].length;
 
@@ -950,6 +971,9 @@ static void sampleRepeatDownButton(bool fast)
 
 static void sampleRepeatLengthUpButton(bool fast)
 {
+	if (editor.sampleZero)
+		return;
+
 	int32_t val = song->samples[editor.currSample].loopLength;
 	int32_t loopStart = song->samples[editor.currSample].loopStart;
 	int32_t len = song->samples[editor.currSample].length;
@@ -992,6 +1016,9 @@ static void sampleRepeatLengthUpButton(bool fast)
 
 static void sampleRepeatLengthDownButton(bool fast)
 {
+	if (editor.sampleZero)
+		return;
+
 	int32_t val = song->samples[editor.currSample].loopLength;
 	int32_t len = song->samples[editor.currSample].length;
 
