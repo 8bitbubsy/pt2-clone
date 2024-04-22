@@ -173,8 +173,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 	// these keys should not allow to be repeated in keyrepeat mode (caps lock)
 	const bool nonRepeatKeys = keyb.leftAmigaPressed || nonRepeatAltKeys || nonRepeatCtrlKeys
 		|| scancode == SDL_SCANCODE_LEFT || scancode == SDL_SCANCODE_RIGHT
-		|| scancode == SDL_SCANCODE_UP   || scancode == SDL_SCANCODE_DOWN;
-	if (editor.repeatKeyFlag && keyb.repeatKey && scancode == keyb.lastRepKey && nonRepeatKeys)
+		|| scancode == SDL_SCANCODE_UP   || scancode == SDL_SCANCODE_DOWN
+		|| scancode == SDL_SCANCODE_RETURN || scancode == SDL_SCANCODE_BACKSPACE;
+	if (editor.repeatKeyFlag && scancode == keyb.lastRepKey && nonRepeatKeys)
 		return;
 
 	if (scancode == SDL_SCANCODE_KP_PLUS)
@@ -614,6 +615,10 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			}
 			else
 			{
+				const bool audioWasntLocked = !audio.locked;
+				if (audioWasntLocked)
+					lockAudio();
+
 				editor.stepPlayEnabled = true;
 				editor.stepPlayBackwards = false;
 
@@ -632,6 +637,9 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					editor.playMode = PLAY_MODE_NORMAL;
 					editor.currMode = MODE_EDIT;
 				}
+
+				if (audioWasntLocked)
+					unlockAudio();
 			}
 		}
 		break;
@@ -2902,6 +2910,9 @@ static void movePatCurLeft(void)
 
 void handleKeyRepeat(SDL_Scancode scancode)
 {
+	if (keyb.lastRepKey == 0)
+		return;
+
 	if (!keyb.repeatKey || ui.askBoxShown)
 	{
 		keyb.repeatFrac = 0;

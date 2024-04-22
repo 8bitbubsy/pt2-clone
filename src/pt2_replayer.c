@@ -191,6 +191,10 @@ void modSetSpeed(int32_t speed)
 
 void doStopIt(bool resetPlayMode)
 {
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	editor.songPlaying = false;
 
 	pattDelTime = pattDelTime2 = 0;
@@ -199,7 +203,9 @@ void doStopIt(bool resetPlayMode)
 	{
 		editor.playMode = PLAY_MODE_NORMAL;
 		editor.currMode = MODE_IDLE;
-		pointerSetModeThreadSafe(POINTER_MODE_IDLE, true);
+
+		if (editor.stepPlayLastMode != MODE_IDLE)
+			pointerSetModeThreadSafe(POINTER_MODE_IDLE, true);
 	}
 
 	if (song != NULL)
@@ -215,6 +221,9 @@ void doStopIt(bool resetPlayMode)
 	}
 
 	doStopSong = false; // just in case this flag was stuck from command F00 (stop song)
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void setPattern(int16_t pattern)
@@ -1576,6 +1585,10 @@ void playPattern(int8_t startRow)
 	if (!editor.stepPlayEnabled)
 		pointerSetMode(POINTER_MODE_PLAY, DO_CARRY);
 
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+
 	audio.tickSampleCounter = 0; // zero tick sample counter so that it will instantly initiate a tick
 	audio.tickSampleCounterFrac = 0;
 
@@ -1588,10 +1601,17 @@ void playPattern(int8_t startRow)
 
 	ciaSetBPM = -1; // fix possibly stuck "set BPM" flag
 
-	editor.playMode = PLAY_MODE_PATTERN;
-	editor.currMode = MODE_PLAY;
+	if (!editor.stepPlayEnabled)
+	{
+		editor.playMode = PLAY_MODE_PATTERN;
+		editor.currMode = MODE_PLAY;
+	}
+
 	editor.didQuantize = false;
 	editor.songPlaying = true;
+
+	if (audioWasntLocked)
+		unlockAudio();
 }
 
 void incPatt(void)

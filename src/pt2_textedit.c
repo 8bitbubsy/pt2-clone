@@ -1278,6 +1278,10 @@ bool handleTextEditMode(SDL_Scancode scancode)
 				}
 				else
 				{
+					const bool audioWasntLocked = !audio.locked;
+					if (audioWasntLocked)
+						lockAudio();
+
 					editor.stepPlayEnabled = true;
 					editor.stepPlayBackwards = true;
 
@@ -1296,6 +1300,9 @@ bool handleTextEditMode(SDL_Scancode scancode)
 						editor.playMode = PLAY_MODE_NORMAL;
 						editor.currMode = MODE_EDIT;
 					}
+
+					if (audioWasntLocked)
+						unlockAudio();
 				}
 			}
 		}
