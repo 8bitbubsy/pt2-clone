@@ -171,10 +171,11 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 	                                                    && scancode != SDL_SCANCODE_BACKSPACE;
 
 	// these keys should not allow to be repeated in keyrepeat mode (caps lock)
+	const bool dontRepeatReturnAndBackspace = !ui.editTextFlag && (scancode == SDL_SCANCODE_RETURN || scancode == SDL_SCANCODE_BACKSPACE);
 	const bool nonRepeatKeys = keyb.leftAmigaPressed || nonRepeatAltKeys || nonRepeatCtrlKeys
 		|| scancode == SDL_SCANCODE_LEFT || scancode == SDL_SCANCODE_RIGHT
 		|| scancode == SDL_SCANCODE_UP   || scancode == SDL_SCANCODE_DOWN
-		|| scancode == SDL_SCANCODE_RETURN || scancode == SDL_SCANCODE_BACKSPACE;
+		|| dontRepeatReturnAndBackspace;
 	if (editor.repeatKeyFlag && scancode == keyb.lastRepKey && nonRepeatKeys)
 		return;
 
@@ -215,8 +216,10 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 		keyb.repeatCounter = 0;
 		keyb.repeatFrac = 0;
+
 		keyb.lastRepKey = scancode;
 	}
+	
 
 	// ENTRY JUMPING IN DISK OP. FILELIST
 	if (ui.diskOpScreenShown && keyb.shiftPressed && !ui.editTextFlag)
