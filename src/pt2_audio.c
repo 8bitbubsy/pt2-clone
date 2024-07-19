@@ -430,7 +430,7 @@ bool setupAudio(void)
 	want.callback = audioCallback;
 	want.userdata = NULL;
 
-	dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_ANY_CHANGE);
+	dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
 	if (dev == 0)
 	{
 		showErrorMsgBox("Couldn't open audio device:\n\"%s\"\n\nDo you have an audio device enabled and plugged in?", SDL_GetError());
@@ -442,12 +442,6 @@ bool setupAudio(void)
 	if (have.freq < minFreq)
 	{
 		showErrorMsgBox("Unable to open audio: An audio rate below %dHz can't be used!", minFreq);
-		return false;
-	}
-
-	if (have.format != AUDIO_S16)
-	{
-		showErrorMsgBox("Couldn't open audio device:\nThis program only supports 16-bit audio streams. Sorry!");
 		return false;
 	}
 
