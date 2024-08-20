@@ -16,6 +16,7 @@ typedef struct config_t
 	bool waveformCenterLine, pattDots, compoMode, autoCloseDiskOp, hideDiskOpDates, hwMouse;
 	bool transDel, fullScreenStretch, vsyncOff, modDot, blankZeroFlag, realVuMeters, rememberPlayMode;
 	bool startInFullscreen, integerScaling, disableE8xEffect, noDownsampleOnSmpLoad, keepEditModeAfterStepPlay;
+	bool restrictedPattEditClick;
 	int8_t stereoSeparation, accidental;
 	bool autoFitVideoScale;
 	int8_t videoScaleFactor;

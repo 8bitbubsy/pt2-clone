@@ -68,6 +68,7 @@ void loadConfig(void)
 	config.mod2WavOutputFreq = 44100;
 	config.keepEditModeAfterStepPlay = false;
 	config.maxSampleLength = 65534;
+	config.restrictedPattEditClick = false;
 
 #ifndef _WIN32
 	getcwd(oldCwd, PATH_MAX);
@@ -190,6 +191,15 @@ static bool loadProTrackerDotIni(FILE *f)
 		{
 			configLine = strtok(NULL, "\n");
 			continue;
+		}
+
+		// RESTRICTED_PATT_EDIT_CLICK
+		else if (!_strnicmp(configLine, "RESTRICTED_PATT_EDIT_CLICK=", 27))
+		{
+			if (!_strnicmp(&configLine[27], "TRUE", 4))
+				config.restrictedPattEditClick = true;
+			else if (!_strnicmp(&configLine[27], "FALSE", 5))
+				config.restrictedPattEditClick = false;
 		}
 
 		// STEPPLAY_KEEP_EDITMODE

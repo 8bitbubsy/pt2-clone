@@ -3197,11 +3197,16 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		}
 		break;
 
+		// pattern editor main area (sets current pattern number to edit)
 		case PTB_PATTBOX:
 		case PTB_PATTDATA:
 		{
 			if (!ui.introTextShown && (editor.currMode == MODE_IDLE || editor.currMode == MODE_EDIT || editor.playMode != PLAY_MODE_NORMAL))
 			{
+				// limit click coordinate to pattern edit number box if needed
+				if (config.restrictedPattEditClick && (mouse.x < 6 || mouse.y < 124 || mouse.x >= 26 || mouse.y >= 135))
+					break;
+
 				textEdit.tmpDisp16 = song->currPattern;
 				editor.currEditPatternDisp = &textEdit.tmpDisp16;
 				textEdit.numPtr16 = &textEdit.tmpDisp16;
