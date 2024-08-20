@@ -300,6 +300,11 @@
  ## Copy ## (or ctrl+C)
  Will copy the marked range to the copy buffer.
 
+ New feature in PT2 clone by holding down SHIFT:
+ - Finds a free sample slot and clones the sample to it.
+   If you have marked part of the sample, only the slice
+   will get copied.
+
  ## Paste ## (or ctrl+V)
  Will paste the copy buffer into the current sample.
  

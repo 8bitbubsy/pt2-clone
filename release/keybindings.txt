@@ -29,6 +29,11 @@
    page up     - Go 16 rows up
    page down   - Go 16 rows down
    ctrl+del    - Delete note+sample from pattern data
+   
+   shift+"COPY"-button in sampler editor:
+     Finds a free sample slot and clones the sample to it.
+     If you have marked part of the sample, only the slice
+     will get copied.
  -------------------------------------------------
                   (US keyboard layout)
  High note keys:  2 3   5 6 7   9 0   =

@@ -20,6 +20,7 @@
 #include "pt2_chordmaker.h"
 #include "pt2_replayer.h"
 #include "pt2_visuals_sync.h"
+#include "pt2_askbox.h"
 
 #define CENTER_LINE_COLOR 0x303030
 #define MARK_COLOR_1 0x666666 /* inverted background */
@@ -1392,6 +1393,83 @@ void samplerSamCopy(void)
 		return;
 	}
 
+	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	moduleSample_t *s = &song->samples[editor.currSample];
+
+	if (s->length == 0)
+	{
+		statusSampleIsEmpty();
+		return;
+	}
+
+	// copy sample/slice to new sample slot if shift is held down (new PT feature)
+	if (keyb.shiftPressed)
+	{
+		// find free sample slot
+		int8_t newSmpNum = 0;
+		moduleSample_t *dstSmp = song->samples;
+		for (; newSmpNum < MOD_SAMPLES; newSmpNum++, dstSmp++)
+		{
+			if (dstSmp->length == 0)
+				break;
+		}
+
+		if (newSmpNum == MOD_SAMPLES)
+		{
+			displayErrorMsg("NO FREE SMP SLOT!");
+			return;
+		}
+
+		const int32_t markLength = editor.markEndOfs - editor.markStartOfs;
+		if (editor.markStartOfs == -1 || markLength <= 0)
+		{
+			// no sample data marked, copy whole sample
+
+			if (!askBox(ASKBOX_YES_NO, "CLONE SAMPLE ?"))
+				return;
+
+			dstSmp->fineTune = s->fineTune;
+			dstSmp->length = s->length;
+			dstSmp->loopLength = s->loopLength;
+			dstSmp->loopStart = s->loopStart;
+			dstSmp->volume = s->volume;
+
+			memset(dstSmp->text, '\0', sizeof (dstSmp->text));
+			strcpy(dstSmp->text, "[CLONED SAMPLE]");
+
+			// copy over sample data
+			memcpy(&song->sampleData[dstSmp->offset], &song->sampleData[s->offset], s->length);
+		}
+		else
+		{
+			// sample data marked, copy slice only
+
+			if (!askBox(ASKBOX_YES_NO, "COPY SMP SLICE ?"))
+				return;
+
+			dstSmp->fineTune = s->fineTune;
+			dstSmp->length = markLength;
+			dstSmp->loopLength = 2;
+			dstSmp->loopStart = 0;
+			dstSmp->volume = s->volume;
+
+			memset(dstSmp->text, '\0', sizeof (dstSmp->text));
+			strcpy(dstSmp->text, "[COPIED SAMPLE SLICE]");
+
+			// copy over sample data slice
+			memcpy(&song->sampleData[dstSmp->offset], &song->sampleData[s->offset+editor.markStartOfs],markLength);
+
+			// new data must have its first two bytes zeroed to prevent beep syndrome
+			fixSampleBeep(dstSmp);
+		}
+
+		editor.samplePos = 0;
+		editor.currSample = newSmpNum;
+		updateCurrSample();
+
+		return;
+	}
+
 	if (editor.markStartOfs == -1)
 	{
 		displayErrorMsg("NO RANGE SELECTED");
@@ -1401,15 +1479,6 @@ void samplerSamCopy(void)
 	if (editor.markEndOfs-editor.markStartOfs <= 0)
 	{
 		displayErrorMsg("SET LARGER RANGE");
-		return;
-	}
-
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-
-	moduleSample_t *s = &song->samples[editor.currSample];
-	if (s->length == 0)
-	{
-		statusSampleIsEmpty();
 		return;
 	}
 
