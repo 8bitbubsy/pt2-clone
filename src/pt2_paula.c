@@ -136,7 +136,7 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 
-	// Note: A500 rev3 (old) -may- be C1 = 7500pF (cutoff = 2942.776Hz, qfactor = 0.693375)
+	// Note: A500 rev3's (old) LED filter -may- be C1 = 7500pF (cutoff = 2942.776Hz, qfactor = 0.693375)
 	
 	// 2-pole (12dB/oct) RC low-pass filter ("LED" filter, same values on A500/A1200):
 	R1 = 10000.0; // R322 (10K ohm)
