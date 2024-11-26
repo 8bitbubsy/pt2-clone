@@ -333,33 +333,46 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	return true;
 }
 
+static void assureModulesDir(void)
+{
+	// if we're in samples mode in Disk Op., set dir to current modules dir
+	if (diskop.mode == DISKOP_MODE_SMP && editor.modulesPathU != NULL)
+		UNICHAR_CHDIR(editor.modulesPathU);
+}
+
+static void setBackDirIfNeeded(void)
+{
+	// if we're in samples mode in Disk Op., set dir back to current samples dir
+	if (diskop.mode == DISKOP_MODE_SMP && editor.samplesPathU != NULL)
+		UNICHAR_CHDIR(editor.samplesPathU);
+}
+
 bool mod2WavRender(char *filename)
 {
 	struct stat statBuffer;
 
 	lastFilename[0] = '\0'; // for rendering-thread
 
+	assureModulesDir();
+
 	if (stat(filename, &statBuffer) == 0)
 	{
 		if (!askBox(ASKBOX_YES_NO, "OVERWRITE FILE?"))
+		{
+			setBackDirIfNeeded();
 			return false;
+		}
 	}
 
-	// if we're in samples mode in Disk Op., set dir to current modules path
-	if (diskop.mode == DISKOP_MODE_SMP && editor.modulesPathU != NULL)
-		UNICHAR_CHDIR(editor.modulesPathU);
-
 	FILE *fOut = fopen(filename, "wb");
-
-	// if we're in samples mode in Disk Op., set dir back to current samples path
-	if (diskop.mode == DISKOP_MODE_SMP && editor.samplesPathU != NULL)
-		UNICHAR_CHDIR(editor.samplesPathU);
-
 	if (fOut == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR");
+		setBackDirIfNeeded();
 		return false;
 	}
+
+	setBackDirIfNeeded();
 
 	strncpy(lastFilename, filename, PATH_MAX-1); // for rendering-thread
 
