@@ -37,10 +37,16 @@ enum
 // this may change after opening the audio input device
 #define SAMPLING_BUFFER_SIZE 1024
 
+#define SAMPLING_MIXER_FRAC_BITS 32
+
 // after several tests, these values yields a good trade-off between quality and compute time
 #define SINC_TAPS 64
 #define SINC_TAPS_BITS 6 /* log2(SINC_TAPS) */
 #define SINC_PHASES 4096
+#define SINC_PHASES_BITS 12 /* log2(SINC_PHASES */
+#define SINC_FSHIFT (SAMPLING_MIXER_FRAC_BITS-(SINC_PHASES_BITS+SINC_TAPS_BITS))
+#define SINC_FMASK ((SINC_TAPS*SINC_PHASES)-SINC_TAPS)
+
 #define MID_TAP ((SINC_TAPS/2)*SINC_PHASES)
 
 #define SAMPLE_PREVIEW_WITDH 194
@@ -56,61 +62,57 @@ static int16_t displayBuffer[SAMPLING_BUFFER_SIZE];
 static int32_t samplingMode = SAMPLE_MIX, inputFrequency, roundedOutputFrequency;
 static int32_t numAudioInputDevs, audioInputDevListOffset, selectedDev;
 static int32_t bytesSampled, maxSamplingLength, inputBufferSize;
-static double dOutputFrequency, *dSincTable, *dKaiserTable, *dSamplingBuffer, *dSamplingBufferOrig;
+static float *fSincTable, *fKaiserWindow, *fSamplingBuffer, *fSamplingBufferOrig;
+static double dOutputFrequency;
 static SDL_AudioDeviceID recordDev;
 
 /*
 ** ----------------------------------------------------------------------------------
-** Sinc code taken from the OpenMPT project (has a similar BSD license), and modified
+** Sinc code based on code from the OpenMPT project (has a similar BSD license)
 ** ----------------------------------------------------------------------------------
 */
 
-static double Izero(double y) // Compute Bessel function Izero(y) using a series approximation
+// zeroth-order modified Bessel function of the first kind (series approximation)
+static double besselI0(double z)
 {
-	double s = 1.0, ds = 1.0, d = 0.0;
-	const double epsilon = 1E-9; // 8bb: 1E-7 -> 1E-9 for added precision (still fast to calculate)
+	double s = 1.0, ds = 1.0, d = 2.0;
 
 	do
 	{
-		d = d + 2.0;
-		ds = ds * (y * y) / (d * d);
-		s = s + ds;
+		ds *= (z * z) / (d * d);
+		s += ds;
+		d += 2.0;
 	}
-	while (ds > epsilon * s);
+	while (ds > s*1E-15);
 
 	return s;
 }
 
 bool initKaiserTable(void) // called once on tracker init
 {
-	dKaiserTable = (double *)malloc(SINC_TAPS * SINC_PHASES * sizeof (double));
-	if (dKaiserTable == NULL)
+	fKaiserWindow = (float *)malloc(SINC_TAPS * SINC_PHASES * sizeof (float));
+	if (fKaiserWindow == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
 
-	const double beta = 9.6377;
-	const double izeroBeta = Izero(beta);
+	const double beta = 9.6567817670946337; // 96.3dB sidelobe attenuation
+	const double izeroBeta = besselI0(beta);
 
 	for (int32_t i = 0; i < SINC_TAPS*SINC_PHASES; i++)
 	{
-		double fkaiser;
-		int32_t ix = (SINC_TAPS-1) - (i & (SINC_TAPS-1));
+		const int32_t ix = (((SINC_TAPS-1) - (i & (SINC_TAPS-1))) << SINC_PHASES_BITS) + (i >> SINC_TAPS_BITS);
 
-		ix = (ix * SINC_PHASES) + (i >> SINC_TAPS_BITS);
-		if (ix == MID_TAP)
-		{
-			fkaiser = 1.0;
-		}
-		else
+		double dKaiser = 1.0;
+		if (ix != MID_TAP)
 		{
 			const double x = (ix - MID_TAP) * (1.0 / SINC_PHASES);
 			const double xMul = 1.0 / ((SINC_TAPS/2) * (SINC_TAPS/2));
-			fkaiser = Izero(beta * sqrt(1.0 - x * x * xMul)) / izeroBeta;
+			dKaiser = besselI0(beta * sqrt(1.0 - x * x * xMul)) / izeroBeta;
 		}
 
-		dKaiserTable[i] = fkaiser;
+		fKaiserWindow[i] = (float)dKaiser;
 	}
 
 	return true;
@@ -118,43 +120,38 @@ bool initKaiserTable(void) // called once on tracker init
 
 void freeKaiserTable(void)
 {
-	if (dKaiserTable != NULL)
+	if (fKaiserWindow != NULL)
 	{
-		free(dKaiserTable);
-		dKaiserTable = NULL;
+		free(fKaiserWindow);
+		fKaiserWindow = NULL;
 	}
 }
 
 // calculated after completion of sampling (before downsampling)
-static bool initSincTable(double cutoff)
+static bool initSincTable(float cutoff)
 {
-	dSincTable = (double *)malloc(SINC_TAPS * SINC_PHASES * sizeof (double));
-	if (dSincTable == NULL)
+	fSincTable = (float *)malloc(SINC_TAPS * SINC_PHASES * sizeof (float));
+	if (fSincTable == NULL)
 		return false;
 
-	if (cutoff > 1.0)
-		cutoff = 1.0;
+	if (cutoff > 1.0f)
+		cutoff = 1.0f;
 
-	const double kPi = PT2_PI * cutoff;
-	for (int32_t i = 0; i < SINC_TAPS*SINC_PHASES; i++)
+	const float kPi = (float)(PT2_PI * cutoff);
+	for (int32_t i = 0; i < SINC_TAPS * SINC_PHASES; i++)
 	{
-		double fsinc;
-		int32_t ix = (SINC_TAPS-1) - (i & (SINC_TAPS-1));
+		const int32_t ix = (((SINC_TAPS-1) - (i & (SINC_TAPS-1))) << SINC_PHASES_BITS) + (i >> SINC_TAPS_BITS);
 
-		ix = (ix * SINC_PHASES) + (i >> SINC_TAPS_BITS);
-		if (ix == MID_TAP)
+		float fSinc = 1.0f;
+		if (ix != MID_TAP)
 		{
-			fsinc = 1.0;
-		}
-		else
-		{
-			const double x = (ix - MID_TAP) * (1.0 / SINC_PHASES);
-			const double xPi = x * kPi;
+			const float x = (ix - MID_TAP) * (1.0f / SINC_PHASES);
+			const float xPi = x * kPi;
 
-			fsinc = (sin(xPi) / xPi) * dKaiserTable[i];
+			fSinc = (sinf(xPi) / xPi) * fKaiserWindow[i];
 		}
 
-		dSincTable[i] = fsinc * cutoff;
+		fSincTable[i] = fSinc * cutoff;
 	}
 
 	return true;
@@ -162,23 +159,22 @@ static bool initSincTable(double cutoff)
 
 static void freeSincTable(void)
 {
-	if (dSincTable != NULL)
+	if (fSincTable != NULL)
 	{
-		free(dSincTable);
-		dSincTable = NULL;
+		free(fSincTable);
+		fSincTable = NULL;
 	}
 }
 
-static double sinc(const double *dSmpData, const double dPhase)
+static inline float sinc(const float *fSmpData, const uint32_t phase32)
 {
-	const int32_t phase = (int32_t)(dPhase * SINC_PHASES);
-	const double *dSincLUT = &dSincTable[phase << SINC_TAPS_BITS];
+	const float *t = fSincTable + ((phase32 >> SINC_FSHIFT) & SINC_FMASK);
 
-	double dSmp = 0.0;
+	float fSmp = 0.0f;
 	for (int32_t i = 0; i < SINC_TAPS; i++)
-		dSmp += dSmpData[i] * dSincLUT[i];
+		fSmp += fSmpData[i] * t[i];
 
-	return dSmp;
+	return fSmp;
 }
 
 /*
@@ -243,22 +239,22 @@ static void SDLCALL samplingCallback(void *userdata, Uint8 *stream, int len)
 		const int16_t *L = (int16_t *)stream;
 		const int16_t *R = ((int16_t *)stream) + 1;
 
-		double *dSmp = &dSamplingBuffer[bytesSampled];
+		float *fSmp = &fSamplingBuffer[bytesSampled];
 
 		if (samplingMode == SAMPLE_LEFT)
 		{
 			for (int32_t i = 0; i < len; i++)
-				dSmp[i] = L[i << 1] * (1.0 / 32768.0);
+				fSmp[i] = L[i << 1] * (1.0f / 32768.0f);
 		}
 		else if (samplingMode == SAMPLE_RIGHT)
 		{
 			for (int32_t i = 0; i < len; i++)
-				dSmp[i] = R[i << 1] * (1.0 / 32768.0);
+				fSmp[i] = R[i << 1] * (1.0f / 32768.0f);
 		}
 		else
 		{
 			for (int32_t i = 0; i < len; i++)
-				dSmp[i] = (L[i << 1] + R[i << 1]) * (1.0 / (32768.0 * 2.0));
+				fSmp[i] = (L[i << 1] + R[i << 1]) * (1.0f / (32768.0f * 2.0f));
 		}
 
 		bytesSampled += len;
@@ -572,7 +568,7 @@ void writeSampleMonitorWaveform(void) // called every frame
 		if (smpAbs == 0)
 			centerPtr[x] = video.palette[PAL_QADSCP];
 		else
-			vLine(x + 123, 76 - smpAbs, (smpAbs << 1) + 1, video.palette[PAL_QADSCP]);
+			vLine(x + 123, 76 - smpAbs, (smpAbs * 2) + 1, video.palette[PAL_QADSCP]);
 	}
 	displayingBuffer = false;
 }
@@ -605,16 +601,17 @@ static void startSampling(void)
 	maxSamplingLength = (int32_t)(ceil(((double)config.maxSampleLength*inputFrequency) / dOutputFrequency)) + 1;
 	
 	const int32_t allocLen = (SINC_TAPS/2) + maxSamplingLength + (SINC_TAPS/2);
-	dSamplingBufferOrig = (double *)malloc(allocLen * sizeof (double));
-	if (dSamplingBufferOrig == NULL)
+
+	fSamplingBufferOrig = (float *)malloc(allocLen * sizeof (float));
+	if (fSamplingBufferOrig == NULL)
 	{
 		statusOutOfMemory();
 		return;
 	}
-	dSamplingBuffer = dSamplingBufferOrig + (SINC_TAPS/2); // allow negative look-up for sinc taps
+	fSamplingBuffer = fSamplingBufferOrig + (SINC_TAPS/2); // allow negative look-up for sinc taps
 
 	// clear tap area before sample
-	memset(dSamplingBufferOrig, 0, (SINC_TAPS/2) * sizeof (double));
+	memset(fSamplingBufferOrig, 0, (SINC_TAPS/2) * sizeof (float));
 
 	bytesSampled = 0;
 	audio.isSampling = true;
@@ -629,7 +626,7 @@ static void startSampling(void)
 static int32_t downsampleSamplingBuffer(void)
 {
 	// clear tap area after sample
-	memset(&dSamplingBuffer[bytesSampled], 0, (SINC_TAPS/2) * sizeof (double));
+	memset(&fSamplingBuffer[bytesSampled], 0, (SINC_TAPS/2) * sizeof (float));
 
 	const int32_t readLength = bytesSampled;
 	const double dRatio = dOutputFrequency / inputFrequency;
@@ -638,14 +635,14 @@ static int32_t downsampleSamplingBuffer(void)
 	if (writeLength > config.maxSampleLength)
 		writeLength = config.maxSampleLength;
 
-	double *dBuffer = (double *)malloc(writeLength * sizeof (double));
-	if (dBuffer == NULL)
+	float *fBuffer = (float *)malloc(writeLength * sizeof (float));
+	if (fBuffer == NULL)
 	{
 		statusOutOfMemory();
 		return -1;
 	}
 
-	if (!initSincTable(dRatio))
+	if (!initSincTable((float)dRatio))
 	{
 		statusOutOfMemory();
 		return -1;
@@ -654,57 +651,56 @@ static int32_t downsampleSamplingBuffer(void)
 	// downsample
 
 	int8_t *output = &song->sampleData[song->samples[editor.currSample].offset];
-	const double dDelta = inputFrequency / dOutputFrequency;
+	const uint64_t delta64 = (uint64_t)round((inputFrequency / dOutputFrequency) * (UINT32_MAX+1.0));
+	uint64_t phase64 = 0;
 
-	// pre-centered (this is safe, look at how dSamplingBufferOrig is alloc'd)
-	const double *dSmpPtr = &dSamplingBuffer[-((SINC_TAPS/2)-1)];
+	// pre-centered (this is safe, look at how fSamplingBufferOrig is alloc'd)
+	const float *fSmpData = &fSamplingBuffer[-((SINC_TAPS/2)-1)];
 
-	double dPhase = 0.0;
-	double dPeakAmp = 0.0;
+	float fPeakAmp = 0.0f;
 	for (int32_t i = 0; i < writeLength; i++)
 	{
-		double dSmp = sinc(dSmpPtr, dPhase);
-		dBuffer[i] = dSmp;
+		float fSmp = sinc(fSmpData, (uint32_t)phase64);
+		fBuffer[i] = fSmp;
 
-		// dSmp = fabs(dSmp)
-		if (dSmp < 0.0)
-			dSmp = -dSmp;
+		// get peak for normalization stage
+		if (fSmp < 0.0f)
+			fSmp = -fSmp;
 
-		if (dSmp > dPeakAmp)
-			dPeakAmp = dSmp;
+		if (fSmp > fPeakAmp)
+			fPeakAmp = fSmp;
+		// -------------------
 
-		dPhase += dDelta;
-		const int32_t wholeSamples = (int32_t)dPhase;
-		dPhase -= wholeSamples;
-		dSmpPtr += wholeSamples;
+		phase64 += delta64;
+		fSmpData += phase64 >> 32;
+		phase64 &= UINT32_MAX;
 	}
 
 	freeSincTable();
 
-	// normalize
+	// normalize and quantize to 8-bit integer
 
-	double dAmp = INT8_MAX / dPeakAmp;
+	float fAmp = INT8_MAX / fPeakAmp;
 
 	/* If we have to amplify THIS much, it would mean that the gain was extremely low.
 	** We don't want the result to be 99% noise, so keep it quantized to zero (silence).
 	*/
-	const double dAmp_dB = 20.0 * log10(dAmp / 128.0);
-	if (dAmp_dB > 50.0)
-		dAmp = 0.0;
+	const float fAmp_dB = 20.0f * log10f(fAmp / 128.0f);
+	if (fAmp_dB > 30.0f)
+		fAmp = 0.0f;
 
 	for (int32_t i = 0; i < writeLength; i++)
 	{
-		double dSmp = dBuffer[i] * dAmp;
+		float fSmp = fBuffer[i] * fAmp;
 
-		// faster than calling round()
-		     if (dSmp < 0.0) dSmp -= 0.5;
-		else if (dSmp > 0.0) dSmp += 0.5;
-		const int32_t smp32 = (int32_t)dSmp; // rounded
+		// add rounding bias
+		if (fSmp < 0.0f) fSmp -= 0.5f;
+		if (fSmp > 0.0f) fSmp += 0.5f;
 
-		output[i] = (int8_t)smp32;
+		output[i] = (int8_t)fSmp;
 	}
 
-	free(dBuffer);
+	free(fBuffer);
 	return writeLength;
 }
 
@@ -717,10 +713,10 @@ void stopSampling(void)
 	if (newLength == -1)
 		return; // out of memory
 
-	if (dSamplingBufferOrig != NULL)
+	if (fSamplingBufferOrig != NULL)
 	{
-		free(dSamplingBufferOrig);
-		dSamplingBufferOrig = NULL;
+		free(fSamplingBufferOrig);
+		fSamplingBufferOrig = NULL;
 	}
 
 	moduleSample_t *s = &song->samples[editor.currSample];
