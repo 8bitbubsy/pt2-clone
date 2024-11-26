@@ -7,7 +7,7 @@
 #include "pt2_math.h"
 
 static const double pi = PT2_PI;
-static const double twopi = PT2_TWO_PI;
+static const double twopi = PT2_2PI;
 static const double four_over_pi = 4.0 / PT2_PI;
 static const double threehalfpi = (3.0 * PT2_PI) / 2.0;
 static const double halfpi = PT2_PI / 2.0;

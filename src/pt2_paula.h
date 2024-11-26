@@ -7,7 +7,7 @@
 enum
 {
 	MODEL_A1200 = 0,
-	MODEL_A500  = 1,
+	MODEL_A500  = 1
 };
 
 #define PAULA_VOICES 4

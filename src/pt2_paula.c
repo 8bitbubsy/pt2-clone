@@ -54,96 +54,61 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	clearOnePoleFilterState(&filterHi);
 	clearTwoPoleFilterState(&filterLED);
 
-	/* Amiga 500/1200 filter emulation
+	/*
+	** Amiga 500/1200 filters
 	**
-	** aciddose:
-	** First comes a static low-pass 6dB formed by the supply current
-	** from the Paula's mixture of channels A+B / C+D into the opamp with
-	** 0.1uF capacitor and 360 ohm resistor feedback in inverting mode biased by
-	** dac vRef (used to center the output).
+	** RC values for Amiga 500 (rev 6A):
+	** - 1-pole (6dB/oct) RC low-pass: R=360 ohm, C=0.1uF
+	** - 2-pole (12dB/oct) Sallen-Key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF
+	** - 1-pole (6dB/oct) RC high-pass: R=1390 ohm (1000+390), C=22.33uF (22+0.33)
 	**
-	** R = 360 ohm
-	** C = 0.1uF
-	** Low Hz = 4420.97~ = 1 / (2pi * 360 * 0.0000001)
-	**
-	** Under spice simulation the circuit yields -3dB = 4400Hz.
-	**
-	** Next comes a bog-standard Sallen-Key filter ("LED") with:
-	** R1 = 10K ohm
-	** R2 = 10K ohm
-	** C1 = 6800pF
-	** C2 = 3900pF
-	**  Q = 0.660 (8bitbubsy: edited with correct nominal)
-	**
-	** This filter is optionally bypassed by an MPF-102 JFET chip when
-	** the LED filter is turned off.
-	**
-	** Under spice simulation the circuit yields -3dB = 2800Hz.
-	** 90 degrees phase = 3000Hz (so, should oscillate at 3kHz!)
-	**
-	** The buffered output of the Sallen-Key passes into an RC high-pass with:
-	** R = 1.39K ohm (1K ohm + 390 ohm)
-	** C = 22uF (also C = 330nF, for improved high-frequency)
-	**
-	** High Hz = 5.2~ = 1 / (2pi * 1390 * 0.000022)
-	** Under spice simulation the circuit yields -3dB = 5.2Hz.
-	**
-	** 8bitbubsy:
-	** Keep in mind that many of the Amiga schematics that are floating around on
-	** the internet have wrong RC values! They were most likely very early schematics
-	** that didn't change before production (or changes that never reached production).
-	** This has been confirmed by measuring the components on several Amiga motherboards.
-	**
-	** Correct values for A500, >rev3 (?) (A500_R6.pdf):
-	** - 1-pole RC 6dB/oct low-pass: R=360 ohm, C=0.1uF
-	** - Sallen-key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF
-	** - 1-pole RC 6dB/oct high-pass: R=1390 ohm (1000+390), C=22.33uF (22+0.33)
-	**
-	** Correct values for A1200, all revs (A1200_R2.pdf):
-	** - 1-pole RC 6dB/oct low-pass: R=680 ohm, C=6800pF
-	** - Sallen-key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF (same as A500)
-	** - 1-pole RC 6dB/oct high-pass: R=1360 ohm (1000+360), C=22uF
+	** RC values for Amiga 1200 (rev 1D4):
+	** - 1-pole (6dB/oct) RC low-pass: R=680 ohm, C=6800pF
+	** - 2-pole (12dB/oct) Sallen-Key low-pass ("LED"): R1/R2=10k ohm, C1=6800pF, C2=3900pF
+	** - 1-pole (6dB/oct) RC high-pass: R=1360 ohm (1000+360), C=22uF
 	*/
 	double R, C, R1, R2, C1, C2, cutoff, qfactor;
 
 	if (amigaModel == MODEL_A500)
 	{
-		// A500 1-pole (6dB/oct) RC low-pass filter:
+		// Amiga 500 rev 6A
+
+		// 1-pole (6dB/oct) RC low-pass filter:
 		R = 360.0; // R321 (360 ohm)
 		C = 1e-7;  // C321 (0.1uF)
-		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~4420.971Hz
+		cutoff = 1.0 / (PT2_2PI * R * C); // ~4420.971Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterLo);
 
-		// A500 1-pole (6dB/oct) RC high-pass filter:
+		// 1-pole (6dB/oct) RC high-pass filter:
 		R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
 		C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
-		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.128Hz
+		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.128Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 	else
 	{
-		/* Don't use the A1200 low-pass filter since its cutoff
+		// Amiga 1200 rev 1D4
+
+		/* Don't handle the A1200 low-pass filter since its cutoff
 		** is well above human hearable range anyway (~34.4kHz).
 		** We don't do volume PWM, so we have nothing we need to
 		** filter away.
 		*/
 		useLowpassFilter = false;
 
-		// A1200 1-pole (6dB/oct) RC high-pass filter:
+		// 1-pole (6dB/oct) RC high-pass filter:
 		R = 1360.0; // R324 (1K ohm resistor) + R325 (360 ohm resistor)
 		C = 2.2e-5; // C334 (22uF capacitor)
-		cutoff = 1.0 / (PT2_TWO_PI * R * C); // ~5.319Hz
+		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.319Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 
-	// Note: A500 rev3's (old) LED filter -may- be C1 = 7500pF (cutoff = 2942.776Hz, qfactor = 0.693375)
-	
-	// 2-pole (12dB/oct) RC low-pass filter ("LED" filter, same values on A500/A1200):
+	// 2-pole (12dB/oct) Sallen-Key low-pass filter ("LED" filter, same values on A500/A1200):
 	R1 = 10000.0; // R322 (10K ohm)
 	R2 = 10000.0; // R323 (10K ohm)
 	C1 = 6.8e-9;  // C322 (6800pF)
 	C2 = 3.9e-9;  // C323 (3900pF)
-	cutoff = 1.0 / (PT2_TWO_PI * pt2_sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
+	cutoff = 1.0 / (PT2_2PI * pt2_sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
 	qfactor = pt2_sqrt(R1 * R2 * C1 * C2) / (C2 * (R1 + R2)); // ~0.660225
 	setupTwoPoleFilter(dPaulaOutputFreq, cutoff, qfactor, &filterLED);
 }
