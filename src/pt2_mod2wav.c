@@ -1,4 +1,4 @@
-// for finding memory leaks in debug mode with Visual Studio 
+// for finding memory leaks in debug mode with Visual Studio
 #if defined _DEBUG && defined _MSC_VER
 #include <crtdbg.h>
 #endif
@@ -7,6 +7,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/stat.h> // stat()
+#ifndef _WIN32
+#include <unistd.h> // chdir()
+#endif
 #include "pt2_audio.h"
 #include "pt2_mouse.h"
 #include "pt2_textout.h"
@@ -334,7 +337,7 @@ bool mod2WavRender(char *filename)
 {
 	struct stat statBuffer;
 
-	lastFilename[0] = '\0';
+	lastFilename[0] = '\0'; // for rendering-thread
 
 	if (stat(filename, &statBuffer) == 0)
 	{
@@ -342,14 +345,23 @@ bool mod2WavRender(char *filename)
 			return false;
 	}
 
+	// if we're in samples mode in Disk Op., set dir to current modules path
+	if (diskop.mode == DISKOP_MODE_SMP && editor.modulesPathU != NULL)
+		UNICHAR_CHDIR(editor.modulesPathU);
+
 	FILE *fOut = fopen(filename, "wb");
+
+	// if we're in samples mode in Disk Op., set dir back to current samples path
+	if (diskop.mode == DISKOP_MODE_SMP && editor.samplesPathU != NULL)
+		UNICHAR_CHDIR(editor.samplesPathU);
+
 	if (fOut == NULL)
 	{
 		displayErrorMsg("FILE I/O ERROR");
 		return false;
 	}
 
-	strncpy(lastFilename, filename, PATH_MAX-1);
+	strncpy(lastFilename, filename, PATH_MAX-1); // for rendering-thread
 
 	const int32_t paulaMixFrequency = config.mod2WavOutputFreq * 2; // *2 for oversampling (we always do oversampling in MOD2WAV)
 	int32_t maxSamplesPerTick = (int32_t)ceil(paulaMixFrequency / (MIN_BPM / 2.5)) + 1;
