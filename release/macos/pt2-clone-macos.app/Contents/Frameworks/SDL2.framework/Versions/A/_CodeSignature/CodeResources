@@ -14,7 +14,7 @@
 		</data>
 		<key>Resources/Info.plist</key>
 		<data>
-		3Ap8eMmzH6O//HE0CuQuDI6OAis=
+		6ZYOMHaOYK0y//pgRxbrRTmghgM=
 		</data>
 		<key>Resources/License.txt</key>
 		<data>
@@ -68,11 +68,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			mO1jIX10BMO3YSgktP4b6Z1Oyqs=
+			wqkK8HYwYj1T7tvf9G86kUsQfXc=
 			</data>
 			<key>hash2</key>
 			<data>
-			dwmzZFx1CKgM7pYIq4tw7eGJMeAAJ5s3CyXDbfXYKpI=
+			ZECjsTuBMJKkK+yrAqHruMAJ1Dnk0CN4Uj7isjWLvAU=
 			</data>
 		</dict>
 		<key>Headers/SDL_bits.h</key>
@@ -255,11 +255,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			hqQx2W6tdgbMQiyN1qszXtM7Gpw=
+			enJz/y9Kq25SdPiDoBP7yR86jo4=
 			</data>
 			<key>hash2</key>
 			<data>
-			goxQLEkBzHVdp82tkViyxuCxR6r7a27JoHIgwhFDi9E=
+			gxFXZAIhlPaEbPerAgtEJYDawHaM5Y3B1Ns/t6Hr49A=
 			</data>
 		</dict>
 		<key>Headers/SDL_joystick.h</key>
@@ -563,11 +563,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			C1MRUY7Nk0opTpHnwI3d56Y0bao=
+			wlRT2sTA0dP97Vvcah+M13dM6Ng=
 			</data>
 			<key>hash2</key>
 			<data>
-			VF4HqxV58fpr/lsXHLKf3fu696GHjN0qfaN1Ju6loug=
+			Dn4kx2zaANESjNuADThOyPh3QukKZMRvUrIcDo8vIR4=
 			</data>
 		</dict>
 		<key>Headers/SDL_rwops.h</key>
@@ -618,11 +618,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			y2Mt0lJYUgd5gWFkFRD5+fNDZcg=
+			c3m7eehD1NIIXfsZ4lm6lgZO/AM=
 			</data>
 			<key>hash2</key>
 			<data>
-			ivK1q2flGXgxdtEIPDmES9Q+ZnfIn5EsmgddibmOkC4=
+			elTc5qJYwUBuKwCpNzRR+2giYouwx+mKzw1+qVrO+68=
 			</data>
 		</dict>
 		<key>Headers/SDL_surface.h</key>
@@ -706,11 +706,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			NFA6tQZnpSgJC8laqSROY1ivaAY=
+			ttcgxHkFC9JNkusMwO1ZwMHT0J4=
 			</data>
 			<key>hash2</key>
 			<data>
-			nuKO9hbAn5kdFDh6gbqI2p2ClR+9lXhSdrv8TnwXH9c=
+			OL6CnEC1BJE1NNZ/rzV9irlTFLO23OulTCH67f1odps=
 			</data>
 		</dict>
 		<key>Headers/SDL_video.h</key>
@@ -728,11 +728,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			k22upiGXgz0TzSKkWtDwaKrV2fw=
+			bsq9F6bHSfRUZWqi6pyhcJfFdv8=
 			</data>
 			<key>hash2</key>
 			<data>
-			kg2f48mMRh4+Ev5cnsEDDyQqf6YbP7YqWNhykRYzgDo=
+			orVndhc5fB+XucpAcaS8hFxijBDU2oR4F1jhbc7Ju1k=
 			</data>
 		</dict>
 		<key>Headers/begin_code.h</key>
@@ -783,11 +783,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			3Ap8eMmzH6O//HE0CuQuDI6OAis=
+			6ZYOMHaOYK0y//pgRxbrRTmghgM=
 			</data>
 			<key>hash2</key>
 			<data>
-			wHRU1XFQbqyS1ldsbNJToqpZSKKXO8cTLyOWZFbTo5U=
+			TdNrc/OZRL1tzIoTtvRoDcp2GfIbLSIjL9mu5CfONUE=
 			</data>
 		</dict>
 		<key>Resources/License.txt</key>
