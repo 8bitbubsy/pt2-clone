@@ -1708,9 +1708,8 @@ void samplerSamPaste(void)
 		return;
 	}
 
-	int32_t markStart = editor.markStartOfs;
-	if (s->length == 0)
-		markStart = 0;
+	bool sampleWasEmpty = (s->length == 0);
+	int32_t markStart = sampleWasEmpty ? 0 : editor.markStartOfs;
 
 	if (s->length+sampler.copyBufSize > config.maxSampleLength)
 	{
@@ -1819,6 +1818,13 @@ void samplerSamPaste(void)
 		displaySample();
 	else
 		redrawSample();
+
+	// if we pasted into an empty sample, force its volume to max (64)
+	if (sampleWasEmpty)
+	{
+		s->volume = 64;
+		ui.updateCurrSampleVolume = true;
+	}
 
 	ui.updateCurrSampleLength = true;
 	ui.updateSongSize = true;
