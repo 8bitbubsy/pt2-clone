@@ -2357,11 +2357,17 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			else if (keyb.leftAltPressed)
 			{
 				if (keyb.shiftPressed)
+				{
 					editor.metroChannel = cursor.channel + 1;
-				else
-					editor.metroFlag ^= 1;
 
-				ui.updateTrackerFlags = true;
+					if (ui.editOpScreenShown && ui.editOpScreen == 1)
+						ui.updateMetro2Text = true;
+				}
+				else
+				{
+					editor.metroFlag ^= 1;
+					ui.updateTrackerFlags = true;
+				}
 			}
 			else
 			{
