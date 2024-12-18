@@ -11,7 +11,7 @@ Windows/macOS binary releases can always be found at [16-bits.org/pt2.php](https
 
 # Note to Linux users
 - On some distros, a "pt2-clone" package may be available in the distribution's package repository
-- `protracker.ini` should be copied to `~/.config/protracker/`. If you do this, make sure you delete `protracker.ini` if it exists in the same directory as the program executable. You can find an up-to-date copy in the source code tree at `/release/other/` (or inside the Windows/macOS release zips at [16-bits.org/pt2.php](https://16-bits.org/pt2.php))
+- `protracker.ini` should be copied to `~/.config/protracker/` (or ~/.protracker/). If you do this, make sure you delete `protracker.ini` if it exists in the same directory as the program executable. You can find an up-to-date copy in the source code tree at `/release/other/` (or inside the Windows/macOS release zips at [16-bits.org/pt2.php](https://16-bits.org/pt2.php))
 
 # Note to macOS users
 - To get the config file to load, protracker.ini has to be in the same directory as the .app (program) itself
