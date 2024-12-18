@@ -82,10 +82,18 @@ void loadConfig(void)
 	if (f != NULL)
 		proTrackerDotIniFound = true;
 #else
-	// check in program directory
+	// check in program executable directory (first priority)
 	f = fopen("protracker.ini", "r");
 	if (f != NULL)
 		proTrackerDotIniFound = true;
+
+	// check in ~/.config/protracker/
+	if (!proTrackerDotIniFound && changePathToHome() && chdir(".config/protracker") == 0)
+	{
+		f = fopen("protracker.ini", "r");
+		if (f != NULL)
+			proTrackerDotIniFound = true;
+	}
 
 	// check in ~/.protracker/
 	if (!proTrackerDotIniFound && changePathToHome() && chdir(".protracker") == 0)
@@ -111,10 +119,18 @@ void loadConfig(void)
 	if (f != NULL)
 		ptDotConfigFound = true;
 #else
-	// check in program directory
+	// check in program executable directory (first priority)
 	f = openPTDotConfig();
 	if (f != NULL)
 		ptDotConfigFound = true;
+
+	// check in ~/.config/protracker/
+	if (!ptDotConfigFound && changePathToHome() && chdir(".config/protracker") == 0)
+	{
+		f = openPTDotConfig();
+		if (f != NULL)
+			ptDotConfigFound = true;
+	}
 
 	// check in ~/.protracker/
 	if (!ptDotConfigFound && changePathToHome() && chdir(".protracker") == 0)
@@ -137,19 +153,21 @@ void loadConfig(void)
 #ifdef _WIN32
 	loadColorsDotIni();
 #else
-	// check in program directory
+	// check in program executable directory (first priority)
 	colorsDotIniFound = loadColorsDotIni();
+
+	// check in ~/.config/protracker/
+	if (!colorsDotIniFound && changePathToHome() && chdir(".config/protracker") == 0)
+		colorsDotIniFound = loadColorsDotIni();
 
 	// check in ~/.protracker/
 	if (!colorsDotIniFound && changePathToHome() && chdir(".protracker") == 0)
 		loadColorsDotIni();
-#endif
 
-#ifndef _WIN32
 	chdir(oldCwd);
 #endif
 
-	// use palette for generating sample data mark (invert) table
+	// make 'sample data mark' palette-invert table now
 	createSampleMarkTable();
 }
 
