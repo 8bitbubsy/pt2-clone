@@ -1,7 +1,7 @@
  == Frequently Asked Questions (FAQ) ==
  
-  * Is there a way to make the window bigger?
- - Set VIDEOSCALE to 2X, 3x or 4X in protracker.ini.
+ * Is there a way to make the window bigger?
+ - Set VIDEOSCALE to 2X, 3x or 4X (or higher) in protracker.ini.
  
  * Is there a way to run the program in fullscreen mode?
  - Press F11. On some keyboards/configurations you may need to press fn+F11.
@@ -49,7 +49,8 @@
    function is extremely limited and will only revert to the last loaded sample.
 
  * [insert random question]
- - Try to send an email to olav.sorensen@live.no or visit #protracker at IRCnet.
+ - Try to send an email (address found on the bottom of 16-bits.org) or join
+   the Discord server (also found at 16-bits.org).
 
  == Some misc. info ==
 
@@ -64,7 +65,7 @@
   * MIDI support
   * Setup screen
   
- == Some ProTracker keybindings are used by other things in OS X! ==
+ == Some ProTracker keybindings are used by other things in macOS/OS X! ==
  
   - In OS X, go to System Preferences -> Keyboard -> Keyboard Shortcuts and
     disable keybindings that could interrupt with any PT keybindings.
