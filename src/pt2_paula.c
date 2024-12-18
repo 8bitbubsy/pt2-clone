@@ -69,23 +69,7 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	*/
 	double R, C, R1, R2, C1, C2, cutoff, qfactor;
 
-	if (amigaModel == MODEL_A500)
-	{
-		// Amiga 500 rev 6A
-
-		// 1-pole (6dB/oct) RC low-pass filter:
-		R = 360.0; // R321 (360 ohm)
-		C = 1e-7;  // C321 (0.1uF)
-		cutoff = 1.0 / (PT2_2PI * R * C); // ~4420.971Hz
-		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterLo);
-
-		// 1-pole (6dB/oct) RC high-pass filter:
-		R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
-		C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
-		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.128Hz
-		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
-	}
-	else
+	if (amigaModel == MODEL_A1200)
 	{
 		// Amiga 1200 rev 1D4
 
@@ -96,10 +80,26 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 		*/
 		useLowpassFilter = false;
 
-		// 1-pole (6dB/oct) RC high-pass filter:
+		// A1200 1-pole (6dB/oct) RC high-pass filter:
 		R = 1360.0; // R324 (1K ohm resistor) + R325 (360 ohm resistor)
 		C = 2.2e-5; // C334 (22uF capacitor)
 		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.319Hz
+		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
+	}
+	else
+	{
+		// Amiga 500 rev 6A
+
+		// A500 1-pole (6dB/oct) RC low-pass filter:
+		R = 360.0; // R321 (360 ohm)
+		C = 1e-7;  // C321 (0.1uF)
+		cutoff = 1.0 / (PT2_2PI * R * C); // ~4420.971Hz
+		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterLo);
+
+		// A500 1-pole (6dB/oct) RC high-pass filter:
+		R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
+		C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
+		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.128Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 
@@ -224,13 +224,13 @@ void paulaWriteByte(uint32_t address, uint8_t data8)
 			const bool oldLedFilterState = useLEDFilter;
 
 			useLEDFilter = !!(data8 & 2);
-
 			if (useLEDFilter != oldLedFilterState)
 				clearTwoPoleFilterState(&filterLED);
 		}
 		break;
 
-		default: return;
+		default:
+			return;
 	}
 }
 
@@ -281,7 +281,8 @@ void paulaWriteWord(uint32_t address, uint16_t data16)
 		case 0xDFF0C8: audxvol(2, data16); break;
 		case 0xDFF0D8: audxvol(3, data16); break;
 
-		default: return;
+		default:
+			return;
 	}
 }
 
@@ -298,7 +299,8 @@ void paulaWritePtr(uint32_t address, const int8_t *ptr)
 		case 0xDFF0C0: audxdat(2, ptr); break;
 		case 0xDFF0D0: audxdat(3, ptr); break;
 
-		default: return;
+		default:
+			return;
 	}
 }
 
