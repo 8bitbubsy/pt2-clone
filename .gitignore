@@ -26,3 +26,4 @@ vs2019_project/pt2-clone/Debug/pt2-clone.vcxproj.FileListAbsolute.txt
 *.iobj
 *.enc
 release/macos/pt2-clone-macos.app/Contents/MacOS/pt2-clone-macos
+pt_pal_editor/vs2019_project/pt_pal_editor/x64/Debug/pt_pal_editor.vcxproj.FileListAbsolute.txt
