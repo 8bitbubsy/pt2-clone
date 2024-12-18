@@ -1,11 +1,10 @@
 ---- Guide on how to compile the PT2 clone for Windows/macOS/Linux ---
-
-LINUX NOTE: This code is NOT big-endian compatible!
+  LINUX NOTE: The program source code is NOT big-endian compatible!
 
 Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
 
 
-== COMPILING ON LINUX (little-endian only!) ==
+== COMPILING ON LINUX ==
  1. Install the following packages:
     Ubuntu/Debian and similar: build-essential libsdl2-dev
     Fedora: gcc gcc-c++ alsa-lib-devel SDL2-devel
@@ -13,11 +12,14 @@ Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
  2. Compile the PT2 clone:     (folder: "pt2-clone")
     chmod +x make-linux.sh     (only needed once)
     ./make-linux.sh
- 3. Move pt2-clone/release/other/protracker.ini to ~/.protracker/
+ 3. Copy pt2-clone/release/other/protracker.ini to ~/.config/protracker/
+    (or ~/.protracker/).
+    Make sure there are no config files in the same path as the
+    program executable, as those will have first load priority.
 
 
 == COMPILING ON WINDOWS 7 SP1 OR NEWER ==
- 1. Download Visual Studio Community 2019 (it's free)
+ 1. Download Visual Studio Community 2019 (it's free). EDIT: Hard to find now!
  2. Start the installer and select the "Desktop development with C++" package
  3. Install and wait for it to finish...
  4. Open "pt2-clone\vs2019_project\pt2-clone.sln"
@@ -33,5 +35,8 @@ Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
  4. Compile the PT2 clone:      (folder: "pt2-clone")
     chmod +x make-macos.sh      (only needed once)
    ./make-macos.sh
- 5. If you have more than one user in your OS, move
-    pt2-clone/release/macos/protracker.ini to ~/.protracker/
+ 5. If you have more than one user in your OS, copy
+    pt2-clone/release/macos/protracker.ini to ~/.config/protracker/
+    (or ~/.protracker/).
+    Make sure there are no config files in the same path as the
+    program executable, as those will have first load priority.
