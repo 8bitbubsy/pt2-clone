@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <ctype.h> // toupper()
 #include "pt2_structs.h"
 #include "pt2_config.h"

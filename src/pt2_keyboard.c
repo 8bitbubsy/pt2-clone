@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <ctype.h> // tolower()
 #ifdef _WIN32
 #include <windows.h>

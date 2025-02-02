@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "pt2_textout.h"
 #include "pt2_visuals.h"
 #include "pt2_helpers.h"

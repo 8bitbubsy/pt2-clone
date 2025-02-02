@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "../pt2_header.h"
 #include "../pt2_config.h"
 #include "../pt2_structs.h"

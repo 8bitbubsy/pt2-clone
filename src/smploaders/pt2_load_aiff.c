@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <math.h>
 #include "../pt2_header.h"
 #include "../pt2_config.h"
@@ -27,7 +28,7 @@ static uint32_t getAIFFSampleRate(uint8_t *in)
 	const uint64_t mantissa63 = SWAP64(mantissaBits) & INT64_MAX;
 
 	double dExp = exp15 - EXP_BIAS;
-	double dMantissa = mantissa63 / (INT64_MAX+1.0);
+	double dMantissa = mantissa63 / ((double)INT64_MAX+1.0);
 
 	double dResult = (1.0 + dMantissa) * exp2(dExp);
 	return (uint32_t)round(dResult);

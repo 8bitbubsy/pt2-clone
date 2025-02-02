@@ -1,5 +1,6 @@
 // used for syncing audio from Paula writes to tracker visuals
 
+#include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include "pt2_audio.h"
