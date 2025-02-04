@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <ctype.h>
 #include "pt2_textout.h"
 #include "pt2_visuals.h"

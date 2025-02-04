@@ -3,10 +3,12 @@
 #include <crtdbg.h>
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "pt2_helpers.h"
 #include "pt2_textout.h"
 #include "pt2_audio.h"

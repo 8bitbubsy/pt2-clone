@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "pt2_paula.h"
 #include "pt2_blep.h"
 #include "pt2_rcfilters.h"

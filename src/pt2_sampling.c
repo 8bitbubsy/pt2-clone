@@ -12,9 +12,11 @@
 #include <crtdbg.h>
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include "pt2_textout.h"
 #include "pt2_sampler.h"
 #include "pt2_visuals.h"

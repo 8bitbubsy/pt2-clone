@@ -3,8 +3,11 @@
 #include <crtdbg.h>
 #endif
 
+#include <ctype.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #ifndef _WIN32
 #include <unistd.h>
 #endif

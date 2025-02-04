@@ -3,9 +3,11 @@
 #include <crtdbg.h>
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <sys/stat.h> // stat()
 #ifndef _WIN32
 #include <unistd.h> // chdir()
