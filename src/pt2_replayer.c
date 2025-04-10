@@ -54,21 +54,27 @@ void updatePaulaLoops(void) // used after manipulating sample loop points while 
 	if (audioWasntLocked)
 		lockAudio();
 
-	for (int32_t i = 0; i < PAULA_VOICES; i++)
+	moduleSample_t *s = &song->samples[editor.currSample];
+
+	moduleChannel_t *ch = song->channels;
+	for (uint32_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
-		const moduleChannel_t *ch = &song->channels[i];
 		if (ch->n_samplenum == editor.currSample) // selected sample matches channel's sample?
 		{
-			const moduleSample_t *s = &song->samples[editor.currSample];
-
 			const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
 
-			// set voice data ptr and data length
-			paulaWritePtr(voiceAddr + 0, ch->n_start + s->loopStart);
-			paulaWriteWord(voiceAddr + 4, (uint16_t)(s->loopLength >> 1));
+			// update replayer vars
+			ch->n_loopstart = ch->n_start + s->loopStart;
+			ch->n_replen = (uint16_t)(s->loopLength >> 1);
+			ch->n_wavestart = ch->n_loopstart;
 
-			setVisualsDataPtr(i, ch->n_start + s->loopStart);
-			setVisualsLength(i, (uint16_t)(s->loopLength >> 1));
+			// set Paula DAT and LEN (for next cycle)
+			paulaWritePtr(voiceAddr + 0, ch->n_loopstart);
+			paulaWriteWord(voiceAddr + 4, ch->n_replen);
+
+			// ... and update quadrascope as well
+			setVisualsDataPtr(i, ch->n_loopstart);
+			setVisualsLength(i, ch->n_replen);
 		}
 	}
 
