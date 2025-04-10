@@ -137,9 +137,9 @@ static inline void processMixedSamplesAmigaPanning(int32_t i, int16_t *out)
 	double dL = dMixBufferL[i];
 	double dR = dMixBufferR[i];
 
-	// normalize w/ phase-inversion (A500/A1200 has a phase-inverted audio signal)
-	dL *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
-	dR *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
+	// normalize
+	dL *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
+	dR *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
 
 	// left channel
 	smp32 = (int32_t)dL;
@@ -167,9 +167,9 @@ static inline void processMixedSamples(int32_t i, int16_t *out)
 	dL = dMid + dSide;
 	dR = dMid - dSide;
 
-	// normalize w/ phase-inversion (A500/A1200 has a phase-inverted audio signal)
-	dL *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
-	dR *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
+	// normalize
+	dL *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
+	dR *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
 
 	// left channel
 	smp32 = (int32_t)dL;
@@ -193,9 +193,9 @@ static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) /
 	dL = decimate2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
 	dR = decimate2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
 
-	// normalize w/ phase-inversion (A500/A1200 has a phase-inverted audio signal)
-	dL *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
-	dR *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
+	// normalize
+	dL *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
+	dR *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
 
 	// left channel
 	smp32 = (int32_t)dL;
@@ -227,9 +227,9 @@ static inline void processMixedSamples_2x(int32_t i, int16_t *out) // 2x oversam
 	dL = dMid + dSide;
 	dR = dMid - dSide;
 
-	// normalize w/ phase-inversion (A500/A1200 has a phase-inverted audio signal)
-	dL *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
-	dR *= NORM_FACTOR * (-INT16_MAX / (double)PAULA_VOICES);
+	// normalize
+	dL *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
+	dR *= NORM_FACTOR * (INT16_MAX / (double)PAULA_VOICES);
 
 	// left channel
 	smp32 = (int32_t)dL;
