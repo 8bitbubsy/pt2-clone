@@ -1,4 +1,4 @@
-// for finding memory leaks in debug mode with Visual Studio 
+// for finding memory leaks in debug mode with Visual Studio
 #if defined _DEBUG && defined _MSC_VER
 #include <crtdbg.h>
 #endif
@@ -282,7 +282,7 @@ void resetAllScreens(void) // prepare GUI for "really quit?" dialog
 	ui.changingDrumPadNote = false;
 
 	ui.disableVisualizer = false;
-	
+
 	if (ui.samplerScreenShown)
 	{
 		if (ui.samplingBoxShown)
@@ -352,7 +352,7 @@ void renderVuMeters(void)
 		return;
 
 	fillToVuMetersBgBuffer();
-	
+
 	uint32_t *dstPtr = &video.frameBuffer[(187 * SCREEN_W) + 55];
 	for (uint32_t i = 0; i < PAULA_VOICES; i++)
 	{
@@ -1273,7 +1273,7 @@ void updateEditOp(void)
 				textOutBg(256, 80, config.accidental ? noteNames2[2+editor.note3] : noteNames1[2+editor.note3],
 					video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 		}
-			
+
 		if (ui.updateChordNote4Text)
 		{
 			ui.updateChordNote4Text = false;
@@ -2003,6 +2003,12 @@ bool setupVideo(void)
 	}
 
 	uint32_t windowFlags = SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI;
+
+#ifndef SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR
+/* older SDL2 versions don't define this, don't fail the build for it */
+#define SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR "SDL_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR"
+#endif
+	SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
 
 	video.window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED, screenW, screenH, windowFlags);
