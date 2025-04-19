@@ -1,4 +1,5 @@
 CC ?= gcc
+DESTDIR ?= /usr/local
 
 HAS_FLAC ?= 1
 DEFINES ?=
@@ -50,3 +51,10 @@ $(OUT_FILE): $(OBJ)
 clean:
 	-rm -f $(OUT_FILE)
 	-rm -f $(SRC:%.c=%.o)
+
+USER_HOME ?= $(shell getent passwd $(SUDO_USER) | cut -d: -f6)
+USER_HOME := $(if $(USER_HOME),$(USER_HOME),$(HOME))
+
+install: $(OUT_FILE)
+	@install -v $(OUT_FILE) $(DESTDIR)/bin/
+	@install -vD $(OUT_DIR)/protracker.ini $(USER_HOME)/.config/protracker/protracker.ini
