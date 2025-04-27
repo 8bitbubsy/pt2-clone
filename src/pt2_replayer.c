@@ -50,16 +50,16 @@ double ciaBpm2Hz(int32_t bpm)
 
 void updatePaulaLoops(void) // used after manipulating sample loop points while Paula is live
 {
+	moduleSample_t *s = &song->samples[editor.currSample];
+
 	const bool audioWasntLocked = !audio.locked;
 	if (audioWasntLocked)
 		lockAudio();
 
-	moduleSample_t *s = &song->samples[editor.currSample];
-
 	moduleChannel_t *ch = song->channels;
 	for (uint32_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
-		if (ch->n_samplenum == editor.currSample) // selected sample matches channel's sample?
+		if (ch->n_samplenum == editor.currSample && ch->n_start != NULL)
 		{
 			const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
 
