@@ -30,6 +30,13 @@
    page down   - Go 16 rows down
    ctrl+del    - Delete note+sample from pattern data
    
+   When sample editor is open:
+     shift+(alt/ctrl)+z     = play sample range
+     shift+(alt/ctrl)+left  = decrease sample range start
+     shift+(alt/ctrl)+right = increase sample range start
+     shift+(alt/ctrl)+up    = increase sample range end
+     shift+(alt/ctrl)+down  = decrease sample range end
+  
    shift+"COPY"-button in sampler editor:
      Finds a free sample slot and clones the sample to it.
      If you have marked part of the sample, only the slice
