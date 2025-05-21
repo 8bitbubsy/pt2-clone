@@ -851,10 +851,8 @@ static void sampleOffset(moduleChannel_t *ch)
 	if ((ch->n_cmd & 0xFF) > 0)
 		ch->n_sampleoffset = ch->n_cmd & 0xFF;
 
-	uint16_t newOffset = ch->n_sampleoffset << 7;
-
-	// this signed test is the reason for the 9xx "sample >64kB = silence" bug
-	if ((int16_t)newOffset < (int16_t)ch->n_length)
+	const uint16_t newOffset = ch->n_sampleoffset << 7;
+	if (newOffset < ch->n_length)
 	{
 		ch->n_length -= newOffset;
 		ch->n_start += newOffset << 1;
