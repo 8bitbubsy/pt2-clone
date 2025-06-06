@@ -1046,7 +1046,7 @@ void renderEditOpMode(void)
 		break;
 
 		case 2:
-			srcPtr = &editOpModeCharsBMP[editor.halfClipFlag ? EDOP_MODE_BMP_C_OFS : EDOP_MODE_BMP_H_OFS];
+			srcPtr = &editOpModeCharsBMP[editor.halveSampleFlag ? EDOP_MODE_BMP_H_OFS : EDOP_MODE_BMP_C_OFS];
 		break;
 
 		case 3:

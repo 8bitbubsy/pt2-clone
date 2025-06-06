@@ -158,7 +158,7 @@ typedef struct editor_t
 	UNICHAR *fileNameTmpU, *currPathU, *modulesPathU, *samplesPathU;
 
 	bool errorMsgActive, errorMsgBlock, multiFlag, metroFlag, keypadToggle8CFlag, normalizeFiltersFlag;
-	bool sampleAllFlag, halfClipFlag, newOldFlag, pat2SmpHQ, mixFlag;
+	bool sampleAllFlag, halveSampleFlag, newOldFlag, pat2SmpHQ, mixFlag;
 	bool modLoaded, autoInsFlag, repeatKeyFlag, sampleZero, tuningToneFlag;
 	bool stepPlayEnabled, stepPlayBackwards, blockBufferFlag, blockMarkFlag, didQuantize;
 	bool swapChannelFlag, configFound, chordLengthMin, rowVisitTable[128 * MOD_ROWS];
@@ -175,7 +175,7 @@ typedef struct editor_t
 	uint16_t metroSpeed, metroChannel, sampleVol;
 	uint16_t effectMacros[10], currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	int32_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
-	int32_t oldTempo, modulatePos, modulateOffset, markStartOfs, markEndOfs, samplePos, chordLength;
+	int32_t oldTempo, markStartOfs, markEndOfs, samplePos, chordLength;
 	uint32_t playbackSeconds;
 	uint64_t playbackSecondsFrac;
 

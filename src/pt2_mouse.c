@@ -2170,7 +2170,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		{
 			     if (ui.editOpScreen == 0) editor.sampleAllFlag ^= 1;
 			else if (ui.editOpScreen == 1) editor.trackPattFlag = (editor.trackPattFlag + 1) % 3;
-			else if (ui.editOpScreen == 2) editor.halfClipFlag ^= 1;
+			else if (ui.editOpScreen == 2) editor.halveSampleFlag ^= 1;
 			else if (ui.editOpScreen == 3) editor.newOldFlag ^= 1;
 
 			renderEditOpMode();
@@ -2379,7 +2379,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				textEdit.scrollable = false;
 				enterTextEditMode(PTB_EO_MIX);
 			}
-			else
+			else // right mouse button = special, mix sample with itself (w/ modulation)
 			{
 				if (editor.sampleZero)
 				{
@@ -2394,57 +2394,60 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 					break;
 				}
 
-				if (editor.samplePos == s->length)
+				if (editor.samplePos >= s->length)
 				{
 					displayErrorMsg("INVALID POS !");
 					break;
 				}
 
-				int8_t *ptr8_1 = (int8_t *)malloc(config.maxSampleLength);
-				if (ptr8_1 == NULL)
+				int8_t *sampleData = &song->sampleData[s->offset];
+
+				// make copy of sample data
+				int8_t *sampleCopy = (int8_t *)malloc(s->length);
+				if (sampleCopy == NULL)
 				{
 					statusOutOfMemory();
 					return true;
 				}
 
-				memcpy(ptr8_1, &song->sampleData[s->offset], config.maxSampleLength);
+				memcpy(sampleCopy, sampleData, s->length);
 
-				int8_t *ptr8_2 = &song->sampleData[s->offset+editor.samplePos];
-				int8_t *ptr8_3 = &song->sampleData[s->offset+s->length-1];
-				int8_t *ptr8_4 = ptr8_1;
+				int8_t *mixPtr = sampleData + editor.samplePos;
+				const int32_t mixLength = s->length - editor.samplePos;
 
-				editor.modulateOffset = 0;
-				editor.modulatePos = 0;
-
-				do
+				if (editor.modulateSpeed == 0) // no modulation
 				{
-					int16_t tmp16 = *ptr8_2 + *ptr8_1;
-					if (editor.halfClipFlag == 0)
-						tmp16 >>= 1;
-
-					CLAMP8(tmp16);
-					*ptr8_2++ = (int8_t)tmp16;
-
-					if (editor.modulateSpeed == 0)
+					for (int32_t j = 0; j < mixLength; j++)
 					{
-						ptr8_1++;
-					}
-					else
-					{
-						editor.modulatePos += editor.modulateSpeed;
+						int16_t tmp16 = mixPtr[j] + sampleCopy[j];
+						if (editor.halveSampleFlag)
+							tmp16 >>= 1;
 
-						int8_t modTmp = (editor.modulatePos >> 12) & 0xFF;
-						int8_t modDat = vibratoTable[modTmp & 0x1F] >> 2;
-						int32_t modPos = ((modTmp & 32) ? (editor.modulateOffset - modDat) : (editor.modulateOffset + modDat)) + 2048;
-
-						editor.modulateOffset = modPos;
-						modPos >>= 11;
-						modPos = CLAMP(modPos, 0, s->length - 1);
-						ptr8_1 = &ptr8_4[modPos];
+						CLAMP8(tmp16);
+						mixPtr[j] = (int8_t)tmp16;
 					}
 				}
-				while (ptr8_2 < ptr8_3);
-				free(ptr8_4);
+				else // modulation
+				{
+					int32_t modTableOffset = 0;
+					uint32_t modOffset = 0; // 21.11fp
+
+					for (int32_t j = 0; j < mixLength; j++)
+					{
+						const int32_t sampleReadPos = modOffset >> 11;
+						int16_t tmp16 = mixPtr[j] + sampleCopy[MIN(sampleReadPos, s->length-1)];
+						if (editor.halveSampleFlag)
+							tmp16 >>= 1;
+
+						CLAMP8(tmp16);
+						mixPtr[j] = (int8_t)tmp16;
+
+						modTableOffset += editor.modulateSpeed;
+						modOffset += modulationTable[(modTableOffset >> 12) & 63];
+					}
+				}
+
+				free(sampleCopy);
 
 				fixSampleBeep(s);
 				if (ui.samplerScreenShown)
@@ -2476,52 +2479,49 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			if (editor.samplePos == s->length)
+			if (editor.samplePos >= s->length)
 			{
 				displayErrorMsg("INVALID POS !");
 				break;
 			}
 
-			int8_t *ptr8_1 = &song->sampleData[s->offset+editor.samplePos];
-			int8_t *ptr8_2 = &song->sampleData[s->offset];
-			int8_t *ptr8_3 = ptr8_2;
+			int8_t *sampleData = &song->sampleData[s->offset];
 
-			editor.modulateOffset = 0;
-			editor.modulatePos = 0;
-
-			for (int32_t j = 0; j < s->length; j++)
-			{
-				int16_t tmp16 = (*ptr8_2 + *ptr8_1) >> 1;
-				CLAMP8(tmp16);
-
-				*ptr8_1++ = (int8_t)tmp16;
-
-				if (editor.modulateSpeed == 0)
-				{
-					ptr8_2++;
-				}
-				else
-				{
-					editor.modulatePos += editor.modulateSpeed;
-
-					int8_t modTmp = (editor.modulatePos >> 12) & 0xFF;
-					int8_t modDat = vibratoTable[modTmp & 0x1F] >> 2;
-					int32_t modPos = ((modTmp & 32) ? (editor.modulateOffset - modDat) : (editor.modulateOffset + modDat)) + 2048;
-
-					editor.modulateOffset = modPos;
-					modPos >>= 11;
-					modPos = CLAMP(modPos, 0, s->length - 1);
-					ptr8_2 = &ptr8_3[modPos];
-				}
-			}
-
-			if (editor.halfClipFlag != 0)
+			if (editor.modulateSpeed == 0) // no modulation
 			{
 				for (int32_t j = 0; j < s->length; j++)
 				{
-					int16_t tmp16 = ptr8_3[j] + ptr8_3[j];
+					int16_t tmp16 = (sampleData[editor.samplePos+j] + sampleData[j]) >> 1;
 					CLAMP8(tmp16);
-					ptr8_3[j] = (int8_t)tmp16;
+
+					sampleData[editor.samplePos+j] = (int8_t)tmp16;
+				}
+			}
+			else // modulation
+			{
+				int32_t modTableOffset = 0;
+				uint32_t modOffset = 0; // 21.11fp
+
+				for (int32_t j = 0; j < s->length; j++)
+				{
+					const int32_t sampleReadPos = modOffset >> 11;
+					int16_t tmp16 = (sampleData[editor.samplePos+j] + sampleData[MIN(sampleReadPos, s->length-1)]) >> 1;
+					CLAMP8(tmp16);
+
+					sampleData[editor.samplePos+j] = (int8_t)tmp16;
+
+					modTableOffset += editor.modulateSpeed;
+					modOffset += modulationTable[(modTableOffset >> 12) & 63];
+				}
+			}
+
+			if (!editor.halveSampleFlag)
+			{
+				for (int32_t j = 0; j < s->length; j++)
+				{
+					int16_t tmp16 = (int16_t)sampleData[j] * 2;
+					CLAMP8(tmp16);
+					sampleData[j] = (int8_t)tmp16;
 				}
 			}
 
@@ -2630,7 +2630,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 		}
 		break;
 
-		case PTB_EO_MOD:
+		case PTB_EO_MOD: // modulate sample data
 		{
 			if (editor.sampleZero)
 			{
@@ -2651,40 +2651,31 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			int8_t *ptr8_1 = &song->sampleData[s->offset];
+			int8_t *sampleData = &song->sampleData[s->offset];
 
-			int8_t *ptr8_3 = (int8_t *)malloc(config.maxSampleLength);
-			if (ptr8_3 == NULL)
+			// make copy of sample data
+			int8_t *sampleCopy = (int8_t *)malloc(s->length);
+			if (sampleCopy == NULL)
 			{
 				statusOutOfMemory();
 				return true;
 			}
 
-			int8_t *ptr8_2 = ptr8_3;
+			memcpy(sampleCopy, sampleData, s->length);
 
-			memcpy(ptr8_2, ptr8_1, config.maxSampleLength);
-
-			editor.modulateOffset = 0;
-			editor.modulatePos = 0;
+			int32_t modTableOffset = 0;
+			uint32_t modOffset = 0; // 21.11fp
 
 			for (int32_t j = 0; j < s->length; j++)
 			{
-				*ptr8_1++ = *ptr8_2;
+				const int32_t sampleReadPos = modOffset >> 11;
+				sampleData[j] = sampleCopy[MIN(sampleReadPos, s->length-1)];
 
-				editor.modulatePos += editor.modulateSpeed;
-
-				int8_t modTmp = (editor.modulatePos >> 12) & 0xFF;
-				int8_t modDat = vibratoTable[modTmp & 0x1F] >> 2;
-				int32_t modPos = ((modTmp & 32) ? (editor.modulateOffset - modDat) : (editor.modulateOffset + modDat)) + 2048;
-
-				editor.modulateOffset = modPos;
-
-				modPos >>= 11;
-				modPos = CLAMP(modPos, 0, s->length - 1);
-				ptr8_2 = &ptr8_3[modPos];
+				modTableOffset += editor.modulateSpeed;
+				modOffset += modulationTable[(modTableOffset >> 12) & 63];
 			}
 
-			free(ptr8_3);
+			free(sampleCopy);
 
 			fixSampleBeep(s);
 			if (ui.samplerScreenShown)
@@ -2713,22 +2704,21 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
-			int8_t *ptr8_1 = &song->sampleData[s->offset];
-			int8_t *ptr8_2 = &song->sampleData[s->offset+s->length-1];
+			int8_t *sampleData = &song->sampleData[s->offset];
+			int32_t lastSamplePoint = s->length - 1;
 
-			do
+			for (int32_t j = 0; j < s->length / 2; j++)
 			{
-				int16_t tmp16 = *ptr8_1 + *ptr8_2;
-				if (editor.halfClipFlag == 0)
+				int16_t tmp16 = sampleData[j] + sampleData[lastSamplePoint-j];
+				if (editor.halveSampleFlag)
 					tmp16 >>= 1;
 
 				CLAMP8(tmp16);
 				int8_t tmpSmp = (int8_t)tmp16;
 
-				*ptr8_1++ = tmpSmp;
-				*ptr8_2-- = tmpSmp;
+				sampleData[j] = tmpSmp;
+				sampleData[lastSamplePoint-j] = tmpSmp;
 			}
-			while (ptr8_1 < ptr8_2);
 
 			fixSampleBeep(s);
 			if (ui.samplerScreenShown)
@@ -2766,13 +2756,12 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				ptr8_2 = &song->sampleData[s->offset+s->length-1];
 			}
 
-			do
+			for (int32_t j = 0; j < s->length / 2; j++)
 			{
-				int8_t tmpSmp = *ptr8_1;
+				const int8_t tmpSmp = *ptr8_1;
 				*ptr8_1++ = *ptr8_2;
 				*ptr8_2-- = tmpSmp;
 			}
-			while (ptr8_1 < ptr8_2);
 
 			fixSampleBeep(s);
 			if (ui.samplerScreenShown)

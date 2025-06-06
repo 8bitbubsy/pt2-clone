@@ -1117,7 +1117,7 @@ void doMix(void)
 	for (int32_t i = 0; i < mixLength; i++)
 	{
 		int16_t tmp16 = (i < s2->length) ? (fromPtr1[i] + fromPtr2[i]) : fromPtr1[i];
-		if (editor.halfClipFlag == 0)
+		if (editor.halveSampleFlag)
 			tmp16 >>= 1;
 
 		CLAMP8(tmp16);
@@ -1125,7 +1125,7 @@ void doMix(void)
 	}
 
 	memcpy(&song->sampleData[s3->offset], mixPtr, mixLength);
-	if (mixLength < config.maxSampleLength)
+	if (mixLength < config.maxSampleLength) // clear unused part of sample
 		memset(&song->sampleData[s3->offset + mixLength], 0, config.maxSampleLength - mixLength);
 
 	free(mixPtr);
@@ -1181,6 +1181,7 @@ void boostSample(int32_t sample, bool ignoreMark)
 	{
 		int16_t tmp16 = smpDat[i] - prevSmp;
 
+		// hackery to make it ProTracker accurate
 		int16_t smp16;
 		if (tmp16 < 0)
 			smp16 = smpDat[i] - (-tmp16 >> 2);
@@ -1232,8 +1233,8 @@ void filterSample(int32_t sample, bool ignoreMark)
 
 	if (to < 1)
 		return;
-	to--;
 
+	to--;
 	for (int32_t i = from; i < to; i++)
 		smpDat[i] = (smpDat[i+0] + smpDat[i+1]) >> 1;
 
