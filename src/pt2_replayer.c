@@ -50,16 +50,16 @@ double ciaBpm2Hz(int32_t bpm)
 
 void updatePaulaLoops(void) // used after manipulating sample loop points while Paula is live
 {
+	moduleSample_t *s = &song->samples[editor.currSample];
+
 	const bool audioWasntLocked = !audio.locked;
 	if (audioWasntLocked)
 		lockAudio();
 
-	moduleSample_t *s = &song->samples[editor.currSample];
-
 	moduleChannel_t *ch = song->channels;
 	for (uint32_t i = 0; i < PAULA_VOICES; i++, ch++)
 	{
-		if (ch->n_samplenum == editor.currSample) // selected sample matches channel's sample?
+		if (ch->n_samplenum == editor.currSample && ch->n_start != NULL)
 		{
 			const uint32_t voiceAddr = 0xDFF0A0 + (i * 16);
 
@@ -851,10 +851,8 @@ static void sampleOffset(moduleChannel_t *ch)
 	if ((ch->n_cmd & 0xFF) > 0)
 		ch->n_sampleoffset = ch->n_cmd & 0xFF;
 
-	uint16_t newOffset = ch->n_sampleoffset << 7;
-
-	// this signed test is the reason for the 9xx "sample >64kB = silence" bug
-	if ((int16_t)newOffset < (int16_t)ch->n_length)
+	const uint16_t newOffset = ch->n_sampleoffset << 7;
+	if (newOffset < ch->n_length)
 	{
 		ch->n_length -= newOffset;
 		ch->n_start += newOffset << 1;

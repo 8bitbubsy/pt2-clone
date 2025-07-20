@@ -1667,43 +1667,74 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			keyb.delayKey = false;
 			keyb.repeatKey = false;
-
-			if (ui.diskOpScreenShown)
+			
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				if (diskop.numEntries > DISKOP_LINES)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					diskop.scrollOffset++;
-					if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
-						diskop.scrollOffset += 3;
+					int32_t end = smpPos2Scr(editor.markEndOfs);
+					if (end > 0)
+					{
+						end--;
+						invertRange();
+						editor.markEndOfs = scr2SmpPos(end);
 
-					if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
-						diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
+						if (editor.markStartOfs > editor.markEndOfs)
+						{
+							int32_t tmp = editor.markEndOfs;
+							editor.markEndOfs = editor.markStartOfs;
+							editor.markStartOfs = tmp;
+						}
 
-					ui.updateDiskOpFileList = true;
+						invertRange();
+					}
+
+					if (editor.repeatKeyFlag)
+					{
+						keyb.delayKey = true;
+						keyb.repeatKey = true;
+					}
 				}
-
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
-
-				keyb.repeatKey = true;
-				keyb.delayKey = false;
 			}
-			else if (ui.posEdScreenShown)
+			else
 			{
-				posEdScrollDown();
+				if (ui.diskOpScreenShown)
+				{
+					if (diskop.numEntries > DISKOP_LINES)
+					{
+						diskop.scrollOffset++;
+						if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
+							diskop.scrollOffset += 3;
 
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
+						if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
+							diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
 
-				keyb.repeatKey = true;
-				keyb.delayKey = true;
-			}
-			else if (!ui.samplerScreenShown)
-			{
-				if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
-					modSetPos(DONT_SET_ORDER, (song->currRow + 1) & 63);
+						ui.updateDiskOpFileList = true;
+					}
 
-				keyb.repeatKey = true;
+					if (!keyb.repeatKey)
+						keyb.delayCounter = 0;
+
+					keyb.repeatKey = true;
+					keyb.delayKey = false;
+				}
+				else if (ui.posEdScreenShown)
+				{
+					posEdScrollDown();
+
+					if (!keyb.repeatKey)
+						keyb.delayCounter = 0;
+
+					keyb.repeatKey = true;
+					keyb.delayKey = true;
+				}
+				else if (!ui.samplerScreenShown)
+				{
+					if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
+						modSetPos(DONT_SET_ORDER, (song->currRow + 1) & 63);
+
+					keyb.repeatKey = true;
+				}
 			}
 		}
 		break;
@@ -1713,39 +1744,70 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			keyb.delayKey  = false;
 			keyb.repeatKey = false;
 
-			if (ui.diskOpScreenShown)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				diskop.scrollOffset--;
-				if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
-					diskop.scrollOffset -= 3;
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
+				{
+					int32_t end = smpPos2Scr(editor.markEndOfs);
+					if (end < 313)
+					{
+						end++;
+						invertRange();
+						editor.markEndOfs = scr2SmpPos(end);
 
-				if (diskop.scrollOffset < 0)
-					diskop.scrollOffset = 0;
+						if (editor.markStartOfs > editor.markEndOfs)
+						{
+							int32_t tmp = editor.markEndOfs;
+							editor.markEndOfs = editor.markStartOfs;
+							editor.markStartOfs = tmp;
+						}
 
-				ui.updateDiskOpFileList = true;
+						invertRange();
+					}
 
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
-
-				keyb.repeatKey = true;
-				keyb.delayKey = false;
+					if (editor.repeatKeyFlag)
+					{
+						keyb.delayKey = true;
+						keyb.repeatKey = true;
+					}
+				}
 			}
-			else if (ui.posEdScreenShown)
+			else
 			{
-				posEdScrollUp();
+				if (ui.diskOpScreenShown)
+				{
+					diskop.scrollOffset--;
+					if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
+						diskop.scrollOffset -= 3;
 
-				if (!keyb.repeatKey)
-					keyb.delayCounter = 0;
+					if (diskop.scrollOffset < 0)
+						diskop.scrollOffset = 0;
 
-				keyb.repeatKey = true;
-				keyb.delayKey = true;
-			}
-			else if (!ui.samplerScreenShown)
-			{
-				if ((editor.currMode != MODE_PLAY) && (editor.currMode != MODE_RECORD))
-					modSetPos(DONT_SET_ORDER, (song->currRow - 1) & 63);
+					ui.updateDiskOpFileList = true;
 
-				keyb.repeatKey = true;
+					if (!keyb.repeatKey)
+						keyb.delayCounter = 0;
+
+					keyb.repeatKey = true;
+					keyb.delayKey = false;
+				}
+				else if (ui.posEdScreenShown)
+				{
+					posEdScrollUp();
+
+					if (!keyb.repeatKey)
+						keyb.delayCounter = 0;
+
+					keyb.repeatKey = true;
+					keyb.delayKey = true;
+				}
+				else if (!ui.samplerScreenShown)
+				{
+					if ((editor.currMode != MODE_PLAY) && (editor.currMode != MODE_RECORD))
+						modSetPos(DONT_SET_ORDER, (song->currRow - 1) & 63);
+
+					keyb.repeatKey = true;
+				}
 			}
 		}
 		break;
@@ -1755,20 +1817,19 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			keyb.delayKey = false;
 			keyb.repeatKey = false;
 
-			if (keyb.leftCtrlPressed)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				sampleDownButton();
-				if (editor.repeatKeyFlag)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					keyb.delayKey = true;
-					keyb.repeatKey = true;
-				}
-			}
-			else if (keyb.shiftPressed)
-			{
-				if (song->currPos > 0)
-				{
-					modSetPos(song->currPos - 1, DONT_SET_ROW);
+					int32_t start = smpPos2Scr(editor.markStartOfs);
+					if (start > 0)
+					{
+						start--;
+						invertRange();
+						editor.markStartOfs = scr2SmpPos(start);
+						invertRange();
+					}
+
 					if (editor.repeatKeyFlag)
 					{
 						keyb.delayKey = true;
@@ -1776,19 +1837,43 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					}
 				}
 			}
-			else if (keyb.leftAltPressed)
-			{
-				decPatt();
-				if (editor.repeatKeyFlag)
-				{
-					keyb.delayKey = true;
-					keyb.repeatKey = true;
-				}
-			}
 			else
 			{
-				movePatCurLeft();
-				keyb.repeatKey = true;
+				if (keyb.leftCtrlPressed)
+				{
+					sampleDownButton();
+					if (editor.repeatKeyFlag)
+					{
+						keyb.delayKey = true;
+						keyb.repeatKey = true;
+					}
+				}
+				else if (keyb.shiftPressed)
+				{
+					if (song->currPos > 0)
+					{
+						modSetPos(song->currPos - 1, DONT_SET_ROW);
+						if (editor.repeatKeyFlag)
+						{
+							keyb.delayKey = true;
+							keyb.repeatKey = true;
+						}
+					}
+				}
+				else if (keyb.leftAltPressed)
+				{
+					decPatt();
+					if (editor.repeatKeyFlag)
+					{
+						keyb.delayKey = true;
+						keyb.repeatKey = true;
+					}
+				}
+				else
+				{
+					movePatCurLeft();
+					keyb.repeatKey = true;
+				}
 			}
 		}
 		break;
@@ -1798,20 +1883,27 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 			keyb.delayKey = false;
 			keyb.repeatKey = false;
 
-			if (keyb.leftCtrlPressed)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				sampleUpButton();
-				if (editor.repeatKeyFlag)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					keyb.delayKey = true;
-					keyb.repeatKey = true;
-				}
-			}
-			else if (keyb.shiftPressed)
-			{
-				if (song->currPos < 126)
-				{
-					modSetPos(song->currPos + 1, DONT_SET_ROW);
+					int32_t start = smpPos2Scr(editor.markStartOfs);
+					if (start < 313)
+					{
+						start++;
+						invertRange();
+						editor.markStartOfs = scr2SmpPos(start);
+
+						if (editor.markStartOfs > editor.markEndOfs)
+						{
+							int32_t tmp = editor.markEndOfs;
+							editor.markEndOfs = editor.markStartOfs;
+							editor.markStartOfs = tmp;
+						}
+
+						invertRange();
+					}
+
 					if (editor.repeatKeyFlag)
 					{
 						keyb.delayKey = true;
@@ -1819,19 +1911,43 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 					}
 				}
 			}
-			else if (keyb.leftAltPressed)
-			{
-				incPatt();
-				if (editor.repeatKeyFlag)
-				{
-					keyb.delayKey = true;
-					keyb.repeatKey = true;
-				}
-			}
 			else
 			{
-				movePatCurRight();
-				keyb.repeatKey = true;
+				if (keyb.leftCtrlPressed)
+				{
+					sampleUpButton();
+					if (editor.repeatKeyFlag)
+					{
+						keyb.delayKey = true;
+						keyb.repeatKey = true;
+					}
+				}
+				else if (keyb.shiftPressed)
+				{
+					if (song->currPos < 126)
+					{
+						modSetPos(song->currPos + 1, DONT_SET_ROW);
+						if (editor.repeatKeyFlag)
+						{
+							keyb.delayKey = true;
+							keyb.repeatKey = true;
+						}
+					}
+				}
+				else if (keyb.leftAltPressed)
+				{
+					incPatt();
+					if (editor.repeatKeyFlag)
+					{
+						keyb.delayKey = true;
+						keyb.repeatKey = true;
+					}
+				}
+				else
+				{
+					movePatCurRight();
+					keyb.repeatKey = true;
+				}
 			}
 		}
 		break;
@@ -2816,42 +2932,50 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 
 		case SDL_SCANCODE_Z:
 		{
-			if (keyb.leftAmigaPressed)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				trackOctaDown(TRANSPOSE_ALL, 0, MOD_ROWS - 1);
-			}
-			else if (keyb.leftCtrlPressed)
-			{
-				if (ui.samplerScreenShown)
-				{
-					if (askBox(ASKBOX_YES_NO, "RESTORE SAMPLE?"))
-						redoSampleData(editor.currSample);
-				}
-				else
-				{
-					modSetTempo(125, true);
-					modSetSpeed(6);
-
-					moduleChannel_t *ch = song->channels;
-					for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
-					{
-						ch->n_wavecontrol = 0;
-						ch->n_glissfunk = 0;
-						ch->n_finetune = 0;
-						ch->n_loopcount = 0;
-					}
-
-					displayMsg("EFX RESTORED !");
-				}
-			}
-			else if (keyb.leftAltPressed)
-			{
-				editor.muted[0] ^= 1; // toggle channel 1
-				renderMuteButtons();
+				if (keyb.leftCtrlPressed || keyb.leftAltPressed)
+					samplerPlayRange();
 			}
 			else
 			{
-				handleEditKeys(scancode, EDIT_NORMAL);
+				if (keyb.leftAmigaPressed)
+				{
+					trackOctaDown(TRANSPOSE_ALL, 0, MOD_ROWS - 1);
+				}
+				else if (keyb.leftCtrlPressed)
+				{
+					if (ui.samplerScreenShown)
+					{
+						if (askBox(ASKBOX_YES_NO, "RESTORE SAMPLE?"))
+							redoSampleData(editor.currSample);
+					}
+					else
+					{
+						modSetTempo(125, true);
+						modSetSpeed(6);
+
+						moduleChannel_t *ch = song->channels;
+						for (int32_t i = 0; i < PAULA_VOICES; i++, ch++)
+						{
+							ch->n_wavecontrol = 0;
+							ch->n_glissfunk = 0;
+							ch->n_finetune = 0;
+							ch->n_loopcount = 0;
+						}
+
+						displayMsg("EFX RESTORED !");
+					}
+				}
+				else if (keyb.leftAltPressed)
+				{
+					editor.muted[0] ^= 1; // toggle channel 1
+					renderMuteButtons();
+				}
+				else
+				{
+					handleEditKeys(scancode, EDIT_NORMAL);
+				}
 			}
 		}
 		break;
@@ -3003,55 +3127,83 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 		case SDL_SCANCODE_LEFT:
 		{
-			if (ui.editTextFlag)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					if (keyb.repeatCounter >= 3)
+					if (keyb.delayCounter >= 6)
 					{
-						keyb.repeatCounter = 0;
-						editTextPrevChar();
+						if (keyb.repeatCounter >= 2)
+						{
+							keyb.repeatCounter = 0;
+							int32_t start = smpPos2Scr(editor.markStartOfs);
+							if (start > 0)
+							{
+								start--;
+								invertRange();
+								editor.markStartOfs = scr2SmpPos(start);
+								invertRange();
+							}
+						}
 					}
-				}
-				else
-				{
-					keyb.delayCounter++;
+					else
+					{
+						keyb.delayCounter++;
+					}
 				}
 			}
 			else
 			{
-				if (keyb.leftCtrlPressed)
+				if (ui.editTextFlag)
 				{
-					if (keyb.repeatCounter >= 6)
+					if (keyb.delayCounter >= 6)
 					{
-						keyb.repeatCounter = 0;
-						sampleDownButton();
+						if (keyb.repeatCounter >= 3)
+						{
+							keyb.repeatCounter = 0;
+							editTextPrevChar();
+						}
 					}
-				}
-				else if (keyb.shiftPressed)
-				{
-					if (keyb.repeatCounter >= 6)
+					else
 					{
-						keyb.repeatCounter = 0;
-						if (song->currPos > 0)
-							modSetPos(song->currPos - 1, DONT_SET_ROW);
-					}
-				}
-				else if (keyb.leftAltPressed)
-				{
-					if (keyb.repeatCounter >= 4)
-					{
-						keyb.repeatCounter = 0;
-						decPatt();
+						keyb.delayCounter++;
 					}
 				}
 				else
 				{
-					if (keyb.repeatCounter >= 6)
+					if (keyb.leftCtrlPressed)
 					{
-						keyb.repeatCounter = 0;
-						if (!keyb.shiftPressed && !keyb.leftAltPressed && !keyb.leftCtrlPressed)
-							movePatCurLeft();
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							sampleDownButton();
+						}
+					}
+					else if (keyb.shiftPressed)
+					{
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							if (song->currPos > 0)
+								modSetPos(song->currPos - 1, DONT_SET_ROW);
+						}
+					}
+					else if (keyb.leftAltPressed)
+					{
+						if (keyb.repeatCounter >= 4)
+						{
+							keyb.repeatCounter = 0;
+							decPatt();
+						}
+					}
+					else
+					{
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							if (!keyb.shiftPressed && !keyb.leftAltPressed && !keyb.leftCtrlPressed)
+								movePatCurLeft();
+						}
 					}
 				}
 			}
@@ -3060,55 +3212,87 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 		case SDL_SCANCODE_RIGHT:
 		{
-			if (ui.editTextFlag)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					if (keyb.repeatCounter >= 3)
+					if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
 					{
-						keyb.repeatCounter = 0;
-						editTextNextChar();
+						if (keyb.repeatCounter >= 2)
+						{
+							keyb.repeatCounter = 0;
+							int32_t start = smpPos2Scr(editor.markStartOfs);
+							if (start < 313)
+							{
+								start++;
+								invertRange();
+								editor.markStartOfs = scr2SmpPos(start);
+
+								if (editor.markStartOfs > editor.markEndOfs)
+								{
+									int32_t tmp = editor.markEndOfs;
+									editor.markEndOfs = editor.markStartOfs;
+									editor.markStartOfs = tmp;
+								}
+
+								invertRange();
+							}
+						}
 					}
-				}
-				else
-				{
-					keyb.delayCounter++;
 				}
 			}
 			else
 			{
-				if (keyb.leftCtrlPressed)
+				if (ui.editTextFlag)
 				{
-					if (keyb.repeatCounter >= 6)
+					if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
 					{
-						keyb.repeatCounter = 0;
-						sampleUpButton();
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							editTextNextChar();
+						}
 					}
-				}
-				else if (keyb.shiftPressed)
-				{
-					if (keyb.repeatCounter >= 6)
+					else
 					{
-						keyb.repeatCounter = 0;
-						if (song->currPos < 126)
-							modSetPos(song->currPos + 1, DONT_SET_ROW);
-					}
-				}
-				else if (keyb.leftAltPressed)
-				{
-					if (keyb.repeatCounter >= 4)
-					{
-						keyb.repeatCounter = 0;
-						incPatt();
+						keyb.delayCounter++;
 					}
 				}
 				else
 				{
-					if (keyb.repeatCounter >= 6)
+					if (keyb.leftCtrlPressed)
 					{
-						keyb.repeatCounter = 0;
-						if (!keyb.shiftPressed && !keyb.leftAltPressed && !keyb.leftCtrlPressed)
-							movePatCurRight();
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							sampleUpButton();
+						}
+					}
+					else if (keyb.shiftPressed)
+					{
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							if (song->currPos < 126)
+								modSetPos(song->currPos + 1, DONT_SET_ROW);
+						}
+					}
+					else if (keyb.leftAltPressed)
+					{
+						if (keyb.repeatCounter >= 4)
+						{
+							keyb.repeatCounter = 0;
+							incPatt();
+						}
+					}
+					else
+					{
+						if (keyb.repeatCounter >= 6)
+						{
+							keyb.repeatCounter = 0;
+							if (!keyb.shiftPressed && !keyb.leftAltPressed && !keyb.leftCtrlPressed)
+								movePatCurRight();
+						}
 					}
 				}
 			}
@@ -3117,44 +3301,76 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 		case SDL_SCANCODE_UP:
 		{
-			if (ui.diskOpScreenShown)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				if (keyb.repeatCounter >= 1)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					keyb.repeatCounter = 0;
+					if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
+					{
+						if (keyb.repeatCounter >= 2)
+						{
+							keyb.repeatCounter = 0;
+							int32_t end = smpPos2Scr(editor.markEndOfs);
+							if (end < 313)
+							{
+								end++;
+								invertRange();
+								editor.markEndOfs = scr2SmpPos(end);
 
-					diskop.scrollOffset--;
-					if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
-						diskop.scrollOffset -= 3;
+								if (editor.markStartOfs > editor.markEndOfs)
+								{
+									int32_t tmp = editor.markEndOfs;
+									editor.markEndOfs = editor.markStartOfs;
+									editor.markStartOfs = tmp;
+								}
 
-					if (diskop.scrollOffset < 0)
-						diskop.scrollOffset = 0;
-
-					ui.updateDiskOpFileList = true;
+								invertRange();
+							}
+						}
+					}
 				}
 			}
-			else if (ui.posEdScreenShown)
+			else
 			{
-				if (keyb.repeatCounter >= 3)
+				if (ui.diskOpScreenShown)
 				{
-					keyb.repeatCounter = 0;
-					posEdScrollUp();
-				}
-			}
-			else if (!ui.samplerScreenShown)
-			{
-				if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
-				{
-					uint8_t repeatNum = 6;
-					if (keyb.leftAltPressed)
-						repeatNum = 1;
-					else if (keyb.shiftPressed)
-						repeatNum = 3;
-
-					if (keyb.repeatCounter >= repeatNum)
+					if (keyb.repeatCounter >= 1)
 					{
 						keyb.repeatCounter = 0;
-						modSetPos(DONT_SET_ORDER, (song->currRow - 1) & 63);
+
+						diskop.scrollOffset--;
+						if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
+							diskop.scrollOffset -= 3;
+
+						if (diskop.scrollOffset < 0)
+							diskop.scrollOffset = 0;
+
+						ui.updateDiskOpFileList = true;
+					}
+				}
+				else if (ui.posEdScreenShown)
+				{
+					if (keyb.repeatCounter >= 3)
+					{
+						keyb.repeatCounter = 0;
+						posEdScrollUp();
+					}
+				}
+				else if (!ui.samplerScreenShown)
+				{
+					if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
+					{
+						uint8_t repeatNum = 6;
+						if (keyb.leftAltPressed)
+							repeatNum = 1;
+						else if (keyb.shiftPressed)
+							repeatNum = 3;
+
+						if (keyb.repeatCounter >= repeatNum)
+						{
+							keyb.repeatCounter = 0;
+							modSetPos(DONT_SET_ORDER, (song->currRow - 1) & 63);
+						}
 					}
 				}
 			}
@@ -3163,47 +3379,79 @@ void handleKeyRepeat(SDL_Scancode scancode)
 
 		case SDL_SCANCODE_DOWN:
 		{
-			if (ui.diskOpScreenShown)
+			if (ui.samplerScreenShown && keyb.shiftPressed)
 			{
-				if (keyb.repeatCounter >= 1)
+				if (editor.markStartOfs >= 0 && (keyb.leftCtrlPressed || keyb.leftAltPressed))
 				{
-					keyb.repeatCounter = 0;
-
-					if (diskop.numEntries > DISKOP_LINES)
+					if (keyb.delayCounter >= KEYB_REPEAT_DELAY)
 					{
-						diskop.scrollOffset++;
-						if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
-							diskop.scrollOffset += 3;
+						if (keyb.repeatCounter >= 2)
+						{
+							keyb.repeatCounter = 0;
+							int32_t end = smpPos2Scr(editor.markEndOfs);
+							if (end > 0)
+							{
+								end--;
+								invertRange();
+								editor.markEndOfs = scr2SmpPos(end);
 
-						if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
-							diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
+								if (editor.markStartOfs > editor.markEndOfs)
+								{
+									int32_t tmp = editor.markEndOfs;
+									editor.markEndOfs = editor.markStartOfs;
+									editor.markStartOfs = tmp;
+								}
 
-						ui.updateDiskOpFileList = true;
+								invertRange();
+							}
+						}
 					}
 				}
 			}
-			else if (ui.posEdScreenShown)
+			else
 			{
-				if (keyb.repeatCounter >= 3)
+				if (ui.diskOpScreenShown)
 				{
-					keyb.repeatCounter = 0;
-					posEdScrollDown();
-				}
-			}
-			else if (!ui.samplerScreenShown)
-			{
-				if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
-				{
-					uint8_t repeatNum = 6;
-					if (keyb.leftAltPressed)
-						repeatNum = 1;
-					else if (keyb.shiftPressed)
-						repeatNum = 3;
-
-					if (keyb.repeatCounter >= repeatNum)
+					if (keyb.repeatCounter >= 1)
 					{
 						keyb.repeatCounter = 0;
-						modSetPos(DONT_SET_ORDER, (song->currRow + 1) & 63);
+
+						if (diskop.numEntries > DISKOP_LINES)
+						{
+							diskop.scrollOffset++;
+							if (mouse.rightButtonPressed) // PT quirk: right mouse button speeds up scrolling even on keyb UP/DOWN
+								diskop.scrollOffset += 3;
+
+							if (diskop.scrollOffset > diskop.numEntries-DISKOP_LINES)
+								diskop.scrollOffset = diskop.numEntries-DISKOP_LINES;
+
+							ui.updateDiskOpFileList = true;
+						}
+					}
+				}
+				else if (ui.posEdScreenShown)
+				{
+					if (keyb.repeatCounter >= 3)
+					{
+						keyb.repeatCounter = 0;
+						posEdScrollDown();
+					}
+				}
+				else if (!ui.samplerScreenShown)
+				{
+					if (editor.currMode != MODE_PLAY && editor.currMode != MODE_RECORD)
+					{
+						uint8_t repeatNum = 6;
+						if (keyb.leftAltPressed)
+							repeatNum = 1;
+						else if (keyb.shiftPressed)
+							repeatNum = 3;
+
+						if (keyb.repeatCounter >= repeatNum)
+						{
+							keyb.repeatCounter = 0;
+							modSetPos(DONT_SET_ORDER, (song->currRow + 1) & 63);
+						}
 					}
 				}
 			}

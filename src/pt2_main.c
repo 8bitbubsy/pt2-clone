@@ -564,6 +564,7 @@ static bool initializeVars(void)
 	editor.multiModeNext[3] = 1;
 	ui.introTextShown = true;
 	editor.normalizeFiltersFlag = true;
+	editor.halveSampleFlag = true;
 	editor.markStartOfs = -1;
 	ui.sampleMarkingPos = -1;
 	ui.previousPointerMode = ui.pointerMode;

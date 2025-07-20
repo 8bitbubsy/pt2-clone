@@ -174,6 +174,31 @@ module_t *loadMod31(uint8_t *buffer, uint32_t filesize)
 		}
 	}
 
+	// scan for non-sensical use of F00 and remove if so (f.ex. "dirt.mod")
+	uint32_t numF00s = 0;
+	for (int32_t i = 0; i < numPatterns; i++)
+	{
+		note_t *note = m->patterns[i];
+		for (int32_t j = 0; j < MOD_ROWS*4; j++, note++)
+		{
+			if (note->command == 0xF && note->param == 0)
+				numF00s++;
+		}
+	}
+
+	if (numF00s > 7)
+	{
+		for (int32_t i = 0; i < numPatterns; i++)
+		{
+			note_t *note = m->patterns[i];
+			for (int32_t j = 0; j < MOD_ROWS*4; j++, note++)
+			{
+				if (note->command == 0xF && note->param == 0)
+					note->command = 0;
+			}
+		}
+	}
+
 	// load sample data
 	s = m->samples;
 	for (int32_t i = 0; i < MOD_SAMPLES; i++, s++)

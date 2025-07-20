@@ -146,8 +146,6 @@
  This command will play from a chosen position in the sample, and not from
  the beginning. The two numbers equal the two first numbers in the length
  of the sample. Handy for speech samples.
- Due to a bug in the ProTracker replayer, attempting to use this command on
- samples longer than 65534/$FFFF will result in no sound.
 
  Example: C-300923  Play sample from offset $2300.
 
