@@ -222,7 +222,7 @@ module_t *loadMod15(uint8_t *buffer, uint32_t filesize)
 	for (int32_t i = 0; i < 15; i++, s++)
 	{
 		// for Ultimate SoundTracker modules, only the loop area of a looped sample is played.
-		if (s->loopStart > 0 && s->loopLength < s->length)
+		if (s->loopStart > 0 && s->loopLength < s->length && s->loopStart < s->length)
 		{
 			s->length -= s->loopStart;
 			p += s->loopStart;
