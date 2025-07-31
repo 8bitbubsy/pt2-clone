@@ -10,8 +10,7 @@ Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
     Fedora: gcc gcc-c++ alsa-lib-devel SDL2-devel
     Others: www.google.com (you want gcc, g++ (or c++), alsa dev and SDL2 dev)
  2. Compile the PT2 clone:     (folder: "pt2-clone")
-    chmod +x make-linux.sh     (only needed once)
-    ./make-linux.sh
+    make -j2
  3. Copy pt2-clone/release/other/protracker.ini to ~/.config/protracker/
     (or ~/.protracker/).
     Make sure there are no config files in the same path as the
@@ -33,7 +32,6 @@ Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
  2. Download the SDL 2 framework at https://www.libsdl.org
  3. Inside the package, copy SDL2.framework to /Library/Frameworks/
  4. Compile the PT2 clone:      (folder: "pt2-clone")
-    chmod +x make-macos.sh      (only needed once)
    ./make-macos.sh
  5. If you have more than one user in your OS, copy
     pt2-clone/release/macos/protracker.ini to ~/.config/protracker/
