@@ -766,7 +766,9 @@ void diskOpRenderFileList(void)
 		if (diskop.fillThread == NULL)
 			return;
 
+		SDL_DetachThread(diskop.fillThread);
 		diskop.cached = true;
+
 		return;
 	}
 

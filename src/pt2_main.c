@@ -476,25 +476,7 @@ static void handleInput(void)
 #endif
 
 		if (ui.throwExit)
-		{
 			editor.programRunning = false;
-
-			if (diskop.isFilling)
-			{
-				diskop.isFilling = false;
-
-				diskop.forceStopReading = true;
-				SDL_WaitThread(diskop.fillThread, NULL);
-			}
-
-			if (editor.mod2WavOngoing)
-			{
-				editor.mod2WavOngoing = false;
-
-				editor.abortMod2Wav = true;
-				SDL_WaitThread(editor.mod2WavThread, NULL);
-			}
-		}
 	}
 }
 
@@ -596,13 +578,17 @@ oom:
 
 static void handleSigTerm(void)
 {
+	if (diskop.isFilling)
+	{
+		diskop.forceStopReading = true;
+		while (diskop.isFilling) SDL_Delay(5);
+	}
+
 	if (editor.mod2WavOngoing)
 	{
-		editor.mod2WavOngoing = false;
-
 		editor.abortMod2Wav = true;
-		SDL_WaitThread(editor.mod2WavThread, NULL);
-		removeAskBox();
+		while (editor.mod2WavOngoing) SDL_Delay(5);
+		removeAskBox(); // removes MOD2WAV dialog
 	}
 
 	if (song->modified)

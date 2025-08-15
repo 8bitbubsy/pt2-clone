@@ -263,9 +263,6 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 
 	free(mod2WavBuffer);
 
-	if (sampleCounter & 1)
-		fputc(0, f); // pad align byte
-
 	uint32_t totalRiffChunkLen = (uint32_t)ftell(f) - 8;
 
 	// go back and fill in WAV header
@@ -331,6 +328,9 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 
 	ui.mod2WavFinished = true;
 	ui.updateMod2WavDialog = true;
+
+	if (editor.abortMod2Wav)
+		editor.mod2WavOngoing = false;
 
 	return true;
 }
@@ -424,6 +424,7 @@ bool mod2WavRender(char *filename)
 		return false;
 	}
 
+	SDL_DetachThread(editor.mod2WavThread);
 	return true;
 }
 

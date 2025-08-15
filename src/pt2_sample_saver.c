@@ -194,7 +194,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 				fputc((uint8_t)(sampleData[i] + 128), f);
 
 			if (sampleLength & 1)
-				fputc(0, f); // pad align byte
+				fputc(0, f); // pad byte needed for 8-bit samples
 
 			if (loopStart+loopLength > 2) // loop enabled?
 				fwrite(&samplerChunk, sizeof (samplerChunk), 1, f);
