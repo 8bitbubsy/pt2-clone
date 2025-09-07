@@ -1,4 +1,4 @@
-/* Simple Paula emulator by 8bitbubsy (with BLEP synthesis by aciddose).
+/* Simple Paula emulator (with BLEP synthesis by aciddose).
 ** Limitation: The audio output frequency can't be below 31389Hz ( ceil(PAULA_PAL_CLK / 113.0) )
 **
 ** WARNING: These functions must not be called while paulaGenerateSamples() is running!
@@ -27,12 +27,12 @@ typedef struct voice_t
 	double dDelta, dPhase;
 
 	// for BLEP synthesis
-	double dLastDelta, dLastPhase, dLastDeltaMul, dBlepOffset, dDeltaMul;
+	double dLastDelta, dLastPhase, dBlepOffset;
 
 	// registers modified by Paula functions
 	const int8_t *AUD_LC; // location (data pointer)
 	uint16_t AUD_LEN;
-	double AUD_PER_delta, AUD_PER_deltamul;
+	double AUD_PER_delta;
 	double AUD_VOL;
 } paulaVoice_t;
 
@@ -137,15 +137,10 @@ static void audxper(int32_t ch, uint16_t period)
 
 	// to be read on next sampling step (or on DMA trigger)
 	v->AUD_PER_delta = dPeriodToDeltaDiv / realPeriod;
-	v->AUD_PER_deltamul = 1.0 / v->AUD_PER_delta; // for BLEP synthesis (prevents division in inner mixing loop)
 
-	// handle BLEP synthesis edge-cases
-
+	// handle BLEP synthesis edge-case
 	if (v->dLastDelta == 0.0)
 		v->dLastDelta = v->AUD_PER_delta;
-
-	if (v->dLastDeltaMul == 0.0)
-		v->dLastDeltaMul = v->AUD_PER_deltamul;
 }
 
 static void audxvol(int32_t ch, uint16_t vol)
@@ -173,15 +168,13 @@ static void audxdat(int32_t ch, const int8_t *src)
 
 static inline void refetchPeriod(paulaVoice_t *v) // Paula stage
 {
-	// set BLEP stuff
+	// set BLEP variables
 	v->dLastPhase = v->dPhase;
 	v->dLastDelta = v->dDelta;
-	v->dLastDeltaMul = v->dDeltaMul;
-	v->dBlepOffset = v->dLastPhase * v->dLastDeltaMul;
+	v->dBlepOffset = v->dLastPhase / v->dLastDelta;
 
 	// Paula only updates period (delta) during period refetching (this stage)
 	v->dDelta = v->AUD_PER_delta;
-	v->dDeltaMul = v->AUD_PER_deltamul;
 
 	v->nextSampleStage = true;
 }

@@ -1,10 +1,9 @@
 // these BLEP routines were coded by aciddose
 
 #include <stdint.h>
-#include <assert.h>
 #include "pt2_blep.h"
 
-static const double dMinblepData[256+1] =
+static const double dMinBlepData[256+1] =
 {
 	 1.000047730261351741631870027, 1.000070326525919428561905988, 1.000026295486963423542192686, 0.999910424773336803383472216,
 	 0.999715744379055859525351480, 0.999433014919733908598686867, 0.999050085771328588712947294, 0.998551121919525108694415394,
@@ -78,12 +77,10 @@ static const double dMinblepData[256+1] =
 
 void blepAdd(blep_t *b, double dOffset, double dAmplitude)
 {
-	assert(dOffset >= 0.0 && dOffset < 1.0);
-
 	double f = dOffset * BLEP_SP;
 
 	int32_t i = (int32_t)f; // 8bitbubsy: get integer part of f
-	const double *dBlepSrc = dMinblepData + i;
+	const double *dBlepSrc = dMinBlepData + i;
 	f -= i; // 8bitbubsy: remove integer part from f
 
 	i = b->index;
