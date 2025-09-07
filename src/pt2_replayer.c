@@ -100,6 +100,8 @@ void turnOffVoices(void)
 		setVisualsVolume(i, 0);
 	}
 
+	resetAudioDither();
+
 	if (audioWasntLocked)
 		unlockAudio();
 

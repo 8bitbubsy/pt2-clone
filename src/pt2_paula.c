@@ -50,6 +50,8 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	dPaulaOutputFreq = dOutputFreq;
 	dPeriodToDeltaDiv = PAULA_PAL_CLK / dPaulaOutputFreq;
 
+	clearBlepState();
+
 	useLowpassFilter = useHighpassFilter = true;
 	clearOnePoleFilterState(&filterLo);
 	clearOnePoleFilterState(&filterHi);
@@ -341,6 +343,11 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b)
 	// progress AUD_DAT buffer
 	v->AUD_DAT[0] = v->AUD_DAT[1];
 	v->sampleCounter--;
+}
+
+void clearBlepState(void)
+{
+	memset(blep, 0, sizeof (blep));
 }
 
 // output is -4.00 .. 3.97 (can be louder because of high-pass filter)

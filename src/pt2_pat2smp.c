@@ -245,9 +245,12 @@ void pat2SmpRender(void)
 		return;
 	}
 
-	const int8_t oldRow = editor.songPlaying ? 0 : song->currRow;
+	// wait for main audio callback to catch PAT2SMP flag
+	editor.pat2SmpOngoing = true;
+	while (audio.callbackOngoing)
+		SDL_Delay(5);
 
-	editor.pat2SmpOngoing = true; // this must be set first
+	const int8_t oldRow = editor.songPlaying ? 0 : song->currRow;
 
 	// do some prep work
 	generateBpmTable(dPat2SmpFreq, editor.timingMode == TEMPO_MODE_VBLANK);

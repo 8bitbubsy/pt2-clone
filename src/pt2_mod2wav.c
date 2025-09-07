@@ -389,10 +389,13 @@ bool mod2WavRender(char *filename)
 		return false;
 	}
 
-	editor.mod2WavOngoing = true; // set this first
+	// wait for main audio callback to catch MOD2WAV flag
+	editor.mod2WavOngoing = true;
+	while (audio.callbackOngoing)
+		SDL_Delay(5);
 
 	// do some prep work
-	audio.oversamplingFlag = true; 
+	audio.oversamplingFlag = true;
 	generateBpmTable(config.mod2WavOutputFreq, editor.timingMode == TEMPO_MODE_VBLANK);
 	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	storeTempVariables();

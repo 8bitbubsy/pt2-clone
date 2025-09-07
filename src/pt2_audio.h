@@ -19,7 +19,7 @@
 
 typedef struct audio_t
 {
-	volatile bool locked, isSampling;
+	volatile bool locked, isSampling, callbackOngoing;
 
 	bool ledFilterEnabled, oversamplingFlag;
 	
@@ -55,6 +55,7 @@ void normalizeDoubleTo8Bit(double *dSampleData, uint32_t sampleLength);
 void toggleAmigaPanMode(void);
 void lockAudio(void);
 void unlockAudio(void);
+void resetAudioDither(void);
 void audioSetStereoSeparation(uint8_t percentage);
 void outputAudio(int16_t *target, int32_t numSamples);
 bool setupAudio(void);
