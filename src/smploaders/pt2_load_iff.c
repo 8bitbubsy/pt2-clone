@@ -1,3 +1,7 @@
+/* Tnis IFF loader intentionally avoids reading the sample volume from the
+** IFF header as the IFF vol range can differ depending on the software used.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -31,7 +35,6 @@ bool loadIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	bool is16Bit = !strncmp(tmpCharBuf, "16SV", 4);
 
 	int32_t sampleLength = 0;
-	uint32_t sampleVolume = 65536; // max volume
 
 	fseek(f, 12, SEEK_SET);
 	while (!feof(f) && (uint32_t)ftell(f) < filesize-12)
@@ -98,14 +101,6 @@ bool loadIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		displayErrorMsg("UNSUPPORTED IFF !");
 		return false;
 	}
-
-	fread(&sampleVolume, 4, 1, f); sampleVolume = SWAP32(sampleVolume);
-	if (sampleVolume > 65536)
-		sampleVolume = 65536;
-
-	sampleVolume = (sampleVolume + 512) / 1024; // rounded
-	if (sampleVolume > 64)
-		sampleVolume = 64;
 
 	sampleLength = bodyLen;
 
@@ -226,7 +221,7 @@ bool loadIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	}
 
 	// set sample attributes
-	s->volume = (int8_t)sampleVolume;
+	s->volume = 64;
 	s->fineTune = 0;
 	s->length = sampleLength;
 	s->loopStart = loopStart;
