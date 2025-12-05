@@ -102,10 +102,10 @@ void turnOffVoices(void)
 
 	resetAudioDither();
 
+	editor.tuningToneFlag = false;
+
 	if (audioWasntLocked)
 		unlockAudio();
-
-	editor.tuningToneFlag = false;
 }
 
 void initializeModuleChannels(module_t *m)
@@ -1507,6 +1507,12 @@ void modSetPattern(uint8_t pattern)
 
 void modSetPos(int16_t pos, int16_t row)
 {
+	/*
+	const bool audioWasntLocked = !audio.locked;
+	if (audioWasntLocked)
+		lockAudio();
+	*/
+
 	if (row != -1)
 	{
 		row = CLAMP(row, 0, 63);
@@ -1546,6 +1552,11 @@ void modSetPos(int16_t pos, int16_t row)
 				ui.updatePosEd = true;
 		}
 	}
+
+	/*
+	if (audioWasntLocked)
+		unlockAudio();
+	*/
 
 	ui.updatePatternData = true;
 
