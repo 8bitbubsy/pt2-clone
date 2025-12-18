@@ -8,10 +8,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
+#include "pt2_header.h" // PI
 #include "pt2_paula.h"
 #include "pt2_blep.h"
 #include "pt2_rcfilters.h"
-#include "pt2_math.h"
 
 typedef struct voice_t
 {
@@ -86,7 +87,7 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 		// A1200 1-pole (6dB/oct) RC high-pass filter:
 		R = 1360.0; // R324 (1K ohm resistor) + R325 (360 ohm resistor)
 		C = 2.2e-5; // C334 (22uF capacitor)
-		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.319Hz
+		cutoff = 1.0 / ((2.0 * PI) * R * C); // ~5.319Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 	else
@@ -96,13 +97,13 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 		// A500 1-pole (6dB/oct) RC low-pass filter:
 		R = 360.0; // R321 (360 ohm)
 		C = 1e-7;  // C321 (0.1uF)
-		cutoff = 1.0 / (PT2_2PI * R * C); // ~4420.971Hz
+		cutoff = 1.0 / ((2.0 * PI) * R * C); // ~4420.971Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterLo);
 
 		// A500 1-pole (6dB/oct) RC high-pass filter:
 		R = 1390.0;   // R324 (1K ohm) + R325 (390 ohm)
 		C = 2.233e-5; // C334 (22uF) + C335 (0.33uF)
-		cutoff = 1.0 / (PT2_2PI * R * C); // ~5.128Hz
+		cutoff = 1.0 / ((2.0 * PI) * R * C); // ~5.128Hz
 		setupOnePoleFilter(dPaulaOutputFreq, cutoff, &filterHi);
 	}
 
@@ -111,8 +112,8 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 	R2 = 10000.0; // R323 (10K ohm)
 	C1 = 6.8e-9;  // C322 (6800pF)
 	C2 = 3.9e-9;  // C323 (3900pF)
-	cutoff = 1.0 / (PT2_2PI * pt2_sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
-	qfactor = pt2_sqrt(R1 * R2 * C1 * C2) / (C2 * (R1 + R2)); // ~0.660225
+	cutoff = 1.0 / ((2.0 * PI) * sqrt(R1 * R2 * C1 * C2)); // ~3090.533Hz
+	qfactor = sqrt(R1 * R2 * C1 * C2) / (C2 * (R1 + R2)); // ~0.660225
 	setupTwoPoleFilter(dPaulaOutputFreq, cutoff, qfactor, &filterLED);
 }
 

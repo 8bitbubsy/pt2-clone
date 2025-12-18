@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-bool initKaiserTable(void); // called once on tracker init
-void freeKaiserTable(void);
+bool initSincWindow(void); // called once on tracker init
+void freeSincWindow(void);
 
 void stopSampling(void);
 void freeAudioDeviceList(void);

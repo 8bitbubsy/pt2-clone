@@ -266,7 +266,6 @@
     <ClInclude Include="..\..\src\pt2_helpers.h" />
     <ClInclude Include="..\..\src\pt2_hpc.h" />
     <ClInclude Include="..\..\src\pt2_keyboard.h" />
-    <ClInclude Include="..\..\src\pt2_math.h" />
     <ClInclude Include="..\..\src\pt2_mod2wav.h" />
     <ClInclude Include="..\..\src\pt2_module_loader.h" />
     <ClInclude Include="..\..\src\pt2_module_saver.h" />
@@ -336,7 +335,6 @@
     <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_keyboard.c" />
     <ClCompile Include="..\..\src\pt2_main.c" />
-    <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_mod2wav.c" />
     <ClCompile Include="..\..\src\pt2_module_loader.c" />
     <ClCompile Include="..\..\src\pt2_paula.c" />
