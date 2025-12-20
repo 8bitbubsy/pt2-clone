@@ -13,7 +13,7 @@ void setupOnePoleFilter(double audioRate, double cutOff, onePoleFilter_t *f)
 	if (cutOff >= audioRate/2.0)
 		cutOff = (audioRate/2.0) - SMALL_NUMBER;
 
-	const double a = 2.0 - cos((PI * cutOff) / audioRate);
+	const double a = 2.0 - cos(((2.0 * PI) * cutOff) / audioRate);
 	const double b = a - sqrt((a * a) - 1.0);
 
 	f->a1 = 1.0 - b;
@@ -68,7 +68,7 @@ void setupTwoPoleFilter(double audioRate, double cutOff, double qFactor, twoPole
 	if (cutOff >= audioRate/2.0)
 		cutOff = (audioRate/2.0) - SMALL_NUMBER;
 
-	const double a = 1.0 / tan((PI * cutOff) / audioRate);
+	const double a = 1.0 / tan(((2.0 * PI) * cutOff) / audioRate);
 	const double b = 1.0 / qFactor;
 
 	f->a1 = 1.0 / (1.0 + b * a + a * a);
