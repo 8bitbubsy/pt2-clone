@@ -108,9 +108,6 @@
     <ClInclude Include="..\..\src\pt2_downsample2x.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\pt2_math.h">
-      <Filter>headers</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\pt2_hpc.h">
       <Filter>headers</Filter>
     </ClInclude>
@@ -216,7 +213,6 @@
     <ClCompile Include="..\..\src\pt2_rcfilters.c" />
     <ClCompile Include="..\..\src\pt2_chordmaker.c" />
     <ClCompile Include="..\..\src\pt2_downsample2x.c" />
-    <ClCompile Include="..\..\src\pt2_math.c" />
     <ClCompile Include="..\..\src\pt2_hpc.c" />
     <ClCompile Include="..\..\src\pt2_askbox.c" />
     <ClCompile Include="..\..\src\pt2_paula.c" />

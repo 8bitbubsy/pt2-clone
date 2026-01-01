@@ -16,8 +16,9 @@
 
 enum
 {
-	WAV_FORMAT_PCM = 0x0001,
-	WAV_FORMAT_IEEE_FLOAT = 0x0003
+	WAV_FORMAT_PCM = 1,
+	WAV_FORMAT_IEEE_FLOAT = 3,
+	WAV_FORMAT_EXTENSIBLE = 65534
 };
 
 bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
@@ -127,7 +128,14 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	fread(&sampleRate,  4, 1, f);
 	fseek(f, 6, SEEK_CUR);
 	fread(&bitsPerSample, 2, 1, f);
+
 	int32_t sampleLength = dataLen;
+
+	if (audioFormat == WAV_FORMAT_EXTENSIBLE)
+	{
+		fseek(f, 8, SEEK_CUR);
+		fread(&audioFormat, 2, 1, f);
+	}
 	// ---------------------------
 
 	if (sampleRate == 0 || sampleLength == 0 || sampleLength >= (int32_t)filesize*(bitsPerSample/8))

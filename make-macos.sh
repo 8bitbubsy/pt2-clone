@@ -116,23 +116,23 @@ function compile() {
     local arch=$2
     local sdl2_include=$3
     local sdl2_lib=$4
-    
+
     rm $target &> /dev/null || true
-    
+
     if [ $USE_HOMEBREW_SDL -eq 1 ]; then
         # Compile with Homebrew SDL2
         clang $VERBOSE $CFLAGS -I"$sdl2_include" -g0 -DNDEBUG -DHAS_LIBFLAC \
             src/gfx/*.c src/modloaders/*.c src/libflac/*.c src/smploaders/*.c src/*.c \
-            -Wall -Winit-self -Wextra -Wunused -Wredundant-decls \
+            -ffast-math -Wall -Winit-self -Wextra -Wunused -Wredundant-decls \
             $LDFLAGS -L"$sdl2_lib" -lSDL2 -framework Cocoa -lm -o $target
     else
         # Compile with Framework SDL2
         clang $VERBOSE $CFLAGS -F "$SDL2_FRAMEWORK" -g0 -DNDEBUG -DHAS_LIBFLAC \
             src/gfx/*.c src/modloaders/*.c src/libflac/*.c src/smploaders/*.c src/*.c \
-            -Wall -Winit-self -Wextra -Wunused -Wredundant-decls \
+            -ffast-math -Wall -Winit-self -Wextra -Wunused -Wredundant-decls \
             $LDFLAGS -L "$SDL2_FRAMEWORK" -framework SDL2 -framework Cocoa -lm -o $target
     fi
-    
+
     return $?
 }
 

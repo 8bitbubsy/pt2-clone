@@ -14,7 +14,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.78"
+#define PROG_VER_STR "1.80"
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'
@@ -52,6 +52,10 @@
 ** Sadly, the scopes might mildly flicker from this in some cases.
 */
 #define SCOPE_HZ 64
+
+#ifndef PI
+#define PI 3.14159265358979323846264338327950288
+#endif
 
 #define FONT_CHAR_W 8 // actual data length is 7, includes right spacing (1px column)
 #define FONT_CHAR_H 5
