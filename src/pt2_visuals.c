@@ -1994,7 +1994,6 @@ bool setupVideo(void)
 	video.vsync60HzPresent = false;
 	if (!config.vsyncOff)
 	{
-
 		if (dm.refresh_rate >= 59 && dm.refresh_rate <= 61)
 		{
 			video.vsync60HzPresent = true;
