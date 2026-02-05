@@ -762,7 +762,7 @@ void diskOpRenderFileList(void)
 	// if needed, update the file list and add entries
 	if (!diskop.cached)
 	{
-		diskop.fillThread = SDL_CreateThread(diskOpFillThreadFunc, NULL, NULL);
+		diskop.fillThread = SDL_CreateThread(diskOpFillThreadFunc, "file lister thread", NULL);
 		if (diskop.fillThread == NULL)
 			return;
 

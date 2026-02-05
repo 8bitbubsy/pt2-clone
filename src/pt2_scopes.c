@@ -308,7 +308,7 @@ static int32_t SDLCALL scopeThreadFunc(void *ptr)
 
 bool initScopes(void)
 {
-	scopeThread = SDL_CreateThread(scopeThreadFunc, NULL, NULL);
+	scopeThread = SDL_CreateThread(scopeThreadFunc, "scope thread", NULL);
 	if (scopeThread == NULL)
 	{
 		showErrorMsgBox("Couldn't create scope thread!");

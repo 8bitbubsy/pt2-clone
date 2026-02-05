@@ -409,7 +409,7 @@ bool mod2WavRender(char *filename)
 	pointerSetMode(POINTER_MODE_MSG2, NO_CARRY);
 	setStatusMessage("RENDERING MOD...", NO_CARRY);
 
-	editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, NULL, fOut);
+	editor.mod2WavThread = SDL_CreateThread(mod2WavThreadFunc, "MOD2WAV thread", fOut);
 	if (editor.mod2WavThread == NULL)
 	{
 		fclose(fOut);
