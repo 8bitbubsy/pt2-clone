@@ -220,7 +220,7 @@ bool chQueuePush(chSyncData_t t)
 	if (!chQueueWriteSize())
 		return false;
 
-	assert(chSync.writePos <= SYNC_QUEUE_LEN);
+	ASSERT(chSync.writePos <= SYNC_QUEUE_LEN);
 	chSync.data[chSync.writePos] = t;
 	chSync.writePos = (chSync.writePos + 1) & SYNC_QUEUE_LEN;
 
@@ -233,7 +233,7 @@ static bool chQueuePop(void)
 		return false;
 
 	chSync.readPos = (chSync.readPos + 1) & SYNC_QUEUE_LEN;
-	assert(chSync.readPos <= SYNC_QUEUE_LEN);
+	ASSERT(chSync.readPos <= SYNC_QUEUE_LEN);
 
 	return true;
 }
@@ -243,7 +243,7 @@ static chSyncData_t *chQueuePeek(void)
 	if (!chQueueReadSize())
 		return NULL;
 
-	assert(chSync.readPos <= SYNC_QUEUE_LEN);
+	ASSERT(chSync.readPos <= SYNC_QUEUE_LEN);
 	return &chSync.data[chSync.readPos];
 }
 
@@ -252,7 +252,7 @@ static uint64_t getChQueueTimestamp(void)
 	if (!chQueueReadSize())
 		return 0;
 
-	assert(chSync.readPos <= SYNC_QUEUE_LEN);
+	ASSERT(chSync.readPos <= SYNC_QUEUE_LEN);
 	return chSync.data[chSync.readPos].timestamp;
 }
 

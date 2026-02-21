@@ -84,7 +84,7 @@ void sampleDownButton(void)
 
 static void pointerSetColor(uint8_t cursorColorIndex)
 {
-	assert(cursorColorIndex <= 5);
+	ASSERT(cursorColorIndex <= 5);
 
 	video.palette[PAL_MOUSE_1] = cursorColors[cursorColorIndex][0];
 	video.palette[PAL_MOUSE_2] = cursorColors[cursorColorIndex][1];
@@ -110,7 +110,7 @@ void updatePointerColor(void)
 
 void pointerSetMode(uint8_t pointerMode, bool carry)
 {
-	assert(pointerMode <= 5);
+	ASSERT(pointerMode <= 5);
 
 	ui.pointerMode = pointerMode;
 	if (carry)
@@ -121,7 +121,7 @@ void pointerSetMode(uint8_t pointerMode, bool carry)
 
 void pointerSetModeThreadSafe(uint8_t pointerMode, bool carry)
 {
-	assert(pointerMode <= 5);
+	ASSERT(pointerMode <= 5);
 
 	ui.pointerMode = pointerMode;
 	if (carry)

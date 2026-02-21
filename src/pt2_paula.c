@@ -47,7 +47,7 @@ static paulaVoice_t paula[PAULA_VOICES];
 
 void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 {
-	assert(dOutputFreq != 0.0);
+	ASSERT(dOutputFreq != 0.0);
 	dPaulaOutputFreq = dOutputFreq;
 	dPeriodToDeltaDiv = PAULA_PAL_CLK / dPaulaOutputFreq;
 

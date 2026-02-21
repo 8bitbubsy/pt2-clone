@@ -5,12 +5,12 @@
 ** This is probably not 100% safe code, but it works.
 */
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "../pt2_header.h"
 #include "../pt2_helpers.h"
 
 typedef struct XPKFILEHEADER
@@ -38,7 +38,7 @@ static const uint8_t xpk_table[56] =
 
 static inline uint8_t SrcRead(size_t index, XPK_BufferBounds *bufs)
 {
-	assert(index < bufs->SrcSize);
+	ASSERT(index < bufs->SrcSize);
 	if (index >= bufs->SrcSize)
 		return 0; // this is actually not how to do it, ugh...
 

@@ -194,7 +194,7 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 	wavHeader_t wavHeader;
 
 	FILE *f = (FILE *)ptr;
-	assert(mod2WavBuffer != NULL && f != NULL);
+	ASSERT(mod2WavBuffer != NULL && f != NULL);
 
 	// skip wav header place, render data first
 	fseek(f, sizeof (wavHeader_t), SEEK_SET);

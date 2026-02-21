@@ -393,7 +393,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 
 void audioSetStereoSeparation(uint8_t percentage) // 0..100 (percentage)
 {
-	assert(percentage <= 100);
+	ASSERT(percentage <= 100);
 
 	stereoSeparation = percentage;
 	dSideFactor = (percentage / 100.0) * STEREO_NORM_FACTOR;

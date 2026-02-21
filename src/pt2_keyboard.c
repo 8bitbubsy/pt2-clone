@@ -142,7 +142,7 @@ static void incMulti(uint8_t slot)
 {
 	char str[32];
 
-	assert(slot < 4);
+	ASSERT(slot < 4);
 	if (editor.multiModeNext[slot] == 4)
 		editor.multiModeNext[slot] = 1;
 	else

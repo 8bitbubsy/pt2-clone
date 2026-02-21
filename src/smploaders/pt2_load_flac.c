@@ -145,7 +145,7 @@ bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		for (int32_t i = 0; i < sampleLength; i++)
 		{
 			int32_t smp32 = (int32_t)round(smpBuf16[i] * dAmp);
-			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
+			ASSERT(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpDataPtr[i] = (int8_t)smp32;
 		}
 
@@ -180,7 +180,7 @@ bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		for (int32_t i = 0; i < sampleLength; i++)
 		{
 			int32_t smp32 = (int32_t)round(smpBuf24[i] * dAmp);
-			assert(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
+			ASSERT(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
 			smpDataPtr[i] = (int8_t)smp32;
 		}
 

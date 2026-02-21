@@ -229,19 +229,19 @@ uint32_t *unpackBMP(const uint8_t *src, uint32_t packedLen)
 	for (i = 0; i < decodedLength; i++)
 	{
 		const uint8_t byte1 = (tmpBuffer[i] & 0xC0) >> 6;
-		assert(byte1 < PALETTE_NUM);
+		ASSERT(byte1 < PALETTE_NUM);
 		dst[(i << 2) + 0] = video.palette[byte1];
 
 		const uint8_t byte2 = (tmpBuffer[i] & 0x30) >> 4;
-		assert(byte2 < PALETTE_NUM);
+		ASSERT(byte2 < PALETTE_NUM);
 		dst[(i << 2) + 1] = video.palette[byte2];
 
 		const uint8_t byte3 = (tmpBuffer[i] & 0x0C) >> 2;
-		assert(byte3 < PALETTE_NUM);
+		ASSERT(byte3 < PALETTE_NUM);
 		dst[(i << 2) + 2] = video.palette[byte3];
 
 		const uint8_t byte4 = (tmpBuffer[i] & 0x03) >> 0;
-		assert(byte4 < PALETTE_NUM);
+		ASSERT(byte4 < PALETTE_NUM);
 		dst[(i << 2) + 3] = video.palette[byte4];
 	}
 

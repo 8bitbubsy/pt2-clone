@@ -3,7 +3,9 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifdef _DEBUG
 #include <assert.h>
+#endif
 #ifdef _WIN32
 #define WIN32_MEAN_AND_LEAN
 #include <windows.h> // MAX_PATH
@@ -15,6 +17,14 @@
 #include "pt2_palette.h"
 
 #define PROG_VER_STR "1.80"
+
+#ifndef ASSERT
+#ifdef _DEBUG
+#define ASSERT(x) assert(x)
+#else
+#define ASSERT(x)
+#endif
+#endif
 
 #ifdef _WIN32
 #define DIR_DELIMITER '\\'

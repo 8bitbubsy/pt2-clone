@@ -200,7 +200,7 @@ void updateSamplePos(void)
 {
 	moduleSample_t *s;
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
 		s = &song->samples[editor.currSample];
@@ -216,7 +216,7 @@ void fillSampleFilterUndoBuffer(void)
 {
 	moduleSample_t *s;
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
 		s = &song->samples[editor.currSample];
@@ -228,8 +228,8 @@ void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_
 {
 	const uint32_t color = 0x01000000 | video.palette[PAL_QADSCP]; // set alpha to 0x10 ( used for invertRange() as a hack )
 
-	assert(line_x1 >= 0 || line_x2 >= 0 || line_x1 < SCREEN_W || line_x2 < SCREEN_W);
-	assert(line_y1 >= 0 || line_y2 >= 0 || line_y1 < SCREEN_H || line_y2 < SCREEN_H);
+	ASSERT(line_x1 >= 0 || line_x2 >= 0 || line_x1 < SCREEN_W || line_x2 < SCREEN_W);
+	ASSERT(line_y1 >= 0 || line_y2 >= 0 || line_y1 < SCREEN_H || line_y2 < SCREEN_H);
 
 	int32_t dx = line_x2 - line_x1;
 	int32_t ax = ABS(dx) * 2;
@@ -245,7 +245,7 @@ void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_
 		int32_t d = ay - ((uint16_t)ax >> 1);
 		while (true)
 		{
-			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
+			ASSERT(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
 
 			video.frameBuffer[(y * SCREEN_W) + x] = color;
 
@@ -267,7 +267,7 @@ void sampleLine(int32_t line_x1, int32_t line_x2, int32_t line_y1, int32_t line_
 		int32_t d = ax - ((uint16_t)ay >> 1);
 		while (true)
 		{
-			assert(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
+			ASSERT(y >= 0 || x >= 0 || y < SCREEN_H || x < SCREEN_W);
 
 			video.frameBuffer[(y * SCREEN_W) + x] = color;
 
@@ -508,7 +508,7 @@ void redrawSample(void)
 	if (!ui.samplerScreenShown)
 		return;
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	if (editor.currSample >= 0 && editor.currSample <= 30)
 	{
 		editor.markStartOfs = -1;
@@ -543,7 +543,7 @@ void highPassSample(int32_t cutOff)
 {
 	onePoleFilter_t filterHi;
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	if (editor.sampleZero)
 	{
@@ -648,7 +648,7 @@ void lowPassSample(int32_t cutOff)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	if (cutOff == 0)
 	{
@@ -750,7 +750,7 @@ void redoSampleData(int8_t sample)
 		return;
 	}
 
-	assert(sample >= 0 && sample <= 30);
+	ASSERT(sample >= 0 && sample <= 30);
 	moduleSample_t *s = &song->samples[sample];
 
 	turnOffVoices();
@@ -790,7 +790,7 @@ void redoSampleData(int8_t sample)
 
 void fillSampleRedoBuffer(int8_t sample)
 {
-	assert(sample >= 0 && sample <= 30);
+	ASSERT(sample >= 0 && sample <= 30);
 	moduleSample_t *s = &song->samples[sample];
 
 	if (editor.smpRedoBuffer[sample] != NULL)
@@ -863,7 +863,7 @@ void samplerRemoveDcOffset(void)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -933,8 +933,8 @@ void samplerResample(void)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	assert(editor.tuningNote <= 35 && editor.resampleNote <= 35);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.tuningNote <= 35 && editor.resampleNote <= 35);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -971,7 +971,7 @@ void samplerResample(void)
 	}
 
 	uint64_t delta64 = ((uint64_t)readLength << 32) / writeLength;
-	assert(delta64 != 0);
+	ASSERT(delta64 != 0);
 
 	writeLength = writeLength & ~1;
 	if (writeLength > config.maxSampleLength)
@@ -1147,7 +1147,7 @@ void doMix(void)
 // this is actually treble increase
 void boostSample(int32_t sample, bool ignoreMark)
 {
-	assert(sample >= 0 && sample <= 30);
+	ASSERT(sample >= 0 && sample <= 30);
 
 	moduleSample_t *s = &song->samples[sample];
 	if (s->length == 0)
@@ -1202,7 +1202,7 @@ void boostSample(int32_t sample, bool ignoreMark)
 // this is actually treble decrease
 void filterSample(int32_t sample, bool ignoreMark)
 {
-	assert(sample >= 0 && sample <= 30);
+	ASSERT(sample >= 0 && sample <= 30);
 
 	moduleSample_t *s = &song->samples[sample];
 	if (s->length == 0)
@@ -1292,7 +1292,7 @@ void toggleTuningTone(void)
 
 void sampleMarkerToBeg(void)
 {
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -1323,7 +1323,7 @@ void sampleMarkerToBeg(void)
 
 void sampleMarkerToCenter(void)
 {
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -1359,7 +1359,7 @@ void sampleMarkerToCenter(void)
 
 void sampleMarkerToEnd(void)
 {
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -1396,7 +1396,7 @@ void samplerSamCopy(void)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	moduleSample_t *s = &song->samples[editor.currSample];
 
 	if (s->length == 0)
@@ -1519,7 +1519,7 @@ void samplerSamDelete(uint8_t cut)
 	if (cut)
 		samplerSamCopy();
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	moduleSample_t *s = &song->samples[editor.currSample];
 
 	int32_t sampleLength = s->length;
@@ -1702,7 +1702,7 @@ void samplerSamPaste(void)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length > 0 && editor.markStartOfs == -1)
@@ -1837,9 +1837,9 @@ void samplerSamPaste(void)
 
 static void playCurrSample(uint8_t chn, int32_t startOffset, int32_t endOffset, bool playWaveformFlag)
 {
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
-	assert(chn < PAULA_VOICES);
-	assert(editor.currPlayNote <= 35);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(chn < PAULA_VOICES);
+	ASSERT(editor.currPlayNote <= 35);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	moduleChannel_t *ch = &song->channels[chn];
@@ -1960,7 +1960,7 @@ void setLoopSprites(void)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->loopStart+s->loopLength > 2)
@@ -2095,7 +2095,7 @@ void samplerZoomOut2x(void)
 
 void samplerRangeAll(void)
 {
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -2114,7 +2114,7 @@ void samplerRangeAll(void)
 
 void samplerShowRange(void)
 {
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length == 0)
@@ -2291,7 +2291,7 @@ void samplerEditSample(bool mouseButtonHeld)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	moduleSample_t *s = &song->samples[editor.currSample];
 
 	if (s->length == 0)
@@ -2421,7 +2421,7 @@ void samplerSamplePressed(bool mouseButtonHeld)
 
 	int32_t mouseX = CLAMP(mouse.x, 0, SCREEN_W+8); // allow some extra pixels outside of the screen
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	moduleSample_t *s = &song->samples[editor.currSample];
 
 	if (ui.leftLoopPinMoving)
@@ -2581,7 +2581,7 @@ void samplerLoopToggle(void)
 		return;
 	}
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 
 	moduleSample_t *s = &song->samples[editor.currSample];
 	if (s->length < 2)

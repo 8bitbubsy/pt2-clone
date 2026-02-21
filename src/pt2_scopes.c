@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h> // modf()
@@ -21,7 +20,7 @@ scope_t scope[PAULA_VOICES]; // global
 // this is quite hackish, but fixes sample swapping issues
 static int32_t getSampleSlotFromReadAddress(const int8_t *sampleReadAddress)
 {
-	assert(song != NULL);
+	ASSERT(song != NULL);
 	const int8_t *sampleData = song->sampleData;
 	const int32_t sampleSlotSize = config.maxSampleLength;
 

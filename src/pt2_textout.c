@@ -149,7 +149,7 @@ void charOutBigBg(uint32_t xPos, uint32_t yPos, char ch, uint32_t fgColor, uint3
 
 void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	while (*text != '\0')
@@ -161,7 +161,7 @@ void textOut(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 
 void textOutN(uint32_t xPos, uint32_t yPos, const char *text, uint32_t n, uint32_t color)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	uint32_t i = 0;
@@ -175,7 +175,7 @@ void textOutN(uint32_t xPos, uint32_t yPos, const char *text, uint32_t n, uint32
 
 void textOut2(uint32_t xPos, uint32_t yPos, const char *text) // for static GUI text
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	while (*text != '\0')
@@ -187,7 +187,7 @@ void textOut2(uint32_t xPos, uint32_t yPos, const char *text) // for static GUI 
 
 void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	while (*text != '\0')
@@ -199,7 +199,7 @@ void textOutTight(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color
 
 void textOutTightN(uint32_t xPos, uint32_t yPos, const char *text, uint32_t n, uint32_t color)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	uint32_t i = 0;
@@ -213,7 +213,7 @@ void textOutTightN(uint32_t xPos, uint32_t yPos, const char *text, uint32_t n, u
 
 void textOutBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor, uint32_t bgColor)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	while (*text != '\0')
@@ -225,7 +225,7 @@ void textOutBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor,
 
 void textOutBig(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	while (*text != '\0')
@@ -237,7 +237,7 @@ void textOutBig(uint32_t xPos, uint32_t yPos, const char *text, uint32_t color)
 
 void textOutBigBg(uint32_t xPos, uint32_t yPos, const char *text, uint32_t fgColor, uint32_t bgColor)
 {
-	assert(text != NULL);
+	ASSERT(text != NULL);
 
 	uint32_t x = xPos;
 	while (*text != '\0')
@@ -679,7 +679,7 @@ void setPrevStatusMessage(void)
 
 void setStatusMessage(const char *msg, bool carry)
 {
-	assert(msg != NULL);
+	ASSERT(msg != NULL);
 
 	if (carry)
 		strcpy(ui.prevStatusMessage, msg);
@@ -690,7 +690,7 @@ void setStatusMessage(const char *msg, bool carry)
 
 void displayMsg(const char *msg)
 {
-	assert(msg != NULL);
+	ASSERT(msg != NULL);
 
 	editor.errorMsgActive = true;
 	editor.errorMsgBlock = false;
@@ -702,7 +702,7 @@ void displayMsg(const char *msg)
 
 void displayErrorMsg(const char *msg)
 {
-	assert(msg != NULL);
+	ASSERT(msg != NULL);
 
 	editor.errorMsgActive = true;
 	editor.errorMsgBlock = true;

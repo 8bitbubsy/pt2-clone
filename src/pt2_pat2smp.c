@@ -328,7 +328,7 @@ void pat2SmpRender(void)
 		else if (dSmp > 0.0) dSmp += 0.5;
 
 		int32_t smp = (int32_t)dSmp;
-		assert(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp
+		ASSERT(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp
 		smpPtr[i] = (int8_t)smp;
 	}
 

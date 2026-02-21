@@ -648,7 +648,7 @@ void updateSampler(void)
 	if (!ui.samplerScreenShown || ui.samplingBoxShown)
 		return;
 
-	assert(editor.currSample >= 0 && editor.currSample <= 30);
+	ASSERT(editor.currSample >= 0 && editor.currSample <= 30);
 	moduleSample_t *s = &song->samples[editor.currSample];
 
 	// update 9xx offset
@@ -686,7 +686,7 @@ void updateSampler(void)
 		}
 		else
 		{
-			assert(editor.resampleNote < 36);
+			ASSERT(editor.resampleNote < 36);
 			textOutBg(288, 236,
 				config.accidental ? noteNames2[2+editor.resampleNote] : noteNames1[2+editor.resampleNote],
 				video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
@@ -1465,7 +1465,7 @@ void eraseSprites(void)
 		if (s->x >= SCREEN_W || s->y >= SCREEN_H) // sprite is hidden, don't draw nor fill clear buffer
 			continue;
 
-		assert(s->refreshBuffer != NULL);
+		ASSERT(s->refreshBuffer != NULL);
 
 		int32_t sw = s->w;
 		int32_t sh = s->h;
@@ -1524,7 +1524,7 @@ void renderSprites(void)
 		if (s->x >= SCREEN_W || s->y >= SCREEN_H) // sprite is hidden, don't draw nor fill clear buffer
 			continue;
 
-		assert(s->data != NULL && s->refreshBuffer != NULL);
+		ASSERT(s->data != NULL && s->refreshBuffer != NULL);
 
 		int32_t sw = s->w;
 		int32_t sh = s->h;
@@ -1591,7 +1591,7 @@ void renderSprites(void)
 					*clr32++ = *dst32; // fill clear buffer
 					if (*src8 != colorKey)
 					{
-						assert(*src8 < PALETTE_NUM);
+						ASSERT(*src8 < PALETTE_NUM);
 						*dst32 = video.palette[*src8];
 					}
 

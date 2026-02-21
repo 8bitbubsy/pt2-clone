@@ -249,7 +249,7 @@ void handleTextEditing(uint8_t mouseButton) // handle mouse while editing text/n
 		int32_t tmp32 = mouse.y - textEdit.cursorStartY;
 		if (tmp32 <= 2 && tmp32 >= -9)
 		{
-			assert(textEdit.textStartPtr != NULL);
+			ASSERT(textEdit.textStartPtr != NULL);
 			const int32_t textLength = (int32_t)strlen(textEdit.textStartPtr);
 			int32_t cursorBlock = (mouse.x - textEdit.cursorStartX) / FONT_CHAR_W;
 			const int32_t textPos = CLAMP(textEdit.scrollOffset + cursorBlock, 0, textLength);

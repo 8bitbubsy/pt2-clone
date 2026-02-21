@@ -241,7 +241,7 @@ void mixChordSample(void)
 	for (i = 0; i < s->length; i++)
 	{
 		const int32_t smp = (const int32_t)round(dMixData[i] * dAmp);
-		assert(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp (but just in case)
+		ASSERT(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp (but just in case)
 		smpPtr[i] = (int8_t)smp;
 	}
 

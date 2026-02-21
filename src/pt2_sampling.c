@@ -272,7 +272,7 @@ static void startInputAudio(void)
 		return;
 	}
 
-	assert(roundedOutputFrequency > 0);
+	ASSERT(roundedOutputFrequency > 0);
 
 	memset(&want, 0, sizeof (SDL_AudioSpec));
 	want.freq = config.audioInputFrequency;
@@ -394,7 +394,7 @@ static void listAudioDevices(void)
 
 static void drawSamplingNote(void)
 {
-	assert(samplingNote < 36);
+	ASSERT(samplingNote < 36);
 	const char *str = config.accidental ? noteNames2[2+samplingNote]: noteNames1[2+samplingNote];
 	textOutBg(262, 230, str, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 }
@@ -576,7 +576,7 @@ static void startSampling(void)
 		return;
 	}
 
-	assert(roundedOutputFrequency > 0);
+	ASSERT(roundedOutputFrequency > 0);
 
 	maxSamplingLength = (int32_t)(ceil(((double)config.maxSampleLength*inputFrequency) / dOutputFrequency)) + 1;
 	

@@ -110,7 +110,7 @@ void turnOffVoices(void)
 
 void initializeModuleChannels(module_t *m)
 {
-	assert(m != NULL);
+	ASSERT(m != NULL);
 
 	memset(m->channels, 0, sizeof (m->channels));
 
@@ -1730,7 +1730,7 @@ void modPlay(int16_t patt, int16_t pos, int8_t row)
 
 void clearSong(void)
 {
-	assert(song != NULL);
+	ASSERT(song != NULL);
 	if (song == NULL)
 		return;
 
@@ -1796,7 +1796,7 @@ void clearSong(void)
 
 void clearSamples(void)
 {
-	assert(song != NULL);
+	ASSERT(song != NULL);
 	if (song == NULL)
 		return;
 

@@ -52,7 +52,7 @@ static const int8_t scancode2NoteHi[52] = // "USB usage page standard" order
 
 static uint8_t quantizeCheck(uint8_t row)
 {
-	assert(song != NULL);
+	ASSERT(song != NULL);
 	if (song == NULL)
 		return row;
 
@@ -89,7 +89,7 @@ static uint8_t quantizeCheck(uint8_t row)
 static void jamAndPlaceSample(SDL_Scancode scancode, bool normalMode)
 {
 	uint8_t chNum = cursor.channel;
-	assert(chNum < PAULA_VOICES);
+	ASSERT(chNum < PAULA_VOICES);
 
 	moduleChannel_t *ch = &song->channels[chNum];
 	note_t *note = &song->patterns[song->currPattern][(quantizeCheck(song->currRow) * PAULA_VOICES) + chNum];

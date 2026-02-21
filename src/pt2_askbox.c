@@ -159,7 +159,7 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 	uint32_t returnValue = 0;
 	dialog_t d;
 
-	assert(dialogType < ASKBOX_NUM);
+	ASSERT(dialogType < ASKBOX_NUM);
 	if (dialogType >= ASKBOX_NUM)
 		return ASKBOX_NO;
 
