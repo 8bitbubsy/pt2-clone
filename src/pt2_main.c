@@ -380,6 +380,8 @@ int main(int argc, char *argv[])
 
 static void handleInput(void)
 {
+	bool focusGained = false;
+
 	SDL_Event event;
 	while (SDL_PollEvent(&event))
 	{
@@ -389,6 +391,9 @@ static void handleInput(void)
 				video.windowHidden = true;
 			else if (event.window.event == SDL_WINDOWEVENT_SHOWN)
 				video.windowHidden = false;
+
+			if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
+				focusGained = true;
 
 			// reset vblank end time if we minimize window
 			if (event.window.event == SDL_WINDOWEVENT_MINIMIZED || event.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
@@ -469,8 +474,16 @@ static void handleInput(void)
 		}
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
 		{
-			if (ui.sampleMarkingPos == -1 && !ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
-				mouseButtonDownHandler(event.button.button);
+			/* If program was not in focus and we clicked somewhere,
+			** only accept the click if an ask box dialog is shown.
+			*/
+			if (!focusGained || ui.askBoxShown)
+			{
+				if (ui.sampleMarkingPos == -1 && !ui.forceSampleDrag && !ui.forceVolDrag && !ui.forceSampleEdit)
+					mouseButtonDownHandler(event.button.button);
+			}
+
+			focusGained = false;
 		}
 #if defined __APPLE__ && defined __aarch64__
 		else if (event.type == SDL_MOUSEMOTION)
