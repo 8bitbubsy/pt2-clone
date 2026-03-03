@@ -106,6 +106,22 @@ static void clearStructs(void)
 
 int main(int argc, char *argv[])
 {
+#ifdef _WIN32 // test for SSE/SSE2 presence very first, to make sure no SSE/SSE2 code is attempted to be ran
+	if (!SDL_HasSSE())
+	{
+		MessageBoxA(NULL, "Your computer's processor doesn't have the SSE instruction set " \
+			"which is needed for this program to run. Sorry!", "Error", MB_ICONEXCLAMATION);
+		return 0;
+	}
+
+	if (!SDL_HasSSE2())
+	{
+		MessageBoxA(NULL, "Your computer's processor doesn't have the SSE2 instruction set " \
+			"which is needed for this program to run. Sorry!", "Error", MB_ICONEXCLAMATION);
+		return 0;
+	}
+#endif
+
 #ifndef _WIN32
 	struct sigaction act, oldAct;
 #endif
@@ -173,24 +189,12 @@ int main(int argc, char *argv[])
 	SDL_SetHint("SDL_WINDOWS_NO_CLOSE_ON_ALT_F4", "1");
 #endif
 
+	SDL_SetHint("SDL_MOUSE_FOCUS_CLICKTHROUGH", "1");
+
 #ifdef _WIN32
 #ifndef _MSC_VER
 	SetProcessDPIAware();
 #endif
-
-	if (!SDL_HasSSE())
-	{
-		showErrorMsgBox("Your computer's processor doesn't have the SSE instruction set\n" \
-		                "which is needed for this program to run. Sorry!");
-		return 0;
-	}
-
-	if (!SDL_HasSSE2())
-	{
-		showErrorMsgBox("Your computer's processor doesn't have the SSE2 instruction set\n" \
-		                "which is needed for this program to run. Sorry!");
-		return 0;
-	}
 
 	disableWasapi(); // disable problematic WASAPI SDL2 audio driver on Windows (causes clicks/pops sometimes...)
 	                 // 13.03.2020: This is still needed with SDL 2.0.12...
