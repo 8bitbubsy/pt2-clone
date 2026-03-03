@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-bool initSincWindow(void); // called once on tracker init
+bool calculateSincKernel(void); // called once on tracker init
 void freeSincWindow(void);
 
 void stopSampling(void);

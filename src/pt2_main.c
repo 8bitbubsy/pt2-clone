@@ -275,7 +275,7 @@ int main(int argc, char *argv[])
 	hpc_Init();
 	hpc_SetDurationInHz(&video.vblankHpc, VBLANK_HZ);
 
-	if (!initSincWindow() || !setupAudio() || !unpackBMPs())
+	if (!calculateSincKernel() || !setupAudio() || !unpackBMPs())
 	{
 		cleanUp();
 		SDL_Quit();

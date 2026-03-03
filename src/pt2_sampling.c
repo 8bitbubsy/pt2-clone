@@ -76,7 +76,7 @@ static inline double besselI0(double z)
 	return s;
 }
 
-bool initSincWindow(void) // called once on tracker init
+bool calculateSincKernel(void) // called once on tracker init
 {
 	fSincWindow = (float *)malloc(SINC_PHASES * SINC_TAPS * sizeof (float));
 	if (fSincWindow == NULL)
@@ -85,8 +85,6 @@ bool initSincWindow(void) // called once on tracker init
 		return false;
 	}
 
-	// Kaiser-Bessel window
-
 	const double kaiserBeta = 9.6377;
 
 	const double besselI0Beta = 1.0 / besselI0(kaiserBeta);
@@ -94,6 +92,7 @@ bool initSincWindow(void) // called once on tracker init
 	{
 		const double x = ((i & (SINC_TAPS-1)) - ((SINC_TAPS/2)-1)) - ((i >> SINC_TAPS_BITS) * (1.0 / SINC_PHASES));
 
+		// Kaiser-Bessel window
 		const double n = x * (1.0 / (SINC_TAPS / 2));
 		const double window = besselI0(kaiserBeta * sqrt(1.0 - n * n)) * besselI0Beta;
 
