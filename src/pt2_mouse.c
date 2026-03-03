@@ -1489,9 +1489,7 @@ static void handleSamplerVolumeBox(void)
 				{
 					double dSmp = ((dToFrac + dFromFrac) * sampleData[i]) * (1.0 / 100.0);
 					int32_t smp32 = (int32_t)dSmp;
-					CLAMP8(smp32);
-
-					sampleData[i] = (int8_t)smp32;
+					sampleData[i] = (int8_t)(CLAMP(smp32, INT8_MIN, INT8_MAX));
 
 					dToFrac += dToDelta;
 					dFromFrac -= dFromDelta;
@@ -2423,8 +2421,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 						if (editor.halveSampleFlag)
 							tmp16 >>= 1;
 
-						CLAMP8(tmp16);
-						mixPtr[j] = (int8_t)tmp16;
+						mixPtr[j] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 					}
 				}
 				else // modulation
@@ -2439,8 +2436,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 						if (editor.halveSampleFlag)
 							tmp16 >>= 1;
 
-						CLAMP8(tmp16);
-						mixPtr[j] = (int8_t)tmp16;
+						mixPtr[j] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 
 						modTableOffset += editor.modulateSpeed;
 						modOffset += modulationTable[(modTableOffset >> 12) & 63];
@@ -2492,9 +2488,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				for (int32_t j = 0; j < s->length; j++)
 				{
 					int16_t tmp16 = (sampleData[editor.samplePos+j] + sampleData[j]) >> 1;
-					CLAMP8(tmp16);
-
-					sampleData[editor.samplePos+j] = (int8_t)tmp16;
+					sampleData[editor.samplePos+j] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 				}
 			}
 			else // modulation
@@ -2506,9 +2500,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				{
 					const int32_t sampleReadPos = modOffset >> 11;
 					int16_t tmp16 = (sampleData[editor.samplePos+j] + sampleData[MIN(sampleReadPos, s->length-1)]) >> 1;
-					CLAMP8(tmp16);
-
-					sampleData[editor.samplePos+j] = (int8_t)tmp16;
+					sampleData[editor.samplePos+j] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 
 					modTableOffset += editor.modulateSpeed;
 					modOffset += modulationTable[(modTableOffset >> 12) & 63];
@@ -2520,8 +2512,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				for (int32_t j = 0; j < s->length; j++)
 				{
 					int16_t tmp16 = (int16_t)sampleData[j] * 2;
-					CLAMP8(tmp16);
-					sampleData[j] = (int8_t)tmp16;
+					sampleData[j] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 				}
 			}
 
@@ -2713,8 +2704,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				if (editor.halveSampleFlag)
 					tmp16 >>= 1;
 
-				CLAMP8(tmp16);
-				int8_t tmpSmp = (int8_t)tmp16;
+				int8_t tmpSmp = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 
 				sampleData[j] = tmpSmp;
 				sampleData[lastSamplePoint-j] = tmpSmp;
@@ -2859,8 +2849,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			for (int32_t j = 0; j < editor.samplePos; j++)
 			{
 				int32_t smp32 = (int32_t)((*ptr8) * dPos);
-				CLAMP8(smp32);
-				*ptr8++ = (int8_t)smp32;
+				*ptr8++ = (int8_t)(CLAMP(smp32, INT8_MIN, INT8_MAX));
 
 				dPos += dDelta;
 			}
@@ -2906,8 +2895,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 			for (int32_t j = editor.samplePos; j < s->length; j++)
 			{
 				int32_t smp32 = (int32_t)((*ptr8) * dPos);
-				CLAMP8(smp32);
-				*ptr8-- = (int8_t)smp32;
+				*ptr8-- = (int8_t)(CLAMP(smp32, INT8_MIN, INT8_MAX));
 
 				dPos += dDelta;
 			}
@@ -2991,8 +2979,7 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				for (int32_t j = 0; j < s->length; j++)
 				{
 					int16_t tmp16 = (ptr8[j] * sampleMul) >> 19;
-					CLAMP8(tmp16);
-					ptr8[j] = (int8_t)tmp16;
+					ptr8[j] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 				}
 
 				fixSampleBeep(s);

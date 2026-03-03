@@ -165,16 +165,14 @@ static inline void processMixedSamplesAmigaPanning(int32_t i, int16_t *out)
 	dOut = (dL + dPrng) - dPrngStateL;
 	dPrngStateL = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[0] = (int16_t)out32;
+	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
 	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
 	dOut = (dR + dPrng) - dPrngStateR;
 	dPrngStateR = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[1] = (int16_t)out32;
+	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 static inline void processMixedSamples(int32_t i, int16_t *out)
@@ -202,16 +200,14 @@ static inline void processMixedSamples(int32_t i, int16_t *out)
 	dOut = (dL + dPrng) - dPrngStateL;
 	dPrngStateL = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[0] = (int16_t)out32;
+	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
 	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
 	dOut = (dR + dPrng) - dPrngStateR;
 	dPrngStateR = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[1] = (int16_t)out32;
+	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) // 2x oversampling
@@ -234,16 +230,14 @@ static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) /
 	dOut = (dL + dPrng) - dPrngStateL;
 	dPrngStateL = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[0] = (int16_t)out32;
+	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
 	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
 	dOut = (dR + dPrng) - dPrngStateR;
 	dPrngStateR = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[1] = (int16_t)out32;
+	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 static inline void processMixedSamples_2x(int32_t i, int16_t *out) // 2x oversampling
@@ -274,16 +268,14 @@ static inline void processMixedSamples_2x(int32_t i, int16_t *out) // 2x oversam
 	dOut = (dL + dPrng) - dPrngStateL;
 	dPrngStateL = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[0] = (int16_t)out32;
+	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
 	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
 	dOut = (dR + dPrng) - dPrngStateR;
 	dPrngStateR = dPrng;
 	out32 = (int32_t)dOut;
-	CLAMP16(out32);
-	out[1] = (int16_t)out32;
+	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 void outputAudio(int16_t *target, int32_t numSamples)

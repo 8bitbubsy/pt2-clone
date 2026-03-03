@@ -3,12 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// fast 32-bit -> 16-bit clamp
-#define CLAMP16(i) if ((int16_t)(i) != i) i = 0x7FFF ^ (i >> 31)
-
-// fast 16-bit -> 8-bit clamp
-#define CLAMP8(i) if ((int8_t)(i) != i) i = 0x7F ^ (i >> 15)
-
 #define SWAP16(value) \
 ( \
 	(((uint16_t)((value) & 0x00FF)) << 8) | \

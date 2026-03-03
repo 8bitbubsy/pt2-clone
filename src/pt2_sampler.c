@@ -627,8 +627,7 @@ void highPassSample(int32_t cutOff)
 	for (int32_t i = from; i < to; i++)
 	{
 		int16_t smp16 = (int16_t)round(dSampleData[i] * dAmp);
-		CLAMP8(smp16);
-		smpPtr[i] = (int8_t)smp16;
+		smpPtr[i] = (int8_t)(CLAMP(smp16, INT8_MIN, INT8_MAX));
 	}
 
 	free(dSampleData);
@@ -731,8 +730,7 @@ void lowPassSample(int32_t cutOff)
 	for (int32_t i = from; i < to; i++)
 	{
 		int16_t smp16 = (int16_t)round(dSampleData[i] * dAmp);
-		CLAMP8(smp16);
-		smpPtr[i] = (int8_t)smp16;
+		smpPtr[i] = (int8_t)(CLAMP(smp16, INT8_MIN, INT8_MAX));
 	}
 
 	free(dSampleData);
@@ -905,8 +903,7 @@ void samplerRemoveDcOffset(void)
 	for (int32_t i = from; i < to; i++)
 	{
 		int32_t smp32 = smpDat[i] - offset;
-		CLAMP8(smp32);
-		smpDat[i] = (int8_t)smp32;
+		smpDat[i] = (int8_t)(CLAMP(smp32, INT8_MIN, INT8_MAX));
 	}
 
 	fixSampleBeep(s);
@@ -1120,8 +1117,7 @@ void doMix(void)
 		if (editor.halveSampleFlag)
 			tmp16 >>= 1;
 
-		CLAMP8(tmp16);
-		mixPtr[i] = (int8_t)tmp16;
+		mixPtr[i] = (int8_t)(CLAMP(tmp16, INT8_MIN, INT8_MAX));
 	}
 
 	memcpy(&song->sampleData[s3->offset], mixPtr, mixLength);
@@ -1190,8 +1186,7 @@ void boostSample(int32_t sample, bool ignoreMark)
 
 		prevSmp = smpDat[i];
 
-		CLAMP8(smp16);
-		smpDat[i] = (int8_t)smp16;
+		smpDat[i] = (int8_t)(CLAMP(smp16, INT8_MIN, INT8_MAX));
 	}
 
 	fixSampleBeep(s);
