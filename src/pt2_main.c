@@ -215,6 +215,8 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+	hpc_Init();
+
 	/* Text input is started by default in SDL2, turn it off to remove ~2ms spikes per key press.
 	** We manuallay start it again when someone clicks on a text edit box, and stop it when done.
 	** Ref.: https://bugzilla.libsdl.org/show_bug.cgi?id=4166
@@ -272,7 +274,6 @@ int main(int argc, char *argv[])
 	SDL_EventState(SDL_SYSWMEVENT, SDL_ENABLE);
 #endif
 
-	hpc_Init();
 	hpc_SetDurationInHz(&video.vblankHpc, VBLANK_HZ);
 
 	if (!calculateSincKernel() || !setupAudio() || !unpackBMPs())
