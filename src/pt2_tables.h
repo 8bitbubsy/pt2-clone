@@ -19,7 +19,7 @@ extern const uint8_t vibratoTable[32];
 extern const uint16_t modulationTable[64];
 extern const int16_t periodTable[(37*16)+15];
 extern int8_t pNoteTable[32];
-extern const uint64_t musicTimeTab52[(MAX_BPM-MIN_BPM)+1+1];
+extern const uint32_t tickDuration31fp[(MAX_BPM-MIN_BPM)+1+1];
 
 // changable by config file
 extern uint16_t analyzerColors[36];
