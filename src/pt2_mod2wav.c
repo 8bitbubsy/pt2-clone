@@ -218,10 +218,10 @@ static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
 				break;
 			}
 
-			/* PT replayer ticker (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac).
+			/* Handle replayer tick (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac).
 			** Returns false on end of song.
 			*/
-			if (!intMusic())
+			if (!tickReplayer())
 			{
 				if (--numLoops < 0)
 				{

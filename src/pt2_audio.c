@@ -353,7 +353,7 @@ static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
 		{
 			if (editor.songPlaying)
 			{
-				intMusic(); // PT replayer ticker (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac)
+				tickReplayer(); // (sets audio.samplesPerTickInt and audio.samplesPerTickFrac)
 				fillVisualsSyncBuffer();
 			}
 
@@ -399,21 +399,14 @@ void generateBpmTable(double dAudioFreq, bool vblankTimingFlag)
 
 	for (int32_t bpm = MIN_BPM; bpm <= MAX_BPM; bpm++)
 	{
-		const int32_t i = bpm - MIN_BPM; // index for tables
+		const double dHz = vblankTimingFlag ? AMIGA_PAL_VBLANK_HZ : ciaBpm2Hz(bpm);
 
-		double dBpmHz;
-		if (vblankTimingFlag)
-			dBpmHz = AMIGA_PAL_VBLANK_HZ;
-		else
-			dBpmHz = ciaBpm2Hz(bpm);
+		const double dSamplesPerTick = dAudioFreq / dHz;
+		double dSamplesPerTickInt, dSamplesPerTickFrac = modf(dSamplesPerTick, &dSamplesPerTickInt);
 
-		const double dSamplesPerTick = dAudioFreq / dBpmHz;
-
-		double dSamplesPerTickInt;
-		double dSamplesPerTickFrac = modf(dSamplesPerTick, &dSamplesPerTickInt);
-
+		const int32_t i = bpm - MIN_BPM;
 		audio.samplesPerTickIntTab[i] = (uint32_t)dSamplesPerTickInt;
-		audio.samplesPerTickFracTab[i] = (uint64_t)((dSamplesPerTickFrac * BPM_FRAC_SCALE) + 0.5); // rounded
+		audio.samplesPerTickFracTab[i] = (uint64_t)(dSamplesPerTickFrac * BPM_FRAC_SCALE);
 	}
 
 	audio.tickSampleCounter = 0;
@@ -423,26 +416,18 @@ void generateBpmTable(double dAudioFreq, bool vblankTimingFlag)
 		unlockAudio();
 }
 
-static void generateTickLengthTable(bool vblankTimingFlag)
+static void generateTickLengthTable(bool vblankTimingFlag) // for performance counter (syncing visuals to audio)
 {
 	for (int32_t bpm = MIN_BPM; bpm <= MAX_BPM; bpm++)
 	{
-		const int32_t i = bpm - MIN_BPM; // index for tables
+		double dHz = vblankTimingFlag ? AMIGA_PAL_VBLANK_HZ : ciaBpm2Hz(bpm);
 
-		double dHz;
-		if (vblankTimingFlag)
-			dHz = AMIGA_PAL_VBLANK_HZ;
-		else
-			dHz = ciaBpm2Hz(bpm);
-
-		// BPM -> Hz -> tick length for performance counter (syncing visuals to audio)
 		const double dTickTime = (double)hpcFreq.freq64 / dHz;
+		double dTickTimeInt, dTickTimeFrac = modf(dTickTime, &dTickTimeInt);
 
-		double dTimeInt;
-		double dTimeFrac = modf(dTickTime, &dTimeInt);
-
-		audio.tickTimeIntTab[i] = (uint32_t)dTimeInt;
-		audio.tickTimeFracTab[i] = (uint64_t)((dTimeFrac * TICK_TIME_FRAC_SCALE) + 0.5); // rounded
+		const int32_t i = bpm - MIN_BPM;
+		audio.tickTimeIntTab[i] = (uint32_t)dTickTimeInt;
+		audio.tickTimeFracTab[i] = (uint64_t)(dTickTimeFrac * TICK_TIME_FRAC_SCALE);
 	}
 }
 

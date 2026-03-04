@@ -1351,7 +1351,7 @@ void modSetTempo(int32_t bpm, bool doLockAudio)
 		unlockAudio();
 }
 
-bool intMusic(void) // replayer ticker
+bool tickReplayer(void)
 {
 	// quirk: CIA BPM changes are delayed by one tick in PT, so handle previous tick's BPM change now
 	if (ciaSetBPM != -1)

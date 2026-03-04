@@ -15,7 +15,7 @@ void initializeModuleChannels(module_t *s);
 module_t *createEmptyMod(void);
 void setReplayerPosToTrackerPos(void);
 void setPattern(int16_t pattern);
-bool intMusic(void);
+bool tickReplayer(void);
 void storeTempVariables(void);
 void restartSong(void);
 void resetSong(void);

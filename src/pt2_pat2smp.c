@@ -270,10 +270,10 @@ void pat2SmpRender(void)
 	pat2SmpEndReached = false;
 	while (!pat2SmpEndReached && editor.songPlaying)
 	{
-		/* PT replayer ticker (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac).
+		/* Handle replayer tick (also sets audio.samplesPerTickInt and audio.samplesPerTickFrac).
 		** Returns false on end of song.
 		*/
-		if (!intMusic())
+		if (!tickReplayer())
 			lastRow = true;
 
 		if (song->row > pat2SmpStartRow+pat2SmpRows)
