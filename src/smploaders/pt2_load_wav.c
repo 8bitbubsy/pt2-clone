@@ -204,7 +204,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength; i++) // add right channel to left channel
 			{
 				int32_t smp32 = (audioDataU8[(i << 1) + 0] - 128) + (audioDataU8[(i << 1) + 1] - 128);
 				smp32 = 128 + (smp32 >> 1);
@@ -253,8 +253,8 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
-				audioDataS16[i] = (audioDataS16[(i << 1) + 0] + audioDataS16[(i << 1) + 1]) >> 1;;
+			for (int32_t i = 0; i < sampleLength; i++) // add right channel to left channel
+				audioDataS16[i] = (audioDataS16[(i << 1) + 0] + audioDataS16[(i << 1) + 1]) >> 1;
 		}
 
 		// 2x downsampling
@@ -315,7 +315,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength; i++) // add right channel to left channel
 			{
 				int64_t smp = ((int64_t)audioDataS32[(i << 1) + 0] + audioDataS32[(i << 1) + 1]) >> 1;
 				audioDataS32[i] = (int32_t)smp;
@@ -379,7 +379,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength; i++) // add right channel to left channel
 			{
 				int64_t smp = ((int64_t)audioDataS32[(i << 1) + 0] + audioDataS32[(i << 1) + 1]) >> 1;
 				audioDataS32[i] = (int32_t)smp;
@@ -445,7 +445,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength; i++) // add right channel to left channel
 				fAudioDataFloat[i] = (fAudioDataFloat[(i * 2) + 0] + fAudioDataFloat[(i * 2) + 1]) * 0.5f;
 		}
 
@@ -501,7 +501,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		if (numChannels == 2)
 		{
 			sampleLength >>= 1;
-			for (int32_t i = 0; i < sampleLength-1; i++) // add right channel to left channel
+			for (int32_t i = 0; i < sampleLength; i++) // add right channel to left channel
 				dAudioDataDouble[i] = (dAudioDataDouble[(i * 2) + 0] + dAudioDataDouble[(i * 2) + 1]) * 0.5;
 		}
 
@@ -571,7 +571,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			loopStart &= ~1;
 			loopLength &= ~1;
 
-			if (loopLength < 2 || loopStart+loopLength >= s->length)
+			if (loopLength < 2 || loopStart+loopLength > s->length)
 			{
 				loopStart = 0;
 				loopLength = 2;

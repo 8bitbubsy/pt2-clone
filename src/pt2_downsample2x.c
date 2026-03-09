@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <math.h>
 #include "pt2_helpers.h" // ABS()
+#include "pt2_config.h"
+
+// 2x downsamplers for main audio mixer
 
 // 19-tap half-band FIR coefficients (sinc w/ cutoff=0.5, window = kaiser-bessel w/ beta=6.0)
 static const double c0 =  0.5; // center point
@@ -16,10 +19,6 @@ static const double c3 = -0.07765651545790620836;
 static const double c5 =  0.02553750191646480053;
 static const double c7 = -0.00628026647195643276;
 static const double c9 =  0.00052603669344336991;
-
-// ----------------------------------------------------------
-// reserved for main audio channel mixer, PAT2SMP and MOD2WAV
-// ----------------------------------------------------------
 
 static double tmp1_L, tmp2_L, tmp3_L, tmp4_L, tmp5_L, tmp6_L, tmp7_L, tmp8_L, tmp9_L;
 static double tmp1_R, tmp2_R, tmp3_R, tmp4_R, tmp5_R, tmp6_R, tmp7_R, tmp8_R, tmp9_R;
@@ -82,85 +81,186 @@ double decimate2x_R(double s1, double s2)
 // ----------------------------------------------------------
 // ----------------------------------------------------------
 
-static double tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9;
+// 2x downsampler for sample loaders (no sample delay)
 
-static void clearDownsamplerState(void)
+#define NUM_TAPS 19
+
+// 19-tap half-band FIR coefficients (sinc w/ cutoff=0.5, window = kaiser-bessel w/ beta=6.0)
+static const double coeffs[NUM_TAPS] =
 {
-	tmp1 = tmp2 = tmp3 = tmp4 = tmp5 = tmp6 = tmp7 = tmp8 = tmp9 = 0.0;
+	 0.0005260366934434,
+	 0.0000000000000000,
+	-0.0062802664719564,
+	 0.0000000000000000,
+	 0.0255375019164648,
+	 0.0000000000000000,
+	-0.0776565154579062,
+	 0.0000000000000000,
+	 0.3077045713778285,
+	 0.5000000000000000,
+	 0.3077045713778285,
+	 0.0000000000000000,
+	-0.0776565154579062,
+	 0.0000000000000000,
+	 0.0255375019164648,
+	 0.0000000000000000,
+	-0.0062802664719564,
+	 0.0000000000000000,
+	 0.0005260366934434
+};
+
+static double dDownsample2x(double *dSamples, int32_t offset, int32_t sampleLength)
+{
+	double dVal = 0.0;
+	for (int32_t i = 0; i < NUM_TAPS; i++)
+	{
+		const int32_t tapOffset = offset + (i - ((NUM_TAPS/2)-1));
+
+		double dSmp;
+		if (tapOffset < 0 || tapOffset >= sampleLength)
+			dSmp = 0.0;
+		else
+			dSmp = dSamples[tapOffset];
+
+		dVal += dSmp * coeffs[i];
+	}
+
+	return dVal;
 }
 
-static double decimate2x(double s1, double s2)
+static float fDownsample2x(float *fSamples, int32_t offset, int32_t sampleLength)
 {
-	const double x0 = s2 * c0;
-	const double x1 = s1 * c1;
-	const double x3 = s1 * c3;
-	const double x5 = s1 * c5;
-	const double x7 = s1 * c7;
-	const double x9 = s1 * c9;
+	double dVal = 0.0f;
+	for (int32_t i = 0; i < NUM_TAPS; i++)
+	{
+		const int32_t tapOffset = offset + (i - ((NUM_TAPS/2)-1));
 
-	const double out = tmp9 + x9;
+		double dSmp;
+		if (tapOffset < 0 || tapOffset >= sampleLength)
+			dSmp = 0.0;
+		else
+			dSmp = fSamples[tapOffset];
 
-	tmp9 = tmp8 + x7;
-	tmp8 = tmp7 + x5;
-	tmp7 = tmp6 + x3;
-	tmp6 = tmp5 + x1;
-	tmp5 = tmp4 + x1 + x0;
-	tmp4 = tmp3 + x3;
-	tmp3 = tmp2 + x5;
-	tmp2 = tmp1 + x7;
-	tmp1 =        x9;
+		dVal += dSmp * coeffs[i];
+	}
 
-	return out;
+	return (float)dVal;
+}
+
+static double dDownsample2x_U8(uint8_t *samplesU8, int32_t offset, int32_t sampleLength)
+{
+	double dVal = 0.0;
+	for (int32_t i = 0; i < NUM_TAPS; i++)
+	{
+		const int32_t tapOffset = offset + (i - ((NUM_TAPS/2)-1));
+
+		double dSmp;
+		if (tapOffset < 0 || tapOffset >= sampleLength)
+			dSmp = 0.0;
+		else
+			dSmp = samplesU8[tapOffset];
+
+		dVal += (dSmp - 128) * coeffs[i];
+	}
+
+	return dVal;
+}
+
+static double dDownsample2x_S8(int8_t *samplesS8, int32_t offset, int32_t sampleLength)
+{
+	double dVal = 0.0;
+	for (int32_t i = 0; i < NUM_TAPS; i++)
+	{
+		const int32_t tapOffset = offset + (i - ((NUM_TAPS/2)-1));
+
+		double dSmp;
+		if (tapOffset < 0 || tapOffset >= sampleLength)
+			dSmp = 0.0;
+		else
+			dSmp = samplesS8[tapOffset];
+
+		dVal += dSmp * coeffs[i];
+	}
+
+	return dVal;
+}
+
+static double dDownsample2x_S16(int16_t *samplesS16, int32_t offset, int32_t sampleLength)
+{
+	double dVal = 0.0;
+	for (int32_t i = 0; i < NUM_TAPS; i++)
+	{
+		const int32_t tapOffset = offset + (i - ((NUM_TAPS/2)-1));
+
+		double dSmp;
+		if (tapOffset < 0 || tapOffset >= sampleLength)
+			dSmp = 0.0;
+		else
+			dSmp = samplesS16[tapOffset];
+
+		dVal += dSmp * coeffs[i];
+	}
+
+	return dVal;
+}
+
+static double dDownsample2x_S32(int32_t *samplesS32, int32_t offset, int32_t sampleLength)
+{
+	double dVal = 0.0;
+	for (int32_t i = 0; i < NUM_TAPS; i++)
+	{
+		const int32_t tapOffset = offset + (i - ((NUM_TAPS/2)-1));
+
+		double dSmp;
+		if (tapOffset < 0 || tapOffset >= sampleLength)
+			dSmp = 0.0;
+		else
+			dSmp = samplesS32[tapOffset];
+
+		dVal += dSmp * coeffs[i];
+	}
+
+	return dVal;
 }
 
 // Warning: These can exceed original range because of undershoot/overshoot!
 
 void downsample2xDouble(double *buffer, uint32_t originalLength)
 {
-	clearDownsamplerState();
-
-	const double *input = buffer;
-	const uint32_t length = originalLength / 2;
-
-	for (uint32_t i = 0; i < length; i++, input += 2)
-		buffer[i] = decimate2x(input[0], input[1]);
+	int32_t offset = 0;
+	for (uint32_t i = 0; i < originalLength / 2; i++, offset += 2)
+		buffer[i] = dDownsample2x(buffer, offset, originalLength);
 }
 
 void downsample2xFloat(float *buffer, uint32_t originalLength)
 {
-	clearDownsamplerState();
-
-	const float *input = buffer;
-	const uint32_t length = originalLength / 2;
-
-	for (uint32_t i = 0; i < length; i++, input += 2)
-		buffer[i] = (float)decimate2x(input[0], input[1]);
+	int32_t offset = 0;
+	for (uint32_t i = 0; i < originalLength / 2; i++, offset += 2)
+		buffer[i] = fDownsample2x(buffer, offset, originalLength);
 }
 
 // Warning: These are slow and use normalization to prevent clipping from undershoot/overshoot!
 
 bool downsample2x8BitU(uint8_t *buffer, uint32_t originalLength)
 {
-	double *dBuffer = (double *)malloc(originalLength * sizeof (double));
+	uint32_t newLength = originalLength / 2;
+	if (newLength > (uint32_t)config.maxSampleLength)
+		newLength = config.maxSampleLength;
+
+	double *dBuffer = (double *)malloc(newLength * sizeof (double));
 	if (dBuffer == NULL)
 		return false;
 
-	for (uint32_t i = 0; i < originalLength; i++)
-		dBuffer[i] = (buffer[i] - 128) * (1.0 / (INT8_MAX+1.0));
-
-	const double *input = dBuffer;
 	double dPeak = 0.0;
 
-	clearDownsamplerState();
-	const uint32_t length = originalLength / 2;
-	for (uint32_t i = 0; i < length; i++, input += 2)
+	int32_t offset = 0;
+	for (uint32_t i = 0; i < newLength; i++, offset += 2)
 	{
-		double dOut = decimate2x(input[0], input[1]);
-		dBuffer[i] = dOut;
+		dBuffer[i] = dDownsample2x_U8(buffer, offset, originalLength);
 
-		dOut = ABS(dOut);
-		if (dOut > dPeak)
-			dPeak = dOut;
+		const double dAbsSmp = ABS(dBuffer[i]);
+		if (dAbsSmp > dPeak)
+			dPeak = dAbsSmp;
 	}
 
 	// normalize
@@ -169,7 +269,7 @@ bool downsample2x8BitU(uint8_t *buffer, uint32_t originalLength)
 	if (dPeak > 0.0)
 		dAmp = INT8_MAX / dPeak;
 
-	for (uint32_t i = 0; i < length; i++)
+	for (uint32_t i = 0; i < newLength; i++)
 		buffer[i] = (uint8_t)round(dBuffer[i] * dAmp) + 128;
 
 	free(dBuffer);
@@ -178,26 +278,24 @@ bool downsample2x8BitU(uint8_t *buffer, uint32_t originalLength)
 
 bool downsample2x8Bit(int8_t *buffer, uint32_t originalLength)
 {
-	double *dBuffer = (double *)malloc(originalLength * sizeof (double));
+	uint32_t newLength = originalLength / 2;
+	if (newLength > (uint32_t)config.maxSampleLength)
+		newLength = config.maxSampleLength;
+
+	double *dBuffer = (double *)malloc(newLength * sizeof (double));
 	if (dBuffer == NULL)
 		return false;
 
-	for (uint32_t i = 0; i < originalLength; i++)
-		dBuffer[i] = buffer[i] * (1.0 / (INT8_MAX+1.0));
-
-	const double *input = dBuffer;
 	double dPeak = 0.0;
 
-	clearDownsamplerState();
-	const uint32_t length = originalLength / 2;
-	for (uint32_t i = 0; i < length; i++, input += 2)
+	int32_t offset = 0;
+	for (uint32_t i = 0; i < newLength; i++, offset += 2)
 	{
-		double dOut = decimate2x(input[0], input[1]);
-		dBuffer[i] = dOut;
+		dBuffer[i] = dDownsample2x_S8(buffer, offset, originalLength);
 
-		dOut = ABS(dOut);
-		if (dOut > dPeak)
-			dPeak = dOut;
+		const double dAbsSmp = ABS(dBuffer[i]);
+		if (dAbsSmp > dPeak)
+			dPeak = dAbsSmp;
 	}
 
 	// normalize
@@ -206,7 +304,7 @@ bool downsample2x8Bit(int8_t *buffer, uint32_t originalLength)
 	if (dPeak > 0.0)
 		dAmp = INT8_MAX / dPeak;
 
-	for (uint32_t i = 0; i < length; i++)
+	for (uint32_t i = 0; i < newLength; i++)
 		buffer[i] = (int8_t)round(dBuffer[i] * dAmp);
 
 	free(dBuffer);
@@ -215,26 +313,24 @@ bool downsample2x8Bit(int8_t *buffer, uint32_t originalLength)
 
 bool downsample2x16Bit(int16_t *buffer, uint32_t originalLength)
 {
-	double *dBuffer = (double *)malloc(originalLength * sizeof (double));
+	uint32_t newLength = originalLength / 2;
+	if (newLength > (uint32_t)config.maxSampleLength)
+		newLength = config.maxSampleLength;
+
+	double *dBuffer = (double *)malloc(newLength * sizeof (double));
 	if (dBuffer == NULL)
 		return false;
 
-	for (uint32_t i = 0; i < originalLength; i++)
-		dBuffer[i] = buffer[i] * (1.0 / (INT16_MAX+1.0));
-
-	const double *input = dBuffer;
 	double dPeak = 0.0;
 
-	clearDownsamplerState();
-	const uint32_t length = originalLength / 2;
-	for (uint32_t i = 0; i < length; i++, input += 2)
+	int32_t offset = 0;
+	for (uint32_t i = 0; i < newLength; i++, offset += 2)
 	{
-		double dOut = decimate2x(input[0], input[1]);
-		dBuffer[i] = dOut;
+		dBuffer[i] = dDownsample2x_S16(buffer, offset, originalLength);
 
-		dOut = ABS(dOut);
-		if (dOut > dPeak)
-			dPeak = dOut;
+		const double dAbsSmp = ABS(dBuffer[i]);
+		if (dAbsSmp > dPeak)
+			dPeak = dAbsSmp;
 	}
 
 	// normalize
@@ -243,7 +339,7 @@ bool downsample2x16Bit(int16_t *buffer, uint32_t originalLength)
 	if (dPeak > 0.0)
 		dAmp = INT16_MAX / dPeak;
 
-	for (uint32_t i = 0; i < length; i++)
+	for (uint32_t i = 0; i < newLength; i++)
 		buffer[i] = (int16_t)round(dBuffer[i] * dAmp);
 
 	free(dBuffer);
@@ -252,26 +348,24 @@ bool downsample2x16Bit(int16_t *buffer, uint32_t originalLength)
 
 bool downsample2x32Bit(int32_t *buffer, uint32_t originalLength)
 {
-	double *dBuffer = (double *)malloc(originalLength * sizeof (double));
+	uint32_t newLength = originalLength / 2;
+	if (newLength > (uint32_t)config.maxSampleLength)
+		newLength = config.maxSampleLength;
+
+	double *dBuffer = (double *)malloc(newLength * sizeof (double));
 	if (dBuffer == NULL)
 		return false;
 
-	for (uint32_t i = 0; i < originalLength; i++)
-		dBuffer[i] = buffer[i] * (1.0 / (INT32_MAX+1.0));
-
-	const double *input = dBuffer;
 	double dPeak = 0.0;
 
-	clearDownsamplerState();
-	const uint32_t length = originalLength / 2;
-	for (uint32_t i = 0; i < length; i++, input += 2)
+	int32_t offset = 0;
+	for (uint32_t i = 0; i < newLength; i++, offset += 2)
 	{
-		double dOut = decimate2x(input[0], input[1]);
-		dBuffer[i] = dOut;
+		dBuffer[i] = dDownsample2x_S32(buffer, offset, originalLength);
 
-		dOut = ABS(dOut);
-		if (dOut > dPeak)
-			dPeak = dOut;
+		const double dAbsSmp = ABS(dBuffer[i]);
+		if (dAbsSmp > dPeak)
+			dPeak = dAbsSmp;
 	}
 
 	// normalize
@@ -280,7 +374,7 @@ bool downsample2x32Bit(int32_t *buffer, uint32_t originalLength)
 	if (dPeak > 0.0)
 		dAmp = INT32_MAX / dPeak;
 
-	for (uint32_t i = 0; i < length; i++)
+	for (uint32_t i = 0; i < newLength; i++)
 		buffer[i] = (int32_t)round(dBuffer[i] * dAmp);
 
 	free(dBuffer);
