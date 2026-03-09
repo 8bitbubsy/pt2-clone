@@ -3,124 +3,114 @@
 #include <crtdbg.h>
 #endif
 
-/* High-quality /2 decimator from
-** https://www.musicdsp.org/en/latest/Filters/231-hiqh-quality-2-decimators.html
-*/
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <math.h>
 #include "pt2_helpers.h" // ABS()
+
+// 19-tap half-band FIR coefficients (sinc w/ cutoff=0.5, window = kaiser-bessel w/ beta=6.0)
+static const double c0 =  0.5; // center point
+static const double c1 =  0.30770457137782852852;
+static const double c3 = -0.07765651545790620836;
+static const double c5 =  0.02553750191646480053;
+static const double c7 = -0.00628026647195643276;
+static const double c9 =  0.00052603669344336991;
 
 // ----------------------------------------------------------
 // reserved for main audio channel mixer, PAT2SMP and MOD2WAV
 // ----------------------------------------------------------
 
-static double R1_L, R2_L, R3_L, R4_L, R5_L, R6_L, R7_L, R8_L, R9_L;
-static double R1_R, R2_R, R3_R, R4_R, R5_R, R6_R, R7_R, R8_R, R9_R;
+static double tmp1_L, tmp2_L, tmp3_L, tmp4_L, tmp5_L, tmp6_L, tmp7_L, tmp8_L, tmp9_L;
+static double tmp1_R, tmp2_R, tmp3_R, tmp4_R, tmp5_R, tmp6_R, tmp7_R, tmp8_R, tmp9_R;
 
 void clearMixerDownsamplerStates(void)
 {
-	R1_L = R2_L = R3_L = R4_L = R5_L = R6_L = R7_L = R8_L = R9_L = 0.0;
-	R1_R = R2_R = R3_R = R4_R = R5_R = R6_R = R7_R = R8_R = R9_R = 0.0;
+	tmp1_L = tmp2_L = tmp3_L = tmp4_L = tmp5_L = tmp6_L = tmp7_L = tmp8_L = tmp9_L = 0.0;
+	tmp1_R = tmp2_R = tmp3_R = tmp4_R = tmp5_R = tmp6_R = tmp7_R = tmp8_R = tmp9_R = 0.0;
 }
 
-double decimate2x_L(double x0, double x1)
+double decimate2x_L(double s1, double s2)
 {
-	const double h0 =  8192.0 / 16384.0;
-	const double h1 =  5042.0 / 16384.0;
-	const double h3 = -1277.0 / 16384.0;
-	const double h5 =   429.0 / 16384.0;
-	const double h7 =  -116.0 / 16384.0;
-	const double h9 =    18.0 / 16384.0;
+	const double x0 = s2 * c0;
+	const double x1 = s1 * c1;
+	const double x3 = s1 * c3;
+	const double x5 = s1 * c5;
+	const double x7 = s1 * c7;
+	const double x9 = s1 * c9;
 
-	double h9x0 = h9*x0;
-	double h7x0 = h7*x0;
-	double h5x0 = h5*x0;
-	double h3x0 = h3*x0;
-	double h1x0 = h1*x0;
-	double R10  = R9_L+h9x0;
+	const double out = tmp9_L + x9;
 
-	R9_L = R8_L+h7x0;
-	R8_L = R7_L+h5x0;
-	R7_L = R6_L+h3x0;
-	R6_L = R5_L+h1x0;
-	R5_L = R4_L+h1x0+h0*x1;
-	R4_L = R3_L+h3x0;
-	R3_L = R2_L+h5x0;
-	R2_L = R1_L+h7x0;
-	R1_L = h9x0;
+	tmp9_L = tmp8_L + x7;
+	tmp8_L = tmp7_L + x5;
+	tmp7_L = tmp6_L + x3;
+	tmp6_L = tmp5_L + x1;
+	tmp5_L = tmp4_L + x1 + x0;
+	tmp4_L = tmp3_L + x3;
+	tmp3_L = tmp2_L + x5;
+	tmp2_L = tmp1_L + x7;
+	tmp1_L =          x9;
 
-	return R10;
+	return out;
 }
 
-double decimate2x_R(double x0, double x1)
+double decimate2x_R(double s1, double s2)
 {
-	const double h0 =  8192.0 / 16384.0;
-	const double h1 =  5042.0 / 16384.0;
-	const double h3 = -1277.0 / 16384.0;
-	const double h5 =   429.0 / 16384.0;
-	const double h7 =  -116.0 / 16384.0;
-	const double h9 =    18.0 / 16384.0;
+	const double x0 = s2 * c0;
+	const double x1 = s1 * c1;
+	const double x3 = s1 * c3;
+	const double x5 = s1 * c5;
+	const double x7 = s1 * c7;
+	const double x9 = s1 * c9;
 
-	double h9x0 = h9*x0;
-	double h7x0 = h7*x0;
-	double h5x0 = h5*x0;
-	double h3x0 = h3*x0;
-	double h1x0 = h1*x0;
-	double R10  = R9_R+h9x0;
+	const double out = tmp9_R + x9;
 
-	R9_R = R8_R+h7x0;
-	R8_R = R7_R+h5x0;
-	R7_R = R6_R+h3x0;
-	R6_R = R5_R+h1x0;
-	R5_R = R4_R+h1x0+h0*x1;
-	R4_R = R3_R+h3x0;
-	R3_R = R2_R+h5x0;
-	R2_R = R1_R+h7x0;
-	R1_R = h9x0;
+	tmp9_R = tmp8_R + x7;
+	tmp8_R = tmp7_R + x5;
+	tmp7_R = tmp6_R + x3;
+	tmp6_R = tmp5_R + x1;
+	tmp5_R = tmp4_R + x1 + x0;
+	tmp4_R = tmp3_R + x3;
+	tmp3_R = tmp2_R + x5;
+	tmp2_R = tmp1_R + x7;
+	tmp1_R =          x9;
 
-	return R10;
+	return out;
 }
 
 // ----------------------------------------------------------
 // ----------------------------------------------------------
 // ----------------------------------------------------------
 
-static double R1, R2, R3, R4, R5, R6, R7, R8, R9;
+static double tmp1, tmp2, tmp3, tmp4, tmp5, tmp6, tmp7, tmp8, tmp9;
 
 static void clearDownsamplerState(void)
 {
-	R1 = R2 = R3 = R4 = R5 = R6 = R7 = R8 = R9 = 0.0;
+	tmp1 = tmp2 = tmp3 = tmp4 = tmp5 = tmp6 = tmp7 = tmp8 = tmp9 = 0.0;
 }
 
-static double decimate2x(double x0, double x1)
+static double decimate2x(double s1, double s2)
 {
-	const double h0 =  8192.0 / 16384.0;
-	const double h1 =  5042.0 / 16384.0;
-	const double h3 = -1277.0 / 16384.0;
-	const double h5 =   429.0 / 16384.0;
-	const double h7 =  -116.0 / 16384.0;
-	const double h9 =    18.0 / 16384.0;
+	const double x0 = s2 * c0;
+	const double x1 = s1 * c1;
+	const double x3 = s1 * c3;
+	const double x5 = s1 * c5;
+	const double x7 = s1 * c7;
+	const double x9 = s1 * c9;
 
-	double h9x0 = h9*x0;
-	double h7x0 = h7*x0;
-	double h5x0 = h5*x0;
-	double h3x0 = h3*x0;
-	double h1x0 = h1*x0;
-	double R10  = R9+h9x0;
+	const double out = tmp9 + x9;
 
-	R9 = R8+h7x0;
-	R8 = R7+h5x0;
-	R7 = R6+h3x0;
-	R6 = R5+h1x0;
-	R5 = R4+h1x0+h0*x1;
-	R4 = R3+h3x0;
-	R3 = R2+h5x0;
-	R2 = R1+h7x0;
-	R1 = h9x0;
+	tmp9 = tmp8 + x7;
+	tmp8 = tmp7 + x5;
+	tmp7 = tmp6 + x3;
+	tmp6 = tmp5 + x1;
+	tmp5 = tmp4 + x1 + x0;
+	tmp4 = tmp3 + x3;
+	tmp3 = tmp2 + x5;
+	tmp2 = tmp1 + x7;
+	tmp1 =        x9;
 
-	return R10;
+	return out;
 }
 
 // Warning: These can exceed original range because of undershoot/overshoot!
@@ -180,15 +170,7 @@ bool downsample2x8BitU(uint8_t *buffer, uint32_t originalLength)
 		dAmp = INT8_MAX / dPeak;
 
 	for (uint32_t i = 0; i < length; i++)
-	{
-		double dSmp = dBuffer[i] * dAmp;
-
-		// faster than calling round()
-		     if (dSmp < 0.0) dSmp -= 0.5;
-		else if (dSmp > 0.0) dSmp += 0.5;
-
-		buffer[i] = (uint8_t)dSmp + 128;
-	}
+		buffer[i] = (uint8_t)round(dBuffer[i] * dAmp) + 128;
 
 	free(dBuffer);
 	return true;
@@ -225,15 +207,7 @@ bool downsample2x8Bit(int8_t *buffer, uint32_t originalLength)
 		dAmp = INT8_MAX / dPeak;
 
 	for (uint32_t i = 0; i < length; i++)
-	{
-		double dSmp = dBuffer[i] * dAmp;
-
-		// faster than calling round()
-		     if (dSmp < 0.0) dSmp -= 0.5;
-		else if (dSmp > 0.0) dSmp += 0.5;
-
-		buffer[i] = (int8_t)dSmp;
-	}
+		buffer[i] = (int8_t)round(dBuffer[i] * dAmp);
 
 	free(dBuffer);
 	return true;
@@ -270,15 +244,7 @@ bool downsample2x16Bit(int16_t *buffer, uint32_t originalLength)
 		dAmp = INT16_MAX / dPeak;
 
 	for (uint32_t i = 0; i < length; i++)
-	{
-		double dSmp = dBuffer[i] * dAmp;
-
-		// faster than calling round()
-		     if (dSmp < 0.0) dSmp -= 0.5;
-		else if (dSmp > 0.0) dSmp += 0.5;
-
-		buffer[i] = (int16_t)dSmp;
-	}
+		buffer[i] = (int16_t)round(dBuffer[i] * dAmp);
 
 	free(dBuffer);
 	return true;
@@ -315,15 +281,7 @@ bool downsample2x32Bit(int32_t *buffer, uint32_t originalLength)
 		dAmp = INT32_MAX / dPeak;
 
 	for (uint32_t i = 0; i < length; i++)
-	{
-		double dSmp = dBuffer[i] * dAmp;
-
-		// faster than calling round()
-		     if (dSmp < 0.0) dSmp -= 0.5;
-		else if (dSmp > 0.0) dSmp += 0.5;
-
-		buffer[i] = (int32_t)dSmp;
-	}
+		buffer[i] = (int32_t)round(dBuffer[i] * dAmp);
 
 	free(dBuffer);
 	return true;
