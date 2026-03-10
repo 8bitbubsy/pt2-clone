@@ -42,9 +42,9 @@ static void pat2SmpOutputAudio(int32_t numSamples, bool outputEnable)
 	{
 		for (int32_t i = 0; i < samplesTodo; i++)
 		{
-			// 2x downsampling (decimation)
-			double dL = decimate2x_L(dMixBufferL[(i << 1) + 0], dMixBufferL[(i << 1) + 1]);
-			double dR = decimate2x_R(dMixBufferR[(i << 1) + 0], dMixBufferR[(i << 1) + 1]);
+			// 2x downsampling
+			double dL = downsample2x_L(dMixBufferL[(i << 1) + 0], dMixBufferL[(i << 1) + 1]);
+			double dR = downsample2x_R(dMixBufferR[(i << 1) + 0], dMixBufferR[(i << 1) + 1]);
 
 			dPat2SmpBuf[pat2SmpPos+i] = (dL + dR) * 0.5; // stereo -> mono, normalized to -128..127 later
 		}
@@ -258,7 +258,7 @@ void pat2SmpRender(void)
 	paulaDisableFilters();
 	storeTempVariables();
 	restartSong(); // this also updates BPM (samples per tick) with the PAT2SMP audio output rate
-	clearMixerDownsamplerStates();
+	clearDownsample2xStates();
 
 	song->currRow = song->row = 0;
 	pat2SmpPos = 0;
@@ -305,7 +305,7 @@ void pat2SmpRender(void)
 	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
 	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	generateBpmTable(audio.outputRate, editor.timingMode == TEMPO_MODE_VBLANK);
-	clearMixerDownsamplerStates();
+	clearDownsample2xStates();
 	resetSong(); // this also updates BPM (samples per tick) with the tracker's audio output rate
 
 	moduleSample_t *s = &song->samples[editor.currSample];

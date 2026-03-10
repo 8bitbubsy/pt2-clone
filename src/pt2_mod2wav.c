@@ -143,7 +143,7 @@ static void resetAudio(void)
 	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
 	paulaSetup(paulaMixFrequency, audio.amigaModel);
 	generateBpmTable(audio.outputRate, editor.timingMode == TEMPO_MODE_VBLANK);
-	clearMixerDownsamplerStates();
+	clearDownsample2xStates();
 	modSetTempo(song->currBPM, true); // update BPM (samples per tick) with the tracker's audio frequency
 }
 
@@ -401,7 +401,7 @@ bool mod2WavRender(char *filename)
 	storeTempVariables();
 	calcMod2WavTotalRows();
 	restartSong(); // this also updates BPM (samples per tick) with the MOD2WAV audio output rate
-	clearMixerDownsamplerStates();
+	clearDownsample2xStates();
 
 	drawMod2WavProgressDialog();
 	editor.abortMod2Wav = false;

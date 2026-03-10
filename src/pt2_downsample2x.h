@@ -3,9 +3,9 @@
 #include <stdint.h>
 
 // reserved for main audio channel mixer, PAT2SMP and MOD2WAV
-void clearMixerDownsamplerStates(void);
-double decimate2x_L(double s1, double s2);
-double decimate2x_R(double s1, double s2);
+void clearDownsample2xStates(void);
+double downsample2x_L(double sample1, double sample2);
+double downsample2x_R(double sample1, double sample2);
 // --------------------------------------
 
 // Warning: These can exceed -1.0 .. 1.0 because of undershoot/overshoot!

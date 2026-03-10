@@ -215,11 +215,11 @@ static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) /
 	int32_t out32;
 	double dL, dR, dOut, dPrng;
 
-	// 2x downsampling (decimation)
+	// 2x downsampling
 	const uint32_t offset1 = (i << 1) + 0;
 	const uint32_t offset2 = (i << 1) + 1;
-	dL = decimate2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
-	dR = decimate2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
+	dL = downsample2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
+	dR = downsample2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
 
 	// normalize
 	dL *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
@@ -245,11 +245,11 @@ static inline void processMixedSamples_2x(int32_t i, int16_t *out) // 2x oversam
 	int32_t out32;
 	double dL, dR, dOut, dPrng;
 
-	// 2x downsampling (decimation)
+	// 2x downsampling
 	const uint32_t offset1 = (i << 1) + 0;
 	const uint32_t offset2 = (i << 1) + 1;
-	dL = decimate2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
-	dR = decimate2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
+	dL = downsample2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
+	dR = downsample2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
 
 	// apply stereo separation
 	const double dOldL = dL;
@@ -503,7 +503,7 @@ bool setupAudio(void)
 	setLEDFilter(false);
 	calcAudioLatencyVars(audio.audioBufferSize, audio.outputRate);
 
-	clearMixerDownsamplerStates();
+	clearDownsample2xStates();
 	audio.resetSyncTickTimeFlag = true;
 
 	audio.samplesPerTickInt = audio.samplesPerTickIntTab[125-MIN_BPM]; // BPM 125
