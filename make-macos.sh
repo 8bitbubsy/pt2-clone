@@ -36,7 +36,7 @@ fi
 #
 function compile() {
     rm $1 &> /dev/null
-    clang $VERBOSE $CFLAGS -F /Library/Frameworks -g0 -DNDEBUG -DHAS_LIBFLAC src/gfx/*.c src/modloaders/*.c src/libflac/*.c src/smploaders/*.c src/*.c -ffast-math -Wall -Winit-self -Wextra -Wunused -Wredundant-decls $LDFLAGS -L /Library/Frameworks -framework SDL2 -framework Cocoa -lm -o $1
+    clang $VERBOSE $CFLAGS -F /Library/Frameworks -g0 -DNDEBUG src/gfx/*.c src/modloaders/*.c src/smploaders/*.c src/*.c -ffast-math -Wall -Winit-self -Wextra -Wunused -Wredundant-decls $LDFLAGS -L /Library/Frameworks -framework SDL2 -framework Cocoa -lm -o $1
     return $?
 }
 
@@ -78,4 +78,4 @@ echo Done. The executable can be found in \'${RELEASE_MACOS_DIR}\' if everything
 #
 # Cleanup
 #
-rm src/gfx/*.o src/modloaders/*.o src/libflac/*.o src/smploaders/*.o src/*.o &> /dev/null
+rm src/gfx/*.o src/modloaders/*.o src/smploaders/*.o src/*.o &> /dev/null

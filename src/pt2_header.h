@@ -16,7 +16,7 @@
 #include "pt2_unicode.h"
 #include "pt2_palette.h"
 
-#define PROG_VER_STR "1.82"
+#define PROG_VER_STR "1.83"
 
 #ifndef ASSERT
 #ifdef _DEBUG

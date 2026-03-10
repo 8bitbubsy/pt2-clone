@@ -13,9 +13,6 @@
     <Filter Include="smploaders">
       <UniqueIdentifier>{962f7c81-1341-453b-a297-c8364806f7f6}</UniqueIdentifier>
     </Filter>
-    <Filter Include="libflac">
-      <UniqueIdentifier>{5d2aea95-3dd5-40ab-8051-220433bcd953}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\pt2_audio.h">
@@ -242,45 +239,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\smploaders\pt2_load_flac.c">
       <Filter>smploaders</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\bitmath.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\bitreader.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\crc.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\fixed.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\format.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\lpc.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\md5.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\memory.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\metadata_iterators.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\metadata_object.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\stream_decoder.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\window.c">
-      <Filter>libflac</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\libflac\windows_unicode_filenames.c">
-      <Filter>libflac</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\pt2_posed.c" />
     <ClCompile Include="..\..\src\pt2_textedit.c" />

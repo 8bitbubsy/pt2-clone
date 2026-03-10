@@ -1,13 +1,18 @@
+// hide miniflac compiler warnings
+#ifdef _MSC_VER
+#pragma warning(disable: 4146)
+#pragma warning(disable: 4201)
+#pragma warning(disable: 4244)
+#pragma warning(disable: 4245)
+#pragma warning(disable: 4267)
+#pragma warning(disable: 4334)
+#endif
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h>
-#ifndef _WIN32
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
+#define MINIFLAC_IMPLEMENTATION
+#include "miniflac.h"
 #include "../pt2_header.h"
 #include "../pt2_config.h"
 #include "../pt2_structs.h"
@@ -19,76 +24,109 @@
 #include "../pt2_downsample2x.h"
 #include "../pt2_audio.h"
 
-#ifdef HAS_LIBFLAC
+#define MAX_FLAC_BLOCK_SIZE 65535
 
-// hide POSIX warning for fileno()
-#ifdef _MSC_VER
-#pragma warning(disable: 4996)
-#endif
+#define INC_BUFFER \
+	bytesLeft -= bytesHandled; \
+	bufferPtr += bytesHandled;
 
-#ifdef EXTERNAL_LIBFLAC
-#include <FLAC/stream_decoder.h>
-#else
-#include "../libflac/FLAC/stream_decoder.h"
-#endif
+static double *dSmpBuf;
+static uint8_t numChannels, bitDepth;
+static uint64_t totalSamples;
 
-static bool loopEnabled;
-static int8_t *smpBuf8;
-static int16_t *smpBuf16;
-static int32_t *smpBuf24, sampleLength, loopStart, loopLength;
-static uint32_t numChannels, bitDepth, sampleRate, samplesRead;
-static moduleSample_t *smp;
-
-static FLAC__StreamDecoderReadStatus read_callback(const FLAC__StreamDecoder *decoder, FLAC__byte buffer[], size_t *bytes, void *client_data);
-static FLAC__StreamDecoderSeekStatus seek_callback(const FLAC__StreamDecoder *decoder, FLAC__uint64 absolute_byte_offset, void *client_data);
-static FLAC__StreamDecoderTellStatus tell_callback(const FLAC__StreamDecoder *decoder, FLAC__uint64 *absolute_byte_offset, void *client_data);
-static FLAC__StreamDecoderLengthStatus length_callback(const FLAC__StreamDecoder *decoder, FLAC__uint64 *stream_length, void *client_data);
-static FLAC__bool eof_callback(const FLAC__StreamDecoder *decoder, void *client_data);
-static void metadata_callback(const FLAC__StreamDecoder *decoder, const FLAC__StreamMetadata *metadata, void *client_data);
-static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 *const buffer[], void *client_data);
-static void error_callback(const FLAC__StreamDecoder *decoder, FLAC__StreamDecoderErrorStatus status, void *client_data);
+static bool writeSamples(uint64_t sampleIndex, int32_t **samples, uint32_t numSamples);
 
 bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 {
-	FLAC__StreamDecoder *decoder = FLAC__stream_decoder_new();
-	if (decoder == NULL)
-	{
-		displayErrorMsg("FLAC LOAD ERROR !");
-		goto error;
-	}
+	int32_t *samples[2];
+	uint32_t sampleRate = 44100;
+	miniflac_t decoder;
 
-	FLAC__stream_decoder_set_metadata_respond_all(decoder);
+	dSmpBuf = NULL;
 
-	FLAC__StreamDecoderInitStatus initStatus =
-		FLAC__stream_decoder_init_stream
-		(
-			decoder,
-			read_callback, seek_callback,
-			tell_callback, length_callback,
-			eof_callback, write_callback,
-			metadata_callback, error_callback,
-			f
-		);
+	uint8_t *fileBuffer = (uint8_t *)malloc(filesize);
+	if (fileBuffer == NULL)
+		goto oomError;
 
-	if (initStatus != FLAC__STREAM_DECODER_INIT_STATUS_OK)
-	{
-		displayErrorMsg("FLAC LOAD ERROR !");
-		goto error;
-	}
+	samples[0] = (int32_t *)malloc(sizeof (int32_t) * MAX_FLAC_BLOCK_SIZE);
+	samples[1] = (int32_t *)malloc(sizeof (int32_t) * MAX_FLAC_BLOCK_SIZE);
+	if (samples[0] == NULL || samples[1] == NULL)
+		goto oomError;
 
-	smp = s;
+	if (fread(fileBuffer, 1, filesize, f) != filesize)
+		goto decodeError;
+
+	uint8_t *bufferPtr = fileBuffer;
+	uint32_t bytesHandled, bytesLeft = filesize;
+
+	miniflac_init(&decoder, MINIFLAC_CONTAINER_NATIVE);
+	if (miniflac_sync(&decoder, bufferPtr, bytesLeft, &bytesHandled) != MINIFLAC_OK) goto decodeError;
+	INC_BUFFER
+
+	int32_t loopStart = 0, loopLength = 2;
 	s->volume = 64;
-	loopStart = 0;
-	loopLength = 2;
-	smpBuf8 = NULL;
-	smpBuf16 = NULL;
-	smpBuf24 = NULL;
+	
+	while (decoder.state == MINIFLAC_METADATA)
+	{
+		if (decoder.metadata.header.type == MINIFLAC_METADATA_STREAMINFO)
+		{
+			if (miniflac_streaminfo_sample_rate(&decoder, bufferPtr, bytesLeft, &bytesHandled, &sampleRate) != MINIFLAC_OK) goto decodeError;
+			INC_BUFFER
+			if (miniflac_streaminfo_channels(&decoder, bufferPtr, bytesLeft, &bytesHandled, &numChannels) != MINIFLAC_OK) goto decodeError;
+			INC_BUFFER
+			if (miniflac_streaminfo_bps(&decoder, bufferPtr, bytesLeft, &bytesHandled, &bitDepth) != MINIFLAC_OK) goto decodeError;
+			INC_BUFFER
+			if (miniflac_streaminfo_total_samples(&decoder, bufferPtr, bytesLeft, &bytesHandled, &totalSamples) != MINIFLAC_OK) goto decodeError;
+			INC_BUFFER
+		}
+		else if (decoder.metadata.header.type == MINIFLAC_METADATA_APPLICATION && !memcmp(bufferPtr, "riff", 4))
+		{
+			const uint8_t *data = bufferPtr + 4;
 
-	FLAC__stream_decoder_process_until_end_of_stream(decoder);
-	FLAC__stream_decoder_finish(decoder);
-	FLAC__stream_decoder_delete(decoder);
+			uint32_t chunkID  = *(uint32_t *)data; data += 4;
+			uint32_t chunkLen = *(uint32_t *)data; data += 4;
 
-	// sample has been read to smpBufX now (depending on bitdepth)
+			if (chunkID == 0x61727478 && chunkLen >= 8) // "xtra"
+			{
+				data += 6;
+
+				// volume (0..256)
+				uint16_t tmpVol = *(uint16_t *)data;
+				if (tmpVol > 256)
+					tmpVol = 256;
+
+				s->volume = (uint8_t)((tmpVol + 2) / 4); // 0..256 -> 0..64 (rounded)
+			}
+
+			if (chunkID == 0x6C706D73 && chunkLen > 52) // "smpl"
+			{
+				data += 28; // seek to first wanted byte
+
+				uint32_t numLoops = *(uint32_t *)data; data += 4;
+				if (numLoops == 1)
+				{
+					data += 4+4+4; // skip "samplerData", "identifier" and "loopType"
+
+					         loopStart = *(uint32_t *)data; data += 4;
+					uint32_t loopEnd   = *(uint32_t *)data; data += 4;
+
+					loopLength = (loopEnd+1) - loopStart;
+				}
+			}
+		}
+
+		if (miniflac_sync_native(&decoder, bufferPtr, bytesLeft, &bytesHandled) != MINIFLAC_OK) break;
+		INC_BUFFER
+	}
+
+	if (totalSamples == 0 || numChannels == 0)
+		goto decodeError;
+
+	if (numChannels > 2 || (bitDepth != 8 && bitDepth != 16 && bitDepth != 24))
+	{
+		displayErrorMsg("UNSUPPORTED FLAC !");
+		goto error;
+	}
 
 	bool downSample = false;
 	if (sampleRate > 22050 && !config.noDownsampleOnSmpLoad)
@@ -97,106 +135,59 @@ bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			downSample = true;
 	}
 
+	if (totalSamples > (uint64_t)(config.maxSampleLength*2))
+		totalSamples = config.maxSampleLength*2;
+
+	dSmpBuf = (double *)calloc(totalSamples, sizeof (double));
+	if (dSmpBuf == NULL)
+		goto oomError;
+	
+	int64_t sampleIndex = 0;
+	while (true)
+	{
+		if (miniflac_decode(&decoder, bufferPtr, bytesLeft, &bytesHandled, samples) != MINIFLAC_OK) break;
+		INC_BUFFER
+
+		const int32_t numSamples = decoder.frame.header.block_size;
+		if (!writeSamples(sampleIndex, samples, numSamples)) break;
+		sampleIndex += numSamples;
+
+		if (miniflac_sync_native(&decoder, bufferPtr, bytesLeft, &bytesHandled) != MINIFLAC_OK) break;
+		INC_BUFFER
+	}
+
+	int32_t sampleLength = (int32_t)totalSamples;
+
+	if (downSample)
+	{
+		downsample2xDouble(dSmpBuf, sampleLength);
+		sampleLength /= 2;
+	}
+
+	double dAmp = 0.0;
+	const double dPeak = getDoublePeak(dSmpBuf, sampleLength);
+	if (dPeak > 0.0)
+		dAmp = INT8_MAX / dPeak;
+
 	int8_t *smpDataPtr = &song->sampleData[s->offset];
 
-	if (bitDepth == 8)
-	{
-		if (downSample)
-		{
-			if (!downsample2x8Bit(smpBuf8, sampleLength))
-			{
-				statusOutOfMemory();
-				goto error;
-			}
-
-			sampleLength /= 2;
-		}
-
-		turnOffVoices();
-		memcpy(smpDataPtr, smpBuf8, sampleLength * sizeof (int8_t));
-		free(smpBuf8);
-	}
-	else if (bitDepth == 16)
-	{
-		if (downSample)
-		{
-			if (!downsample2x16Bit(smpBuf16, sampleLength))
-			{
-				statusOutOfMemory();
-				goto error;
-			}
-
-			sampleLength /= 2;
-		}
-
-		double dAmp = 1.0;
-		if (downSample) // we already normalized
-		{
-			dAmp = INT8_MAX / (double)INT16_MAX;
-		}
-		else
-		{
-			const double dPeak = get16BitPeak(smpBuf16, sampleLength);
-			if (dPeak > 0.0)
-				dAmp = INT8_MAX / dPeak;
-		}
-
-		turnOffVoices();
-		for (int32_t i = 0; i < sampleLength; i++)
-		{
-			int32_t smp32 = (int32_t)round(smpBuf16[i] * dAmp);
-			ASSERT(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
-			smpDataPtr[i] = (int8_t)smp32;
-		}
-
-		free(smpBuf16);
-	}
-	else if (bitDepth == 24)
-	{
-		if (downSample)
-		{
-			if (!downsample2x32Bit(smpBuf24, sampleLength))
-			{
-				statusOutOfMemory();
-				goto error;
-			}
-
-			sampleLength /= 2;
-		}
-
-		double dAmp = 1.0;
-		if (downSample) // we already normalized
-		{
-			dAmp = INT8_MAX / (double)INT32_MAX;
-		}
-		else
-		{
-			const double dPeak = get32BitPeak(smpBuf24, sampleLength);
-			if (dPeak > 0.0)
-				dAmp = INT8_MAX / dPeak;
-		}
-
-		turnOffVoices();
-		for (int32_t i = 0; i < sampleLength; i++)
-		{
-			int32_t smp32 = (int32_t)round(smpBuf24[i] * dAmp);
-			ASSERT(smp32 >= -128 && smp32 <= 127); // shouldn't happen according to dAmp (but just in case)
-			smpDataPtr[i] = (int8_t)smp32;
-		}
-
-		free(smpBuf24);
-	}
+	turnOffVoices();
+	for (int32_t i = 0; i < sampleLength; i++)
+		smpDataPtr[i] = (int8_t)round(dSmpBuf[i] * dAmp);
 
 	if (sampleLength & 1)
 	{
 		if (++sampleLength > config.maxSampleLength)
 			sampleLength = config.maxSampleLength;
+		else
+			smpDataPtr[sampleLength-1] = 0;
 	}
 
 	if (downSample)
 	{
-		loopStart /= 2;
-		loopLength /= 2;
+		// we already downsampled 2x, so we're half the original length
+		loopStart >>= 1;
+		loopLength >>= 1;
 	}
 
 	loopStart &= ~1;
@@ -213,323 +204,55 @@ bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	s->loopLength = loopLength;
 	s->length = sampleLength;
 
+	if (dSmpBuf != NULL) { free(dSmpBuf); dSmpBuf = NULL; }
+	if (fileBuffer != NULL) free(fileBuffer);
+	if (samples[0] != NULL) free(samples[0]);
+	if (samples[1] != NULL) free(samples[1]);
+
 	return true;
 
+decodeError:
+	displayErrorMsg("FLAC LOAD ERROR !");
+	goto error;
+oomError:
+	statusOutOfMemory();
 error:
-	if (smpBuf8 != NULL) free(smpBuf8);
-	if (smpBuf16 != NULL) free(smpBuf16);
-	if (smpBuf24 != NULL) free(smpBuf24);
-	if (decoder != NULL) FLAC__stream_decoder_delete(decoder);
+	if (dSmpBuf != NULL) { free(dSmpBuf); dSmpBuf = NULL; }
+	if (fileBuffer != NULL) free(fileBuffer);
+	if (samples[0] != NULL) free(samples[0]);
+	if (samples[1] != NULL) free(samples[1]);
 
 	return false;
 
 	(void)filesize;
 }
 
-static FLAC__StreamDecoderReadStatus read_callback(const FLAC__StreamDecoder *decoder, FLAC__byte buffer[], size_t *bytes, void *client_data)
+static bool writeSamples(uint64_t sampleIndex, int32_t **samples, uint32_t numSamples)
 {
-	FILE *file = (FILE *)client_data;
-	if (*bytes > 0)
+	if (sampleIndex >= totalSamples)
+		return false;
+
+	uint32_t samplesTodo = numSamples;
+	if (sampleIndex+samplesTodo > totalSamples)
+		samplesTodo = totalSamples - sampleIndex;
+
+	double dMul = 1.0 / (1 << (bitDepth-1));
+	double *dPtr = (double *)dSmpBuf + sampleIndex;
+
+	if (numChannels == 1)
 	{
-		*bytes = fread(buffer, sizeof (FLAC__byte), *bytes, file);
-		if (ferror(file))
-			return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
-		else if (*bytes == 0)
-			return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
-		else
-			return FLAC__STREAM_DECODER_READ_STATUS_CONTINUE;
+		int32_t *src32 = samples[0];
+		for (uint32_t i = 0; i < samplesTodo; i++)
+			dPtr[i] = (double)(src32[i] * dMul);
 	}
 	else
 	{
-		return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
+		dMul *= 0.5;
+
+		int32_t *src32L = samples[0], *src32R = samples[1];
+		for (uint32_t i = 0; i < samplesTodo; i++)
+			dPtr[i] = (double)((src32L[i] + src32R[i]) * dMul);
 	}
 
-	(void)decoder;
+	return true;
 }
-
-static FLAC__StreamDecoderSeekStatus seek_callback(const FLAC__StreamDecoder *decoder, FLAC__uint64 absolute_byte_offset, void *client_data)
-{
-	FILE *file = (FILE *)client_data;
-
-	if (absolute_byte_offset > INT32_MAX)
-		return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
-
-	if (fseek(file, (int32_t)absolute_byte_offset, SEEK_SET) < 0)
-		return FLAC__STREAM_DECODER_SEEK_STATUS_ERROR;
-	else
-		return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
-
-	(void)decoder;
-}
-
-static FLAC__StreamDecoderTellStatus tell_callback(const FLAC__StreamDecoder *decoder, FLAC__uint64 *absolute_byte_offset, void *client_data)
-{
-	FILE *file = (FILE *)client_data;
-	int32_t pos = ftell(file);
-
-	if (pos < 0)
-	{
-		return FLAC__STREAM_DECODER_TELL_STATUS_ERROR;
-	}
-	else
-	{
-		*absolute_byte_offset = (FLAC__uint64)pos;
-		return FLAC__STREAM_DECODER_TELL_STATUS_OK;
-	}
-
-	(void)decoder;
-}
-
-static FLAC__StreamDecoderLengthStatus length_callback(const FLAC__StreamDecoder *decoder, FLAC__uint64 *stream_length, void *client_data)
-{
-	FILE *file = (FILE *)client_data;
-	struct stat filestats;
-
-	if (fstat(fileno(file), &filestats) != 0)
-	{
-		return FLAC__STREAM_DECODER_LENGTH_STATUS_ERROR;
-	}
-	else
-	{
-		*stream_length = (FLAC__uint64)filestats.st_size;
-		return FLAC__STREAM_DECODER_LENGTH_STATUS_OK;
-	}
-
-	(void)decoder;
-}
-
-static FLAC__bool eof_callback(const FLAC__StreamDecoder *decoder, void *client_data)
-{
-	FILE *file = (FILE *)client_data;
-	return feof(file) ? true : false;
-
-	(void)decoder;
-}
-
-static void metadata_callback(const FLAC__StreamDecoder *decoder, const FLAC__StreamMetadata *metadata, void *client_data)
-{
-	if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO && metadata->data.stream_info.total_samples != 0)
-	{
-		bitDepth = metadata->data.stream_info.bits_per_sample;
-		numChannels = metadata->data.stream_info.channels;
-		sampleRate = metadata->data.stream_info.sample_rate;
-
-		int64_t tmp64 = metadata->data.stream_info.total_samples;
-		if (tmp64 > config.maxSampleLength*2)
-			tmp64 = config.maxSampleLength*2;
-
-		sampleLength = (int32_t)tmp64;
-
-		if (bitDepth == 8)
-			smpBuf8 = (int8_t *)calloc(1, config.maxSampleLength * 2 * sizeof (int8_t));
-		else if (bitDepth == 16)
-			smpBuf16 = (int16_t *)calloc(1, config.maxSampleLength * 2 * sizeof (int16_t));
-		else if (bitDepth == 24)
-			smpBuf24 = (int32_t *)calloc(1, config.maxSampleLength * 2 * sizeof (int32_t));
-
-		// alloc result is tasted later
-	}
-
-	// check for RIFF chunks (loop/vol/pan information)
-	else if (metadata->type == FLAC__METADATA_TYPE_APPLICATION && !memcmp(metadata->data.application.id, "riff", 4))
-	{
-		const uint8_t *data = (const uint8_t *)metadata->data.application.data;
-
-		uint32_t chunkID  = *(uint32_t *)data; data += 4;
-		uint32_t chunkLen = *(uint32_t *)data; data += 4;
-
-		if (chunkID == 0x61727478 && chunkLen >= 8) // "xtra"
-		{
-			data += 6;
-
-			// volume (0..256)
-			uint16_t tmpVol = *(uint16_t *)data;
-			if (tmpVol > 256)
-				tmpVol = 256;
-
-			smp->volume = (uint8_t)((tmpVol + 2) / 4); // 0..256 -> 0..64 (rounded)
-		}
-
-		if (chunkID == 0x6C706D73 && chunkLen > 52) // "smpl"
-		{
-			data += 28; // seek to first wanted byte
-
-			uint32_t numLoops = *(uint32_t *)data; data += 4;
-			if (numLoops == 1)
-			{
-				data += 4+4; // skip "samplerData" and "identifier"
-
-				uint32_t loopType  = *(uint32_t *)data; data += 4;
-				         loopStart = *(uint32_t *)data; data += 4;
-				uint32_t loopEnd   = *(uint32_t *)data; data += 4;
-
-				loopLength = (loopEnd+1) - loopStart;
-				loopEnabled = (loopType == 0);
-			}
-		}
-	}
-
-	else if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT)
-	{
-		uint32_t tmpSampleRate = 0;
-		for (uint32_t i = 0; i < metadata->data.vorbis_comment.num_comments; i++)
-		{
-			const char *tag = (const char *)metadata->data.vorbis_comment.comments[i].entry;
-			uint32_t length = metadata->data.vorbis_comment.comments[i].length;
-
-			if (length > 6 && !memcmp(tag, "TITLE=", 6))
-			{
-				length -= 6;
-				if (length > 22)
-					length = 22;
-
-				memcpy(smp->text, &tag[6], length);
-				smp->text[22] = '\0';
-			}
-
-			// the following tags haven't been tested!
-			else if (length > 11 && !memcmp(tag, "SAMPLERATE=", 11))
-			{
-				tmpSampleRate = atoi(&tag[11]);
-			}
-			else if (length > 10 && !memcmp(tag, "LOOPSTART=", 10))
-			{
-				loopStart = atoi(&tag[10]);
-			}
-			else if (length > 11 && !memcmp(tag, "LOOPLENGTH=", 11))
-			{
-				loopLength = atoi(&tag[11]);
-			}
-
-			if (tmpSampleRate > 0)
-				sampleRate = tmpSampleRate;
-		}
-	}
-
-	(void)client_data;
-	(void)decoder;
-}
-
-static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 *const buffer[], void *client_data)
-{
-
-	if (sampleLength == 0 || numChannels == 0)
-	{
-		displayErrorMsg("FLAC LOAD ERROR !");
-		return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-	}
-
-	if (numChannels > 2)
-	{
-		displayErrorMsg("UNSUPPORTED FLAC !");
-		return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-	}
-
-	if (bitDepth != 8 && bitDepth != 16 && bitDepth != 24)
-	{
-		displayErrorMsg("UNSUPPORTED FLAC !");
-		return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-	}
-
-	if ((bitDepth == 8 && smpBuf8 == NULL) || (bitDepth == 16 && smpBuf16 == NULL) || (bitDepth == 24 && smpBuf24 == NULL))
-	{
-		statusOutOfMemory();
-		return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-	}
-
-	if (frame->header.number.sample_number == 0)
-		samplesRead = 0;
-
-	uint32_t blockSize = frame->header.blocksize;
-
-	bool doAbort = false;
-
-	const uint32_t samplesAllocated = config.maxSampleLength * 2;
-	if (samplesRead+blockSize >= samplesAllocated)
-	{
-		blockSize = samplesAllocated-samplesRead;
-		doAbort = true;
-	}
-	
-	if (blockSize > 0)
-	{
-		if (numChannels == 2) // mix to mono
-		{
-			const int32_t *src_L = buffer[0];
-			const int32_t *src_R = buffer[1];
-
-			if (bitDepth == 8)
-			{
-				int8_t *dst8 = smpBuf8 + samplesRead;
-				for (uint32_t i = 0; i < blockSize; i++)
-					dst8[i] = (int8_t)((src_L[i] + src_R[i]) >> 1);
-			}
-			else if (bitDepth == 16)
-			{
-				int16_t *dst16 = smpBuf16 + samplesRead;
-				for (uint32_t i = 0; i < blockSize; i++)
-					dst16[i] = (int16_t)((src_L[i] + src_R[i]) >> 1);
-			}
-			else if (bitDepth == 24)
-			{
-				int32_t *dst24 = smpBuf24 + samplesRead;
-				for (uint32_t i = 0; i < blockSize; i++)
-					dst24[i] = (int32_t)((src_L[i] + src_R[i]) >> 1);
-			}
-		}
-		else // mono sample
-		{
-			const int32_t *src = buffer[0];
-
-			if (bitDepth == 8)
-			{
-				int8_t *dst8 = smpBuf8 + samplesRead;
-				for (uint32_t i = 0; i < blockSize; i++)
-					dst8[i] = (int8_t)src[i];
-			}
-			else if (bitDepth == 16)
-			{
-				int16_t *dst16 = smpBuf16 + samplesRead;
-				for (uint32_t i = 0; i < blockSize; i++)
-					dst16[i] = (int16_t)src[i];
-			}
-			else if (bitDepth == 24)
-			{
-				int32_t *dst24 = smpBuf24 + samplesRead;
-				for (uint32_t i = 0; i < blockSize; i++)
-					dst24[i] = (int32_t)src[i];
-			}
-		}
-
-		samplesRead += blockSize;
-	}
-
-	if (doAbort)
-		return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
-
-	return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
-
-	(void)client_data;
-	(void)decoder;
-}
-
-static void error_callback(const FLAC__StreamDecoder *decoder, FLAC__StreamDecoderErrorStatus status, void *client_data)
-{
-	(void)status;
-	(void)decoder;
-	(void)client_data;
-}
-
-#else
-
-bool loadFLACSample(FILE *f, int32_t filesize, moduleSample_t *s)
-{
-	displayErrorMsg("NO FLAC SUPPORT !");
-	return false;
-
-	(void)f;
-	(void)filesize;
-	(void)s;
-}
-
-#endif
