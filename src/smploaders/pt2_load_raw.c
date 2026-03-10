@@ -22,6 +22,8 @@ bool loadRAWSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	{
 		if (++sampleLength > (uint32_t)config.maxSampleLength)
 			sampleLength = config.maxSampleLength;
+		else
+			smpDataPtr[sampleLength-1] = 0;
 	}
 
 	s->volume = 64;

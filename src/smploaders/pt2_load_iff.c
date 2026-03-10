@@ -209,6 +209,8 @@ bool loadIFFSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	{
 		if (++sampleLength > config.maxSampleLength)
 			sampleLength = config.maxSampleLength;
+		else
+			smpDataPtr[sampleLength-1] = 0;
 	}
 
 	loopStart &= ~1;
