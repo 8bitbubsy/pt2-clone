@@ -34,6 +34,8 @@
 
 /* Code for generating Cxx coeff constants:
 **
+** #define PI 3.14159265358979323846264338327950288
+**
 ** double besselI0(double z)
 ** {
 **     double s = 1.0, ds = 1.0, d = 2.0;
