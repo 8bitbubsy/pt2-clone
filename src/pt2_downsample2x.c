@@ -16,21 +16,60 @@
 
 // halfband FIR coefficients (59 taps - sinc w/ cutoff=0.5, window = kaiser-bessel w/ beta=6.0)
 #define C00  0.5
-#define C01  0.31727533845395933243
-#define C03 -0.10303321752146006596
-#define C05  0.05865502716166654668
-#define C07 -0.03868682170776279600
-#define C09  0.02701025168292331066
-#define C11 -0.01925355542812714343
-#define C13  0.01374473538879383491
-#define C15 -0.00970187572427919434
-#define C17  0.00670148416488584517
-#define C19 -0.00448385676347942252
-#define C21  0.00287126746894360773
-#define C23 -0.00173056563335381741
-#define C25  0.00095536328898008659
-#define C27 -0.00045753041514152396
-#define C29  0.00016325276693070098
+#define C01  0.317275338453959332429832330
+#define C03 -0.103033217521460065957406016
+#define C05  0.058655027161666546675622413
+#define C07 -0.038686821707762795996554672
+#define C09  0.027010251682923310662109984
+#define C11 -0.019253555428127143434036128
+#define C13  0.013744735388793834912624092
+#define C15 -0.009701875724279194340704535
+#define C17  0.006701484164885845168369016
+#define C19 -0.004483856763479422517792994
+#define C21  0.002871267468943607733405932
+#define C23 -0.001730565633353817406661634
+#define C25  0.000955363288980086585409912
+#define C27 -0.000457530415141523959417225
+#define C29  0.000163252766930700981672792
+
+/* Code for generating Cxx coeff constants:
+**
+** double besselI0(double z)
+** {
+**     double s = 1.0, ds = 1.0, d = 2.0;
+**     const double zz = z * z;
+** 
+**     do
+**     {
+**         ds *= zz / (d * d);
+**         s += ds;
+**         d += 2.0;
+**     }
+**     while (ds > s*(1E-15));
+** 
+**     return s;
+** }
+** 
+** void printHalfbandCoeffs(int32_t numTaps, double kaiserBeta)
+** {
+**     printf("#define C00  0.5\n");
+**     for (int32_t i = 0; i < 1 + (numTaps / 4); i++)
+**     {
+**         const double n = 1 + (i * 2);
+** 
+**         // Kaiser-Bessel window
+**         const double kn = n / (double)((numTaps - 1) / 2);
+**         const double window = besselI0(kaiserBeta * sqrt(1.0 - kn * kn)) / besselI0(kaiserBeta);
+** 
+**         const double x = ((n == 0.0) ? 0.5 : (sin(n * (PI * 0.5)) / (n * PI))) * window;
+**         printf("#define C%02d ", (int32_t)n);
+**         if (x >= 0.0) printf(" ");
+**         printf("%.27f\n", x);
+**     }
+** }
+**
+** Then: printHalfbandCoeffs(59, 6.0);
+*/
 
 // ----------------------------------------------------------
 // 2x downsampler for main audio mixer (simpler/faster, but has output sample delay)
