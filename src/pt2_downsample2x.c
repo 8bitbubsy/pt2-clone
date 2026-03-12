@@ -4,73 +4,39 @@
 #include <math.h>
 #include "pt2_config.h" // config.maxSampleLength
 
-/* Halfband FIR sinc filter notes:
-** 1) Number of taps should be 4m+3 (3, 7, 11, 15, 19, ...) for correct symmetry
-** 2) If using a Kaiser-Bessel window, a beta value of 4..6 is ideal
-** 3) More than 59 taps is probably not worth it for this use case.
-**    ProTracker is not THAT high fidelity!
-*/
-
-#define NUM_TAPS 59
+#define NUM_TAPS 59 /* should be 4m+3 (3, 7, 11, 15, 19, ...) */
 #define CENTER_TAP ((NUM_TAPS - 1) / 2)
 
-// halfband FIR coefficients (59 taps - sinc w/ cutoff=0.5, window = kaiser-bessel w/ beta=6.0)
-#define C00  0.5
-#define C01  0.317275338453959332429832330
-#define C03 -0.103033217521460065957406016
-#define C05  0.058655027161666546675622413
-#define C07 -0.038686821707762795996554672
-#define C09  0.027010251682923310662109984
-#define C11 -0.019253555428127143434036128
-#define C13  0.013744735388793834912624092
-#define C15 -0.009701875724279194340704535
-#define C17  0.006701484164885845168369016
-#define C19 -0.004483856763479422517792994
-#define C21  0.002871267468943607733405932
-#define C23 -0.001730565633353817406661634
-#define C25  0.000955363288980086585409912
-#define C27 -0.000457530415141523959417225
-#define C29  0.000163252766930700981672792
+// half-band FIR coeffs (Remez algorithm - numtaps=59, bands=[0.0, 0.2, 0.3, 0.5], desired=[1.0, 0.0])
+#define C00  0.500000000000001776356839400
+#define C01  0.316796099629279681586524475
+#define C03 -0.101638770668561695398324218
+#define C05  0.056469397591722876594833025
+#define C07 -0.035898691728282271229399925
+#define C09  0.023848934428624003062369141
+#define C11 -0.015961026468464808297786917
+#define C13  0.010547947951963959276056038
+#define C15 -0.006789354746338562181240395
+#define C17  0.004207318621831869671912063
+#define C19 -0.002480664366371574183767201
+#define C21  0.001372073862198802066819647
+#define C23 -0.000698236372446042839051694
+#define C25  0.000317104911171300647004800
+#define C27 -0.000121433207895608810135933
+#define C29  0.000035018885257113032771856
 
-/* Code for generating Cxx coeff constants:
+/* Python code for generating the Cxx coefficient constants:
 **
-** #define PI 3.14159265358979323846264338327950288
+** import scipy
 **
-** double besselI0(double z)
-** {
-**     double s = 1.0, ds = 1.0, d = 2.0;
-**     const double zz = z * z;
-** 
-**     do
-**     {
-**         ds *= zz / (d * d);
-**         s += ds;
-**         d += 2.0;
-**     }
-**     while (ds > s*(1E-15));
-** 
-**     return s;
-** }
-** 
-** void printHalfbandCoeffs(int32_t numTaps, double kaiserBeta)
-** {
-**     printf("#define C00  0.5\n");
-**     for (int32_t i = 0; i < 1 + (numTaps / 4); i++)
-**     {
-**         const double n = 1 + (i * 2);
-** 
-**         // Kaiser-Bessel window
-**         const double kn = n / (double)((numTaps - 1) / 2);
-**         const double window = besselI0(kaiserBeta * sqrt(1.0 - kn * kn)) / besselI0(kaiserBeta);
-** 
-**         const double x = ((n == 0.0) ? 0.5 : (sin(n * (PI * 0.5)) / (n * PI))) * window;
-**         printf("#define C%02d ", (int32_t)n);
-**         if (x >= 0.0) printf(" ");
-**         printf("%.27f\n", x);
-**     }
-** }
+** numtaps = 59 # should be 4m+3 (3, 7, 11, 15, 19, ...)
+** bands = [0.0, 0.2, 0.3, 0.5]
+** desired = [1.0, 0.0]
+** h = scipy.signal.remez(numtaps, bands, desired)
 **
-** Then: printHalfbandCoeffs(59, 6.0);
+** print('#define C00 % .27f' % h[(numtaps-1)//2])
+** for i in range(1+(numtaps//4)):
+**     print('#define C%02d % .27f' % (1+(i*2), h[((numtaps-1)//2)+1+(i*2)]))
 */
 
 // ----------------------------------------------------------
@@ -187,7 +153,7 @@ double downsample2x_R(double sample1, double sample2)
 // 2x downsamplers for sample loaders
 // ----------------------------------------------------------
 
-static const double halfbandSincKernel[NUM_TAPS] =
+static const double halfbandKernel[NUM_TAPS] =
 {
 	C29, 0.0,
 	C27, 0.0,
@@ -236,7 +202,7 @@ static double dDownsample2x(double *dSamples, int32_t offset, int32_t sampleLeng
 		else
 			dSmp = dSamples[tapOffset];
 
-		dVal += dSmp * halfbandSincKernel[i];
+		dVal += dSmp * halfbandKernel[i];
 	}
 
 	return dVal;
@@ -257,7 +223,7 @@ static float fDownsample2x(float *fSamples, int32_t offset, int32_t sampleLength
 		else
 			dSmp = fSamples[tapOffset];
 
-		dVal += dSmp * halfbandSincKernel[i];
+		dVal += dSmp * halfbandKernel[i];
 	}
 
 	return (float)dVal;
@@ -278,7 +244,7 @@ static double dDownsample2x_U8(uint8_t *samplesU8, int32_t offset, int32_t sampl
 		else
 			dSmp = samplesU8[tapOffset];
 
-		dVal += (dSmp - 128) * halfbandSincKernel[i];
+		dVal += (dSmp - 128) * halfbandKernel[i];
 	}
 
 	return dVal;
@@ -299,7 +265,7 @@ static double dDownsample2x_S8(int8_t *samplesS8, int32_t offset, int32_t sample
 		else
 			dSmp = samplesS8[tapOffset];
 
-		dVal += dSmp * halfbandSincKernel[i];
+		dVal += dSmp * halfbandKernel[i];
 	}
 
 	return dVal;
@@ -320,7 +286,7 @@ static double dDownsample2x_S16(int16_t *samplesS16, int32_t offset, int32_t sam
 		else
 			dSmp = samplesS16[tapOffset];
 
-		dVal += dSmp * halfbandSincKernel[i];
+		dVal += dSmp * halfbandKernel[i];
 	}
 
 	return dVal;
@@ -341,7 +307,7 @@ static double dDownsample2x_S32(int32_t *samplesS32, int32_t offset, int32_t sam
 		else
 			dSmp = samplesS32[tapOffset];
 
-		dVal += dSmp * halfbandSincKernel[i];
+		dVal += dSmp * halfbandKernel[i];
 	}
 
 	return dVal;
