@@ -30,14 +30,14 @@ enum
 // this may change after opening the audio input device
 #define SAMPLING_BUFFER_SIZE 1024
 
-#define SAMPLING_MIXER_FRAC_BITS 32
+#define SAMPLING_FRAC_BITS 32
 
 // after several tests, these values yields a good trade-off between quality and compute time
 #define SINC_TAPS 64
 #define SINC_TAPS_BITS 6 /* log2(SINC_TAPS) */
 #define SINC_PHASES 4096
 #define SINC_PHASES_BITS 12 /* log2(SINC_PHASES */
-#define SINC_FSHIFT (SAMPLING_MIXER_FRAC_BITS-(SINC_PHASES_BITS+SINC_TAPS_BITS))
+#define SINC_FSHIFT (SAMPLING_FRAC_BITS-(SINC_PHASES_BITS+SINC_TAPS_BITS))
 #define SINC_FMASK ((SINC_TAPS*SINC_PHASES)-SINC_TAPS)
 
 #define SAMPLE_PREVIEW_WITDH 194
@@ -76,7 +76,7 @@ static inline double besselI0(double z)
 	return s;
 }
 
-bool calculateSincKernel(void) // called once on tracker init
+bool calculateSincWindow(void) // called once on tracker init
 {
 	fSincWindow = (float *)malloc(SINC_PHASES * SINC_TAPS * sizeof (float));
 	if (fSincWindow == NULL)
@@ -111,54 +111,31 @@ void freeSincWindow(void)
 	}
 }
 
-static inline float sincf(float x, float cutoff)
+static inline float sincInterpolation(const float *fSmpData, const float sincCutoff, uint32_t phase32)
 {
-	if (x == 0.0f)
-	{
-		return cutoff;
-	}
-	else
-	{
-		x *= (float)PI;
-		return sinf(cutoff * x) / x;
-	}
-}
+	const int32_t phase = (uint32_t)phase32 >> (SAMPLING_FRAC_BITS - SINC_PHASES_BITS);
 
-// calculated after completion of sampling (before resampling)
-static bool initSincKernel(float sincCutoff)
-{
-	fSincKernel = (float *)malloc(SINC_PHASES * SINC_TAPS * sizeof (float));
-	if (fSincKernel == NULL)
-		return false;
-
-	if (sincCutoff > 1.0f)
-		sincCutoff = 1.0f;
-
-	for (int32_t i = 0; i < SINC_PHASES * SINC_TAPS; i++)
-	{
-		const float x = (float)((i & (SINC_TAPS-1)) - ((SINC_TAPS/2)-1)) - ((float)(i >> SINC_TAPS_BITS) * (1.0f / SINC_PHASES));
-		fSincKernel[i] = sincf(x, sincCutoff) * fSincWindow[i];
-	}
-
-	return true;
-}
-
-static void freeSincKernel(void)
-{
-	if (fSincKernel != NULL)
-	{
-		free(fSincKernel);
-		fSincKernel = NULL;
-	}
-}
-
-static inline float sincInterpolation(const float *fSmpData, const uint32_t phase32)
-{
-	const float *t = fSincKernel + ((phase32 >> SINC_FSHIFT) & SINC_FMASK);
+	const float *window = fSincWindow + (phase << SINC_TAPS_BITS);
+	float x = -((SINC_TAPS/2)-1) - ((float)phase * (1.0f / SINC_PHASES));
 
 	float fSmp = 0.0f;
 	for (int32_t i = 0; i < SINC_TAPS; i++)
-		fSmp += fSmpData[i] * t[i];
+	{
+		float sinc;
+		if (x == 0.0f)
+		{
+			sinc = sincCutoff;
+		}
+		else
+		{
+			const float xpi = x * (float)PI;
+			sinc = sinf(xpi * sincCutoff) / xpi;
+		}
+		sinc *= window[i];
+
+		fSmp += fSmpData[i] * sinc;
+		x += 1.0f;
+	}
 
 	return fSmp;
 }
@@ -618,11 +595,6 @@ static int32_t resampleSamplingBuffer(void)
 	}
 
 	const float sincCutoff = (dResamplingRatio >= 1.0) ? 1.0f : (float)dResamplingRatio;
-	if (!initSincKernel(sincCutoff))
-	{
-		statusOutOfMemory();
-		return -1;
-	}
 
 	// resample
 
@@ -649,7 +621,7 @@ static int32_t resampleSamplingBuffer(void)
 		if (i < 2) // clear first two bytes (to prevent "stuck beep syndrome")
 			fSmp = 0.0f;
 		else
-			fSmp = sincInterpolation(fSmpData, (uint32_t)phase64);
+			fSmp = sincInterpolation(fSmpData, sincCutoff, (uint32_t)phase64);
 
 		fBuffer[i] = fSmp;
 
@@ -665,8 +637,6 @@ static int32_t resampleSamplingBuffer(void)
 		fSmpData += phase64 >> 32;
 		phase64 &= UINT32_MAX;
 	}
-
-	freeSincKernel();
 
 	// normalize and quantize to 8-bit integer
 
