@@ -49,8 +49,10 @@ typedef struct sprite_t
 // for debug box
 #define FPS_SCAN_FRAMES 60
 static char fpsTextBuf[1024];
-static uint64_t frameStartTime;
-static double dRunningFrameDuration, dAvgFPS;
+static bool avgFramesReady;
+static uint32_t videoFrameCounter;
+static uint64_t frameStartTime, runningFrameDuration;
+static double dFrameDurationDiv, dAvgFPS;
 // ------------------
 
 static int32_t oldCurrMode = -1;
@@ -1609,9 +1611,10 @@ void renderSprites(void)
 
 void resetFPSCounter(void)
 {
-	editor.framesPassed = 0;
+	videoFrameCounter = 0;
 	fpsTextBuf[0] = '\0';
-	dRunningFrameDuration = 1000.0 / VBLANK_HZ;
+	runningFrameDuration = 0;
+	avgFramesReady = false;
 }
 
 void beginFPSCounter(void)
@@ -1623,13 +1626,7 @@ void beginFPSCounter(void)
 void endFPSCounter(void)
 {
 	if (video.debug && frameStartTime > 0)
-	{
-		uint64_t frameTimeDiff64 = SDL_GetPerformanceCounter() - frameStartTime;
-		if (frameTimeDiff64 > INT32_MAX)
-			frameTimeDiff64 = INT32_MAX;
-
-		dRunningFrameDuration += (int32_t)frameTimeDiff64 * hpcFreq.dFreqMulMs;
-	}
+		runningFrameDuration += SDL_GetPerformanceCounter() - frameStartTime;
 }
 
 static void drawDebugBox(void)
@@ -1638,19 +1635,21 @@ static void drawDebugBox(void)
 
 	SDL_GetVersion(&SDLVer);
 
-	if (editor.framesPassed >= FPS_SCAN_FRAMES && (editor.framesPassed % FPS_SCAN_FRAMES) == 0)
+	if (++videoFrameCounter >= FPS_SCAN_FRAMES)
 	{
-		dAvgFPS = 1000.0 / (dRunningFrameDuration / FPS_SCAN_FRAMES);
+		dAvgFPS = dFrameDurationDiv / (double)runningFrameDuration;
 		if (dAvgFPS < 0.0 || dAvgFPS > 99999999.9999)
 			dAvgFPS = 99999999.9999; // prevent number from overflowing text box
 
-		dRunningFrameDuration = 0.0;
+		runningFrameDuration = 0;
+		videoFrameCounter = 0;
+		avgFramesReady = true;
 	}
 
 	drawFramework3(4, 4, SCREEN_W-8, 81);
 
 	// if enough frame data isn't collected yet, show a message
-	if (editor.framesPassed < FPS_SCAN_FRAMES)
+	if (!avgFramesReady)
 	{
 		const char text[] = "Gathering frame information...";
 		const uint16_t textW = (sizeof (text)-1) * (FONT_CHAR_W-1);
@@ -2072,5 +2071,7 @@ bool setupVideo(void)
 		SDL_ShowCursor(SDL_FALSE);
 
 	SDL_SetRenderDrawColor(video.renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+
+	dFrameDurationDiv = (1000.0 * FPS_SCAN_FRAMES) / hpcFreq.dFreqMulMs;
 	return true;
 }
