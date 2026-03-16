@@ -334,7 +334,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	}
 }
 
-static void SDLCALL audioCallback(void *userdata, Uint8 *stream, int len)
+static void audioCallback(void *userdata, Uint8 *stream, int len)
 {
 	if (editor.mod2WavOngoing || editor.pat2SmpOngoing) // send silence to sound output device
 	{

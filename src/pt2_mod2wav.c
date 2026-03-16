@@ -189,7 +189,7 @@ void updateMod2WavDialog(void)
 	}
 }
 
-static int32_t SDLCALL mod2WavThreadFunc(void *ptr)
+static int32_t mod2WavThreadFunc(void *ptr)
 {
 	wavHeader_t wavHeader;
 

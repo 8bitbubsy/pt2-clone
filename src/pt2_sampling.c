@@ -176,7 +176,7 @@ static void updateOutputFrequency(void)
 	roundedOutputFrequency = (int32_t)(dOutputFrequency + 0.5);
 }
 
-static void SDLCALL samplingCallback(void *userdata, Uint8 *stream, int len)
+static void samplingCallback(void *userdata, Uint8 *stream, int len)
 {
 	callbackBusy = true;
 

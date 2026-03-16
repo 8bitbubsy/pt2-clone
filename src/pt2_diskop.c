@@ -666,7 +666,7 @@ static bool diskOpFillBuffer(void)
 	return true;
 }
 
-static int32_t SDLCALL diskOpFillThreadFunc(void *ptr)
+static int32_t diskOpFillThreadFunc(void *ptr)
 {
 	(void)ptr;
 

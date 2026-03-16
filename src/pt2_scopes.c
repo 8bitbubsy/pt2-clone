@@ -283,7 +283,7 @@ void drawScopes(void)
 	scopesDisplayingFlag = false;
 }
 
-static int32_t SDLCALL scopeThreadFunc(void *ptr)
+static int32_t scopeThreadFunc(void *ptr)
 {
 	// this is confirmed to be needed for scope stability
 	SDL_SetThreadPriority(SDL_THREAD_PRIORITY_HIGH);
