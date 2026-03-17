@@ -53,7 +53,7 @@ static int16_t displayBuffer[SAMPLING_BUFFER_SIZE];
 static int32_t samplingMode = SAMPLE_MIX, inputFrequency, roundedOutputFrequency;
 static int32_t numAudioInputDevs, audioInputDevListOffset, selectedDev;
 static int32_t bytesSampled, maxSamplingLength, inputBufferSize;
-static float *fSincKernel, *fSincWindow, *fSamplingBuffer, *fSamplingBufferOrig;
+static float *fSincWindow, *fSamplingBuffer, *fSamplingBufferOrig;
 static double dOutputFrequency;
 static SDL_AudioDeviceID recordDev;
 
