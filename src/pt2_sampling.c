@@ -34,11 +34,13 @@ enum
 
 // after several tests, these values yields a good trade-off between quality and compute time
 #define SINC_TAPS 64
-#define SINC_TAPS_BITS 6 /* log2(SINC_TAPS) */
 #define SINC_PHASES 4096
+
+#define SINC_TAPS_BITS 6 /* log2(SINC_TAPS) */
 #define SINC_PHASES_BITS 12 /* log2(SINC_PHASES */
 #define SINC_FSHIFT (SAMPLING_FRAC_BITS-(SINC_PHASES_BITS+SINC_TAPS_BITS))
 #define SINC_FMASK ((SINC_TAPS*SINC_PHASES)-SINC_TAPS)
+#define CENTER_TAP ((SINC_TAPS/2)-1)
 
 #define SAMPLE_PREVIEW_WITDH 194
 #define SAMPLE_PREVIEW_HEIGHT 38
@@ -111,33 +113,36 @@ void freeSincWindow(void)
 	}
 }
 
-static inline float sincInterpolation(const float *fSmpData, const float sincCutoff, uint32_t phase32)
+static inline float sincf(float x, float cutoff)
 {
-	const int32_t phase = (uint32_t)phase32 >> (SAMPLING_FRAC_BITS - SINC_PHASES_BITS);
-
-	const float *window = fSincWindow + (phase << SINC_TAPS_BITS);
-	float x = -((SINC_TAPS/2)-1) - ((float)phase * (1.0f / SINC_PHASES));
-
-	float fSmp = 0.0f;
-	for (int32_t i = 0; i < SINC_TAPS; i++)
+	if (x == 0.0f)
 	{
-		float sinc;
-		if (x == 0.0f)
-		{
-			sinc = sincCutoff;
-		}
-		else
-		{
-			const float xpi = x * (float)PI;
-			sinc = sinf(xpi * sincCutoff) / xpi;
-		}
-		sinc *= window[i];
+		return cutoff;
+	}
+	else
+	{
+		x *= (float)PI;
+		return sinf(x * cutoff) / x;
+	}
+}
 
-		fSmp += fSmpData[i] * sinc;
-		x += 1.0f;
+static inline float sincInterpolation(const float *fSmpData, const float fSincCutoff, const uint32_t phase32)
+{
+	// reduce phase resolution to match SINC_PHASES (needed for sinc window alignment)
+	const int32_t phase = (uint32_t)phase32 >> (SAMPLING_FRAC_BITS - SINC_PHASES_BITS);
+	const float *fWindow = fSincWindow + (phase << SINC_TAPS_BITS);
+
+	const float fPhase = (float)phase * (1.0f / SINC_PHASES);
+	float x = -CENTER_TAP - fPhase;
+
+	float fSum = 0.0f;
+	for (int32_t i = 0; i < SINC_TAPS; i++, x += 1.0f)
+	{
+		const float s = sincf(x, fSincCutoff) * fWindow[i];
+		fSum += fSmpData[i] * s;
 	}
 
-	return fSmp;
+	return fSum;
 }
 
 static void updateOutputFrequency(void)
@@ -150,7 +155,7 @@ static void updateOutputFrequency(void)
 		period = 113;
 
 	dOutputFrequency = (double)PAULA_PAL_CLK / period;
-	roundedOutputFrequency = (int32_t)(dOutputFrequency + 0.5);
+	roundedOutputFrequency = (int32_t)(dOutputFrequency + 0.5); // for display
 }
 
 static void samplingCallback(void *userdata, Uint8 *stream, int len)
@@ -607,7 +612,7 @@ static int32_t resampleSamplingBuffer(void)
 	** of fSamplingBufferOrig.
 	*/
 
-	// pre-center sample data pointer
+	// pre-center sample data pointer (left side is pre-cleared)
 	const float *fSmpData = &fSamplingBuffer[-((SINC_TAPS/2)-1)];
 
 	// clear interpolation tap area after sampled data
@@ -618,7 +623,7 @@ static int32_t resampleSamplingBuffer(void)
 	{
 		float fSmp;
 
-		if (i < 2) // clear first two bytes (to prevent "stuck beep syndrome")
+		if (i < 2) // clear first 2 samps. (to prevent "stuck beep"), do it here for norm. peak scan
 			fSmp = 0.0f;
 		else
 			fSmp = sincInterpolation(fSmpData, sincCutoff, (uint32_t)phase64);
