@@ -40,7 +40,7 @@ void loadConfig(void)
 
 	// set default config values first
 	config.noDownsampleOnSmpLoad = false;
-	config.disableE8xEffect = false;
+	config.enableE8xEffect = false;
 	config.fullScreenStretch = false;
 	config.pattDots = false;
 	config.waveformCenterLine = true;
@@ -245,11 +245,11 @@ static bool loadProTrackerDotIni(FILE *f)
 			else if (!_strnicmp(&configLine[22], "FALSE", 5)) config.noDownsampleOnSmpLoad = false;
 		}
 
-		// DISABLE_E8X (Karplus-Strong command)
-		else if (!_strnicmp(configLine, "DISABLE_E8X=", 12))
+		// ENABLE_E8X (Karplus-Strong command)
+		else if (!_strnicmp(configLine, "ENABLE_E8X=", 11))
 		{
-			     if (!_strnicmp(&configLine[12], "TRUE",  4)) config.disableE8xEffect = true;
-			else if (!_strnicmp(&configLine[12], "FALSE", 5)) config.disableE8xEffect = false;
+			     if (!_strnicmp(&configLine[11], "TRUE",  4)) config.enableE8xEffect = true;
+			else if (!_strnicmp(&configLine[11], "FALSE", 5)) config.enableE8xEffect = false;
 		}
 
 		// HWMOUSE
