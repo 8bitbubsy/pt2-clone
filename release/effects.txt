@@ -18,7 +18,7 @@
 
  The E command has been altered to contain more commands than one.
 
- E0- LED Filter On/Off      E8- Karplus-Strong
+ E0- LED Filter On/Off      E8- Karplus-Strong (disabled by default)
  E1- Fine Pitch Slide Up    E9- Note Retrig
  E2- Fine Pitch Slide Down  EA- Fine Volume Slide Up
  E3- Glissando Control      EB- Fine Volume Slide Down
@@ -316,8 +316,12 @@
  sample's loop section. The longer you run the command, the more filtered it
  gets. This is a sample-trashing effect, just like $EFx.
  
- Note: This command is only implemented in the ProTracker trackers, and not
- in the standalone replayer source codes shipped with the trackers.
+ Note #1: This command is only implemented in the ProTracker trackers, and
+          not in the standalone replayer source codes shipped with the
+          trackers.
+ 
+ Note #2: This effect is disabled in the PT2 clone by default. If you want to
+          know why, check out the comment for "ENABLE_E8X" in protracker.ini.
 
 
 
