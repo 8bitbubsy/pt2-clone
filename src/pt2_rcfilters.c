@@ -4,20 +4,14 @@
 
 #define SMALL_NUMBER (1E-4)
 
-/* 1-pole RC low-pass/high-pass filter, based on:
-** https://www.musicdsp.org/en/latest/Filters/116-one-pole-lp-and-hp.html
-*/
-
+// 1-pole 6dB/oct RC low-pass filter (no pre-warping needed for our use)
 void setupOnePoleFilter(double audioRate, double cutOff, onePoleFilter_t *f)
 {
 	if (cutOff >= audioRate/2.0)
 		cutOff = (audioRate/2.0) - SMALL_NUMBER;
 
-	const double a = 2.0 - cos(((2.0 * PI) * cutOff) / audioRate);
-	const double b = a - sqrt((a * a) - 1.0);
-
-	f->a1 = 1.0 - b;
-	f->a2 = b;
+	f->b1 = exp(((-2.0 * PI) * cutOff) / audioRate);
+	f->a0 = 1.0 - f->b1;
 }
 
 void clearOnePoleFilterState(onePoleFilter_t *f)
@@ -27,35 +21,35 @@ void clearOnePoleFilterState(onePoleFilter_t *f)
 
 void onePoleLPFilter(onePoleFilter_t *f, const double in, double *out)
 {
-	f->tmpL = (in * f->a1) + (f->tmpL * f->a2);
+	f->tmpL = (in * f->a0) + (f->tmpL * f->b1);
 	*out = f->tmpL;
 }
 
 void onePoleLPFilterStereo(onePoleFilter_t *f, const double *in, double *out)
 {
 	// left channel
-	f->tmpL = (in[0] * f->a1) + (f->tmpL * f->a2);
+	f->tmpL = (in[0] * f->a0) + (f->tmpL * f->b1);
 	out[0] = f->tmpL;
 
 	// right channel
-	f->tmpR = (in[1] * f->a1) + (f->tmpR * f->a2);
+	f->tmpR = (in[1] * f->a0) + (f->tmpR * f->b1);
 	out[1] = f->tmpR;
 }
 
 void onePoleHPFilter(onePoleFilter_t *f, const double in, double *out)
 {
-	f->tmpL = (in * f->a1) + (f->tmpL * f->a2);
+	f->tmpL = (in * f->a0) + (f->tmpL * f->b1);
 	*out = in - f->tmpL;
 }
 
 void onePoleHPFilterStereo(onePoleFilter_t *f, const double *in, double *out)
 {
 	// left channel
-	f->tmpL = (in[0] * f->a1) + (f->tmpL * f->a2);
+	f->tmpL = (in[0] * f->a0) + (f->tmpL * f->b1);
 	out[0] = in[0] - f->tmpL;
 
 	// right channel
-	f->tmpR = (in[1] * f->a1) + (f->tmpR * f->a2);
+	f->tmpR = (in[1] * f->a0) + (f->tmpR * f->b1);
 	out[1] = in[1] - f->tmpR;
 }
 

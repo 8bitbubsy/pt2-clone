@@ -5,7 +5,7 @@
 
 typedef struct onePoleFilter_t
 {
-	double tmpL, tmpR, a1, a2;
+	double tmpL, tmpR, a0, b1;
 } onePoleFilter_t;
 
 typedef struct twoPoleFilter_t
