@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
 // hide miniflac compiler warnings
 #ifdef _MSC_VER
 #pragma warning(disable: 4146)
@@ -17,9 +21,6 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include "../pt2_header.h"
 #include "../pt2_config.h"
 #include "../pt2_structs.h"
