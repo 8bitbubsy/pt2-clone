@@ -4,13 +4,14 @@
 
 #define SMALL_NUMBER (1E-4)
 
-// 1-pole 6dB/oct RC low-pass filter (no pre-warping needed for our use)
+// 1-pole 6dB/oct RC low-pass filter (Direct Form II)
 void setupOnePoleFilter(double audioRate, double cutOff, onePoleFilter_t *f)
 {
 	if (cutOff >= audioRate/2.0)
 		cutOff = (audioRate/2.0) - SMALL_NUMBER;
 
-	f->b1 = exp(((-2.0 * PI) * cutOff) / audioRate);
+	// this implementation should be OK as long as cutoff is below audioRate/4
+	f->b1 = exp((-2.0 * PI) * cutOff / audioRate);
 	f->a0 = 1.0 - f->b1;
 }
 
