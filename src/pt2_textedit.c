@@ -374,7 +374,7 @@ static void redrawTextEditObject(void)
 		case PTB_EO_MOD_NUM: ui.updateModText = true; break;
 		case PTB_EO_VOL_NUM: ui.updateVolText = true; break;
 		case PTB_DO_DATAPATH: ui.updateDiskOpPathText = true; break;
-		case PTB_POSS: ui.updateSongPos = true; break;
+		case PTB_POSS: updateNewPos(); break;
 		case PTB_PATTERNS: ui.updateSongPattern = true; break;
 		case PTB_LENGTHS: ui.updateSongLength = true; break;
 		case PTB_SAMPLES: ui.updateCurrSampleNum = true; break;

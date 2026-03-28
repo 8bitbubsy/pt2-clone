@@ -1505,6 +1505,14 @@ void modSetPattern(uint8_t pattern)
 	ui.updateCurrPattText = true;
 }
 
+void updateNewPos(void) // for after having edited the "POS" digits only
+{
+	modPos = song->currPos;
+	editor.currPatternDisp = &song->header.patternTable[song->currPos];
+	ui.updateSongPos = true;
+	ui.updateSongPattern = true;
+}
+
 void modSetPos(int16_t pos, int16_t row)
 {
 	/*
