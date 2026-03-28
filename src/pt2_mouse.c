@@ -2735,18 +2735,21 @@ static bool handleGUIButtons(int32_t button) // are you prepared to enter the ju
 				break;
 			}
 
+			int32_t length;
 			if (editor.markStartOfs != -1 && editor.markStartOfs != editor.markEndOfs && editor.markEndOfs != 0)
 			{
 				ptr8_1 = &song->sampleData[s->offset+editor.markStartOfs];
 				ptr8_2 = &song->sampleData[s->offset+editor.markEndOfs-1];
+				length = editor.markEndOfs - editor.markStartOfs;
 			}
 			else
 			{
 				ptr8_1 = &song->sampleData[s->offset];
 				ptr8_2 = &song->sampleData[s->offset+s->length-1];
+				length = s->length;
 			}
 
-			for (int32_t j = 0; j < s->length / 2; j++)
+			for (int32_t j = 0; j < length / 2; j++)
 			{
 				const int8_t tmpSmp = *ptr8_1;
 				*ptr8_1++ = *ptr8_2;
