@@ -313,7 +313,6 @@ int main(int argc, char *argv[])
 	updateWindowTitle(MOD_NOT_MODIFIED);
 	pointerSetMode(POINTER_MODE_IDLE, DO_CARRY);
 	statusAllRight();
-	setStatusMessage("PROTRACKER", NO_CARRY);
 
 	// load a .MOD from the command arguments if passed (also ignore OS X < 10.9 -psn argument on double-click launch)
 	if ((argc >= 2 && argv[1][0] != '\0') && (argc != 2 || strncmp(argv[1], "-psn_", 5)))
