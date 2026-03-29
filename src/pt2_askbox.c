@@ -168,7 +168,6 @@ uint32_t askBox(uint32_t dialogType, const char *statusText)
 	editor.errorMsgCounter = 0;
 
 	editor.blockMarkFlag = false;
-	ui.introTextShown = false; // kludge :-)
 	ui.disableVisualizer = true;
 	ui.askBoxShown = true;
 

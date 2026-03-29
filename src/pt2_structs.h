@@ -211,7 +211,7 @@ typedef struct ui_t
 	volatile bool askBoxShown, throwExit;
 	bool editTextFlag, samplerScreenShown;
 	bool leftLoopPinMoving, rightLoopPinMoving, changingSmpResample, changingDrumPadNote;
-	bool forceSampleDrag, forceSampleEdit, introTextShown;
+	bool forceSampleDrag, forceSampleEdit;
 	bool aboutScreenShown, posEdScreenShown, diskOpScreenShown;
 	bool samplerVolBoxShown, samplerFiltersBoxShown, samplingBoxShown, editOpScreenShown;
 	bool changingSamplingNote;

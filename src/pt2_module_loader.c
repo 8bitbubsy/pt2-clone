@@ -274,7 +274,6 @@ void setupLoadedMod(void)
 
 void loadModFromArg(char *arg)
 {
-	ui.introTextShown = false;
 	statusAllRight();
 
 	uint32_t filenameLen = (uint32_t)strlen(arg);

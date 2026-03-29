@@ -1993,13 +1993,6 @@ void keyDownHandler(SDL_Scancode scancode, SDL_Keycode keycode)
 		{
 			if (keyb.leftCtrlPressed)
 			{
-				// CTRL+B doesn't change the status message back, so do this:
-				if (ui.introTextShown)
-				{
-					ui.introTextShown = false;
-					statusAllRight();
-				}
-
 				if (editor.blockMarkFlag)
 				{
 					editor.blockMarkFlag = false;

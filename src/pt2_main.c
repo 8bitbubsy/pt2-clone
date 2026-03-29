@@ -463,14 +463,6 @@ static void handleInput(void)
 			armMacGhostMouseCursorFix();
 #endif
 			mouseButtonUpHandler(event.button.button);
-
-			if (ui.introTextShown)
-			{
-				if (!ui.diskOpScreenShown && !editor.errorMsgActive && !ui.askBoxShown)
-					statusAllRight();
-
-				ui.introTextShown = false;
-			}
 		}
 		else if (event.type == SDL_MOUSEBUTTONDOWN)
 		{
@@ -561,7 +553,6 @@ static bool initializeVars(void)
 	editor.multiModeNext[1] = 3;
 	editor.multiModeNext[2] = 4;
 	editor.multiModeNext[3] = 1;
-	ui.introTextShown = true;
 	editor.normalizeFiltersFlag = true;
 	editor.halveSampleFlag = true;
 	editor.markStartOfs = -1;
