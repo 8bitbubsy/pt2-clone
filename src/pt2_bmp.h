@@ -36,7 +36,7 @@ extern const uint8_t samplerFiltersPackedBMP[933];
 extern const uint8_t samplerScreenPackedBMP[3076];
 extern const uint8_t spectrumVisualsPackedBMP[2217];
 extern const uint8_t tracker128KFixPackedBMP[363];
-extern const uint8_t trackerFramePackedBMP[8486];
+extern const uint8_t trackerFramePackedBMP[8337];
 extern const uint8_t samplingBoxPackedBMP[1379];
 
 // these are filled/normalized on init, so no const
