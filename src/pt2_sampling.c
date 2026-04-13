@@ -91,6 +91,7 @@ static bool calculateSincWindow(double sincCutoff)
 {
 	fSincWindow = (float *)malloc(SINC_OVERSAMPLING * SINC_TAPS * sizeof (float));
 	if (fSincWindow == NULL)
+		return false;
 
 	const double kaiserBeta = 9.6567817670975007; // -96.33dB sidelobe attenuation (good enough)
 	const double besselI0BetaMul = 1.0 / besselI0(kaiserBeta);
