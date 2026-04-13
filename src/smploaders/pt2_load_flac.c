@@ -14,6 +14,8 @@
 #include "miniflac.h"
 #else
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wunknown-warning-option"
 #pragma GCC diagnostic ignored "-Wshadow"
 #pragma GCC diagnostic ignored "-Wswitch-default"
 #define MINIFLAC_IMPLEMENTATION
