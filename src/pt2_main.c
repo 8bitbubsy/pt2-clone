@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
 
 	hpc_SetDurationInHz(&video.vblankHpc, VBLANK_HZ);
 
-	if (!calculateSincWindow() || !setupAudio() || !unpackBMPs())
+	if (!setupAudio() || !unpackBMPs())
 	{
 		cleanUp();
 		SDL_Quit();
@@ -944,7 +944,6 @@ static void cleanUp(void) // never call this inside the main loop!
 	videoClose();
 	freeSprites();
 	freeAudioDeviceList(); // pt2_sampling.c
-	freeSincWindow(); // pt2_sampling.c
 
 	if (config.defModulesDir != NULL) free(config.defModulesDir);
 	if (config.defSamplesDir != NULL) free(config.defSamplesDir);
