@@ -250,9 +250,9 @@ void renderFrame2(void) // use this in askBox()
 	updateSongInfo2(); // two middle rows of screen, always visible
 	updatePatternData();
 	updateSampler();
-	handleLastGUIObjectDown(); // XXX
+	handleLastGUIObjectDown();
 	drawSamplerLine();
-	writeSampleMonitorWaveform(); // XXX
+	writeSampleMonitorWaveform();
 }
 
 void renderFrame(void)
