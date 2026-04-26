@@ -3,12 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-bool calculateSincWindow(void); // called once on tracker init
-void freeSincWindow(void);
-
 void stopSampling(void);
 void freeAudioDeviceList(void);
-void renderSampleMonitor(void);
 void setSamplingNote(uint8_t note); // must be called from video thread!
 void renderSamplingBox(void);
 void writeSampleMonitorWaveform(void);
