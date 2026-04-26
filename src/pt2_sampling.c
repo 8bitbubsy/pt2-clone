@@ -115,7 +115,7 @@ static bool calcPolyphaseSincLUT(double sincCutoff)
 		// re-arrange for faster logic when in use
 		const int32_t point = i >> SINC_OVERSAMPLING_BITS;
 		const int32_t phase = i & (SINC_OVERSAMPLING-1);
-		fSincLUT[(phase * SINC_TAPS) + ((SINC_TAPS-1) - point)] = (float)wsinc;
+		fSincLUT[(phase << SINC_TAPS_BITS) + ((SINC_TAPS-1) - point)] = (float)wsinc;
 	}
 
 	// store inverted wrap-around taps after end of LUT (for phase interpolation)
