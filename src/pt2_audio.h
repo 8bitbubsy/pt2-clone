@@ -25,7 +25,8 @@ typedef struct audio_t
 	
 	uint32_t amigaModel, outputRate, audioBufferSize;
 
-	uint32_t tickSampleCounter, samplesPerTickInt, samplesPerTickIntTab[(MAX_BPM-MIN_BPM)+1];
+	int32_t tickSampleCounter;
+	uint32_t samplesPerTickInt, samplesPerTickIntTab[(MAX_BPM-MIN_BPM)+1];
 	uint64_t tickSampleCounterFrac, samplesPerTickFrac, samplesPerTickFracTab[(MAX_BPM-MIN_BPM)+1];
 
 	// for audio sampling

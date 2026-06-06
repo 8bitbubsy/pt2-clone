@@ -349,12 +349,14 @@ static void audioCallback(void *userdata, Uint8 *stream, int len)
 	uint32_t samplesLeft = (uint32_t)len / 4;
 	while (samplesLeft > 0)
 	{
-		if (audio.tickSampleCounter == 0) // new replayer tick
+		if (audio.tickSampleCounter <= 0) // new replayer tick
 		{
 			if (editor.songPlaying)
 			{
 				tickReplayer(); // (sets audio.samplesPerTickInt and audio.samplesPerTickFrac)
-				fillVisualsSyncBuffer();
+
+				if (audio.samplesPerTickInt != 0)
+					fillVisualsSyncBuffer();
 			}
 
 			audio.tickSampleCounter = audio.samplesPerTickInt;
@@ -367,8 +369,8 @@ static void audioCallback(void *userdata, Uint8 *stream, int len)
 			}
 		}
 
-		uint32_t samplesToMix = samplesLeft;
-		if (samplesToMix > audio.tickSampleCounter)
+		int32_t samplesToMix = samplesLeft;
+		if (audio.tickSampleCounter > 0 && samplesToMix > audio.tickSampleCounter)
 			samplesToMix = audio.tickSampleCounter;
 
 		outputAudio(streamOut, samplesToMix);
