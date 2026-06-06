@@ -1,9 +1,9 @@
-// these BLEP routines were coded by aciddose
+// these BLEP routines are based on code by aciddose (written for this project)
 
 #include <stdint.h>
 #include "pt2_blep.h"
 
-static const double dMinBlepData[256+1] =
+static const double dMinBlepData[256+1] = // zero-crossings = 16, oversampling = 16
 {
 	 1.000047730261351741631870027, 1.000070326525919428561905988, 1.000026295486963423542192686, 0.999910424773336803383472216,
 	 0.999715744379055859525351480, 0.999433014919733908598686867, 0.999050085771328588712947294, 0.998551121919525108694415394,
@@ -70,20 +70,21 @@ static const double dMinBlepData[256+1] =
 	 0.000000018763994698223029203, 0.000000010636937008622986639, 0.000000005187099504706206719, 0.000000002093670467469700098,
 	 0.000000000648951812097509606, 0.000000000132018063854003986, 0.000000000011591335682393882, 0.000000000000000000000000000,
 
-	 0.000000000000000000000000000 // 8bitbubsy: one extra zero is required for interpolation look-up
+	 0.000000000000000000000000000 // copy of last point required for interpolation
 };
 
-#define LERP(x, y, z) ((x) + ((y) - (x)) * (z))
+// linear interpolation
+#define LERP(p1, p2, frac) ((p1) + (((p2) - (p1)) * (frac)))
 
-void blepAdd(blep_t *b, double dOffset, double dAmplitude)
+void blepAdd(blep_t *b, const double dOffset, const double dAmplitude)
 {
 	double f = dOffset * BLEP_SP;
 
-	int32_t i = (int32_t)f; // 8bitbubsy: get integer part of f
-	const double *dBlepSrc = dMinBlepData + i;
-	f -= i; // 8bitbubsy: remove integer part from f
+	const int32_t fInt = (int32_t)f; // get integer part of f
+	const double *dBlepSrc = dMinBlepData + fInt;
+	f -= fInt; // remove integer part from f
 
-	i = b->index;
+	int32_t i = b->index;
 	for (int32_t n = 0; n < BLEP_NS; n++)
 	{
 		b->dBuffer[i] += dAmplitude * LERP(dBlepSrc[0], dBlepSrc[1], f);
@@ -95,7 +96,7 @@ void blepAdd(blep_t *b, double dOffset, double dAmplitude)
 	b->samplesLeft = BLEP_NS;
 }
 
-double blepRun(blep_t *b, double dInput)
+double blepRun(blep_t *b, const double dInput)
 {
 	double dBlepOutput = dInput + b->dBuffer[b->index];
 	b->dBuffer[b->index] = 0.0;

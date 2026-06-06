@@ -1,4 +1,4 @@
-// these BLEP routines were coded by aciddose
+// these BLEP routines are based on code by aciddose (written for this project)
 
 #pragma once
 
@@ -29,8 +29,8 @@
 typedef struct blep_t
 {
 	int32_t index, samplesLeft;
-	double dBuffer[BLEP_RNS + 1], dLastValue;
+	double dBuffer[BLEP_RNS+1], dLastValue;
 } blep_t;
 
-void blepAdd(blep_t *b, double dOffset, double dAmplitude);
-double blepRun(blep_t *b, double dInput);
+void blepAdd(blep_t *b, const double dOffset, const double dAmplitude);
+double blepRun(blep_t *b, const double dInput);
