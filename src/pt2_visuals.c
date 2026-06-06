@@ -1828,28 +1828,20 @@ void updateSpectrumAnalyzer(uint8_t vol, uint16_t period)
 	}
 }
 
-void sinkVisualizerBars(void) // sinks visualizer bars @ 49.92Hz (Amiga PAL) rate
+void sinkVisualizerBars(void) // sinks visualizer bars
 {
-	static uint64_t counter50Hz; // pre-initialized to zero because of static
-
-	counter50Hz += video.amigaVblankDelta; // 0.52 fixed-point
-	if (counter50Hz > 1ULL<<52)
+	// sink VU-meters
+	for (int32_t i = 0; i < PAULA_VOICES; i++)
 	{
-		counter50Hz &= (1ULL<<52)-1;
+		if (editor.vuMeterVolumes[i] > 0)
+			editor.vuMeterVolumes[i]--;
+	}
 
-		// sink VU-meters
-		for (int32_t i = 0; i < PAULA_VOICES; i++)
-		{
-			if (editor.vuMeterVolumes[i] > 0)
-				editor.vuMeterVolumes[i]--;
-		}
-
-		// sink "spectrum analyzer" bars
-		for (int32_t i = 0; i < SPECTRUM_BAR_NUM; i++)
-		{
-			if (editor.spectrumVolumes[i] > 0)
-				editor.spectrumVolumes[i]--;
-		}
+	// sink "spectrum analyzer" bars
+	for (int32_t i = 0; i < SPECTRUM_BAR_NUM; i++)
+	{
+		if (editor.spectrumVolumes[i] > 0)
+			editor.spectrumVolumes[i]--;
 	}
 }
 
