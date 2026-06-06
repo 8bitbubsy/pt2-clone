@@ -3488,10 +3488,14 @@ void handleKeyRepeat(SDL_Scancode scancode)
 		break;
 	}
 
-	keyb.repeatFrac += video.amigaVblankDelta;  // 0.52 fixed-point
-	if (keyb.repeatFrac > 1ULL<<52)
+	// handle key repeating at ~49.92Hz (Amiga PAL vblank rate)
+
+	const uint32_t delta31 = (uint32_t)(((INT32_MAX+1.0) / ((double)VBLANK_HZ / AMIGA_PAL_VBLANK_HZ)) + 0.5);
+
+	keyb.repeatFrac += delta31; // 0.31fp
+	if (keyb.repeatFrac > INT32_MAX)
 	{
-		keyb.repeatFrac &= (1ULL<<52)-1;
+		keyb.repeatFrac &= INT32_MAX;
 		keyb.repeatCounter++;
 	}
 }

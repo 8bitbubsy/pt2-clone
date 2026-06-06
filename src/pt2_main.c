@@ -494,11 +494,6 @@ static bool initializeVars(void)
 	setDefaultPalette();
 
 	editor.repeatKeyFlag = (SDL_GetModState() & KMOD_CAPS) ? true : false;
-
-	// 0.52 fixed-point delta for Amiga PAL vblank (~49.92Hz) at VBLANK_HZ (60.0Hz)
-	const double dRatio = AMIGA_PAL_VBLANK_HZ / (double)VBLANK_HZ;
-	video.amigaVblankDelta = (uint64_t)((dRatio * (1ULL << 52)) + 0.5);
-
 	strcpy(editor.mixText, "MIX 01+02 TO 03");
 
 	// allocate some memory

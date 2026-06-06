@@ -112,7 +112,7 @@ typedef struct keyb_t
 	bool shiftPressed, leftCtrlPressed, leftAltPressed;
 	bool leftCommandPressed, leftAmigaPressed, keypadEnterPressed;
 	uint8_t repeatCounter, delayCounter;
-	uint64_t repeatFrac;
+	uint32_t repeatFrac;
 	SDL_Scancode lastRepKey, lastKey;
 } keyb_t;
 
@@ -131,7 +131,6 @@ typedef struct video_t
 	bool fullscreen, vsync60HzPresent, windowHidden, useCustomRenderRect, debug;
 	int32_t renderX, renderY, renderW, renderH, displayW, displayH, windowW, windowH;
 	uint32_t mouseCursorUpscaleFactor, *frameBuffer, palette[PALETTE_NUM];
-	uint64_t amigaVblankDelta; // 0.52 fixed-point
 	double dMonitorRefreshRate, dMouseXMul, dMouseYMul;
 #ifdef _WIN32
 	HWND hWnd;
