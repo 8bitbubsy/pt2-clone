@@ -162,7 +162,7 @@ void updateScopes(void)
 ** This gives a somewhat more stable result than getting the peak from the mixer,
 ** and we don't care about including filters/BLEP in the peak calculation.
 */
-static void updateRealVuMeters(void) 
+static void updateRealVuMeters(void)
 {
 	scope_t tmpScope, *sc;
 
@@ -184,16 +184,19 @@ static void updateRealVuMeters(void)
 			continue;
 
 		// amount of integer samples getting skipped every frame (periods < 113 are clamped, this number can't get big)
-		const int32_t samplesToScan = (const int32_t)tmpScope.dDelta;
-		if (samplesToScan <= 0)
+		uint32_t samplesToScan = (uint32_t)tmpScope.dDelta;
+		if (samplesToScan == 0)
 			continue;
+
+		if (samplesToScan > 512)
+			samplesToScan = 512;
 
 		int32_t pos = tmpScope.pos;
 		int32_t length = tmpScope.length;
 		const int8_t *data = tmpScope.data;
 
-		int32_t runningAmplitude = 0;
-		for (int32_t x = 0; x < samplesToScan; x++)
+		uint32_t runningAmplitude = 0;
+		for (uint32_t x = 0; x < samplesToScan; x++)
 		{
 			int32_t amplitude = 0;
 			if (data != NULL)
@@ -213,16 +216,16 @@ static void updateRealVuMeters(void)
 			}
 		}
 
-		double dAvgAmplitude = runningAmplitude / (double)samplesToScan;
+		runningAmplitude *= 96; // increase scale (for VU-meter height)
+		runningAmplitude /= samplesToScan; // get average
+		runningAmplitude = (runningAmplitude + 4096) >> (7+6); // normalize (rounded)
 
-		dAvgAmplitude *= 96.0 / (128.0 * 64.0); // normalize
+		if (runningAmplitude > 48) // max VU-meter height
+			runningAmplitude = 48;
 
-		int32_t vuHeight = (int32_t)(dAvgAmplitude + 0.5); // rounded
-		if (vuHeight > 48) // max VU-meter height
-			vuHeight = 48;
-
-		if ((int8_t)vuHeight > editor.realVuMeterVolumes[i])
-			editor.realVuMeterVolumes[i] = (int8_t)vuHeight;
+		int8_t vuHeight = (int8_t)runningAmplitude;
+		if (vuHeight > editor.realVuMeterVolumes[i])
+			editor.realVuMeterVolumes[i] = vuHeight;
 	}
 }
 
