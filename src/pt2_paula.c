@@ -174,7 +174,7 @@ static inline void refetchPeriod(paulaVoice_t *v) // Paula stage
 	// set BLEP variables
 	v->dLastPhase = v->dPhase;
 	v->dLastDelta = v->dDelta;
-	v->dBlepOffset = v->dLastPhase / v->dLastDelta;
+	v->dBlepOffset = (v->dLastDelta == 0.0) ? 0.0 : (v->dLastPhase / v->dLastDelta);
 
 	// Paula only updates period (delta) during period refetching (this stage)
 	v->dDelta = v->AUD_PER_delta;
