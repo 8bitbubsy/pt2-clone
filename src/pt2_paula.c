@@ -355,10 +355,15 @@ void clearBlepState(void)
 // output is -4.00 .. 3.97 (can be louder because of high-pass filter)
 void paulaGenerateSamples(float *fOutL, float *fOutR, int32_t numSamples)
 {
+	float *fMixBufSelect[PAULA_VOICES];
+
 	if (numSamples <= 0)
 		return;
 
-	float *fMixBufSelect[PAULA_VOICES] = { fOutL, fOutR, fOutR, fOutL };
+	fMixBufSelect[0] = fOutL;
+	fMixBufSelect[1] = fOutR;
+	fMixBufSelect[2] = fOutR;
+	fMixBufSelect[3] = fOutL;
 
 	// clear mix buffer block
 	memset(fOutL, 0, numSamples * sizeof (float));
