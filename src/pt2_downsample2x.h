@@ -4,8 +4,8 @@
 
 // reserved for main audio channel mixer, PAT2SMP and MOD2WAV
 void clearDownsample2xStates(void);
-double downsample2x_L(double sample1, double sample2);
-double downsample2x_R(double sample1, double sample2);
+float downsample2x_L(float sample1, float sample2);
+float downsample2x_R(float sample1, float sample2);
 // --------------------------------------
 
 // Warning: These can exceed -1.0 .. 1.0 because of undershoot/overshoot!

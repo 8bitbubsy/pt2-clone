@@ -29,4 +29,4 @@ void paulaWritePtr(uint32_t address, const int8_t *ptr);
 void clearBlepState(void);
 
 // output is -4.00 .. 3.97 (can be louder because of high-pass filter)
-void paulaGenerateSamples(double *dOutL, double *dOutR, int32_t numSamples);
+void paulaGenerateSamples(float *fOutL, float *fOutR, int32_t numSamples);

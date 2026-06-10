@@ -30,14 +30,14 @@
 #include "pt2_paula.h"
 
 // cumulative mid/side normalization factor (1/sqrt(2))*(1/sqrt(2))
-#define STEREO_NORM_FACTOR 0.5
+#define STEREO_NORM_FACTOR 0.5f
 
 #define INITIAL_DITHER_SEED 0x12345000
 
 static uint8_t panningMode;
 static int32_t stereoSeparation = 100;
 static uint32_t randSeed = INITIAL_DITHER_SEED;
-static double *dMixBufferL, *dMixBufferR, dSideFactor, dPrngStateL, dPrngStateR;
+static float *fMixBufferL, *fMixBufferR, fSideFactor, fPrngStateL, fPrngStateR;
 static SDL_AudioDeviceID dev;
 
 audio_t audio; // globalized
@@ -134,7 +134,7 @@ void unlockAudio(void)
 void resetAudioDither(void)
 {
 	randSeed = INITIAL_DITHER_SEED;
-	dPrngStateL = dPrngStateR = 0.0;
+	fPrngStateL = fPrngStateR = 0.0f;
 }
 
 static inline int32_t random32(void)
@@ -146,135 +146,138 @@ static inline int32_t random32(void)
 	return (int32_t)randSeed;
 }
 
-#define NORM_FACTOR 2.0 /* nominally correct, but can clip from high-pass filter overshoot */
+/* So yeah, the audio may be a little quiet in some cases, but
+** the output can already clip quite a bit in extreme cases due
+** to the ~5Hz high-pass filter, so think twice before changing
+** this...
+*/
+#define AUDIO_GAIN 2.0
+
+#define NORMALIZE_VALUE (float)(AUDIO_GAIN * ((INT16_MAX+1.0) / PAULA_VOICES))
 
 static inline void processMixedSamplesAmigaPanning(int32_t i, int16_t *out)
 {
 	int32_t out32;
-	double dOut, dPrng;
+	float fOut, fPrng;
 
-	double dL = dMixBufferL[i];
-	double dR = dMixBufferR[i];
+	float fL = fMixBufferL[i];
+	float fR = fMixBufferR[i];
 
-	// normalize
-	dL *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
-	dR *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
+	fL *= NORMALIZE_VALUE;
+	fR *= NORMALIZE_VALUE;
 
 	// left channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dL + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fL + fPrng) - fPrngStateL;
+	fPrngStateL = fPrng;
+	out32 = (int32_t)fOut;
 	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dR + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fR + fPrng) - fPrngStateR;
+	fPrngStateR = fPrng;
+	out32 = (int32_t)fOut;
 	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 static inline void processMixedSamples(int32_t i, int16_t *out)
 {
 	int32_t out32;
-	double dOut, dPrng;
+	float fOut, fPrng;
 
-	double dL = dMixBufferL[i];
-	double dR = dMixBufferR[i];
+	float fL = fMixBufferL[i];
+	float fR = fMixBufferR[i];
 
 	// apply stereo separation
-	const double dOldL = dL;
-	const double dOldR = dR;
-	double dMid  = (dOldL + dOldR) * STEREO_NORM_FACTOR;
-	double dSide = (dOldL - dOldR) * dSideFactor;
-	dL = dMid + dSide;
-	dR = dMid - dSide;
+	const float fOldL = fL;
+	const float fOldR = fR;
+	float fMid  = (fOldL + fOldR) * STEREO_NORM_FACTOR;
+	float fSide = (fOldL - fOldR) * fSideFactor;
+	fL = fMid + fSide;
+	fR = fMid - fSide;
 
-	// normalize
-	dL *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
-	dR *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
+	fL *= NORMALIZE_VALUE;
+	fR *= NORMALIZE_VALUE;
 
 	// left channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dL + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fL + fPrng) - fPrngStateL;
+	fPrngStateL = fPrng;
+	out32 = (int32_t)fOut;
 	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dR + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fR + fPrng) - fPrngStateR;
+	fPrngStateR = fPrng;
+	out32 = (int32_t)fOut;
 	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 static inline void processMixedSamplesAmigaPanning_2x(int32_t i, int16_t *out) // 2x oversampling
 {
 	int32_t out32;
-	double dL, dR, dOut, dPrng;
+	float fL, fR, fOut, fPrng;
 
 	// 2x downsampling
 	const uint32_t offset1 = (i << 1) + 0;
 	const uint32_t offset2 = (i << 1) + 1;
-	dL = downsample2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
-	dR = downsample2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
+	fL = downsample2x_L(fMixBufferL[offset1], fMixBufferL[offset2]);
+	fR = downsample2x_R(fMixBufferR[offset1], fMixBufferR[offset2]);
 
-	// normalize
-	dL *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
-	dR *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
+	fL *= NORMALIZE_VALUE;
+	fR *= NORMALIZE_VALUE;
 
 	// left channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dL + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fL + fPrng) - fPrngStateL;
+	fPrngStateL = fPrng;
+	out32 = (int32_t)fOut;
 	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dR + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fR + fPrng) - fPrngStateR;
+	fPrngStateR = fPrng;
+	out32 = (int32_t)fOut;
 	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
 static inline void processMixedSamples_2x(int32_t i, int16_t *out) // 2x oversampling
 {
 	int32_t out32;
-	double dL, dR, dOut, dPrng;
+	float fL, fR, fOut, fPrng;
 
 	// 2x downsampling
 	const uint32_t offset1 = (i << 1) + 0;
 	const uint32_t offset2 = (i << 1) + 1;
-	dL = downsample2x_L(dMixBufferL[offset1], dMixBufferL[offset2]);
-	dR = downsample2x_R(dMixBufferR[offset1], dMixBufferR[offset2]);
+	fL = downsample2x_L(fMixBufferL[offset1], fMixBufferL[offset2]);
+	fR = downsample2x_R(fMixBufferR[offset1], fMixBufferR[offset2]);
 
 	// apply stereo separation
-	const double dOldL = dL;
-	const double dOldR = dR;
-	double dMid  = (dOldL + dOldR) * STEREO_NORM_FACTOR;
-	double dSide = (dOldL - dOldR) * dSideFactor;
-	dL = dMid + dSide;
-	dR = dMid - dSide;
+	const float fOldL = fL;
+	const float fOldR = fR;
+	float fMid  = (fOldL + fOldR) * STEREO_NORM_FACTOR;
+	float fSide = (fOldL - fOldR) * fSideFactor;
+	fL = fMid + fSide;
+	fR = fMid - fSide;
 
-	// normalize
-	dL *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
-	dR *= NORM_FACTOR * ((INT16_MAX+1.0) / PAULA_VOICES);
+	fL *= NORMALIZE_VALUE;
+	fR *= NORMALIZE_VALUE;
 
 	// left channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dL + dPrng) - dPrngStateL;
-	dPrngStateL = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fL + fPrng) - fPrngStateL;
+	fPrngStateL = fPrng;
+	out32 = (int32_t)fOut;
 	out[0] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 
 	// right channel - 1-bit triangular dithering
-	dPrng = random32() * (1.0 / (UINT32_MAX+1.0)); // -0.5 .. 0.5
-	dOut = (dR + dPrng) - dPrngStateR;
-	dPrngStateR = dPrng;
-	out32 = (int32_t)dOut;
+	fPrng = (float)random32() * (1.0f / ((float)UINT32_MAX+1.0f)); // -0.5f .. 0.5f
+	fOut = (fR + fPrng) - fPrngStateR;
+	fPrngStateR = fPrng;
+	out32 = (int32_t)fOut;
 	out[1] = (int16_t)(CLAMP(out32, INT16_MIN, INT16_MAX));
 }
 
@@ -282,7 +285,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 {
 	if (audio.oversamplingFlag) // 2x oversampling
 	{
-		paulaGenerateSamples(dMixBufferL, dMixBufferR, numSamples*2);
+		paulaGenerateSamples(fMixBufferL, fMixBufferR, numSamples*2);
 
 		// downsample and normalize
 		int16_t out[2];
@@ -308,7 +311,7 @@ void outputAudio(int16_t *target, int32_t numSamples)
 	}
 	else
 	{
-		paulaGenerateSamples(dMixBufferL, dMixBufferR, numSamples);
+		paulaGenerateSamples(fMixBufferL, fMixBufferR, numSamples);
 
 		// normalize
 		int16_t out[2];
@@ -390,7 +393,7 @@ void audioSetStereoSeparation(uint8_t percentage) // 0..100 (percentage)
 	ASSERT(percentage <= 100);
 
 	stereoSeparation = percentage;
-	dSideFactor = (percentage / 100.0) * STEREO_NORM_FACTOR;
+	fSideFactor = (percentage / 100.0f) * STEREO_NORM_FACTOR;
 }
 
 void generateBpmTable(double dAudioFreq, bool vblankTimingFlag)
@@ -489,10 +492,10 @@ bool setupAudio(void)
 	const int32_t paulaMixFrequency = audio.oversamplingFlag ? audio.outputRate*2 : audio.outputRate;
 	int32_t maxSamplesPerTick = (int32_t)ceil(maxFrequency / (MIN_BPM / 2.5)) + 1;
 
-	dMixBufferL = (double *)malloc(maxSamplesPerTick * sizeof (double));
-	dMixBufferR = (double *)malloc(maxSamplesPerTick * sizeof (double));
+	fMixBufferL = (float *)malloc(maxSamplesPerTick * sizeof (float));
+	fMixBufferR = (float *)malloc(maxSamplesPerTick * sizeof (float));
 
-	if (dMixBufferL == NULL || dMixBufferR == NULL)
+	if (fMixBufferL == NULL || fMixBufferR == NULL)
 	{
 		// these two are free'd later
 		showErrorMsgBox("Out of memory!");
@@ -529,16 +532,16 @@ void audioClose(void)
 
 	audio.callbackOngoing = false;
 
-	if (dMixBufferL != NULL)
+	if (fMixBufferL != NULL)
 	{
-		free(dMixBufferL);
-		dMixBufferL = NULL;
+		free(fMixBufferL);
+		fMixBufferL = NULL;
 	}
 
-	if (dMixBufferR != NULL)
+	if (fMixBufferR != NULL)
 	{
-		free(dMixBufferR);
-		dMixBufferR = NULL;
+		free(fMixBufferR);
+		fMixBufferR = NULL;
 	}
 }
 

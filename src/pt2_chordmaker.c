@@ -25,7 +25,7 @@ typedef struct sampleMixer_t
 {
 	bool active;
 	int32_t length, pos;
-	double dDelta, dPhase, dLastPhase;
+	float fDelta, fPhase, fBlepPhase;
 } sampleMixer_t;
 
 static void sortNotes(void)
@@ -59,9 +59,9 @@ static void removeDuplicateNotes(void)
 
 static void setupMixVoice(sampleMixer_t *v, int32_t length, double dDelta)
 {
-	v->dDelta = dDelta;
-	v->length = (int32_t)ceil(length / dDelta);
+	v->fDelta = v->fBlepPhase = (float)dDelta;
 
+	v->length = (int32_t)ceil(length / dDelta);
 	if (v->length > 0)
 		v->active = true;
 }
@@ -148,8 +148,8 @@ void mixChordSample(void)
 		editor.currSample = (int8_t)i;
 	}
 
-	double *dMixData = (double *)calloc(config.maxSampleLength*2, sizeof (double));
-	if (dMixData == NULL)
+	float *fMixData = (float *)calloc(config.maxSampleLength*2, sizeof (float));
+	if (fMixData == NULL)
 	{
 		statusOutOfMemory();
 		return;
@@ -161,18 +161,19 @@ void mixChordSample(void)
 	s->text[21] = '!'; // chord sample indicator
 	s->text[22] = '\0';
 
-	memset(mixCh, 0, sizeof (mixCh)); // also clears position and frac
+	// clear mix voices (also clears position and frac etc.)
+	memset(mixCh, 0, sizeof (mixCh));
 
-	// setup mixing lengths and deltas
+	const int32_t outputNote = 24; // C-3 (16574.276Hz)
+	const double dOutputHz = (PAULA_PAL_CLK / (double)periodTable[outputNote]) * 2.0; // *2 for 2x oversampling
 
-	uint8_t finetune = s->fineTune & 0xF;
-	const double dOutputHz = ((double)PAULA_PAL_CLK / periodTable[24]) * 2.0;
-
-	const double dClk = PAULA_PAL_CLK / dOutputHz;
-	if (editor.note1 < 36) setupMixVoice(&mixCh[0], smpEnd, dClk / periodTable[(finetune * 37) + editor.note1]);
-	if (editor.note2 < 36) setupMixVoice(&mixCh[1], smpEnd, dClk / periodTable[(finetune * 37) + editor.note2]);
-	if (editor.note3 < 36) setupMixVoice(&mixCh[2], smpEnd, dClk / periodTable[(finetune * 37) + editor.note3]);
-	if (editor.note4 < 36) setupMixVoice(&mixCh[3], smpEnd, dClk / periodTable[(finetune * 37) + editor.note4]);
+	// set voice pitches
+	const double dBaseClk = PAULA_PAL_CLK / dOutputHz;
+	const int16_t *periods = &periodTable[(s->fineTune & 0xF) * 37];
+	if (editor.note1 < 36) setupMixVoice(&mixCh[0], smpEnd, dBaseClk / periods[editor.note1]);
+	if (editor.note2 < 36) setupMixVoice(&mixCh[1], smpEnd, dBaseClk / periods[editor.note2]);
+	if (editor.note3 < 36) setupMixVoice(&mixCh[2], smpEnd, dBaseClk / periods[editor.note3]);
+	if (editor.note4 < 36) setupMixVoice(&mixCh[3], smpEnd, dBaseClk / periods[editor.note4]);
 
 	// start mixing
 	memset(bleps, 0, sizeof (bleps));
@@ -183,30 +184,34 @@ void mixChordSample(void)
 
 	for (i = 0; i < MAX_NOTES; i++, v++, bSmp++)
 	{
-		if (!v->active || v->dDelta == 0.0)
+		if (!v->active || v->fDelta == 0.0f)
 			continue;
 
-		for (int32_t j = 0; j < config.maxSampleLength*2; j++)
+		for (int32_t j = 0; j < config.maxSampleLength*2; j++) // *2 for 2x oversampling
 		{
-			double dSmp = smpData[v->pos] * (1.0 / 128.0);
+			float fSmp = smpData[v->pos] * (1.0f / 128.0f);
 
-			if (dSmp != bSmp->dLastValue)
+			if (fSmp != bSmp->fLastValue)
 			{
-				if (v->dDelta > v->dLastPhase)
-					blepAdd(bSmp, v->dLastPhase / v->dDelta, bSmp->dLastValue - dSmp);
+				if (v->fDelta > v->fBlepPhase)
+				{
+					const float fBlepOffset = v->fBlepPhase / v->fDelta;
+					blepAdd(bSmp, fBlepOffset, bSmp->fLastValue - fSmp);
+				}
 
-				bSmp->dLastValue = dSmp;
+				bSmp->fLastValue = fSmp;
 			}
 
-			if (bSmp->samplesLeft > 0) dSmp = blepRun(bSmp, dSmp);
+			if (bSmp->samplesLeft > 0)
+				fSmp = blepRun(bSmp, fSmp);
 
-			dMixData[j] += dSmp;
+			fMixData[j] += fSmp;
 
-			v->dPhase += v->dDelta;
-			if (v->dPhase >= 1.0)
+			v->fPhase += v->fDelta;
+			if (v->fPhase >= 1.0f)
 			{
-				v->dPhase -= 1.0;
-				v->dLastPhase = v->dPhase;
+				v->fPhase -= 1.0f;
+				v->fBlepPhase = v->fPhase;
 
 				v->pos++;
 				if (v->pos >= smpEnd)
@@ -230,22 +235,23 @@ void mixChordSample(void)
 
 	// downsample oversampled buffer, normalize and quantize to 8-bit
 
-	downsample2xDouble(dMixData, s->length * 2);
+	downsample2xFloat(fMixData, s->length * 2);
 
-	double dAmp = 1.0;
-	const double dPeak = getDoublePeak(dMixData, s->length);
-	if (dPeak > 0.0)
-		dAmp = INT8_MAX / dPeak;
+	const float fPeak = getFloatPeak(fMixData, s->length);
+
+	float fAmp = 0.0f;
+	if (fPeak > 0.0f)
+		fAmp = INT8_MAX / fPeak;
 
 	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (i = 0; i < s->length; i++)
 	{
-		const int32_t smp = (const int32_t)round(dMixData[i] * dAmp);
-		ASSERT(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp (but just in case)
+		const int32_t smp = (const int32_t)roundf(fMixData[i] * fAmp);
+		ASSERT(smp >= -128 && smp <= 127); // shouldn't happen according to fAmp (but just in case)
 		smpPtr[i] = (int8_t)smp;
 	}
 
-	free(dMixData);
+	free(fMixData);
 
 	// clear unused sample data (if sample is not full already)
 	if (s->length < config.maxSampleLength)

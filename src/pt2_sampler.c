@@ -582,8 +582,8 @@ void highPassSample(int32_t cutOff)
 		}
 	}
 
-	double *dSampleData = (double *)malloc(s->length * sizeof (double));
-	if (dSampleData == NULL)
+	float *fSampleData = (float *)malloc(s->length * sizeof (float));
+	if (fSampleData == NULL)
 	{
 		statusOutOfMemory();
 		return;
@@ -610,27 +610,27 @@ void highPassSample(int32_t cutOff)
 		const int8_t *smpPtr = &song->sampleData[s->offset];
 		for (int32_t i = from; i < to; i++)
 		{
-			double dSmp = smpPtr[i];
-			onePoleHPFilter(&filterHi, dSmp, &dSampleData[i]);
+			float fSmp = smpPtr[i];
+			onePoleHPFilter(&filterHi, fSmp, &fSampleData[i]);
 		}
 	}
 
-	double dAmp = 1.0;
+	float fAmp = 1.0f;
 	if (editor.normalizeFiltersFlag)
 	{
-		const double dPeak = getDoublePeak(dSampleData, s->length);
-		if (dPeak > 0.0)
-			dAmp = INT8_MAX / dPeak;
+		const float fPeak = getFloatPeak(fSampleData, s->length);
+		if (fPeak > 0.0f)
+			fAmp = INT8_MAX / fPeak;
 	}
 
 	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (int32_t i = from; i < to; i++)
 	{
-		int16_t smp16 = (int16_t)round(dSampleData[i] * dAmp);
+		int16_t smp16 = (int16_t)roundf(fSampleData[i] * fAmp);
 		smpPtr[i] = (int8_t)(CLAMP(smp16, INT8_MIN, INT8_MAX));
 	}
 
-	free(dSampleData);
+	free(fSampleData);
 
 	fixSampleBeep(s);
 	displaySample();
@@ -680,8 +680,8 @@ void lowPassSample(int32_t cutOff)
 		}
 	}
 
-	double *dSampleData = (double *)malloc(s->length * sizeof (double));
-	if (dSampleData == NULL)
+	float *fSampleData = (float *)malloc(s->length * sizeof (float));
+	if (fSampleData == NULL)
 	{
 		statusOutOfMemory();
 		return;
@@ -704,7 +704,7 @@ void lowPassSample(int32_t cutOff)
 
 	// copy over sample data to double buffer
 	for (int32_t i = 0; i < s->length; i++)
-		dSampleData[i] = song->sampleData[s->offset+i];
+		fSampleData[i] = song->sampleData[s->offset+i];
 
 	clearOnePoleFilterState(&filterLo);
 	if (to <= s->length)
@@ -712,28 +712,28 @@ void lowPassSample(int32_t cutOff)
 		const int8_t *smpPtr = &song->sampleData[s->offset];
 		for (int32_t i = from; i < to; i++)
 		{ 
-			double dSmp = smpPtr[i];
-			onePoleLPFilter(&filterLo, dSmp, &dSampleData[i]);
+			float fSmp = smpPtr[i];
+			onePoleLPFilter(&filterLo, fSmp, &fSampleData[i]);
 		}
 	}
 
-	double dAmp = 1.0;
+	float fAmp = 1.0f;
 
 	if (editor.normalizeFiltersFlag)
 	{
-		const double dPeak = getDoublePeak(dSampleData, s->length);
-		if (dPeak > 0.0)
-			dAmp = INT8_MAX / dPeak;
+		const float fPeak = getFloatPeak(fSampleData, s->length);
+		if (fPeak > 0.0f)
+			fAmp = INT8_MAX / fPeak;
 	}
 
 	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (int32_t i = from; i < to; i++)
 	{
-		int16_t smp16 = (int16_t)round(dSampleData[i] * dAmp);
+		int16_t smp16 = (int16_t)roundf(fSampleData[i] * fAmp);
 		smpPtr[i] = (int8_t)(CLAMP(smp16, INT8_MIN, INT8_MAX));
 	}
 
-	free(dSampleData);
+	free(fSampleData);
 
 	fixSampleBeep(s);
 	displaySample();

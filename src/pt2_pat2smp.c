@@ -27,7 +27,8 @@ static bool pat2SmpEndReached;
 static uint8_t pat2SmpFinetune = 4, pat2SmpNote = 33; // A-3 finetune +4 (default, max safe frequency)
 static uint8_t pat2SmpStartRow = 0, pat2SmpRows = 32;
 static int32_t pat2SmpPos;
-static double *dMixBufferL, *dMixBufferR, *dPat2SmpBuf, dPat2SmpFreq, dSeconds;
+static float *fMixBufferL, *fMixBufferR, *fPat2SmpBuf;
+static double dPat2SmpFreq, dSeconds;
 
 static void pat2SmpOutputAudio(int32_t numSamples, bool outputEnable)
 {
@@ -36,17 +37,17 @@ static void pat2SmpOutputAudio(int32_t numSamples, bool outputEnable)
 	if (outputEnable && pat2SmpPos+samplesTodo > config.maxSampleLength)
 		samplesTodo = config.maxSampleLength - pat2SmpPos;
 
-	paulaGenerateSamples(dMixBufferL, dMixBufferR, samplesTodo*2); // 2x oversampling
+	paulaGenerateSamples(fMixBufferL, fMixBufferR, samplesTodo*2); // 2x oversampling
 
 	if (outputEnable)
 	{
 		for (int32_t i = 0; i < samplesTodo; i++)
 		{
 			// 2x downsampling
-			double dL = downsample2x_L(dMixBufferL[(i << 1) + 0], dMixBufferL[(i << 1) + 1]);
-			double dR = downsample2x_R(dMixBufferR[(i << 1) + 0], dMixBufferR[(i << 1) + 1]);
+			float fL = downsample2x_L(fMixBufferL[(i << 1) + 0], fMixBufferL[(i << 1) + 1]);
+			float fR = downsample2x_R(fMixBufferR[(i << 1) + 0], fMixBufferR[(i << 1) + 1]);
 
-			dPat2SmpBuf[pat2SmpPos+i] = (dL + dR) * 0.5; // stereo -> mono, normalized to -128..127 later
+			fPat2SmpBuf[pat2SmpPos+i] = (fL + fR) * 0.5f; // stereo -> mono, normalized to -128..127 later
 		}
 
 		pat2SmpPos += samplesTodo;
@@ -221,8 +222,8 @@ void pat2SmpRender(void)
 		return;
 	}
 
-	dPat2SmpBuf = (double *)malloc(config.maxSampleLength * sizeof (double));
-	if (dPat2SmpBuf == NULL)
+	fPat2SmpBuf = (float *)malloc(config.maxSampleLength * sizeof (float));
+	if (fPat2SmpBuf == NULL)
 	{
 		statusOutOfMemory();
 		return;
@@ -231,15 +232,15 @@ void pat2SmpRender(void)
 	const double dAudioFrequency = dPat2SmpFreq * 2.0; // *2 for oversampling
 	int32_t maxSamplesPerTick = (int32_t)ceil(dAudioFrequency / (MIN_BPM / 2.5)) + 1;
 
-	dMixBufferL = (double *)malloc(maxSamplesPerTick * sizeof (double));
-	dMixBufferR = (double *)malloc(maxSamplesPerTick * sizeof (double));
+	fMixBufferL = (float *)malloc(maxSamplesPerTick * sizeof (float));
+	fMixBufferR = (float *)malloc(maxSamplesPerTick * sizeof (float));
 
-	if (dMixBufferL == NULL || dMixBufferR == NULL)
+	if (fMixBufferL == NULL || fMixBufferR == NULL)
 	{
-		free(dPat2SmpBuf);
+		free(fPat2SmpBuf);
 
-		if (dMixBufferL != NULL) free(dMixBufferL);
-		if (dMixBufferR != NULL) free(dMixBufferR);
+		if (fMixBufferL != NULL) free(fMixBufferL);
+		if (fMixBufferR != NULL) free(fMixBufferR);
 
 		statusOutOfMemory();
 		return;
@@ -296,8 +297,8 @@ void pat2SmpRender(void)
 	}
 	editor.pat2SmpOngoing = false;
 
-	free(dMixBufferL);
-	free(dMixBufferR);
+	free(fMixBufferL);
+	free(fMixBufferR);
 
 	song->currRow = song->row = oldRow; // set back old row
 
@@ -312,27 +313,21 @@ void pat2SmpRender(void)
 
 	// normalize and quantize to 8-bit
 
-	const double dPeak = getDoublePeak(dPat2SmpBuf, pat2SmpPos);
+	const float fPeak = getFloatPeak(fPat2SmpBuf, pat2SmpPos);
 
-	double dAmp = INT8_MAX;
-	if (dPeak > 0.0)
-		dAmp = INT8_MAX / dPeak;
+	float fAmp = 0.0f;
+	if (fPeak > 0.0f)
+		fAmp = INT8_MAX / fPeak;
 
 	int8_t *smpPtr = &song->sampleData[s->offset];
 	for (int32_t i = 0; i < pat2SmpPos; i++)
 	{
-		double dSmp = dPat2SmpBuf[i] * dAmp;
-
-		// faster than calling round()
-		     if (dSmp < 0.0) dSmp -= 0.5;
-		else if (dSmp > 0.0) dSmp += 0.5;
-
-		int32_t smp = (int32_t)dSmp;
-		ASSERT(smp >= -128 && smp <= 127); // shouldn't happen according to dAmp
+		const int32_t smp = (const int32_t)roundf(fPat2SmpBuf[i] * fAmp);
+		ASSERT(smp >= -128 && smp <= 127); // shouldn't happen according to fAmp (but just in case)
 		smpPtr[i] = (int8_t)smp;
 	}
 
-	free(dPat2SmpBuf);
+	free(fPat2SmpBuf);
 
 	int32_t newSampleLength = (pat2SmpPos + 1) & ~1;
 	if (newSampleLength > config.maxSampleLength)

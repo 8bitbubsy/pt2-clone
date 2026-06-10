@@ -34,10 +34,10 @@ enum
 #define SINC_OVERSAMPLING_BITS 8 /* log2(SINC_OVERSAMPLING) */
 
 #define CENTER_TAP ((SINC_TAPS/2)-1)
-#define DELTA_FRAC_BITS 32
-#define DELTA_FRAC_SCALE (1ULL << DELTA_FRAC_BITS)
-#define DELTA_FRAC_MASK (DELTA_FRAC_SCALE-1)
-#define INTRP_PHASE_SHIFT (DELTA_FRAC_BITS-SINC_OVERSAMPLING_BITS)
+#define SMP_DELTA_FRAC_BITS 32
+#define SMP_DELTA_FRAC_SCALE (1ULL << SMP_DELTA_FRAC_BITS)
+#define SMP_DELTA_FRAC_MASK (SMP_DELTA_FRAC_SCALE-1)
+#define INTRP_PHASE_SHIFT (SMP_DELTA_FRAC_BITS-SINC_OVERSAMPLING_BITS)
 #define INTRP_PHASE_SCALE (1L << INTRP_PHASE_SHIFT)
 #define INTRP_PHASE_MASK (INTRP_PHASE_SCALE-1)
 #define SAMPLE_PREVIEW_WITDH 194
@@ -625,7 +625,7 @@ static int32_t resampleSamplingBuffer(void)
 		fSamplingBuffer[bytesSampled+i] = fSamplingBuffer[bytesSampled-1];
 	}
 	
-	const uint64_t delta = (uint64_t)round(DELTA_FRAC_SCALE / dResamplingRatio);
+	const uint64_t delta = (uint64_t)round(SMP_DELTA_FRAC_SCALE / dResamplingRatio);
 	uint64_t frac = 0;
 
 	float fSmpPeak = 0.0f;
@@ -649,8 +649,8 @@ static int32_t resampleSamplingBuffer(void)
 		// -------------------
 
 		frac += delta;
-		fSmpData += (uint32_t)(frac >> DELTA_FRAC_BITS);
-		frac &= DELTA_FRAC_MASK;
+		fSmpData += (uint32_t)(frac >> SMP_DELTA_FRAC_BITS);
+		frac &= SMP_DELTA_FRAC_MASK;
 	}
 
 	// normalize and quantize to 8-bit integer

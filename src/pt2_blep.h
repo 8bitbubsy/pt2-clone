@@ -3,7 +3,6 @@
 #pragma once
 
 #include <stdint.h>
-#include "pt2_paula.h" // PAULA_VOICES
 
 /* aciddose:
 ** information on blep variables
@@ -29,8 +28,8 @@
 typedef struct blep_t
 {
 	int32_t index, samplesLeft;
-	double dBuffer[BLEP_RNS+1], dLastValue;
+	float fBuffer[BLEP_RNS+1], fLastValue;
 } blep_t;
 
-void blepAdd(blep_t *b, const double dOffset, const double dAmplitude);
-double blepRun(blep_t *b, const double dInput);
+void blepAdd(blep_t *b, const float fOffset, const float fAmplitude);
+float blepRun(blep_t *b, const float fInput);
