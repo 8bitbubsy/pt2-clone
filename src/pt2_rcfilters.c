@@ -68,12 +68,12 @@ void setupTwoPoleFilter(double audioRate, double cutOff, double qFactor, twoPole
 		cutOff = (audioRate/2.0) - SMALL_NUMBER;
 
 	const double a = 1.0 / tan((PI * cutOff) / audioRate);
-	const double b = 1.0 / qFactor;
+	const double r = 1.0 / qFactor; // resonance
 
-	const double a1 = 1.0 / (1.0 + b * a + a * a);
-	const double a2 = (2.0 * a1);
+	const double a1 = 1.0 / (1.0 + r * a + a * a);
+	const double a2 = 2.0 * a1;
 	const double b1 = 2.0 * (1.0 - a*a) * a1;
-	const double b2 = (1.0 - b * a + a * a) * a1;
+	const double b2 = (1.0 - r * a + a * a) * a1;
 
 	f->a1 = (float)a1;
 	f->a2 = (float)a2;
