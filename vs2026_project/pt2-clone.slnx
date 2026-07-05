@@ -1,0 +1,7 @@
+﻿<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="pt2-clone/pt2-clone.vcxproj" Id="6c633792-f87d-4f1c-ab02-c25202ffede6" />
+</Solution>

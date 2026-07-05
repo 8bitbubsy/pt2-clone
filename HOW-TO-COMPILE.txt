@@ -18,11 +18,11 @@ Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
     program executable, as those will have first load priority.
 
 
-== COMPILING ON WINDOWS 7 SP1 OR NEWER ==
- 1. Download Visual Studio Community 2019 (it's free). EDIT: Hard to find now!
+== COMPILING ON WINDOWS 10 OR NEWER ==
+ 1. Download Visual Studio 2026 (it's free)
  2. Start the installer and select the "Desktop development with C++" package
  3. Install and wait for it to finish...
- 4. Open "pt2-clone\vs2019_project\pt2-clone.sln"
+ 4. Open "pt2-clone\vs2026_project\pt2-clone.slnx"
  5. If you're missing the Windows 10 SDK, then you need to change the Windows
     SDK version used in the project settings for both debug and release x86/x64.
  6. Compile (make sure it's in Release mode. Also note x86/x64)
