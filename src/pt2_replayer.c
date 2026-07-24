@@ -486,6 +486,9 @@ static void funkIt(moduleChannel_t *ch)
 
 static void positionJump(moduleChannel_t *ch)
 {
+	if (editor.stepPlayEnabled)
+		return;
+
 	// original PT doesn't do this check, but we have to
 	if (editor.playMode != PLAY_MODE_PATTERN || (editor.currMode == MODE_RECORD && editor.recordMode != RECORD_PATT))
 		modPos = (ch->n_cmd & 0xFF) - 1; // B00 results in -1, but it safely jumps to order 0
@@ -503,6 +506,9 @@ static void volumeChange(moduleChannel_t *ch)
 
 static void patternBreak(moduleChannel_t *ch)
 {
+	if (editor.stepPlayEnabled)
+		return;
+
 	pBreakPosition = (((ch->n_cmd & 0xF0) >> 4) * 10) + (ch->n_cmd & 0x0F);
 	if ((uint8_t)pBreakPosition > 63)
 		pBreakPosition = 0;
