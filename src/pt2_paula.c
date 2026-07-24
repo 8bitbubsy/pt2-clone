@@ -211,7 +211,7 @@ static void audxvol(int32_t ch, uint16_t vol)
 		realVol = 64;
 
 	// multiplying sample point by this also scales the sample from -128..127 -> -1.000 .. ~0.992
-	paula[ch].fStoredVol = realVol * (1.0f / (128.0f * 64.0f));
+	paula[ch].fStoredVol = (float)realVol * (1.0f / (128.0f * 64.0f));
 }
 
 static void audxlen(int32_t ch, uint16_t len)
