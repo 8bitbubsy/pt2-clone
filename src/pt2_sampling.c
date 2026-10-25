@@ -72,7 +72,7 @@ static inline double besselI0(double z)
 		s += ds;
 		d += 2.0;
 	}
-	while (ds > s*(1E-12));
+	while (ds > s*(1E-11));
 
 	return s;
 }
@@ -92,36 +92,32 @@ static inline double sinc(double x, double cutoff)
 
 static bool calcPolyphaseSincLUT(double sincCutoff)
 {
-	fSincLUT = (float *)malloc(SINC_TAPS * (SINC_OVERSAMPLING+1) * sizeof (float));
+	fSincLUT = (float *)malloc((SINC_OVERSAMPLING+1) * SINC_TAPS * sizeof (float));
 	if (fSincLUT == NULL)
 	{
 		showErrorMsgBox("Out of memory!");
 		return false;
 	}
 
-	const double kaiserBeta = 9.62046; // stopband attenuation of ~96dB
+	const double kaiserBeta = 10.1326; // stopband attenuation of ~100.6dB
 	const double besselI0BetaMul = 1.0 / besselI0(kaiserBeta);
 
-	for (int32_t i = 0; i < SINC_TAPS * SINC_OVERSAMPLING; i++)
+	float *fOutPtr = fSincLUT;
+	for (int32_t i = 0; i < SINC_OVERSAMPLING * SINC_TAPS; i++)
 	{
-		const double x = i * (1.0 / SINC_OVERSAMPLING);
+		const double x = ((i & (SINC_TAPS-1)) - ((SINC_TAPS / 2) - 1)) - ((i >> SINC_TAPS_BITS) * (1.0 / SINC_OVERSAMPLING));
 
 		// Kaiser-Bessel window
-		const double n = (x * (2.0 / SINC_TAPS)) - 1.0;
+		const double n = x * (1.0 / (SINC_TAPS/2));
 		const double window = besselI0(kaiserBeta * sqrt(1.0 - n * n)) * besselI0BetaMul;
 
-		const double wsinc = sinc(x - (double)(SINC_TAPS / 2), sincCutoff) * window;
-
-		// re-arrange for faster logic when in use
-		const int32_t point = i >> SINC_OVERSAMPLING_BITS;
-		const int32_t phase = i & (SINC_OVERSAMPLING-1);
-		fSincLUT[(phase << SINC_TAPS_BITS) + ((SINC_TAPS-1) - point)] = (float)wsinc;
+		const double wsinc = sinc(x, sincCutoff) * window;
+		*fOutPtr++ = (float)wsinc;
 	}
 
-	// store inverted wrap-around taps after end of LUT (for phase interpolation)
-	float *fEnd = &fSincLUT[SINC_TAPS * SINC_OVERSAMPLING];
+	// store inverted copy of first phase after end of LUT (for interpolation look-up)
 	for (int32_t i = 0; i < SINC_TAPS; i++)
-		fEnd[i] = fSincLUT[(SINC_TAPS-1) - i];
+		*fOutPtr++ = fSincLUT[(SINC_TAPS-1) - i];
 
 	return true;
 }
@@ -579,27 +575,24 @@ static void startSampling(void)
 	setStatusMessage("SAMPLING ...", NO_CARRY);
 }
 
+// it may look like we go out of bounds in fSinc, but we have an extra phase after LUT
 static float sincInterpolation(const float *fSmpData, const uint32_t frac)
 {
-	const uint32_t lutPhase = frac >> INTRP_PHASE_SHIFT;
-	const float fIntrpFrac = (frac & INTRP_PHASE_MASK) * (1.0f / INTRP_PHASE_SCALE);
+	const uint32_t phaseInt = frac >> INTRP_PHASE_SHIFT;
+	const int32_t phaseFrac = frac & INTRP_PHASE_MASK;
+	const float fPhaseFrac = phaseFrac * (float)(1.0 / INTRP_PHASE_SCALE);
 
-	// it may look like we go out of bounds for fSinc_2, but we have an extra phase after LUT
-	const float *fSinc_1 = fSincLUT + ( lutPhase    << SINC_TAPS_BITS);
-	const float *fSinc_2 = fSincLUT + ((lutPhase+1) << SINC_TAPS_BITS);
+	const float *fSinc = fSincLUT + (phaseInt << SINC_TAPS_BITS);
 
-	float fSum = 0.0f;
+	float y1 = 0.0f, y2 = 0.0f;
 	for (int32_t i = 0; i < SINC_TAPS; i++)
 	{
-		const float fSample = fSmpData[i];
-
-		// do linear interpolation between phases
-		const float y1 = fSinc_1[i];
-		const float y2 = fSinc_2[i];
-		fSum += fSample * (y1 + ((y2 - y1) * fIntrpFrac));
+		y1 += fSmpData[i] * fSinc[i];
+		y2 += fSmpData[i] * fSinc[SINC_TAPS+i];
 	}
 
-	return fSum;
+	// do linear interpolation between points
+	return y1 + ((y2 - y1) * fPhaseFrac);
 }
 
 static int32_t resampleSamplingBuffer(void)
