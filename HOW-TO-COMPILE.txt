@@ -40,3 +40,30 @@ Compiled Windows/macOS binaries are always available at 16-bits.org/pt2.php
     (or ~/.protracker/).
     Make sure there are no config files in the same path as the
     program executable, as those will have first load priority.
+
+== COMPILING ON macOS 26.7 OR NEWER WITH HOMEBREW (APPLE SILICON) ==
+
+This method uses SDL2 installed through Homebrew instead of SDL2.framework.
+It builds a native ARM64 executable using CMake.
+
+ 1. Install the required dependencies:
+    brew install cmake sdl2
+
+ 2. Configure the project (folder: "pt2-clone"):
+    cmake -S . -B build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_OSX_ARCHITECTURES=arm64 \
+      -DCMAKE_PREFIX_PATH="$(brew --prefix sdl2)"
+
+ 3. Compile:
+    cmake --build build --parallel "$(sysctl -n hw.ncpu)"
+
+ 4. Run:
+    ./release/other/pt2-clone
+
+NOTE:
+ - This method does not require SDL2.framework in /Library/Frameworks/.
+ - The resulting executable is native to Apple Silicon (ARM64).
+ - SDL2 must be installed through Homebrew.
+ - The executable depends on the Homebrew SDL2 library.
+ - This method does not produce a standalone macOS .app bundle.
