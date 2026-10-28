@@ -36,6 +36,9 @@ BINARY_DEST="${APP_PATH}/Contents/MacOS/pt2-clone"
 RESOURCES_DIR="${APP_PATH}/Contents/Resources"
 PLIST_PATH="${APP_PATH}/Contents/Info.plist"
 
+ICON_SOURCE="${ROOT_DIR}/release/macos/pt2-clone-macos.app/Contents/Resources/pt2-clone-macos.icns"
+ICON_DEST="${RESOURCES_DIR}/pt2-clone-macos.icns"
+
 # ------------------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------------------
@@ -70,6 +73,9 @@ log "Checking build environment..."
 [[ -x "$BINARY_SOURCE" ]] ||
     die "Source executable is not executable."
 
+[[ -f "$ICON_SOURCE" ]] ||
+    die "Missing official application icon: $ICON_SOURCE"
+
 file "$BINARY_SOURCE"
 
 # ------------------------------------------------------------------------------
@@ -88,6 +94,7 @@ cp "$BINARY_SOURCE" "$BINARY_DEST"
 chmod 755 "$BINARY_DEST"
 
 cp "$CONFIG_SOURCE" "$RESOURCES_DIR/"
+cp "$ICON_SOURCE" "$ICON_DEST"
 
 # ------------------------------------------------------------------------------
 # Generate Info.plist
@@ -124,6 +131,9 @@ cat > "$PLIST_PATH" <<EOF
 
     <key>NSHighResolutionCapable</key>
     <true/>
+
+    <key>CFBundleIconFile</key>
+    <string>pt2-clone-macos.icns</string>
 </dict>
 </plist>
 EOF
