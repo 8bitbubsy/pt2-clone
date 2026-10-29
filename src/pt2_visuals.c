@@ -554,23 +554,11 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 	}
 
 	// playback timer
-
-	uint32_t seconds = editor.playbackSeconds;
-	if (seconds <= 5999) // below 100 minutes (99:59 is max for the UI)
-	{
-		const uint32_t MI_TimeM = seconds / 60;
-		const uint32_t MI_TimeS = seconds - (MI_TimeM * 60);
-
-		// xx:xx
-		printTwoDecimalsBg(272, 102, MI_TimeM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		printTwoDecimalsBg(296, 102, MI_TimeS, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-	}
-	else
-	{
-		// 99:59
-		printTwoDecimalsBg(272, 102, 99, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-		printTwoDecimalsBg(296, 102, 59, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
-	}
+	uint32_t seconds = (int32_t)editor.dPlaybackSeconds;
+	const uint32_t MI_TimeM = seconds / 60;
+	const uint32_t MI_TimeS = seconds - (MI_TimeM * 60);
+	printTwoDecimalsBg(272, 102, MI_TimeM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
+	printTwoDecimalsBg(296, 102, MI_TimeS, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
 
 	if (ui.updateSongName)
 	{

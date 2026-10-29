@@ -1240,25 +1240,18 @@ static void nextPosition(void)
 	}
 }
 
+// (the timer is not counting in "play pattern" mode)
 static void increasePlaybackTimer(void)
 {
-	// (the timer is not counting in "play pattern" mode)
 	if (editor.playMode != PLAY_MODE_PATTERN && modBPM >= MIN_BPM && modBPM <= MAX_BPM)
 	{
 		if (editor.timingMode == TEMPO_MODE_CIA)
-			editor.playbackSecondsFrac += tickDuration31fp[modBPM-MIN_BPM];
+			editor.dPlaybackSeconds += dSongTickDuration[modBPM-MIN_BPM];
 		else
-			editor.playbackSecondsFrac += tickDuration31fp[(MAX_BPM-MIN_BPM)+1]; // vblank tempo mode
+			editor.dPlaybackSeconds += dSongTickDuration[(MAX_BPM-MIN_BPM)+1]; // vblank tempo mode
 
-		if (editor.playbackSecondsFrac > INT32_MAX)
-		{
-			editor.playbackSecondsFrac &= INT32_MAX;
-
-			if (editor.playbackSeconds >= (99*60)+59) // wrap around 99:59 -> 00:00
-				editor.playbackSeconds = 0;
-			else
-				editor.playbackSeconds++;
-		}
+		if (editor.dPlaybackSeconds >= (99.0*60.0)+60.0) // wrap around 99:59 -> 00:00
+			editor.dPlaybackSeconds = 0.0;
 	}
 }
 
@@ -1723,7 +1716,7 @@ void modPlay(int16_t patt, int16_t pos, int8_t row)
 
 	// don't reset playback counter in "play/rec pattern" mode
 	if (editor.playMode != PLAY_MODE_PATTERN)
-		editor.playbackSeconds = editor.playbackSecondsFrac = 0;
+		editor.dPlaybackSeconds = 0.0;
 
 	audio.tickSampleCounter = 0; // zero tick sample counter so that it will instantly initiate a tick
 	audio.tickSampleCounterFrac = 0;
@@ -1762,7 +1755,7 @@ void clearSong(void)
 	editor.f9Pos = 48;
 	editor.f10Pos = 63;
 
-	editor.playbackSeconds = editor.playbackSecondsFrac = 0;
+	editor.dPlaybackSeconds = 0.0;
 	editor.metroFlag = false;
 	editor.currSample = 0;
 	editor.editMoveAdd = 1;
