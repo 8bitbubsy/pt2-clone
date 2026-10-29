@@ -77,20 +77,20 @@ static const float fMinBlepData[256+1] = // zero-crossings = 16, oversampling = 
 // linear interpolation macro
 #define LERP(p1, p2, frac) ((p1) + (((p2) - (p1)) * (frac)))
 
-void blepAdd(blep_t *b, const float fOffset, const float fAmplitude)
+void blepAdd(blep_t *b, const double dOffset, const float fAmplitude)
 {
-	ASSERT(fOffset >= 0.0f && fOffset < 1.0f);
+	ASSERT(dOffset >= 0.0 && dOffset < 1.0);
 
-	float f = fOffset * BLEP_SP;
+	double dPhase = dOffset * BLEP_SP;
+	const int32_t phaseInt = (int32_t)dPhase;
+	const float fPhaseFrac = (float)(dPhase - phaseInt);
 
-	const int32_t fInt = (int32_t)f; // get integer part of f
-	const float *fBlepSrc = fMinBlepData + fInt;
-	f -= fInt; // remove integer part from f
+	const float *fBlepSrc = fMinBlepData + phaseInt;
 
 	int32_t i = b->index;
 	for (int32_t n = 0; n < BLEP_NS; n++)
 	{
-		b->fBuffer[i] += fAmplitude * LERP(fBlepSrc[0], fBlepSrc[1], f);
+		b->fBuffer[i] += fAmplitude * LERP(fBlepSrc[0], fBlepSrc[1], fPhaseFrac);
 		fBlepSrc += BLEP_SP;
 
 		i = (i + 1) & BLEP_RNS;

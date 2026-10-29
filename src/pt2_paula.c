@@ -26,19 +26,18 @@ typedef struct voice_t
 	uint16_t lengthCounter; // current length
 	int32_t sampleCounter; // how many bytes left in AUD_DAT
 	float fSample; // currently held sample point (multiplied by volume)
-	float fDelta, fPhase;
-	float fBlepDelta, fBlepPhase;
+	double dDelta, dPhase, dBlepDelta, dBlepPhase;
 
 	// registers modified by Paula functions
 	const int8_t *storedLocation; // data pointer
 	uint16_t storedLength;
-	float fStoredVol, fStoredDelta;
+	float fStoredVol;
+	double dStoredDelta;
 } paulaVoice_t;
 
 static bool useLEDFilter, useLowpassFilter, useHighpassFilter;
 static int8_t nullSample[0xFFFF*2]; // buffer for NULL data pointer
-static float fPeriodToDeltaDiv;
-static double dPaulaOutputFreq;
+static double dPeriodToDeltaDiv, dPaulaOutputFreq;
 static blep_t blep[PAULA_VOICES];
 static onePoleFilter_t filterLo, filterHi;
 static twoPoleFilter_t filterLED;
@@ -48,7 +47,7 @@ void paulaSetup(double dOutputFreq, uint32_t amigaModel)
 {
 	ASSERT(dOutputFreq != 0.0);
 	dPaulaOutputFreq = dOutputFreq;
-	fPeriodToDeltaDiv = (float)(PAULA_PAL_CLK / dPaulaOutputFreq);
+	dPeriodToDeltaDiv = PAULA_PAL_CLK / dPaulaOutputFreq;
 
 	clearBlepState();
 
@@ -129,11 +128,11 @@ int8_t *paulaGetNullSamplePtr(void)
 
 static inline void refetchPeriod(paulaVoice_t *v) // Paula stage
 {
-	v->fBlepPhase = v->fPhase;
-	v->fBlepDelta = v->fDelta;
+	v->dBlepPhase = v->dPhase;
+	v->dBlepDelta = v->dDelta;
 
 	// Paula only updates period (delta) during period refetching (this stage)
-	v->fDelta = v->fStoredDelta;
+	v->dDelta = v->dStoredDelta;
 
 	v->nextSampleStage = true;
 }
@@ -172,10 +171,10 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b) // Paula stage
 	// fill BLEP buffer if the new sample differs from the old one
 	if (v->fSample != b->fLastValue)
 	{
-		if (v->fBlepDelta > v->fBlepPhase) // also checks if v->fBlepDelta > 0.0f
+		if (v->dBlepDelta > v->dBlepPhase) // also checks if v->fBlepDelta > 0.0f
 		{
-			const float fBlepOffset = v->fBlepPhase / v->fBlepDelta;
-			blepAdd(b, fBlepOffset, b->fLastValue - v->fSample);
+			const double dBlepOffset = v->dBlepPhase / v->dBlepDelta;
+			blepAdd(b, dBlepOffset, b->fLastValue - v->fSample);
 		}
 
 		b->fLastValue = v->fSample;
@@ -197,11 +196,11 @@ static void audxper(int32_t ch, uint16_t period)
 		realPeriod = 113; // close to what happens on real Amiga (and low-limit needed for BLEP synthesis)
 
 	// to be read on next sampling step (or on DMA trigger)
-	v->fStoredDelta = fPeriodToDeltaDiv / (float)realPeriod;
+	v->dStoredDelta = dPeriodToDeltaDiv / (double)realPeriod;
 
 	// BLEP synthesis edge-case
-	if (v->fBlepDelta == 0.0f)
-		v->fBlepDelta = v->fDelta;
+	if (v->dBlepDelta == 0.0)
+		v->dBlepDelta = v->dDelta;
 }
 
 static void audxvol(int32_t ch, uint16_t vol)
@@ -244,7 +243,7 @@ static void startDMA(int32_t ch)
 	refetchPeriod(v);
 
 	// kludge: must be cleared *after* refetchPeriod()
-	v->fPhase = 0.0f;
+	v->dPhase = 0.0;
 
 	v->active = true;
 }
@@ -394,10 +393,10 @@ void paulaGenerateSamples(float *fOutL, float *fOutR, int32_t numSamples)
 
 			fMixBuffer[j] += fSample;
 
-			v->fPhase += v->fDelta;
-			if (v->fPhase >= 1.0f)
+			v->dPhase += v->dDelta;
+			if (v->dPhase >= 1.0)
 			{
-				v->fPhase -= 1.0f;
+				v->dPhase -= 1.0;
 				refetchPeriod(v);
 			}
 		}

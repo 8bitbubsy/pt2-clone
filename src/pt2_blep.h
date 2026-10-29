@@ -31,5 +31,5 @@ typedef struct blep_t
 	float fBuffer[BLEP_RNS+1], fLastValue;
 } blep_t;
 
-void blepAdd(blep_t *b, const float fOffset, const float fAmplitude);
+void blepAdd(blep_t *b, const double dOffset, const float fAmplitude);
 float blepRun(blep_t *b, const float fInput);
