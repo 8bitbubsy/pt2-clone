@@ -171,7 +171,7 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b) // Paula stage
 	// fill BLEP buffer if the new sample differs from the old one
 	if (v->fSample != b->fLastValue)
 	{
-		if (v->dBlepDelta > v->dBlepPhase) // also checks if v->fBlepDelta > 0.0f
+		if (v->dBlepDelta > v->dBlepPhase) // also checks if v->dBlepDelta > 0.0
 		{
 			const double dBlepOffset = v->dBlepPhase / v->dBlepDelta;
 			blepAdd(b, dBlepOffset, b->fLastValue - v->fSample);
