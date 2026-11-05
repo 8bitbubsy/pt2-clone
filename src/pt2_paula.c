@@ -26,13 +26,13 @@ typedef struct voice_t
 	uint16_t lengthCounter; // current length
 	int32_t sampleCounter; // how many bytes left in AUD_DAT
 	float fSample; // currently held sample point (multiplied by volume)
-	double dDelta, dPhase, dBlepDelta, dBlepPhase;
+	double dDelta, dInvDelta, dPhase, dBlepDelta, dBlepInvDelta, dBlepPhase;
 
 	// registers modified by Paula functions
 	const int8_t *storedLocation; // data pointer
 	uint16_t storedLength;
 	float fStoredVol;
-	double dStoredDelta;
+	double dStoredDelta, dStoredInvDelta;
 } paulaVoice_t;
 
 static bool useLEDFilter, useLowpassFilter, useHighpassFilter;
@@ -130,9 +130,11 @@ static inline void refetchPeriod(paulaVoice_t *v) // Paula stage
 {
 	v->dBlepPhase = v->dPhase;
 	v->dBlepDelta = v->dDelta;
+	v->dBlepInvDelta = v->dInvDelta;
 
 	// Paula only updates period (delta) during period refetching (this stage)
 	v->dDelta = v->dStoredDelta;
+	v->dInvDelta = v->dStoredInvDelta;
 
 	v->nextSampleStage = true;
 }
@@ -173,7 +175,7 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b) // Paula stage
 	{
 		if (v->dBlepDelta > v->dBlepPhase) // also checks if v->dBlepDelta > 0.0
 		{
-			const double dBlepOffset = v->dBlepPhase / v->dBlepDelta;
+			const double dBlepOffset = v->dBlepPhase * v->dBlepInvDelta; // same as: dBlepPhase / dBlepDelta
 			blepAdd(b, dBlepOffset, b->fLastValue - v->fSample);
 		}
 
@@ -195,12 +197,16 @@ static void audxper(int32_t ch, uint16_t period)
 	else if (realPeriod < 113)
 		realPeriod = 113; // close to what happens on real Amiga (and low-limit needed for BLEP synthesis)
 
-	// to be read on next sampling step (or on DMA trigger)
+	// these are to be read on the next sampling step (or on DMA trigger)
 	v->dStoredDelta = dPeriodToDeltaDiv / (double)realPeriod;
+	v->dStoredInvDelta = 1.0 / v->dStoredDelta; // to prevent division in inner mixing loop (BLEP)
 
 	// BLEP synthesis edge-case
 	if (v->dBlepDelta == 0.0)
+	{
 		v->dBlepDelta = v->dDelta;
+		v->dBlepInvDelta = v->dInvDelta;
+	}
 }
 
 static void audxvol(int32_t ch, uint16_t vol)
