@@ -168,7 +168,8 @@ static inline void nextSample(paulaVoice_t *v, blep_t *b) // Paula stage
 	** and we don't emulate volume PWM anyway, so we can
 	** pre-multiply by volume here.
 	*/
-	v->fSample = v->AUD_DAT[0] * v->fStoredVol; // -128..127 * 0.0f .. 1.0f
+	const int32_t sample = v->AUD_DAT[0];
+	v->fSample = sample * v->fStoredVol; // -128..127 * 0.0f .. 1.0f
 
 	// fill BLEP buffer if the new sample differs from the old one
 	if (v->fSample != b->fLastValue)
@@ -211,12 +212,12 @@ static void audxper(int32_t ch, uint16_t period)
 
 static void audxvol(int32_t ch, uint16_t vol)
 {
-	int32_t realVol = vol & 127;
-	if (realVol > 64)
-		realVol = 64;
+	int32_t useVol = vol & 127;
+	if (useVol > 64)
+		useVol = 64;
 
 	// multiplying sample point by this also scales the sample from -128..127 -> -1.000 .. ~0.992
-	paula[ch].fStoredVol = (float)realVol * (1.0f / (128.0f * 64.0f));
+	paula[ch].fStoredVol = (float)useVol * (float)(1.0 / (128.0 * 64.0));
 }
 
 static void audxlen(int32_t ch, uint16_t len)
