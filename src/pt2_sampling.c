@@ -575,20 +575,20 @@ static void startSampling(void)
 	setStatusMessage("SAMPLING ...", NO_CARRY);
 }
 
-// it may look like we go out of bounds in fSinc, but we have an extra phase after LUT
 static float sincInterpolation(const float *fSmpData, const uint32_t frac)
 {
 	const uint32_t phaseInt = frac >> INTRP_PHASE_SHIFT;
 	const int32_t phaseFrac = frac & INTRP_PHASE_MASK;
-	const float fPhaseFrac = phaseFrac * (float)(1.0 / INTRP_PHASE_SCALE);
+	const float fPhaseFrac = (float)phaseFrac * (float)(1.0 / INTRP_PHASE_SCALE);
 
+	// it may look like we go out of bounds in fSinc, but we have an extra phase after LUT
 	const float *fSinc = fSincLUT + (phaseInt << SINC_TAPS_BITS);
 
 	float y1 = 0.0f, y2 = 0.0f;
 	for (int32_t i = 0; i < SINC_TAPS; i++)
 	{
 		y1 += fSmpData[i] * fSinc[i];
-		y2 += fSmpData[i] * fSinc[SINC_TAPS+i];
+		y2 += fSmpData[i] * fSinc[SINC_TAPS+i]; // next phase
 	}
 
 	// do linear interpolation between points
