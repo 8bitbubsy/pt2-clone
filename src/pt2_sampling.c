@@ -55,7 +55,7 @@ static int32_t samplingMode = SAMPLE_MIX, inputFrequency, roundedOutputFrequency
 static int32_t numAudioInputDevs, audioInputDevListOffset, selectedDev;
 static int32_t bytesSampled, maxSamplingLength, inputBufferSize;
 static float *fSincLUT, *fSamplingBuffer, *fSamplingBufferOrig;
-static double dOutputFrequency, dResamplingRatio;
+static double dOutputFrequency, dResamplingRatio, dTapBuffer[SINC_TAPS];
 static SDL_AudioDeviceID recordDev;
 
 static void listAudioDevices(void);
@@ -102,22 +102,36 @@ static bool calcPolyphaseSincLUT(double sincCutoff)
 	const double kaiserBeta = 10.1326; // stopband attenuation of ~100.6dB
 	const double besselI0BetaMul = 1.0 / besselI0(kaiserBeta);
 
-	float *fOutPtr = fSincLUT;
-	for (int32_t i = 0; i < SINC_OVERSAMPLING * SINC_TAPS; i++)
+#define KAISER_XMUL (1.0 / (SINC_TAPS / 2))
+
+	float *fLUTPtr = fSincLUT;
+	for (int32_t phase = 0; phase < SINC_OVERSAMPLING; phase++)
 	{
-		const double x = ((i & (SINC_TAPS-1)) - ((SINC_TAPS / 2) - 1)) - ((i >> SINC_TAPS_BITS) * (1.0 / SINC_OVERSAMPLING));
+		const double dPhase = phase * (1.0 / SINC_OVERSAMPLING);
 
-		// Kaiser-Bessel window
-		const double n = x * (1.0 / (SINC_TAPS/2));
-		const double window = besselI0(kaiserBeta * sqrt(1.0 - n * n)) * besselI0BetaMul;
+		double dTapSum = 0.0;
+		for (int32_t tap = 0; tap < SINC_TAPS; tap++)
+		{
+			const double x = (tap - CENTER_TAP) - dPhase;
 
-		const double wsinc = sinc(x, sincCutoff) * window;
-		*fOutPtr++ = (float)wsinc;
+			// Kaiser-Bessel window
+			const double n = x * KAISER_XMUL;
+			const double dWindow = besselI0(kaiserBeta * sqrt(1.0 - n * n)) * besselI0BetaMul;
+
+			const double dWSinc = sinc(x, sincCutoff) * dWindow;
+			dTapBuffer[tap] = dWSinc;
+			dTapSum += dWSinc;
+		}
+
+		// normalize for unity gain before storing taps
+		const double dTapScale = 1.0 / dTapSum;
+		for (int32_t tap = 0; tap < SINC_TAPS; tap++)
+			*fLUTPtr++ = (float)(dTapBuffer[tap] * dTapScale);
 	}
 
 	// store inverted copy of first phase after end of LUT (for interpolation look-up)
 	for (int32_t i = 0; i < SINC_TAPS; i++)
-		*fOutPtr++ = fSincLUT[(SINC_TAPS-1) - i];
+		*fLUTPtr++ = fSincLUT[(SINC_TAPS-1) - i];
 
 	return true;
 }
