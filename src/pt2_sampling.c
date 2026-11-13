@@ -85,7 +85,7 @@ static inline double sinc(double x, double cutoff)
 	}
 	else
 	{
-		x *= PI;
+		x *= MY_PI;
 		return sin(x * cutoff) / x;
 	}
 }

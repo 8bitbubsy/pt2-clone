@@ -63,9 +63,7 @@
 */
 #define SCOPE_HZ 64
 
-#ifndef PI
-#define PI 3.14159265358979323846264338327950288
-#endif
+#define MY_PI 3.14159265358979323846264338327950288
 
 #define FONT_CHAR_W 8 // actual data length is 7, includes right spacing (1px column)
 #define FONT_CHAR_H 5
