@@ -1360,7 +1360,7 @@ bool tickReplayer(void)
 	{
 		increasePlaybackTimer();
 		song->tick++;
-	}		
+	}
 
 	bool readNewNote = false;
 	if ((uint32_t)song->tick >= (uint32_t)song->speed)
