@@ -41,7 +41,11 @@ enum
 #define INTRP_PHASE_SCALE (1L << INTRP_PHASE_SHIFT)
 #define INTRP_PHASE_MASK (INTRP_PHASE_SCALE-1)
 #define SAMPLE_PREVIEW_WITDH 194
-#define SAMPLE_PREVIEW_HEIGHT 38
+#define SAMPLE_PREVIEW_HEIGHT 37
+#define SAMPLE_PREVIEW_WAVESCALE (SAMPLE_PREVIEW_HEIGHT/2)
+#define SAMPLE_PREVIEW_X 123
+#define SAMPLE_PREVIEW_Y 58
+#define SAMPLE_PREVIEW_Y_CENTER (SAMPLE_PREVIEW_Y + SAMPLE_PREVIEW_WAVESCALE)
 #define MAX_INPUT_DEVICES 99
 #define VISIBLE_LIST_ENTRIES 4
 #define SAMPLING_BUFFER_SIZE 1024 /* may change on audio input init */
@@ -482,9 +486,10 @@ static uint8_t getDispBuffPeak(const int16_t *smpData, int32_t smpNum)
 			max = smpAbs;
 	}
 
-	max = ((max * SAMPLE_PREVIEW_HEIGHT) + 32768) >> 16;
-	if (max > (SAMPLE_PREVIEW_HEIGHT/2)-1)
-		max = (SAMPLE_PREVIEW_HEIGHT/2)-1;
+	max = ((max * SAMPLE_PREVIEW_WAVESCALE) + (1 << (15-1))) >> 15; // rounded
+
+	if (max > SAMPLE_PREVIEW_WAVESCALE) // just in case
+		max = SAMPLE_PREVIEW_WAVESCALE;
 
 	return (uint8_t)max;
 }
@@ -501,7 +506,7 @@ void writeSampleMonitorWaveform(void) // called every frame
 	}
 
 	// clear waveform background
-	fillRect(123, 58, SAMPLE_PREVIEW_WITDH, SAMPLE_PREVIEW_HEIGHT, video.palette[PAL_BACKGRD]);
+	fillRect(SAMPLE_PREVIEW_X, SAMPLE_PREVIEW_Y, SAMPLE_PREVIEW_WITDH, SAMPLE_PREVIEW_HEIGHT, video.palette[PAL_BACKGRD]);
 
 	if (!audioDevOpen)
 	{
@@ -509,7 +514,7 @@ void writeSampleMonitorWaveform(void) // called every frame
 		return;
 	}
 
-	uint32_t *centerPtr = &video.frameBuffer[(76 * SCREEN_W) + 123];
+	uint32_t *centerPtr = &video.frameBuffer[(SAMPLE_PREVIEW_Y_CENTER * SCREEN_W) + SAMPLE_PREVIEW_X];
 
 	// hardcoded for a buffer size of 512
 	displayingBuffer = true;
@@ -525,7 +530,7 @@ void writeSampleMonitorWaveform(void) // called every frame
 		if (smpAbs == 0)
 			centerPtr[x] = video.palette[PAL_QADSCP];
 		else
-			vLine(x + 123, 76 - smpAbs, (smpAbs * 2) + 1, video.palette[PAL_QADSCP]);
+			vLine(x + SAMPLE_PREVIEW_X, SAMPLE_PREVIEW_Y_CENTER - smpAbs, (smpAbs * 2) + 1, video.palette[PAL_QADSCP]);
 	}
 	displayingBuffer = false;
 }
