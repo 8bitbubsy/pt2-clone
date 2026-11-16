@@ -30,3 +30,5 @@ pt_pal_editor/vs2019_project/pt_pal_editor/x64/*
 *.iobj
 *.enc
 
+# Generated macOS application bundle
+/ProTracker.app/
