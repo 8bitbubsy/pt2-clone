@@ -22,6 +22,7 @@ void resetSong(void);
 void incPatt(void);
 void decPatt(void);
 void updateNewPos(void); // for after having edited the "POS" digits only
+void resetPlaybackTimeCounter(void);
 void modSetPos(int16_t pos, int16_t row);
 void modStop(void);
 void doStopIt(bool resetPlayMode);

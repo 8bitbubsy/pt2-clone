@@ -175,9 +175,10 @@ typedef struct editor_t
 	uint16_t effectMacros[10], currPlayNote, vol1, vol2, lpCutOff, hpCutOff;
 	int32_t smpRedoLoopStarts[MOD_SAMPLES], smpRedoLoopLengths[MOD_SAMPLES], smpRedoLengths[MOD_SAMPLES];
 	int32_t oldTempo, markStartOfs, markEndOfs, samplePos, chordLength;
-	double dPlaybackSeconds;
-
 	uint32_t framesPassed;
+
+	volatile uint32_t playbackSeconds;
+	volatile uint64_t playbackSecondsFrac56fp;
 
 	note_t trackBuffer[MOD_ROWS], cmdsBuffer[MOD_ROWS], blockBuffer[MOD_ROWS];
 	note_t patternBuffer[MOD_ROWS * PAULA_VOICES], undoBuffer[MOD_ROWS * PAULA_VOICES];

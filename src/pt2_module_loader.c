@@ -249,7 +249,8 @@ void setupLoadedMod(void)
 	editor.editMoveAdd = 1;
 	editor.currSample = 0;
 
-	editor.dPlaybackSeconds = 0.0;
+	resetPlaybackTimeCounter();
+
 	editor.modLoaded = true;
 	editor.blockMarkFlag = false;
 	editor.sampleZero = false;

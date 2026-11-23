@@ -553,8 +553,8 @@ void updateSongInfo2(void) // two middle rows of screen, always present
 		}
 	}
 
-	// playback timer
-	uint32_t seconds = (int32_t)editor.dPlaybackSeconds;
+	// song playback time counter
+	volatile uint32_t seconds = editor.playbackSeconds;
 	const uint32_t MI_TimeM = seconds / 60;
 	const uint32_t MI_TimeS = seconds - (MI_TimeM * 60);
 	printTwoDecimalsBg(272, 102, MI_TimeM, video.palette[PAL_GENTXT], video.palette[PAL_GENBKG]);
