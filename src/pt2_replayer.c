@@ -1242,8 +1242,8 @@ static void nextPosition(void)
 
 void resetPlaybackTimeCounter(void)
 {
-	editor.playbackSeconds = 0;
 	editor.playbackSecondsFrac56fp = 0;
+	editor.playbackSeconds = 0;
 }
 
 // (the time is not ticking in "play pattern" mode)
