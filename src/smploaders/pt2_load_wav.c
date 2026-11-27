@@ -41,8 +41,8 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 	{
 		uint32_t chunkID, chunkSize;
 
-		fread(&chunkID, 4, 1, f); if (feof(f)) break;
-		fread(&chunkSize, 4, 1, f); if (feof(f)) break;
+		fread(&chunkID, 4, 1, f); chunkID = LE32(chunkID); if (feof(f)) break;
+		fread(&chunkSize, 4, 1, f); chunkSize = LE32(chunkSize); if (feof(f)) break;
 
 		uint32_t endOfChunk = (ftell(f) + chunkSize) + (chunkSize & 1);
 		switch (chunkID)
@@ -65,14 +65,14 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			{
 				if (chunkSize >= 4)
 				{
-					fread(&chunkID, 4, 1, f);
+					fread(&chunkID, 4, 1, f); chunkID = LE32(chunkID);
 					if (chunkID == 0x4F464E49) // "INFO"
 					{
 						bytesRead = 0;
 						while (!feof(f) && bytesRead < chunkSize)
 						{
-							fread(&chunkID, 4, 1, f);
-							fread(&chunkSize, 4, 1, f);
+							fread(&chunkID, 4, 1, f); chunkID = LE32(chunkID);
+							fread(&chunkSize, 4, 1, f); chunkSize = LE32(chunkSize);
 
 							switch (chunkID)
 							{
@@ -123,18 +123,18 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 
 	// ---- READ "fmt " CHUNK ----
 	fseek(f, fmtPtr, SEEK_SET);
-	fread(&audioFormat, 2, 1, f);
-	fread(&numChannels, 2, 1, f);
-	fread(&sampleRate,  4, 1, f);
+	fread(&audioFormat, 2, 1, f); audioFormat = LE16(audioFormat);
+	fread(&numChannels, 2, 1, f); numChannels = LE16(numChannels);
+	fread(&sampleRate, 4, 1, f); sampleRate = LE32(sampleRate);
 	fseek(f, 6, SEEK_CUR);
-	fread(&bitsPerSample, 2, 1, f);
+	fread(&bitsPerSample, 2, 1, f); bitsPerSample = LE16(bitsPerSample);
 
 	int32_t sampleLength = dataLen;
 
 	if (audioFormat == WAV_FORMAT_EXTENSIBLE)
 	{
 		fseek(f, 8, SEEK_CUR);
-		fread(&audioFormat, 2, 1, f);
+		fread(&audioFormat, 2, 1, f); audioFormat = LE16(audioFormat);
 	}
 	// ---------------------------
 
@@ -248,6 +248,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			displayErrorMsg("I/O ERROR !");
 			return false;
 		}
+		le16Array(audioDataS16, sampleLength); // little-endian file data
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
@@ -310,6 +311,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			fread(&audioDataU8[1], 3, 1, f);
 			audioDataU8 += sizeof (int32_t);
 		}
+		le32Array(audioDataS32, sampleLength); // bytes 0,b0,b1,b2 as a little-endian word: sample << 8
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
@@ -374,6 +376,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			displayErrorMsg("I/O ERROR !");
 			return false;
 		}
+		le32Array(audioDataS32, sampleLength);
 
 		// convert from stereo to mono (if needed)
 		if (numChannels == 2)
@@ -438,6 +441,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			displayErrorMsg("I/O ERROR !");
 			return false;
 		}
+		le32Array(audioDataU32, sampleLength);
 
 		float *fAudioDataFloat = (float *)audioDataU32;
 
@@ -494,6 +498,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			displayErrorMsg("I/O ERROR !");
 			return false;
 		}
+		le64Array(audioDataU32, sampleLength);
 
 		double *dAudioDataDouble = (double *)audioDataU32;
 
@@ -553,10 +558,10 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 
 		fseek(f, smplPtr + 28, SEEK_SET); // seek to first wanted byte
 
-		fread(&loopFlags, 4, 1, f);
+		fread(&loopFlags, 4, 1, f); loopFlags = LE32(loopFlags);
 		fseek(f, 12, SEEK_CUR);
-		fread(&loopStart, 4, 1, f);
-		fread(&loopEnd, 4, 1, f);
+		fread(&loopStart, 4, 1, f); loopStart = LE32(loopStart);
+		fread(&loopEnd, 4, 1, f); loopEnd = LE32(loopEnd);
 		loopEnd++;
 
 		if (loopFlags) // loop enabled?
@@ -594,7 +599,7 @@ bool loadWAVSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 
 		// volume (0..256)
 		fseek(f, 2, SEEK_CUR);
-		fread(&tempVol, 2, 1, f);
+		fread(&tempVol, 2, 1, f); tempVol = LE16(tempVol);
 		if (tempVol > 256)
 			tempVol = 256;
 

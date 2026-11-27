@@ -10,6 +10,7 @@
 #include "pt2_header.h"
 #include "pt2_hpc.h"
 #include "pt2_paula.h"
+#include "pt2_helpers.h"
 
 // for .WAV sample loading/saving
 typedef struct wavHeader_t
@@ -41,6 +42,17 @@ typedef struct mptExtraChunk_t
 	uint16_t defaultPan, defaultVolume, globalVolume, reserved;
 	uint8_t vibratoType, vibratoSweep, vibratoDepth, vibratoRate;
 } mptExtraChunk_t;
+
+// host <-> little-endian (the same operation both ways), before fwrite
+#define WAVHEADER_LE(h) do { \
+	(h).chunkID = LE32((h).chunkID); (h).chunkSize = LE32((h).chunkSize); (h).format = LE32((h).format); \
+	(h).subchunk1ID = LE32((h).subchunk1ID); (h).subchunk1Size = LE32((h).subchunk1Size); \
+	(h).audioFormat = LE16((h).audioFormat); (h).numChannels = LE16((h).numChannels); \
+	(h).sampleRate = LE32((h).sampleRate); (h).byteRate = LE32((h).byteRate); \
+	(h).blockAlign = LE16((h).blockAlign); (h).bitsPerSample = LE16((h).bitsPerSample); \
+	(h).subchunk2ID = LE32((h).subchunk2ID); (h).subchunk2Size = LE32((h).subchunk2Size); } while (0)
+#define SAMPLERCHUNK_LE(c) le32Array(&(c), sizeof (samplerChunk_t) / 4)
+#define MPTEXTRACHUNK_LE(c) do { le32Array(&(c), 3); le16Array(&(c).defaultPan, 4); } while (0)
 // -----------------------------------------
 
 typedef struct note_t

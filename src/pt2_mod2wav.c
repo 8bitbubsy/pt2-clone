@@ -254,7 +254,10 @@ static int32_t mod2WavThreadFunc(void *ptr)
 
 		// write buffer to disk
 		if (samplesInChunk > 0)
+		{
+			le16Array(mod2WavBuffer, samplesInChunk * 2); // WAV is little-endian
 			fwrite(mod2WavBuffer, sizeof (int16_t), samplesInChunk * 2, f);
+		}
 	}
 
 	ui.updateMod2WavDialog = true;
@@ -283,6 +286,7 @@ static int32_t mod2WavThreadFunc(void *ptr)
 	wavHeader.subchunk2Size = sampleCounter * sizeof (int16_t) * 2;
 
 	// write main header
+	WAVHEADER_LE(wavHeader);
 	fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
 	fclose(f);
 
@@ -308,6 +312,7 @@ static int32_t mod2WavThreadFunc(void *ptr)
 				samplesTodo = samplesLeft;
 
 			fread(fadeOutBuffer, sizeof (int16_t), samplesTodo * 2, f);
+			le16Array(fadeOutBuffer, samplesTodo * 2);
 			fseek(f, 0 - (samplesTodo * sizeof (int16_t) * 2), SEEK_CUR);
 
 			// apply fadeout
@@ -318,6 +323,7 @@ static int32_t mod2WavThreadFunc(void *ptr)
 				dFadeOutVal -= dFadeOutDelta;
 			}
 
+			le16Array(fadeOutBuffer, samplesTodo * 2);
 			fwrite(fadeOutBuffer, sizeof (int16_t), samplesTodo * 2, f);
 
 			samplesLeft -= samplesTodo;

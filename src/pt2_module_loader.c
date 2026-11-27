@@ -54,6 +54,7 @@ module_t *modLoad(UNICHAR *fileName)
 
 	// check if mod is a powerpacker mod
 	fread(&powerPackerID, 4, 1, f);
+	powerPackerID = LE32(powerPackerID);
 	if (powerPackerID == 0x30325850) // "PX20"
 	{
 		displayErrorMsg("ENCRYPTED MOD !");

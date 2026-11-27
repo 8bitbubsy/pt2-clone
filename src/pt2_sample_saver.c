@@ -188,6 +188,7 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 			mptExtraChunk.defaultVolume = s->volume * 4; // 0..256
 			mptExtraChunk.globalVolume = 64; // 0..64
 
+			WAVHEADER_LE(wavHeader);
 			fwrite(&wavHeader, sizeof (wavHeader_t), 1, f);
 
 			for (uint32_t i = 0; i < sampleLength; i++)
@@ -197,8 +198,12 @@ bool saveSample(bool checkIfFileExist, bool giveNewFreeFilename)
 				fputc(0, f); // pad byte needed for 8-bit samples
 
 			if (loopStart+loopLength > 2) // loop enabled?
+			{
+				SAMPLERCHUNK_LE(samplerChunk);
 				fwrite(&samplerChunk, sizeof (samplerChunk), 1, f);
+			}
 
+			MPTEXTRACHUNK_LE(mptExtraChunk);
 			fwrite(&mptExtraChunk, sizeof (mptExtraChunk), 1, f);
 		}
 		break;

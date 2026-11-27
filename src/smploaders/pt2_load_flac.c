@@ -93,15 +93,15 @@ bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 		{
 			const uint8_t *data = bufferPtr + 4;
 
-			uint32_t chunkID  = *(uint32_t *)data; data += 4;
-			uint32_t chunkLen = *(uint32_t *)data; data += 4;
+			uint32_t chunkID  = LE32(*(uint32_t *)data); data += 4;
+			uint32_t chunkLen = LE32(*(uint32_t *)data); data += 4;
 
 			if (chunkID == 0x61727478 && chunkLen >= 8) // "xtra"
 			{
 				data += 6;
 
 				// volume (0..256)
-				uint16_t tmpVol = *(uint16_t *)data;
+				uint16_t tmpVol = LE16(*(uint16_t *)data);
 				if (tmpVol > 256)
 					tmpVol = 256;
 
@@ -112,13 +112,13 @@ bool loadFLACSample(FILE *f, uint32_t filesize, moduleSample_t *s)
 			{
 				data += 28; // seek to first wanted byte
 
-				uint32_t numLoops = *(uint32_t *)data; data += 4;
+				uint32_t numLoops = LE32(*(uint32_t *)data); data += 4;
 				if (numLoops == 1)
 				{
 					data += 4+4+4; // skip "samplerData", "identifier" and "loopType"
 
-					         loopStart = *(uint32_t *)data; data += 4;
-					uint32_t loopEnd   = *(uint32_t *)data; data += 4;
+					         loopStart = LE32(*(uint32_t *)data); data += 4;
+					uint32_t loopEnd   = LE32(*(uint32_t *)data); data += 4;
 
 					loopLength = (loopEnd+1) - loopStart;
 				}

@@ -78,6 +78,7 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 	{
 		uint32_t ID;
 		fread(&ID, 4, 1, f);
+		ID = LE32(ID);
 
 		if (ID == 0x43614C66) // "fLaC" (XXX: weak detection)
 		{
@@ -87,6 +88,7 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 		{
 			fseek(f, 4, SEEK_CUR);
 			fread(&ID, 4, 1, f);
+			ID = LE32(ID);
 
 			if (ID == 0x45564157) // "WAVE"
 				sampleType = SAMPLETYPE_WAV;
@@ -95,6 +97,7 @@ bool loadSample(UNICHAR *fileName, char *entryName)
 		{
 			fseek(f, 4, SEEK_CUR);
 			fread(&ID, 4, 1, f);
+			ID = LE32(ID);
 
 			// check if it's an Amiga IFF sample
 			if (ID == 0x58565338 || ID == 0x56533631) // "8SVX" (normal) and "16SV" (FT2 sample)
