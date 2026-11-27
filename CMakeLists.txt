@@ -3,7 +3,9 @@ cmake_minimum_required(VERSION 3.7)
 project(pt2-clone)
 
 find_package(SDL2 REQUIRED)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${pt2-clone_SOURCE_DIR}/release/other/")
+if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${pt2-clone_SOURCE_DIR}/release/other/")
+endif()
 
 if((CMAKE_CXX_COMPILER_ID MATCHES "Clang") OR (CMAKE_CXX_COMPILER_ID MATCHES "GNU"))
 	add_compile_options(-O3)
